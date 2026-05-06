@@ -144,6 +144,39 @@
       border: 1.5px solid var(--border);
       color: var(--white);
     }
+    .video-section {
+      padding: 14px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #111;
+    }
+    .video-wrapper {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1.5px solid var(--border);
+      box-shadow: 0 0 24px rgba(249,115,22,0.15), 0 8px 32px rgba(0,0,0,0.6);
+      background: #000;
+      margin-top: 8px;
+    }
+    .promo-video {
+      width: 100%;
+      display: block;
+      max-height: 420px;
+      object-fit: cover;
+    }
+    .video-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--orange);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 50px;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+    }
     .links {
       padding: 14px 20px 10px;
       border-bottom: 1px solid var(--border);
@@ -232,6 +265,22 @@
       <a href="tel:0722998998" class="btn btn-dark">☎️ 072-299-8998</a>
     </div>
     <a href="https://myb.bio/Projects/1098/meircohen.vcf" class="btn btn-dark">👤 שמור איש קשר</a>
+  </div>
+
+  <!-- Video Section -->
+  <div class="video-section">
+    <div class="sec-title">סרטון היכרות</div>
+    <div class="video-wrapper">
+      <video
+        src="meir_card.mp4"
+        controls
+        playsinline
+        preload="metadata"
+        poster=""
+        class="promo-video"
+      ></video>
+      <div class="video-badge">▶ הכר אותי</div>
+    </div>
   </div>
 
   <div class="links">
