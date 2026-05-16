@@ -5,373 +5,962 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>מאיר כהן | יהב ביטוח ופיננסים</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;800;900&family=Heebo:wght@300;400;500;600;700;800;900&family=Suez+One&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --black:       #0d0d0d;
-      --dark:        #141414;
-      --dark2:       #1c1c1c;
-      --orange:      #f97316;
-      --orange2:     #fb923c;
-      --orange-glow: rgba(249,115,22,0.15);
-      --border:      rgba(249,115,22,0.25);
-      --muted:       #8a8a8a;
-      --white:       #ffffff;
+      --cream:        #f1e3c4;
+      --cream-2:      #ead7b0;
+      --paper:        #f6ecd2;
+      --ink:          #2a1a10;
+      --ink-soft:     #4a3322;
+      --rust:         #c14a1d;
+      --rust-deep:    #9c3814;
+      --mustard:      #e6a92b;
+      --mustard-deep: #c98a17;
+      --olive:        #6b6a2e;
+      --teal:         #2f5d62;
+      --red-brick:    #b13e2b;
+      --shadow:       rgba(42,26,16,0.25);
     }
-    * { margin:0; padding:0; box-sizing:border-box; }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { background: var(--cream); }
+
     body {
       font-family: 'Heebo', sans-serif;
-      background: #0a0a0a;
-      color: var(--white);
+      color: var(--ink);
       min-height: 100vh;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding: 16px 16px 32px;
+      background:
+        radial-gradient(ellipse at top, #f7e9c8 0%, transparent 60%),
+        repeating-linear-gradient(0deg, transparent 0 3px, rgba(42,26,16,0.025) 3px 4px),
+        var(--cream);
+      padding: 0;
     }
-    .card {
+
+    /* ============ shared layout ============ */
+    .page {
       width: 100%;
-      max-width: 420px;
-      background: var(--dark);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      overflow: hidden;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(249,115,22,0.08);
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
     }
-    .band {
-      height: 5px;
-      background: linear-gradient(90deg, #0d0d0d 0%, var(--orange) 40%, var(--orange2) 60%, var(--orange) 80%, #0d0d0d 100%);
-    }
-    .hero {
-      padding: 22px 22px 18px;
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(135deg, #1a1a1a 0%, #111 100%);
-    }
-    .avatar {
-      width: 78px; height: 78px;
-      border-radius: 50%;
-      border: 2.5px solid var(--orange);
-      overflow: hidden;
-      flex-shrink: 0;
-      box-shadow: 0 0 0 5px var(--orange-glow), 0 4px 20px rgba(249,115,22,0.2);
-    }
-    .avatar img {
-      width: 100%; height: 100%;
-      object-fit: cover;
-      object-position: center top;
-    }
-    .brand {
-      font-size: 10px; font-weight: 700;
-      color: var(--orange); letter-spacing: 1.2px;
-      text-transform: uppercase; margin-bottom: 3px;
-    }
-    .name { font-size: 22px; font-weight: 800; line-height: 1.2; margin-bottom: 3px; }
-    .title { font-size: 12px; color: var(--muted); font-weight: 500; }
-    .tagline {
-      padding: 13px 22px;
-      font-size: 13.5px; color: #bbb;
-      line-height: 1.6;
-      border-bottom: 1px solid var(--border);
-      background: #131313;
-    }
-    .tagline strong { color: var(--white); font-weight: 700; }
-    .stats {
-      display: flex;
-      border-bottom: 1px solid var(--border);
-      background: #111;
-    }
-    .stat {
-      flex: 1; padding: 12px 8px;
-      text-align: center;
-      border-left: 1px solid var(--border);
-    }
-    .stat:last-child { border-left: none; }
-    .stat-num { font-size: 19px; font-weight: 800; color: var(--orange); line-height: 1; }
-    .stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; font-weight: 500; }
-    .services {
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
-      background: #141414;
-    }
-    .sec-title {
-      font-size: 10px; font-weight: 700; color: var(--orange);
-      letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 9px;
-    }
-    .chips { display: flex; flex-wrap: wrap; gap: 7px; }
-    .chip {
-      background: var(--orange-glow);
-      border: 1px solid var(--border);
-      border-radius: 50px;
-      padding: 5px 12px;
-      font-size: 12px; font-weight: 600;
-      color: #e0e0e0;
-    }
-    .actions {
-      padding: 15px 20px;
-      display: flex; flex-direction: column; gap: 9px;
-      border-bottom: 1px solid var(--border);
-      background: #131313;
-    }
-    .row2 { display: flex; gap: 9px; }
-    .row2 .btn { flex: 1; }
-    .btn {
-      display: flex; align-items: center; justify-content: center;
-      gap: 8px; padding: 12px 16px;
-      border-radius: 12px;
-      font-family: 'Heebo', sans-serif;
-      font-size: 14px; font-weight: 700;
-      text-decoration: none; cursor: pointer;
-      border: none; transition: all 0.2s;
-    }
-    .btn-wa {
-      background: linear-gradient(135deg, #25d366, #128c7e);
-      color: #fff; font-size: 15px;
-      animation: pulse 2.8s infinite;
-    }
-    @keyframes pulse {
-      0%,100% { box-shadow: 0 4px 16px rgba(37,211,102,0.28); }
-      50%      { box-shadow: 0 4px 28px rgba(37,211,102,0.55); }
-    }
-    .btn-orange {
-      background: linear-gradient(135deg, var(--orange), var(--orange2));
-      color: #fff;
-    }
-    .btn-dark {
-      background: var(--dark2);
-      border: 1.5px solid var(--border);
-      color: var(--white);
-    }
-    .video-section {
-      padding: 14px 20px 16px;
-      border-bottom: 1px solid var(--border);
-      background: #111;
-    }
-    .video-wrapper {
+    .section {
+      width: 100%;
+      margin: 0 auto;
+      padding: 56px 32px;
       position: relative;
-      border-radius: 14px;
+    }
+    .section-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    /* ============ retro decorative bits ============ */
+    .top-strip {
+      display: flex;
+      height: 14px;
+      width: 100%;
+    }
+    .top-strip span { flex: 1; }
+    .top-strip span:nth-child(1) { background: var(--rust); }
+    .top-strip span:nth-child(2) { background: var(--mustard); }
+    .top-strip span:nth-child(3) { background: var(--ink); }
+    .top-strip span:nth-child(4) { background: var(--cream-2); }
+    .top-strip span:nth-child(5) { background: var(--teal); }
+    .top-strip span:nth-child(6) { background: var(--red-brick); }
+
+    .dashed-rule {
+      border: none;
+      border-top: 3px dashed var(--ink);
+      opacity: 0.6;
+      margin: 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Heebo', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--rust-deep);
+      margin-bottom: 14px;
+    }
+    .eyebrow::before, .eyebrow::after {
+      content: "";
+      display: inline-block;
+      width: 28px; height: 2px;
+      background: var(--rust-deep);
+    }
+
+    .heading-serif {
+      font-family: 'Suez One', 'Frank Ruhl Libre', serif;
+      font-weight: 400;
+      color: var(--ink);
+      letter-spacing: -0.5px;
+    }
+
+    /* ============ HERO ============ */
+    .hero {
+      background:
+        radial-gradient(circle at 18% 90%, rgba(230,169,43,0.45) 0%, transparent 55%),
+        radial-gradient(circle at 85% 10%, rgba(193,74,29,0.35) 0%, transparent 50%),
+        linear-gradient(180deg, #f3e3bd 0%, #ecd9a8 100%);
+      border-bottom: 4px solid var(--ink);
+      position: relative;
       overflow: hidden;
-      border: 1.5px solid var(--border);
-      box-shadow: 0 0 24px rgba(249,115,22,0.15), 0 8px 32px rgba(0,0,0,0.6);
-      background: #000;
-      margin-top: 8px;
+      padding: 64px 32px 72px;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(135deg, rgba(42,26,16,0.04) 0 2px, transparent 2px 14px);
+      pointer-events: none;
+    }
+    .sun {
+      position: absolute;
+      left: -120px; bottom: -120px;
+      width: 360px; height: 360px;
+      border-radius: 50%;
+      background:
+        repeating-conic-gradient(from 0deg, var(--mustard) 0deg 10deg, transparent 10deg 20deg);
+      opacity: 0.55;
+      filter: blur(0.5px);
+      pointer-events: none;
+    }
+    .hero-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 48px;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-left .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      background: var(--ink);
+      color: var(--cream);
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 2.4px;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+    .hero-left .badge .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--mustard);
+      box-shadow: 0 0 0 3px rgba(230,169,43,0.3);
+    }
+    .hero-title {
+      font-family: 'Suez One', serif;
+      font-size: clamp(48px, 7vw, 92px);
+      line-height: 0.95;
+      color: var(--ink);
+      margin-bottom: 18px;
+      letter-spacing: -1.5px;
+    }
+    .hero-title em {
+      font-style: normal;
+      color: var(--rust);
+      position: relative;
+      display: inline-block;
+    }
+    .hero-title em::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: 4px;
+      height: 10px;
+      background: var(--mustard);
+      opacity: 0.55;
+      z-index: -1;
+      border-radius: 4px;
+    }
+    .hero-sub {
+      font-family: 'Frank Ruhl Libre', serif;
+      font-size: clamp(18px, 2vw, 24px);
+      color: var(--ink-soft);
+      line-height: 1.5;
+      margin-bottom: 32px;
+      max-width: 520px;
+    }
+    .hero-cta {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .hero-right {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    .portrait-frame {
+      position: relative;
+      width: min(420px, 90%);
+      aspect-ratio: 1 / 1;
+      background: var(--paper);
+      border: 4px solid var(--ink);
+      box-shadow:
+        14px 14px 0 var(--rust),
+        14px 14px 0 4px var(--ink);
+      transform: rotate(-3deg);
+      padding: 18px 18px 70px;
+      transition: transform 0.4s ease;
+    }
+    .portrait-frame:hover { transform: rotate(0deg); }
+    .portrait-frame img {
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: center top;
+      display: block;
+      filter: sepia(0.18) saturate(1.05) contrast(1.05);
+    }
+    .portrait-stamp {
+      position: absolute;
+      bottom: 14px; left: 18px; right: 18px;
+      text-align: center;
+      font-family: 'Suez One', serif;
+      font-size: 13px;
+      letter-spacing: 4px;
+      color: var(--ink);
+      text-transform: uppercase;
+    }
+    .portrait-stamp small {
+      display: block;
+      font-family: 'Heebo', sans-serif;
+      font-weight: 700;
+      font-size: 9px;
+      color: var(--rust-deep);
+      letter-spacing: 3px;
+      margin-top: 2px;
+    }
+    .corner-badge {
+      position: absolute;
+      top: -34px; right: -34px;
+      width: 130px; height: 130px;
+      background: var(--mustard);
+      border: 3px solid var(--ink);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      transform: rotate(12deg);
+      font-family: 'Suez One', serif;
+      color: var(--ink);
+      text-align: center;
+      line-height: 1;
+      box-shadow: 6px 6px 0 var(--ink);
+      z-index: 2;
+    }
+    .corner-badge .big { font-size: 36px; }
+    .corner-badge .small { font-size: 10px; letter-spacing: 2px; margin-top: 4px; font-family: 'Heebo'; font-weight: 800; }
+
+    /* ============ Buttons (retro) ============ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 24px;
+      font-family: 'Heebo', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      text-decoration: none;
+      border: 3px solid var(--ink);
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 5px 5px 0 var(--ink);
+      letter-spacing: 0.5px;
+    }
+    .btn:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--ink); }
+    .btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+
+    .btn-wa     { background: #25d366; color: var(--ink); }
+    .btn-rust   { background: var(--rust); color: var(--cream); }
+    .btn-mustard{ background: var(--mustard); color: var(--ink); }
+    .btn-ink    { background: var(--ink); color: var(--cream); }
+    .btn-paper  { background: var(--paper); color: var(--ink); }
+
+    /* ============ TAGLINE STRIP ============ */
+    .tagline-strip {
+      background: var(--ink);
+      color: var(--cream);
+      padding: 22px 32px;
+      overflow: hidden;
+      border-top: 4px solid var(--ink);
+      border-bottom: 4px solid var(--ink);
+    }
+    .marquee {
+      display: flex;
+      gap: 60px;
+      align-items: center;
+      white-space: nowrap;
+      animation: scroll-x 32s linear infinite;
+      font-family: 'Suez One', serif;
+      font-size: 28px;
+      letter-spacing: 1px;
+    }
+    .marquee span { display: inline-flex; align-items: center; gap: 60px; }
+    .marquee .star { color: var(--mustard); font-size: 24px; }
+    @keyframes scroll-x {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    /* ============ STATS ============ */
+    .stats-section {
+      background: var(--paper);
+      border-bottom: 4px solid var(--ink);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    .stat-card {
+      padding: 48px 24px;
+      text-align: center;
+      border-left: 3px dashed var(--ink);
+      position: relative;
+    }
+    .stat-card:first-child { border-left: none; }
+    .stat-num {
+      font-family: 'Suez One', serif;
+      font-size: clamp(56px, 7vw, 88px);
+      color: var(--rust);
+      line-height: 1;
+      letter-spacing: -2px;
+    }
+    .stat-label {
+      font-family: 'Heebo', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-top: 12px;
+    }
+
+    /* ============ SERVICES / cards ============ */
+    .services-section {
+      background:
+        radial-gradient(circle at 90% 20%, rgba(193,74,29,0.12) 0%, transparent 40%),
+        var(--cream);
+    }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+    .section-head h2 {
+      font-family: 'Suez One', serif;
+      font-size: clamp(36px, 5vw, 56px);
+      line-height: 1;
+      color: var(--ink);
+      letter-spacing: -1px;
+    }
+    .section-head p {
+      font-family: 'Frank Ruhl Libre', serif;
+      max-width: 460px;
+      color: var(--ink-soft);
+      font-size: 17px;
+      line-height: 1.6;
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+    }
+    .service-card {
+      background: var(--paper);
+      border: 3px solid var(--ink);
+      border-radius: 16px;
+      padding: 28px 24px;
+      box-shadow: 6px 6px 0 var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .service-card:hover { transform: translate(-3px, -3px); box-shadow: 9px 9px 0 var(--ink); }
+    .service-icon {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: var(--mustard);
+      border: 3px solid var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 28px;
+    }
+    .service-card.alt-1 .service-icon { background: var(--rust); }
+    .service-card.alt-2 .service-icon { background: var(--teal); }
+    .service-card.alt-3 .service-icon { background: var(--red-brick); }
+    .service-card.alt-4 .service-icon { background: var(--olive); color: var(--cream); }
+    .service-card.alt-5 .service-icon { background: var(--ink); color: var(--mustard); }
+    .service-name {
+      font-family: 'Suez One', serif;
+      font-size: 22px;
+      line-height: 1.1;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .service-desc {
+      font-family: 'Heebo', sans-serif;
+      font-size: 13px;
+      color: var(--ink-soft);
+      font-weight: 500;
+    }
+
+    /* ============ VIDEO SECTION ============ */
+    .video-section {
+      background:
+        repeating-linear-gradient(90deg, transparent 0 80px, rgba(42,26,16,0.05) 80px 82px),
+        var(--cream-2);
+      border-top: 4px solid var(--ink);
+      border-bottom: 4px solid var(--ink);
+    }
+    .video-frame {
+      position: relative;
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--ink);
+      border: 4px solid var(--ink);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 12px 12px 0 var(--rust), 12px 12px 0 4px var(--ink);
     }
     .promo-video {
       width: 100%;
       display: block;
-      height: auto;
+      max-height: 75vh;
+      background: var(--ink);
     }
-    .video-badge {
+    .video-stamp {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      background: var(--orange);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
+      top: 18px; right: 18px;
+      background: var(--mustard);
+      color: var(--ink);
+      border: 2.5px solid var(--ink);
+      padding: 8px 16px;
       border-radius: 50px;
-      letter-spacing: 0.5px;
+      font-family: 'Heebo', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
       pointer-events: none;
+      transform: rotate(-4deg);
     }
-    .links {
-      padding: 14px 20px 10px;
-      border-bottom: 1px solid var(--border);
-      background: #141414;
+
+    /* ============ LINKS / DESTINATIONS ============ */
+    .links-section {
+      background: var(--paper);
     }
-    .link-grid {
+    .links-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
     }
-    .link-item {
-      display: flex; align-items: center; gap: 9px;
-      padding: 11px 12px;
-      background: #1a1a1a;
-      border: 1px solid var(--border);
-      border-radius: 12px;
+    .link-card {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 28px;
+      background: var(--cream);
+      border: 3px solid var(--ink);
+      border-radius: 18px;
       text-decoration: none;
-      color: var(--white);
-      transition: all 0.18s;
+      color: var(--ink);
+      box-shadow: 6px 6px 0 var(--ink);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      min-height: 200px;
+      position: relative;
+      overflow: hidden;
     }
-    .link-item:hover { background: var(--orange-glow); border-color: rgba(249,115,22,0.5); }
-    .link-icon {
-      width: 32px; height: 32px; flex-shrink: 0;
-      border-radius: 8px; overflow: hidden;
+    .link-card:hover { transform: translate(-3px, -3px); box-shadow: 9px 9px 0 var(--ink); }
+    .link-card .swatch {
+      width: 64px; height: 64px;
+      border-radius: 14px;
+      border: 3px solid var(--ink);
       display: flex; align-items: center; justify-content: center;
+      box-shadow: 4px 4px 0 var(--ink);
     }
-    .link-icon svg { width: 32px; height: 32px; display: block; }
-    .link-icon img { width: 32px; height: 32px; object-fit: contain; }
-    .link-label { font-size: 9.5px; color: var(--muted); font-weight: 500; }
-    .link-name  { font-size: 12px; font-weight: 700; }
-    .link-item.full { grid-column: span 2; }
+    .link-card .swatch svg { width: 36px; height: 36px; display: block; }
+    .link-card .meta {
+      font-family: 'Heebo', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2.4px;
+      text-transform: uppercase;
+      color: var(--rust-deep);
+    }
+    .link-card .title {
+      font-family: 'Suez One', serif;
+      font-size: 22px;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+    .link-card .arrow {
+      margin-top: auto;
+      font-family: 'Heebo', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      color: var(--rust);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 1px;
+    }
+    .link-card.feature {
+      grid-column: span 2;
+      background: var(--ink);
+      color: var(--cream);
+    }
+    .link-card.feature .title { color: var(--cream); }
+    .link-card.feature .meta  { color: var(--mustard); }
+    .link-card.feature .arrow { color: var(--mustard); }
+
+    /* ============ CONTACT BAND ============ */
+    .contact-section {
+      background:
+        radial-gradient(circle at 20% 80%, rgba(230,169,43,0.4) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(193,74,29,0.35) 0%, transparent 50%),
+        var(--ink);
+      color: var(--cream);
+      border-top: 4px solid var(--ink);
+      border-bottom: 4px solid var(--ink);
+    }
+    .contact-section .section-head h2 { color: var(--cream); }
+    .contact-section .section-head p { color: var(--cream-2); }
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr;
+      gap: 22px;
+    }
+    .contact-card {
+      background: var(--paper);
+      border: 3px solid var(--cream);
+      border-radius: 18px;
+      padding: 28px;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 6px 6px 0 var(--rust);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      text-decoration: none;
+    }
+    .contact-card:hover { transform: translate(-3px, -3px); box-shadow: 9px 9px 0 var(--rust); }
+    .contact-card .label {
+      font-family: 'Heebo', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2.4px;
+      text-transform: uppercase;
+      color: var(--rust-deep);
+    }
+    .contact-card .value {
+      font-family: 'Suez One', serif;
+      font-size: clamp(22px, 2.5vw, 32px);
+      color: var(--ink);
+      line-height: 1.1;
+    }
+    .contact-card.primary {
+      background: #25d366;
+      border-color: var(--ink);
+      box-shadow: 6px 6px 0 var(--ink);
+    }
+    .contact-card.primary .label { color: var(--ink); }
+
+    /* ============ FOOTER ============ */
     .footer {
-      padding: 12px 20px 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      background: #111;
+      background: var(--cream);
+      padding: 40px 32px;
     }
-    .footer-brand strong { color: var(--orange); font-weight: 800; font-size: 13px; display:block; }
-    .footer-brand span { color: var(--muted); font-size: 11px; }
-    .footer-addr { font-size: 11px; color: var(--muted); text-align: left; }
+    .footer-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .footer-mark {
+      font-family: 'Suez One', serif;
+      font-size: 22px;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .footer-mark .seal {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: var(--rust);
+      color: var(--cream);
+      display: flex; align-items: center; justify-content: center;
+      border: 3px solid var(--ink);
+      font-family: 'Suez One', serif;
+      font-size: 18px;
+    }
+    .footer-meta {
+      font-family: 'Heebo', sans-serif;
+      font-size: 13px;
+      color: var(--ink-soft);
+      text-align: left;
+      font-weight: 600;
+    }
+    .footer-meta strong { color: var(--ink); display: block; font-size: 14px; }
+
+    /* ============ Responsive ============ */
+    @media (max-width: 920px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 40px; text-align: center; }
+      .hero-cta { justify-content: center; }
+      .hero-sub { margin-left: auto; margin-right: auto; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .stat-card { border-left: none; border-top: 3px dashed var(--ink); }
+      .stat-card:first-child { border-top: none; }
+      .services-grid { grid-template-columns: repeat(2, 1fr); }
+      .links-grid { grid-template-columns: repeat(2, 1fr); }
+      .link-card.feature { grid-column: span 2; }
+      .contact-grid { grid-template-columns: 1fr; }
+      .section-head { flex-direction: column; align-items: flex-start; }
+      .corner-badge { width: 100px; height: 100px; }
+      .corner-badge .big { font-size: 28px; }
+    }
+    @media (max-width: 560px) {
+      .section { padding: 44px 20px; }
+      .hero { padding: 44px 20px 56px; }
+      .services-grid { grid-template-columns: 1fr; }
+      .links-grid { grid-template-columns: 1fr; }
+      .link-card.feature { grid-column: span 1; }
+      .marquee { font-size: 20px; }
+      .portrait-frame { box-shadow: 8px 8px 0 var(--rust), 8px 8px 0 3px var(--ink); }
+    }
   </style>
 </head>
 <body>
-<div class="card">
-  <div class="band"></div>
 
-  <div class="hero">
-    <div class="avatar">
-      <img src="data:image/jpeg;base64,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" alt="מאיר כהן" />
+<!-- top color strip -->
+<div class="top-strip">
+  <span></span><span></span><span></span><span></span><span></span><span></span>
+</div>
+
+<!-- =============== HERO =============== -->
+<section class="hero">
+  <div class="sun"></div>
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="badge"><span class="dot"></span> EST. 2009 · יהב ביטוח ופיננסים</div>
+      <h1 class="hero-title">מאיר<br/>כהן <em>·</em><br/>הסוכן שלך</h1>
+      <p class="hero-sub">
+        ייעוץ ביטוחי ופיננסי אישי לאנשים, משפחות ועסקים — <br/>
+        <strong>כאן כדי לוודא שמה שבנית — מוגן.</strong>
+      </p>
+      <div class="hero-cta">
+        <a href="https://api.whatsapp.com/send?phone=9720505554446&text=שלום+מאיר,+אשמח+לשיחת+ייעוץ" class="btn btn-wa">💬 WhatsApp מיידי</a>
+        <a href="tel:0505554446" class="btn btn-ink">📞 050-555-4446</a>
+      </div>
     </div>
-    <div class="hero-text">
-      <div class="brand">יהב ביטוח ופיננסים</div>
-      <div class="name">מאיר כהן</div>
-      <div class="title">מנכ"ל ובעלים | סוכן ביטוח פנסיוני וכללי</div>
+
+    <div class="hero-right">
+      <div class="corner-badge">
+        <div class="big">15+</div>
+        <div class="small">שנות ניסיון</div>
+      </div>
+      <div class="portrait-frame">
+        <img src="data:image/jpeg;base64,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" alt="מאיר כהן" />
+        <div class="portrait-stamp">
+          MEIR COHEN
+          <small>· סוכן ביטוח מורשה ·</small>
+        </div>
+      </div>
     </div>
   </div>
+</section>
 
-  <div class="tagline">
-    <strong>כאן כדי לוודא שמה שבנית — מוגן.</strong><br/>
-    ייעוץ ביטוחי ופיננסי אישי ומקצועי לאנשים, משפחות ועסקים.
+<!-- =============== Tagline marquee =============== -->
+<div class="tagline-strip">
+  <div class="marquee">
+    <span>
+      ★ ביטוח חיים ★ בריאות ★ פנסיה ★ סיעוד ★ דירה ורכב ★ ביטוח עסקי ★ השקעות ★ ייעוץ פיננסי ★ ביטוח חיים ★ בריאות ★ פנסיה ★ סיעוד ★ דירה ורכב ★ ביטוח עסקי ★ השקעות ★ ייעוץ פיננסי ★
+    </span>
   </div>
+</div>
 
-  <div class="stats">
-    <div class="stat"><div class="stat-num">15+</div><div class="stat-label">שנות ניסיון</div></div>
-    <div class="stat"><div class="stat-num">1,500+</div><div class="stat-label">לקוחות מרוצים</div></div>
-    <div class="stat"><div class="stat-num">24/7</div><div class="stat-label">זמין לתביעות</div></div>
-  </div>
-
-  <div class="services">
-    <div class="sec-title">תחומי התמחות</div>
-    <div class="chips">
-      <div class="chip">🏥 בריאות</div>
-      <div class="chip">📈 פנסיה וחיסכון</div>
-      <div class="chip">🏠 דירה ורכב</div>
-      <div class="chip">🏢 ביטוח עסקי</div>
-      <div class="chip">💰 השקעות</div>
-      <div class="chip">🧓 סיעוד</div>
+<!-- =============== STATS =============== -->
+<section class="section stats-section">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-num">15+</div>
+      <div class="stat-label">שנות ניסיון</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">1,500+</div>
+      <div class="stat-label">לקוחות מרוצים</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">24/7</div>
+      <div class="stat-label">זמין לתביעות</div>
     </div>
   </div>
+</section>
 
-  <div class="actions">
-    <a href="https://api.whatsapp.com/send?phone=9720505554446&text=שלום+מאיר,+אשמח+לשיחת+ייעוץ" class="btn btn-wa">
-      💬 שלח הודעה ב-WhatsApp
-    </a>
-    <div class="row2">
-      <a href="tel:0505554446" class="btn btn-orange">📞 050-555-4446</a>
-      <a href="tel:0722998998" class="btn btn-dark">☎️ 072-299-8998</a>
+<!-- =============== SERVICES =============== -->
+<section class="section services-section">
+  <div class="section-inner">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">תחומי התמחות</div>
+        <h2 class="heading-serif">המסלול<br/>שיתאים לך.</h2>
+      </div>
+      <p>כל ביטוח הוא תחנה בדרך — אצלי מתכננים את כל המסלול: מהבריאות שלך, דרך החיסכון הפנסיוני, ועד להגנה על העסק והבית.</p>
     </div>
-    <a href="https://myb.bio/Projects/1098/meircohen.vcf" class="btn btn-dark">👤 שמור איש קשר</a>
-  </div>
 
-  <!-- Video Section -->
-  <div class="video-section">
-    <div class="sec-title">סרטון היכרות</div>
-    <div class="video-wrapper">
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-icon">🏥</div>
+        <div>
+          <div class="service-name">בריאות</div>
+          <div class="service-desc">פוליסות פרטיות, ניתוחים, תרופות</div>
+        </div>
+      </div>
+      <div class="service-card alt-1">
+        <div class="service-icon">📈</div>
+        <div>
+          <div class="service-name">פנסיה וחיסכון</div>
+          <div class="service-desc">ניהול קופות, קרנות והשתלמות</div>
+        </div>
+      </div>
+      <div class="service-card alt-2">
+        <div class="service-icon">🚗</div>
+        <div>
+          <div class="service-name">דירה ורכב</div>
+          <div class="service-desc">מקיף, חובה, צד ג׳ ומבנה</div>
+        </div>
+      </div>
+      <div class="service-card alt-3">
+        <div class="service-icon">🏢</div>
+        <div>
+          <div class="service-name">ביטוח עסקי</div>
+          <div class="service-desc">אחריות, רכוש ואובדן רווחים</div>
+        </div>
+      </div>
+      <div class="service-card alt-4">
+        <div class="service-icon">💰</div>
+        <div>
+          <div class="service-name">השקעות</div>
+          <div class="service-desc">תכנון פיננסי וניהול הון</div>
+        </div>
+      </div>
+      <div class="service-card alt-5">
+        <div class="service-icon">🧓</div>
+        <div>
+          <div class="service-name">סיעוד</div>
+          <div class="service-desc">הגנה לטווח ארוך למשפחה</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="dashed-rule" />
+
+<!-- =============== VIDEO =============== -->
+<section class="section video-section">
+  <div class="section-inner">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">סרטון היכרות</div>
+        <h2 class="heading-serif">תכיר אותי —<br/>על הדרך.</h2>
+      </div>
+      <p>סיפור קצר על מי שעומד מאחורי הסוכנות. מה מניע אותי, איך אני עובד, ולמה לקוחות נשארים אצלי שנים.</p>
+    </div>
+
+    <div class="video-frame">
       <video
         src="meir_card.mp4"
         controls
         playsinline
         preload="metadata"
-        poster=""
         class="promo-video"
       ></video>
-      <div class="video-badge">▶ הכר אותי</div>
+      <div class="video-stamp">▶ הכר אותי</div>
     </div>
   </div>
+</section>
 
-  <div class="links">
-    <div class="sec-title" style="margin-bottom:10px;">קישורים</div>
-    <div class="link-grid">
-      <!-- Facebook -->
-      <a href="https://www.facebook.com/yahavins/" class="link-item" target="_blank">
-        <div class="link-icon">
+<!-- =============== LINKS / DESTINATIONS =============== -->
+<section class="section links-section">
+  <div class="section-inner">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">תחנות בדרך</div>
+        <h2 class="heading-serif">איפה תמצא<br/>אותי ברשת.</h2>
+      </div>
+      <p>שש תחנות שיביאו אותך אליי הכי מהר — מהאתר, דרך הרשתות החברתיות, ועד ניווט פיזי למשרד בנתיבות.</p>
+    </div>
+
+    <div class="links-grid">
+      <!-- Feature: YouTube -->
+      <a href="https://youtu.be/n5gzM1gjzI8?si=_XNyNbNbH7k6J181" class="link-card feature" target="_blank">
+        <div class="swatch" style="background:#FF0000;">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#1877F2"/>
+            <path d="M24.8 12.4C24.6 11.6 23.9 11 23.1 10.8C21.6 10.4 16 10.4 16 10.4C16 10.4 10.4 10.4 8.9 10.8C8.1 11 7.4 11.6 7.2 12.4C6.8 13.9 6.8 16 6.8 16C6.8 16 6.8 18.1 7.2 19.6C7.4 20.4 8.1 21 8.9 21.2C10.4 21.6 16 21.6 16 21.6C16 21.6 21.6 21.6 23.1 21.2C23.9 21 24.6 20.4 24.8 19.6C25.2 18.1 25.2 16 25.2 16C25.2 16 25.2 13.9 24.8 12.4Z" fill="white"/>
+            <polygon points="14,13 14,19 20,16" fill="#FF0000"/>
+          </svg>
+        </div>
+        <div class="meta">ריאיון טלוויזיה</div>
+        <div class="title">ראיון בנושא מלחמה וכספים<br/>— YouTube</div>
+        <div class="arrow">צפה בריאיון ←</div>
+      </a>
+
+      <!-- Facebook -->
+      <a href="https://www.facebook.com/yahavins/" class="link-card" target="_blank">
+        <div class="swatch" style="background:#1877F2;">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M22 16C22 12.686 19.314 10 16 10C12.686 10 10 12.686 10 16C10 19.007 12.176 21.494 15.063 21.934V17.766H13.563V16H15.063V14.716C15.063 13.234 15.929 12.438 17.279 12.438C17.926 12.438 18.602 12.554 18.602 12.554V14.008H17.855C17.118 14.008 16.938 14.46 16.938 14.922V16H18.531L18.27 17.766H16.938V21.934C19.824 21.494 22 19.007 22 16Z" fill="white"/>
           </svg>
         </div>
-        <div><div class="link-label">רשת חברתית</div><div class="link-name">Facebook</div></div>
+        <div class="meta">רשת חברתית</div>
+        <div class="title">עמוד הפייסבוק של יהב</div>
+        <div class="arrow">לעמוד ←</div>
       </a>
 
       <!-- Website -->
-      <a href="yahav-site.html" class="link-item">
-        <div class="link-icon">
+      <a href="yahav-site.html" class="link-card">
+        <div class="swatch" style="background:var(--rust);">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#f97316"/>
-            <circle cx="16" cy="16" r="7" stroke="white" stroke-width="1.5" fill="none"/>
-            <ellipse cx="16" cy="16" rx="3" ry="7" stroke="white" stroke-width="1.5" fill="none"/>
-            <line x1="9" y1="13" x2="23" y2="13" stroke="white" stroke-width="1.5"/>
-            <line x1="9" y1="19" x2="23" y2="19" stroke="white" stroke-width="1.5"/>
+            <circle cx="16" cy="16" r="9" stroke="white" stroke-width="2" fill="none"/>
+            <ellipse cx="16" cy="16" rx="4" ry="9" stroke="white" stroke-width="2" fill="none"/>
+            <line x1="7" y1="13" x2="25" y2="13" stroke="white" stroke-width="2"/>
+            <line x1="7" y1="19" x2="25" y2="19" stroke="white" stroke-width="2"/>
           </svg>
         </div>
-        <div><div class="link-label">האתר שלנו</div><div class="link-name">יהב ביטוח ופיננסים</div></div>
-      </a>
-
-      <!-- YouTube -->
-      <a href="https://youtu.be/n5gzM1gjzI8?si=_XNyNbNbH7k6J181" class="link-item full" target="_blank">
-        <div class="link-icon">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#FF0000"/>
-            <path d="M24.8 12.4C24.6 11.6 23.9 11 23.1 10.8C21.6 10.4 16 10.4 16 10.4C16 10.4 10.4 10.4 8.9 10.8C8.1 11 7.4 11.6 7.2 12.4C6.8 13.9 6.8 16 6.8 16C6.8 16 6.8 18.1 7.2 19.6C7.4 20.4 8.1 21 8.9 21.2C10.4 21.6 16 21.6 16 21.6C16 21.6 21.6 21.6 23.1 21.2C23.9 21 24.6 20.4 24.8 19.6C25.2 18.1 25.2 16 25.2 16C25.2 16 25.2 13.9 24.8 12.4Z" fill="white" fill-opacity="0.15"/>
-            <path d="M24.8 12.4C24.6 11.6 23.9 11 23.1 10.8C21.6 10.4 16 10.4 16 10.4C16 10.4 10.4 10.4 8.9 10.8C8.1 11 7.4 11.6 7.2 12.4C6.8 13.9 6.8 16 6.8 16C6.8 16 6.8 18.1 7.2 19.6C7.4 20.4 8.1 21 8.9 21.2C10.4 21.6 16 21.6 16 21.6C16 21.6 21.6 21.6 23.1 21.2C23.9 21 24.6 20.4 24.8 19.6C25.2 18.1 25.2 16 25.2 16C25.2 16 25.2 13.9 24.8 12.4Z" stroke="white" stroke-width="0.5"/>
-            <polygon points="14,13 14,19 20,16" fill="white"/>
-          </svg>
-        </div>
-        <div><div class="link-label">ריאיון טלוויזיה</div><div class="link-name">ראיון — מלחמה וכספים | YouTube</div></div>
+        <div class="meta">האתר שלנו</div>
+        <div class="title">יהב ביטוח ופיננסים</div>
+        <div class="arrow">לאתר ←</div>
       </a>
 
       <!-- Walla -->
-      <a href="https://mumlazim.walla.co.il/item/3407007" class="link-item full" target="_blank">
-        <div class="link-icon">
+      <a href="https://mumlazim.walla.co.il/item/3407007" class="link-card" target="_blank">
+        <div class="swatch" style="background:#E8002D;">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#E8002D"/>
-            <text x="16" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="17" fill="white">W!</text>
+            <text x="16" y="23" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="20" fill="white">W!</text>
           </svg>
         </div>
-        <div><div class="link-label">כתבה בתקשורת</div><div class="link-name">כתבה ב-Walla! מומלצים</div></div>
+        <div class="meta">כתבה בתקשורת</div>
+        <div class="title">כתבה ב-Walla! מומלצים</div>
+        <div class="arrow">לכתבה ←</div>
       </a>
 
       <!-- Waze -->
-      <a href="waze://?q=מתחם פריז נתיבות" class="link-item" target="_blank">
-        <div class="link-icon">
+      <a href="waze://?q=מתחם פריז נתיבות" class="link-card" target="_blank">
+        <div class="swatch" style="background:#05C8F7;">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#05C8F7"/>
-            <ellipse cx="16" cy="15" rx="8" ry="7.5" fill="white"/>
-            <circle cx="13" cy="13.5" r="1.2" fill="#333"/>
-            <circle cx="19" cy="13.5" r="1.2" fill="#333"/>
-            <path d="M12.5 17C13.2 18.2 14.5 19 16 19C17.5 19 18.8 18.2 19.5 17" stroke="#333" stroke-width="1.3" stroke-linecap="round" fill="none"/>
-            <circle cx="21" cy="24" r="2" fill="#FFCC00" stroke="#333" stroke-width="0.8"/>
-            <circle cx="11" cy="24" r="2" fill="#FFCC00" stroke="#333" stroke-width="0.8"/>
+            <ellipse cx="16" cy="15" rx="9" ry="8.5" fill="white"/>
+            <circle cx="13" cy="13.5" r="1.4" fill="#333"/>
+            <circle cx="19" cy="13.5" r="1.4" fill="#333"/>
+            <path d="M12 17.5C12.8 19 14.3 19.8 16 19.8C17.7 19.8 19.2 19 20 17.5" stroke="#333" stroke-width="1.5" stroke-linecap="round" fill="none"/>
           </svg>
         </div>
-        <div><div class="link-label">ניווט למשרד</div><div class="link-name">Waze</div></div>
+        <div class="meta">ניווט למשרד</div>
+        <div class="title">Waze — מתחם פריז, נתיבות</div>
+        <div class="arrow">נווט אליי ←</div>
       </a>
 
       <!-- WhatsApp -->
-      <a href="https://api.whatsapp.com/send?phone=9720505554446" class="link-item" target="_blank">
-        <div class="link-icon">
+      <a href="https://api.whatsapp.com/send?phone=9720505554446" class="link-card" target="_blank">
+        <div class="swatch" style="background:#25D366;">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#25D366"/>
-            <path d="M16 8C11.582 8 8 11.582 8 16C8 17.698 8.504 19.278 9.368 20.598L8.2 24L11.698 22.852C12.974 23.598 14.438 24.03 16 24.03C20.418 24.03 24 20.448 24 16.03C24 11.582 20.418 8 16 8Z" fill="white" fill-opacity="0.2"/>
             <path d="M16 8.5C11.858 8.5 8.5 11.858 8.5 16C8.5 17.612 8.99 19.112 9.83 20.352L8.75 23.75L12.24 22.69C13.44 23.44 14.868 23.878 16.4 23.878C20.542 23.878 23.9 20.52 23.9 16.378C23.9 12.236 20.142 8.5 16 8.5Z" fill="white"/>
             <path d="M12.8 13.2C12.6 12.8 12.35 12.78 12.15 12.77C11.98 12.76 11.78 12.76 11.58 12.76C11.38 12.76 11.06 12.84 10.8 13.12C10.54 13.4 9.8 14.1 9.8 15.52C9.8 16.94 10.82 18.32 10.96 18.52C11.1 18.72 12.98 21.7 15.9 22.84C18.36 23.8 18.82 23.62 19.3 23.58C19.78 23.54 20.84 22.88 21.08 22.2C21.32 21.52 21.32 20.94 21.24 20.82C21.16 20.7 20.96 20.62 20.66 20.46C20.36 20.3 18.94 19.6 18.66 19.5C18.38 19.4 18.18 19.35 17.98 19.65C17.78 19.95 17.24 20.62 17.06 20.82C16.88 21.02 16.7 21.04 16.4 20.88C16.1 20.72 15.14 20.41 14 19.38C13.12 18.59 12.54 17.62 12.36 17.32C12.18 17.02 12.34 16.86 12.5 16.7C12.64 16.56 12.8 16.34 12.96 16.16C13.12 15.98 13.18 15.86 13.28 15.66C13.38 15.46 13.33 15.28 13.25 15.12C13.17 14.96 12.62 13.52 12.8 13.2Z" fill="#25D366"/>
           </svg>
         </div>
-        <div><div class="link-label">הודעה מהירה</div><div class="link-name">WhatsApp</div></div>
+        <div class="meta">הודעה מהירה</div>
+        <div class="title">WhatsApp עסקי</div>
+        <div class="arrow">שלח הודעה ←</div>
       </a>
     </div>
   </div>
+</section>
 
-  <div class="footer">
-    <div class="footer-brand">
-      <strong>יהב ביטוח ופיננסים</strong>
-      <span>סוכן ביטוח מורשה</span>
+<!-- =============== CONTACT =============== -->
+<section class="section contact-section">
+  <div class="section-inner">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow" style="color:var(--mustard);">צור קשר</div>
+        <h2 class="heading-serif">בוא נדבר —<br/>שיחה אחת מספיקה.</h2>
+      </div>
+      <p>תיאום פגישת ייעוץ ללא עלות וללא התחייבות. השאר הודעה ב-WhatsApp או חייג ישירות.</p>
     </div>
-    <div class="footer-addr">📍 קומפלקס פריז, נתיבות</div>
+
+    <div class="contact-grid">
+      <a href="https://api.whatsapp.com/send?phone=9720505554446&text=שלום+מאיר,+אשמח+לשיחת+ייעוץ" class="contact-card primary">
+        <div class="label">📱 WhatsApp</div>
+        <div class="value">שלח הודעה<br/>ונחזור אליך</div>
+      </a>
+      <a href="tel:0505554446" class="contact-card">
+        <div class="label">📞 נייד</div>
+        <div class="value">050-555-4446</div>
+      </a>
+      <a href="tel:0722998998" class="contact-card">
+        <div class="label">☎️ משרד</div>
+        <div class="value">072-299-8998</div>
+      </a>
+    </div>
+
+    <div style="margin-top:28px; text-align:center;">
+      <a href="https://myb.bio/Projects/1098/meircohen.vcf" class="btn btn-mustard">👤 שמור כאיש קשר (vCard)</a>
+    </div>
   </div>
+</section>
+
+<!-- =============== FOOTER =============== -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-mark">
+      <div class="seal">י</div>
+      <div>
+        יהב ביטוח ופיננסים<br/>
+        <span style="font-family:'Heebo'; font-size:12px; font-weight:600; color:var(--ink-soft); letter-spacing:1px;">SINCE 2009 · NETIVOT</span>
+      </div>
+    </div>
+    <div class="footer-meta">
+      <strong>📍 קומפלקס פריז, נתיבות</strong>
+      © מאיר כהן — סוכן ביטוח מורשה
+    </div>
+  </div>
+</footer>
+
+<!-- bottom color strip -->
+<div class="top-strip">
+  <span></span><span></span><span></span><span></span><span></span><span></span>
 </div>
+
 </body>
 </html>
