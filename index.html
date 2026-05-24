@@ -144,6 +144,78 @@
       border: 1.5px solid var(--border);
       color: var(--white);
     }
+    /* ── Team Section ── */
+    .team-section {
+      padding: 18px 20px 20px;
+      border-bottom: 1px solid var(--border);
+      background: #111;
+    }
+    .team-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .team-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    .team-card::before {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 3px; height: 100%;
+      background: linear-gradient(180deg, var(--orange), var(--orange2));
+      border-radius: 0 16px 16px 0;
+    }
+    .team-avatar {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: 2px solid var(--orange);
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 3px var(--orange-glow);
+      background: var(--dark2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800; color: var(--orange);
+    }
+    .team-avatar img {
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: center top;
+    }
+    .team-info { flex: 1; min-width: 0; }
+    .team-name {
+      font-size: 16px; font-weight: 800;
+      color: var(--white); margin-bottom: 2px;
+    }
+    .team-role {
+      font-size: 11px; font-weight: 600;
+      color: var(--orange); margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
+    .team-badges {
+      display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .team-badge {
+      font-size: 9.5px; font-weight: 600;
+      background: rgba(249,115,22,0.1);
+      border: 1px solid rgba(249,115,22,0.3);
+      color: #ccc;
+      padding: 2px 7px;
+      border-radius: 50px;
+    }
+    .team-badge.gold {
+      background: rgba(251,191,36,0.1);
+      border-color: rgba(251,191,36,0.35);
+      color: #fbbf24;
+    }
     .video-section {
       padding: 14px 20px 16px;
       border-bottom: 1px solid var(--border);
@@ -266,6 +338,58 @@
     <a href="https://myb.bio/Projects/1098/meircohen.vcf" class="btn btn-dark">👤 שמור איש קשר</a>
   </div>
 
+  <!-- Team Section -->
+  <div class="team-section">
+    <div class="sec-title">הצוות שלנו</div>
+    <div class="team-grid">
+
+      <!-- שקמה טויטו -->
+      <div class="team-card">
+        <div class="team-avatar" id="av-shakma">ש</div>
+        <div class="team-info">
+          <div class="team-name">שקמה טויטו</div>
+          <div class="team-role">סוכנת ביטוח בכירה</div>
+          <div class="team-badges">
+            <span class="team-badge gold">⭐ ותק 20+ שנה</span>
+            <span class="team-badge">לשכת סוכני הביטוח</span>
+            <span class="team-badge">ביטוח פנסיוני</span>
+            <span class="team-badge">ביטוח אלמנטרי</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- רועי כהן -->
+      <div class="team-card">
+        <div class="team-avatar" id="av-roi">ר</div>
+        <div class="team-info">
+          <div class="team-name">רועי כהן</div>
+          <div class="team-role">סוכן ביטוח בכיר</div>
+          <div class="team-badges">
+            <span class="team-badge gold">⭐ ותק 20+ שנה</span>
+            <span class="team-badge">לשכת סוכני הביטוח</span>
+            <span class="team-badge">ביטוח פנסיוני</span>
+            <span class="team-badge">ביטוח אלמנטרי</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- לירן קוצר -->
+      <div class="team-card">
+        <div class="team-avatar" id="av-liran">ל</div>
+        <div class="team-info">
+          <div class="team-name">לירן קוצר</div>
+          <div class="team-role">פקידת משרד</div>
+          <div class="team-badges">
+            <span class="team-badge">שירות לקוחות</span>
+            <span class="team-badge">ניהול תיקים</span>
+            <span class="team-badge">תיאום תביעות</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Video Section -->
   <div class="video-section">
     <div class="sec-title">סרטון היכרות</div>
@@ -295,7 +419,6 @@
         </div>
         <div><div class="link-label">רשת חברתית</div><div class="link-name">Facebook</div></div>
       </a>
-
       <!-- Website -->
       <a href="yahav-site.html" class="link-item">
         <div class="link-icon">
@@ -309,20 +432,16 @@
         </div>
         <div><div class="link-label">האתר שלנו</div><div class="link-name">יהב ביטוח ופיננסים</div></div>
       </a>
-
       <!-- YouTube -->
       <a href="https://youtu.be/n5gzM1gjzI8?si=_XNyNbNbH7k6J181" class="link-item full" target="_blank">
         <div class="link-icon">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="32" height="32" rx="8" fill="#FF0000"/>
-            <path d="M24.8 12.4C24.6 11.6 23.9 11 23.1 10.8C21.6 10.4 16 10.4 16 10.4C16 10.4 10.4 10.4 8.9 10.8C8.1 11 7.4 11.6 7.2 12.4C6.8 13.9 6.8 16 6.8 16C6.8 16 6.8 18.1 7.2 19.6C7.4 20.4 8.1 21 8.9 21.2C10.4 21.6 16 21.6 16 21.6C16 21.6 21.6 21.6 23.1 21.2C23.9 21 24.6 20.4 24.8 19.6C25.2 18.1 25.2 16 25.2 16C25.2 16 25.2 13.9 24.8 12.4Z" fill="white" fill-opacity="0.15"/>
-            <path d="M24.8 12.4C24.6 11.6 23.9 11 23.1 10.8C21.6 10.4 16 10.4 16 10.4C16 10.4 10.4 10.4 8.9 10.8C8.1 11 7.4 11.6 7.2 12.4C6.8 13.9 6.8 16 6.8 16C6.8 16 6.8 18.1 7.2 19.6C7.4 20.4 8.1 21 8.9 21.2C10.4 21.6 16 21.6 16 21.6C16 21.6 21.6 21.6 23.1 21.2C23.9 21 24.6 20.4 24.8 19.6C25.2 18.1 25.2 16 25.2 16C25.2 16 25.2 13.9 24.8 12.4Z" stroke="white" stroke-width="0.5"/>
             <polygon points="14,13 14,19 20,16" fill="white"/>
           </svg>
         </div>
         <div><div class="link-label">ריאיון טלוויזיה</div><div class="link-name">ראיון — מלחמה וכספים | YouTube</div></div>
       </a>
-
       <!-- Walla -->
       <a href="https://mumlazim.walla.co.il/item/3407007" class="link-item full" target="_blank">
         <div class="link-icon">
@@ -333,7 +452,6 @@
         </div>
         <div><div class="link-label">כתבה בתקשורת</div><div class="link-name">כתבה ב-Walla! מומלצים</div></div>
       </a>
-
       <!-- Waze -->
       <a href="waze://?q=מתחם פריז נתיבות" class="link-item" target="_blank">
         <div class="link-icon">
@@ -349,13 +467,11 @@
         </div>
         <div><div class="link-label">ניווט למשרד</div><div class="link-name">Waze</div></div>
       </a>
-
       <!-- WhatsApp -->
       <a href="https://api.whatsapp.com/send?phone=9720505554446" class="link-item" target="_blank">
         <div class="link-icon">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="32" height="32" rx="8" fill="#25D366"/>
-            <path d="M16 8C11.582 8 8 11.582 8 16C8 17.698 8.504 19.278 9.368 20.598L8.2 24L11.698 22.852C12.974 23.598 14.438 24.03 16 24.03C20.418 24.03 24 20.448 24 16.03C24 11.582 20.418 8 16 8Z" fill="white" fill-opacity="0.2"/>
             <path d="M16 8.5C11.858 8.5 8.5 11.858 8.5 16C8.5 17.612 8.99 19.112 9.83 20.352L8.75 23.75L12.24 22.69C13.44 23.44 14.868 23.878 16.4 23.878C20.542 23.878 23.9 20.52 23.9 16.378C23.9 12.236 20.142 8.5 16 8.5Z" fill="white"/>
             <path d="M12.8 13.2C12.6 12.8 12.35 12.78 12.15 12.77C11.98 12.76 11.78 12.76 11.58 12.76C11.38 12.76 11.06 12.84 10.8 13.12C10.54 13.4 9.8 14.1 9.8 15.52C9.8 16.94 10.82 18.32 10.96 18.52C11.1 18.72 12.98 21.7 15.9 22.84C18.36 23.8 18.82 23.62 19.3 23.58C19.78 23.54 20.84 22.88 21.08 22.2C21.32 21.52 21.32 20.94 21.24 20.82C21.16 20.7 20.96 20.62 20.66 20.46C20.36 20.3 18.94 19.6 18.66 19.5C18.38 19.4 18.18 19.35 17.98 19.65C17.78 19.95 17.24 20.62 17.06 20.82C16.88 21.02 16.7 21.04 16.4 20.88C16.1 20.72 15.14 20.41 14 19.38C13.12 18.59 12.54 17.62 12.36 17.32C12.18 17.02 12.34 16.86 12.5 16.7C12.64 16.56 12.8 16.34 12.96 16.16C13.12 15.98 13.18 15.86 13.28 15.66C13.38 15.46 13.33 15.28 13.25 15.12C13.17 14.96 12.62 13.52 12.8 13.2Z" fill="#25D366"/>
           </svg>
