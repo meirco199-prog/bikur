@@ -1,0 +1,52 @@
+{
+  "name": "מאיר כהן | יהב ביטוח ופיננסים",
+  "short_name": "מאיר כהן",
+  "description": "כרטיס ביקור דיגיטלי - מאיר כהן, סוכן ביטוח פנסיוני וכללי. יהב ביטוח ופיננסים.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#f97316",
+  "categories": ["business", "finance", "lifestyle"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "שיחת טלפון",
+      "short_name": "התקשר",
+      "url": "tel:0505554446"
+    },
+    {
+      "name": "WhatsApp",
+      "short_name": "WhatsApp",
+      "url": "https://api.whatsapp.com/send?phone=9720505554446"
+    }
+  ]
+}
