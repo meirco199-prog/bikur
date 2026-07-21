@@ -25,6 +25,14 @@ GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/gmail.compose",
 ]
 
+# --- WhatsApp (Meta Cloud API) ---
+WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
+# מחרוזת סודית שאתה ממציא — אותה מזינים גם במסך ה-Webhook של Meta
+WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "remi-verify")
+# מספר הוואטסאפ שלך בפורמט בינלאומי בלי + (למשל 972501234567). ריק = פתוח לכולם
+ALLOWED_WA_NUMBER = os.environ.get("ALLOWED_WA_NUMBER", "").strip()
+
 MODEL = "claude-opus-4-8"
 
 # כמה הודעות אחרונות לשמור בהקשר השיחה
