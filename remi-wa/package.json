@@ -1,0 +1,19 @@
+{
+  "name": "remi-wa",
+  "version": "1.0.0",
+  "description": "עוזר אישי חינמי בוואטסאפ — יומן, משימות ותזכורות בעברית",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node test/test-parser.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

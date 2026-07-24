@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#008069" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="רמי" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<title>רמי — צ'אט עוזר אישי</title>
+<style>
+  :root {
+    --header: #008069;
+    --header-ink: #ffffff;
+    --bg: #efeae2;
+    --bubble-in: #ffffff;
+    --bubble-out: #d9fdd3;
+    --ink: #111b21;
+    --muted: #667781;
+    --input-bg: #ffffff;
+    --bar-bg: #f0f2f5;
+    --send: #008069;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --header: #202c33;
+      --header-ink: #e9edef;
+      --bg: #0b141a;
+      --bubble-in: #202c33;
+      --bubble-out: #005c4b;
+      --ink: #e9edef;
+      --muted: #8696a0;
+      --input-bg: #2a3942;
+      --bar-bg: #202c33;
+      --send: #00a884;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans Hebrew", "Arial Hebrew", Arial, sans-serif;
+    display: flex; flex-direction: column;
+    overscroll-behavior: none;
+  }
+
+  header {
+    background: var(--header);
+    color: var(--header-ink);
+    padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #25d366;
+    display: grid; place-items: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .who { flex: 1; min-width: 0; }
+  .who .name { font-weight: 700; font-size: 17px; }
+  .who .status { font-size: 12.5px; opacity: 0.85; }
+
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 10px 8px;
+    display: flex; flex-direction: column; gap: 4px;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 0 2px, transparent 3px),
+      radial-gradient(circle at 70% 60%, rgba(0,0,0,0.02) 0 2px, transparent 3px),
+      var(--bg);
+  }
+
+  .msg {
+    max-width: 82%;
+    padding: 7px 10px 6px;
+    border-radius: 10px;
+    font-size: 15px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.08);
+    position: relative;
+    animation: pop 0.15s ease-out;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(4px); } }
+  .msg.me   { align-self: flex-end;   background: var(--bubble-out); border-top-left-radius: 2px; }
+  .msg.bot  { align-self: flex-start; background: var(--bubble-in);  border-top-right-radius: 2px; }
+  .msg .t {
+    display: block; text-align: left;
+    font-size: 10.5px; color: var(--muted); margin-top: 3px;
+  }
+  .msg b { font-weight: 700; }
+  .daysep {
+    align-self: center;
+    background: var(--bubble-in);
+    color: var(--muted);
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    margin: 8px 0 4px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+  }
+
+  form#bar {
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    background: var(--bar-bg);
+    flex-shrink: 0;
+  }
+  #inp {
+    flex: 1;
+    border: none; outline: none; resize: none;
+    background: var(--input-bg);
+    color: var(--ink);
+    font: inherit; font-size: 16px;
+    border-radius: 22px;
+    padding: 11px 16px;
+    max-height: 120px;
+  }
+  #send {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: none; cursor: pointer;
+    background: var(--send); color: #fff;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  #send svg { width: 22px; height: 22px; transform: scaleX(-1); }
+
+  .chips {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding: 6px 10px 0;
+    background: var(--bar-bg);
+    scrollbar-width: none;
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0;
+    border: none; cursor: pointer;
+    background: var(--input-bg); color: var(--ink);
+    font: inherit; font-size: 13px;
+    padding: 7px 13px; border-radius: 16px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="avatar">🤖</div>
+  <div class="who">
+    <div class="name">רמי — עוזר אישי</div>
+    <div class="status" id="status">מחובר · הכול נשמר אצלך בטלפון</div>
+  </div>
+</header>
+
+<div id="chat"></div>
+
+<div class="chips" id="chips">
+  <button class="chip" data-q="מה יש לי היום">📅 היום</button>
+  <button class="chip" data-q="משימות">📋 משימות</button>
+  <button class="chip" data-q="תזכורות">⏰ תזכורות</button>
+  <button class="chip" data-q="עזרה">❓ עזרה</button>
+</div>
+
+<form id="bar" autocomplete="off">
+  <textarea id="inp" rows="1" placeholder="הודעה" enterkeyhint="send"></textarea>
+  <button id="send" type="submit" aria-label="שליחה">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+  </button>
+</form>
+
+<script>
+'use strict';
+
+/* ========== מפענח עברית: זמנים ופקודות ========== */
+
+const DAY_WORDS = { 'ראשון':0,'שני':1,'שלישי':2,'רביעי':3,'חמישי':4,'שישי':5,'שבת':6 };
+const DAY_NAMES = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const PERIOD_DEFAULT_HOUR = {
+  'בבוקר':9,'בצהריים':12,'בצהרים':12,'אחר הצהריים':16,'אחרי הצהריים':16,
+  'אחה"צ':16,'אחהצ':16,'בערב':19,'בלילה':21,
+};
+
+function cleanup(text) {
+  return text.replace(/\s{2,}/g,' ').replace(/^[\s,.:\-–]+|[\s,.:\-–]+$/g,'').trim();
+}
+
+function parseWhen(text, now = new Date()) {
+  let t = ' ' + text + ' ';
+  let recurringDaily = false;
+  let day = null, hour = null, minute = 0, periodHint = null, relative = null;
+
+  if (/\s(כל יום|בכל יום|כל בוקר)\s/.test(t)) {
+    recurringDaily = true;
+    if (/\sכל בוקר\s/.test(t)) periodHint = 'בבוקר';
+    t = t.replace(/\s(כל יום|בכל יום|כל בוקר)\s/, ' ');
+  }
+
+  const relRe = /\s(?:בעוד|עוד)\s+(רבע שעה|חצי שעה|שעה וחצי|שעתיים|שעה|דקה|יומיים|(\d+)\s*(דקות|דקה|שעות|שעה|ימים|יום))\s/;
+  const relM = t.match(relRe);
+  if (relM) {
+    const w = relM[1], n = relM[2] ? parseInt(relM[2],10) : null, unit = relM[3] || '';
+    if (w === 'רבע שעה') relative = 15*60000;
+    else if (w === 'חצי שעה') relative = 30*60000;
+    else if (w === 'שעה וחצי') relative = 90*60000;
+    else if (w === 'שעתיים') relative = 2*3600000;
+    else if (w === 'שעה') relative = 3600000;
+    else if (w === 'דקה') relative = 60000;
+    else if (w === 'יומיים') relative = 2*86400000;
+    else if (n !== null) {
+      if (unit.startsWith('דק')) relative = n*60000;
+      else if (unit.startsWith('שע')) relative = n*3600000;
+      else relative = n*86400000;
+    }
+    t = t.replace(relRe, ' ');
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (/\sמחרתיים\s/.test(t)) { day = new Date(today.getTime()+2*86400000); t = t.replace(/\sמחרתיים\s/,' '); }
+  else if (/\sמחר\s/.test(t)) { day = new Date(today.getTime()+86400000); t = t.replace(/\sמחר\s/,' '); }
+  else if (/\sהיום\s/.test(t)) { day = today; t = t.replace(/\sהיום\s/,' '); }
+  else if (/\sהערב\s/.test(t)) { day = today; periodHint = periodHint || 'בערב'; t = t.replace(/\sהערב\s/,' '); }
+  else {
+    const dayRe = new RegExp('\\s(?:ב?יום\\s+)(' + Object.keys(DAY_WORDS).join('|') + ')\\s');
+    const dm = t.match(dayRe);
+    if (dm) {
+      let diff = (DAY_WORDS[dm[1]] - now.getDay() + 7) % 7;
+      if (diff === 0) diff = 7;
+      day = new Date(today.getTime() + diff*86400000);
+      t = t.replace(dayRe, ' ');
+    }
+  }
+
+  const dateRe = /\s(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\s/;
+  const dateM = t.match(dateRe);
+  if (dateM && !day) {
+    const d = parseInt(dateM[1],10), mo = parseInt(dateM[2],10)-1;
+    let y = dateM[3] ? parseInt(dateM[3],10) : now.getFullYear();
+    if (y < 100) y += 2000;
+    if (d >= 1 && d <= 31 && mo >= 0 && mo <= 11) {
+      day = new Date(y, mo, d);
+      if (!dateM[3] && day.getTime() < today.getTime()) day.setFullYear(y+1);
+      t = t.replace(dateRe, ' ');
+    }
+  }
+
+  for (const [word, h] of Object.entries(PERIOD_DEFAULT_HOUR)) {
+    const re = new RegExp('\\s' + word.replace('"','"?') + '\\s');
+    if (re.test(t)) { periodHint = periodHint || word; t = t.replace(re,' '); break; }
+  }
+
+  const timeRe = /\s(?:בשעה\s*|ב-?\s?)(\d{1,2})(?:[:.](\d{2}))?\s/;
+  let tm = t.match(timeRe);
+  if (!tm) {
+    const bare = /\s(\d{1,2})[:.](\d{2})\s/;
+    tm = t.match(bare);
+    if (tm) t = t.replace(bare, ' ');
+  } else t = t.replace(timeRe, ' ');
+  if (tm) {
+    hour = parseInt(tm[1],10);
+    minute = tm[2] ? parseInt(tm[2],10) : 0;
+    if (hour > 23 || minute > 59) { hour = null; minute = 0; }
+  }
+
+  if (hour !== null && periodHint) {
+    if (PERIOD_DEFAULT_HOUR[periodHint] >= 12 && hour < 12) hour += 12;
+  } else if (hour === null && periodHint) {
+    hour = PERIOD_DEFAULT_HOUR[periodHint];
+  }
+
+  const rest = cleanup(t);
+  let at = null;
+  if (relative !== null) {
+    at = new Date(now.getTime() + relative);
+    if (hour !== null) at.setHours(hour, minute, 0, 0);
+  } else if (day !== null) {
+    at = new Date(day); at.setHours(hour !== null ? hour : 9, minute, 0, 0);
+  } else if (hour !== null) {
+    at = new Date(today); at.setHours(hour, minute, 0, 0);
+    if (at.getTime() <= now.getTime()) at = new Date(at.getTime() + 86400000);
+  } else if (recurringDaily) {
+    at = new Date(today); at.setHours(9, 0, 0, 0);
+    if (at.getTime() <= now.getTime()) at = new Date(at.getTime() + 86400000);
+  }
+  return { at, recurringDaily, rest };
+}
+
+function parseCommand(raw, now = new Date()) {
+  const text = cleanup(raw);
+  if (/^(עזרה|help|\?|פקודות)$/i.test(text)) return { cmd:'help' };
+
+  let m = text.match(/^(?:תזכיר לי|תזכירי לי|תזכורת[:\s])\s*(.+)$/s);
+  if (m) {
+    const { at, recurringDaily, rest } = parseWhen(m[1], now);
+    if (!at) return { cmd:'reminder_missing_time', text: cleanup(m[1]) };
+    return { cmd:'reminder_add', text: rest || 'תזכורת', at, recurringDaily };
+  }
+  if (/^(תזכורות|רשימת תזכורות|מה התזכורות)\??$/.test(text)) return { cmd:'reminder_list' };
+  m = text.match(/^(?:מחק|בטל|מחקי|בטלי)\s+תזכורת\s+(\d+)$/);
+  if (m) return { cmd:'reminder_delete', index: parseInt(m[1],10) };
+
+  m = text.match(/^(?:משימה|תוסיף משימה|הוסף משימה|הוסיפי משימה|תוסיפי משימה)[:\s]+(.+)$/s);
+  if (m) return { cmd:'task_add', text: cleanup(m[1]) };
+  if (/^(משימות|רשימה|רשימת משימות|מה המשימות|מה יש לי ברשימה)\??$/.test(text)) return { cmd:'task_list' };
+  m = text.match(/^(?:סיימתי|בוצע|ביצעתי|עשיתי|✓|וי)\s+(?:משימה\s+)?(\d+)$/);
+  if (m) return { cmd:'task_done', index: parseInt(m[1],10) };
+  m = text.match(/^(?:מחק|מחקי)\s+משימה\s+(\d+)$/);
+  if (m) return { cmd:'task_delete', index: parseInt(m[1],10) };
+  if (/^(נקה משימות|מחק משימות שבוצעו)$/.test(text)) return { cmd:'task_clear_done' };
+
+  m = text.match(/^(?:קבע|קבעי|אירוע[:\s]|פגישה[:\s])\s*(.+)$/s);
+  if (m) {
+    const { at, rest } = parseWhen(m[1], now);
+    if (!at) return { cmd:'event_missing_time', text: cleanup(m[1]) };
+    return { cmd:'event_add', text: rest || 'אירוע', at };
+  }
+  m = text.match(/^(?:מחק|בטל|מחקי|בטלי)\s+(?:אירוע|פגישה)\s+(\d+)$/);
+  if (m) return { cmd:'event_delete', index: parseInt(m[1],10) };
+
+  if (/^(מה יש לי היום|היום|סדר יום|יומן)\??$/.test(text)) return { cmd:'agenda', range:'today' };
+  if (/^(מה יש לי מחר|מחר)\??$/.test(text)) return { cmd:'agenda', range:'tomorrow' };
+  if (/^(מה יש לי השבוע|השבוע|מה יש לי)\??$/.test(text)) return { cmd:'agenda', range:'week' };
+
+  return { cmd:'unknown', text };
+}
+
+/* ========== אחסון ב-localStorage ========== */
+
+const STORE_KEY = 'remi-chat-store-v1';
+const HIST_KEY = 'remi-chat-history-v1';
+
+function loadStore() {
+  try { return Object.assign({ tasks:[], reminders:[], events:[], nextId:1, lastBriefDate:null }, JSON.parse(localStorage.getItem(STORE_KEY))); }
+  catch { return { tasks:[], reminders:[], events:[], nextId:1, lastBriefDate:null }; }
+}
+let S = loadStore();
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
+function nid() { return S.nextId++; }
+
+const openTasks = () => S.tasks.filter(t => !t.done);
+const sortedReminders = () => S.reminders.slice().sort((a,b) => a.at - b.at);
+const eventsBetween = (f,t) => S.events.filter(e => e.at >= f && e.at < t).sort((a,b) => a.at - b.at);
+
+/* ========== ניסוח תשובות ========== */
+
+function fmtTime(ts) {
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function fmtDate(ts, now = new Date()) {
+  const d = new Date(ts);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const that = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((that - today)/86400000);
+  if (diff === 0) return `היום בשעה ${fmtTime(ts)}`;
+  if (diff === 1) return `מחר בשעה ${fmtTime(ts)}`;
+  if (diff > 1 && diff < 7) return `יום ${DAY_NAMES[d.getDay()]} בשעה ${fmtTime(ts)}`;
+  return `${d.getDate()}/${d.getMonth()+1} בשעה ${fmtTime(ts)}`;
+}
+
+const HELP = `היי, אני רמי — העוזר האישי שלך 🤖
+פשוט כתוב לי בעברית:
+
+*⏰ תזכורות*
+• תזכיר לי מחר ב-9 להתקשר לדני
+• תזכיר לי בעוד 20 דקות להוריד כביסה
+• תזכיר לי כל יום ב-8 לקחת כדור
+• תזכורות / מחק תזכורת 2
+
+*📋 משימות*
+• משימה: לשלם ארנונה
+• משימות / סיימתי 1 / מחק משימה 3
+
+*📅 יומן*
+• קבע פגישה עם דני ביום רביעי ב-14:00
+• מה יש לי היום / מחר / השבוע
+
+💡 טיפ: הוסף אותי למסך הבית כדי שאהיה כמו אפליקציה.
+שים לב: תזכורות מצלצלות כשהאפליקציה פתוחה; כשתפתח אותי אציג כל מה שפספסת.`;
+
+function agendaText(range, now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let from, to, title;
+  if (range === 'today') { from = today.getTime(); to = from + 86400000; title = '📅 היום'; }
+  else if (range === 'tomorrow') { from = today.getTime() + 86400000; to = from + 86400000; title = '📅 מחר'; }
+  else { from = today.getTime(); to = from + 7*86400000; title = '📅 השבוע'; }
+
+  const events = eventsBetween(from, to);
+  const rems = sortedReminders().filter(r => r.at >= from && r.at < to);
+  const tasks = openTasks();
+
+  let out = `*${title}*\n`;
+  out += events.length === 0 ? '\nאין אירועים ביומן.'
+    : '\n' + events.map((e,i) => `${i+1}. ${fmtDate(e.at, now)} — ${e.text}`).join('\n');
+  if (rems.length) out += '\n\n*⏰ תזכורות:*\n' + rems.map(r => `• ${fmtDate(r.at, now)} — ${r.text}`).join('\n');
+  if (tasks.length) out += `\n\n*📋 משימות פתוחות (${tasks.length}):*\n` + tasks.map((t,i) => `${i+1}. ${t.text}`).join('\n');
+  return out;
+}
+
+function morningBrief(now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = today.getTime(), to = from + 86400000;
+  const events = eventsBetween(from, to);
+  const rems = sortedReminders().filter(r => r.at >= from && r.at < to);
+  const tasks = openTasks();
+  if (!events.length && !rems.length && !tasks.length) return null;
+  let out = `🌅 *בוקר טוב! הנה היום שלך:*\n`;
+  if (events.length) out += '\n' + events.map(e => `📅 ${fmtTime(e.at)} — ${e.text}`).join('\n');
+  if (rems.length) out += '\n' + rems.map(r => `⏰ ${fmtTime(r.at)} — ${r.text}`).join('\n');
+  if (tasks.length) out += `\n\n📋 משימות פתוחות:\n` + tasks.map((t,i) => `${i+1}. ${t.text}`).join('\n');
+  return out;
+}
+
+function handleMessage(text, now = new Date()) {
+  const c = parseCommand(text, now);
+  switch (c.cmd) {
+    case 'help': return HELP;
+
+    case 'reminder_add': {
+      S.reminders.push({ id: nid(), text: c.text, at: c.at.getTime(), recurringDaily: c.recurringDaily }); save();
+      const when = c.recurringDaily ? `כל יום בשעה ${fmtTime(c.at)}` : fmtDate(c.at, now);
+      return `⏰ סגור! אזכיר לך ${when}:\n"${c.text}"`;
+    }
+    case 'reminder_missing_time':
+      return `לא הצלחתי להבין מתי להזכיר לך 🤔\nנסה למשל: "תזכיר לי מחר ב-9 ${c.text}"`;
+    case 'reminder_list': {
+      const list = sortedReminders();
+      if (!list.length) return 'אין תזכורות פעילות 👌';
+      return '*⏰ התזכורות שלך:*\n' + list.map((r,i) =>
+        `${i+1}. ${r.recurringDaily ? `כל יום ב-${fmtTime(r.at)}` : fmtDate(r.at, now)} — ${r.text}`).join('\n');
+    }
+    case 'reminder_delete': {
+      const r = sortedReminders()[c.index - 1];
+      if (!r) return 'לא מצאתי תזכורת עם המספר הזה. כתוב "תזכורות" לרשימה.';
+      S.reminders = S.reminders.filter(x => x.id !== r.id); save();
+      return `🗑️ מחקתי את התזכורת: "${r.text}"`;
+    }
+
+    case 'task_add': {
+      S.tasks.push({ id: nid(), text: c.text, done: false }); save();
+      return `📋 הוספתי: "${c.text}"\n(${openTasks().length} משימות פתוחות)`;
+    }
+    case 'task_list': {
+      const open = openTasks();
+      if (!open.length) return 'רשימת המשימות ריקה — כל הכבוד! 🎉';
+      return '*📋 המשימות שלך:*\n' + open.map((t,i) => `${i+1}. ${t.text}`).join('\n') + '\n\nלסימון ביצוע: "סיימתי 1"';
+    }
+    case 'task_done': {
+      const t = openTasks()[c.index - 1];
+      if (!t) return 'לא מצאתי משימה עם המספר הזה. כתוב "משימות" לרשימה.';
+      t.done = true; save();
+      const left = openTasks().length;
+      return `✅ יפה! "${t.text}" בוצעה.` + (left ? `\nנשארו ${left} משימות.` : '\nסיימת הכול! 🎉');
+    }
+    case 'task_delete': {
+      const t = openTasks()[c.index - 1];
+      if (!t) return 'לא מצאתי משימה עם המספר הזה.';
+      S.tasks = S.tasks.filter(x => x.id !== t.id); save();
+      return `🗑️ מחקתי את המשימה: "${t.text}"`;
+    }
+    case 'task_clear_done': {
+      const n = S.tasks.filter(t => t.done).length;
+      S.tasks = S.tasks.filter(t => !t.done); save();
+      return n ? `🧹 ניקיתי ${n} משימות שבוצעו.` : 'אין משימות שבוצעו למחיקה.';
+    }
+
+    case 'event_add': {
+      S.events.push({ id: nid(), text: c.text, at: c.at.getTime() }); save();
+      return `📅 קבעתי: "${c.text}"\n${fmtDate(c.at, now)}`;
+    }
+    case 'event_missing_time':
+      return `לא הצלחתי להבין מתי 🤔\nנסה למשל: "קבע ${c.text} ביום רביעי ב-14:00"`;
+    case 'event_delete': {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const e = eventsBetween(today, today + 7*86400000)[c.index - 1];
+      if (!e) return 'לא מצאתי אירוע עם המספר הזה השבוע. כתוב "השבוע" לרשימה.';
+      S.events = S.events.filter(x => x.id !== e.id); save();
+      return `🗑️ ביטלתי: "${e.text}"`;
+    }
+
+    case 'agenda': return agendaText(c.range, now);
+
+    default:
+      return `לא הבנתי 🤔 אני עוזר של משימות, תזכורות ויומן.\nכתוב "עזרה" כדי לראות מה אני יודע לעשות.`;
+  }
+}
+
+/* ========== ממשק הצ'אט ========== */
+
+const chatEl = document.getElementById('chat');
+const inp = document.getElementById('inp');
+const form = document.getElementById('bar');
+
+let history = [];
+try { history = JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch {}
+
+function fmtMd(text) {
+  const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc.replace(/\*([^*\n]+)\*/g, '<b>$1</b>');
+}
+
+function renderMsg(m, scroll = true) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + (m.who === 'me' ? 'me' : 'bot');
+  div.innerHTML = fmtMd(m.text) + `<span class="t">${fmtTime(m.ts)}</span>`;
+  chatEl.appendChild(div);
+  if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function pushMsg(who, text) {
+  const m = { who, text, ts: Date.now() };
+  history.push(m);
+  if (history.length > 300) history = history.slice(-300);
+  localStorage.setItem(HIST_KEY, JSON.stringify(history));
+  renderMsg(m);
+}
+
+function botSay(text, delay = 350) {
+  const status = document.getElementById('status');
+  const prev = status.textContent;
+  status.textContent = 'מקליד...';
+  setTimeout(() => {
+    status.textContent = prev;
+    pushMsg('bot', text);
+  }, delay);
+}
+
+// שחזור היסטוריה עם מפרידי ימים
+{
+  let lastDay = '';
+  for (const m of history) {
+    const d = new Date(m.ts).toDateString();
+    if (d !== lastDay) {
+      lastDay = d;
+      const sep = document.createElement('div');
+      sep.className = 'daysep';
+      const dd = new Date(m.ts);
+      sep.textContent = dd.toDateString() === new Date().toDateString()
+        ? 'היום' : `${DAY_NAMES[dd.getDay()]} ${dd.getDate()}/${dd.getMonth()+1}`;
+      chatEl.appendChild(sep);
+    }
+    renderMsg(m, false);
+  }
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  inp.style.height = 'auto';
+  askNotifPermission();
+  pushMsg('me', text);
+  botSay(handleMessage(text));
+});
+
+inp.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
+inp.addEventListener('input', () => {
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+});
+
+document.getElementById('chips').addEventListener('click', e => {
+  const q = e.target.closest('.chip')?.dataset.q;
+  if (!q) return;
+  pushMsg('me', q);
+  botSay(handleMessage(q));
+});
+
+/* ========== תזכורות והתראות ========== */
+
+function askNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function fireReminder(r) {
+  const text = `⏰ *תזכורת:* ${r.text}` + (r.recurringDaily ? '\n(תזכורת יומית — תחזור מחר)' : '');
+  pushMsg('bot', text);
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      navigator.serviceWorker?.ready.then(reg =>
+        reg.showNotification('רמי — תזכורת ⏰', { body: r.text, icon: 'icon-192.png', tag: 'remi-' + r.id })
+      ).catch(() => new Notification('רמי — תזכורת ⏰', { body: r.text }));
+    } catch { }
+  }
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+
+function checkReminders() {
+  const now = Date.now();
+  let changed = false;
+  for (const r of S.reminders.slice()) {
+    if (r.at <= now) {
+      fireReminder(r);
+      if (r.recurringDaily) { while (r.at <= now) r.at += 86400000; }
+      else S.reminders = S.reminders.filter(x => x.id !== r.id);
+      changed = true;
+    }
+  }
+  if (changed) save();
+}
+
+setInterval(checkReminders, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkReminders(); });
+
+/* ========== פתיחה: ברוך הבא / סיכום בוקר / תזכורות שפוספסו ========== */
+
+if (history.length === 0) {
+  botSay(HELP, 500);
+} else {
+  const todayStr = new Date().toDateString();
+  if (S.lastBriefDate !== todayStr) {
+    S.lastBriefDate = todayStr; save();
+    const brief = morningBrief();
+    if (brief) botSay(brief, 500);
+  }
+  setTimeout(checkReminders, 1200);
+}
+
+/* ========== Service Worker (התקנה כאפליקציה) ========== */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
