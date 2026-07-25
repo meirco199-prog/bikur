@@ -22,8 +22,9 @@ const env = {
 const sent = [];
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, opts) => {
-  if (String(url).includes('api.telegram.org')) {
-    if (String(url).includes('/sendMessage')) sent.push(JSON.parse(opts.body));
+  const u = String(url);
+  if (u.includes('api.telegram.org')) {
+    if (/\/(sendMessage|sendPhoto|sendDocument)$/.test(u) && opts?.body) sent.push(JSON.parse(opts.body));
     return new Response('{"ok":true}', { status: 200 });
   }
   return realFetch(url, opts);
@@ -179,6 +180,72 @@ console.log('יומן גוגל (ICS):');
   const ics = 'BEGIN:VEVENT\r\nUID:u@t\r\nDTSTART:20260115T100000Z\r\nSUMMARY:שיחת זום\r\nEND:VEVENT';
   const events = parseICS(ics, from, to);
   check('שעת UTC מומרת לישראל (10Z→12:00)', events.length === 1 && new Date(events[0].at).getHours() === 12, JSON.stringify(events));
+}
+
+console.log('פיצ\'רים חדשים 2:');
+{
+  const r = await send('קוראים לי מאיר');
+  check('פרופיל — שם', r.text.includes('נעים מאוד, מאיר'), r.text);
+}
+{
+  const r = await send('מה התאריך העברי?');
+  check('תאריך עברי', r.text.includes('ובעברי'), r.text);
+}
+{
+  const r = await send('משקל 82.5');
+  check('רישום משקל', r.text.includes('82.5'), r.text);
+}
+{
+  await send('משקל 81.8');
+  const r = await send('משקל');
+  check('מעקב משקל עם מגמה', r.text.includes('81.8') && r.text.includes('82.5'), r.text);
+}
+{
+  const r = await send('קבע לי ביומן פגישה עם עירית נתיבות מחר ב-8 בבוקר');
+  check('קבע לי ביומן — הכותרת נקייה', r.text.includes('קבעתי') && !r.text.includes('"לי ') && !r.text.includes('ביומן פגישה'), r.text);
+}
+{
+  const r = await send('תקבע לי פגישה עם דני מחרתיים ב-10');
+  check('תקבע (עם ת) עובד', r.text.includes('קבעתי'), r.text);
+}
+{
+  // מסמכים: שמירה דרך תמונה עם כיתוב ואז שליפה
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { chat: { id: 111 }, photo: [{ file_id: 'small' }, { file_id: 'BIG_FILE_ID' }], caption: 'שמור: תז של יוסי' } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  check('שמירת מסמך מתמונה', r.text.includes('שמרתי') && r.text.includes('תז של יוסי'), r.text);
+}
+{
+  const before = sent.length;
+  await send('איפה התז של יוסי');
+  const r = sent[sent.length - 1];
+  check('שליפת מסמך לפי שם', r.photo === 'BIG_FILE_ID' && r.caption.includes('תז של יוסי'), JSON.stringify(r));
+}
+{
+  const r = await send('מסמכים');
+  check('רשימת מסמכים', r.text.includes('תז של יוסי'), r.text);
+}
+{
+  // ניסוח עם AI מדומה
+  env.AI = { run: async (model, input) => ({ response: 'שלום יוסי, בהמשך לשיחתנו...', text: 'תמלול' }) };
+  const r = await send('נסח לי הודעה לעובד על סיום העסקה');
+  check('ניסוח עם AI', r.text.includes('שלום יוסי'), r.text);
+}
+{
+  const r = await send('חפש תנור');
+  check('חיפוש בהיסטוריית התכתבות', r.text.includes('💬') || r.text.includes('תנור'), r.text);
+}
+{
+  const r = await send('סיכום היום');
+  check('סיכום יומי', r.text.includes('סיכום היום') || r.text.includes('עוד לא'), r.text);
+}
+{
+  const r = await send('סיכום 30 ימים');
+  check('ציר זמן לתקופה', r.text.includes('30 הימים'), r.text);
 }
 
 console.log('setup:');

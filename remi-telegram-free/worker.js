@@ -2,17 +2,19 @@
 // תזכורות מגיעות כהתראת טלגרם אמיתית — גם כשכל האפליקציות סגורות.
 //
 // דרוש (מגדירים פעם אחת, ראה README):
-//   BOT_TOKEN     — הטוקן מ-BotFather (משתנה סודי)
-//   SECRET        — מחרוזת סודית שאתה ממציא (לאבטחת ה-webhook)
-//   DATA          — KV namespace binding
+//   BOT_TOKEN         — הטוקן מ-BotFather (משתנה סודי)
+//   SECRET            — מחרוזת סודית שאתה ממציא (לאבטחת ה-webhook)
+//   DATA              — KV namespace binding
 //   Cron trigger: * * * * *  (כל דקה, לבדיקת תזכורות)
 //
 // אופציונלי (משדרג יכולות):
-//   CALENDAR_ICS  — הכתובת הסודית של יומן גוגל בפורמט iCal (קריאת פגישות)
-//   AI            — Workers AI binding (תמלול הודעות קוליות בחינם)
+//   CALENDAR_ICS      — הכתובת הסודית של יומן גוגל (קריאת פגישות)
+//   CALENDAR_WEBHOOK  — כתובת Apps Script לכתיבה ליומן גוגל (קביעת פגישות אמיתית)
+//   AI                — Workers AI binding (קוליות, ניסוח, תרגום, תמונות)
+//   BRIEF_HOUR        — שעת סיכום הבוקר (ברירת מחדל 8, "off" לביטול)
+//   SUMMARY_HOUR      — שעת סיכום הערב (ברירת מחדל 21, "off" לביטול)
 
 const IL_TZ = 'Asia/Jerusalem';
-const BRIEF_HOUR_DEFAULT = 8;
 
 // ===== זמן ישראל =====
 // כל הלוגיקה עובדת ב"שעון קיר" ישראלי: Date מוזז כך שה-getters (getHours וכו')
@@ -22,6 +24,15 @@ function ilNow() {
 }
 function ilWallMs(realDate) {
   return new Date(realDate.toLocaleString('en-US', { timeZone: IL_TZ })).getTime();
+}
+// המרה משעון קיר ישראלי חזרה לזמן אמיתי (בשביל יומן גוגל)
+function ilToRealMs(shiftedMs) {
+  const now = new Date();
+  const offset = ilWallMs(now) - now.getTime();
+  return shiftedMs - offset;
+}
+function hebrewDate() {
+  return new Intl.DateTimeFormat('he-u-ca-hebrew', { timeZone: IL_TZ, day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
 }
 
 // ===== מפענח עברית =====
@@ -152,16 +163,34 @@ export function parseWhen(text, now) {
   return { at, recurringDaily, recurringWeekly, rest };
 }
 
+// מסיר מילות מילוי מכותרת אירוע/תזכורת ("קבע לי ביומן פגישה..." → "פגישה...")
+function stripFiller(text) {
+  return cleanup(text.replace(/^לי\s+/, '').replace(/\sביומן\s/g, ' ').replace(/^ביומן\s+/, ''));
+}
+
 export function parseCommand(raw, now) {
   const text = cleanup(raw);
   if (/^(עזרה|help|\/help|\/start|\?|פקודות|מה אתה יודע( לעשות)?|מה אפשר( לעשות)?)\??$/i.test(text)) return { cmd:'help' };
 
+  // פרופיל אישי
+  let m = text.match(/^(?:קוראים לי|תקרא לי|שמי)\s+(.+)$/);
+  if (m) return { cmd:'profile_name', name: cleanup(m[1]) };
+  m = text.match(/^אני בן\s+(\d+)/);
+  if (m) return { cmd:'profile_age', age: parseInt(m[1],10) };
+  m = text.match(/^(?:עליי|עלי|תדע עליי)[:\s]+(.+)$/s);
+  if (m) return { cmd:'profile_fact', text: cleanup(m[1]) };
+  if (/^(מי אני|פרופיל)\??$/.test(text)) return { cmd:'profile_show' };
+
+  // תאריך (כולל עברי)
+  if (/^(?:מה|איזה|תגיד(?: לי)?)?\s*(?:ה)?תאריך(?:\s+(?:היום|העברי|עברי))*\??$/.test(text) ||
+      /^מה התאריך העברי של היום\??$/.test(text)) return { cmd:'date_info' };
+
   // תזכורות
-  let m = text.match(/^(?:תזכיר לי|תזכירי לי|תזכורת[:\s])\s*(.+)$/s);
+  m = text.match(/^(?:תזכיר לי|תזכירי לי|תזכורת[:\s])\s*(.+)$/s);
   if (m) {
     const { at, recurringDaily, recurringWeekly, rest } = parseWhen(m[1], now);
     if (!at) return { cmd:'reminder_missing_time', text: cleanup(m[1]) };
-    return { cmd:'reminder_add', text: rest || 'תזכורת', at, recurringDaily, recurringWeekly };
+    return { cmd:'reminder_add', text: stripFiller(rest) || 'תזכורת', at, recurringDaily, recurringWeekly };
   }
   if (/^(תזכורות|רשימת תזכורות|מה התזכורות)\??$/.test(text)) return { cmd:'reminder_list' };
   m = text.match(/^(?:מחק|בטל|מחקי|בטלי)\s+תזכורת\s+(\d+)$/);
@@ -190,23 +219,43 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'shop_bought', index: parseInt(m[1],10) };
   if (/^(נקה קניות|מחק קניות)$/.test(text)) return { cmd:'shop_clear' };
 
-  // זיכרונות (המעיין 🙂)
+  // זיכרונות
   m = text.match(/^(?:זכור|תזכור|שמור|זיכרון|רעיון|הערה)[:\s]+(.+)$/s);
   if (m) return { cmd:'note_add', text: cleanup(m[1]) };
   if (/^(זיכרונות|רשימת זיכרונות|הערות)\??$/.test(text)) return { cmd:'note_list' };
   m = text.match(/^(?:מחק|מחקי)\s+זיכרון\s+(\d+)$/);
   if (m) return { cmd:'note_delete', index: parseInt(m[1],10) };
 
+  // בריאות — משקל
+  m = text.match(/^משקל[:\s]+(\d+(?:[.,]\d+)?)$/);
+  if (m) return { cmd:'weight_log', kg: parseFloat(m[1].replace(',', '.')) };
+  if (/^(משקל|בריאות)\??$/.test(text)) return { cmd:'weight_show' };
+
+  // ניסוח ותרגום (דורש AI)
+  m = text.match(/^(?:נסח|תנסח|כתוב|תכתוב)(?:\s+לי)?[:\s]+(.+)$/s);
+  if (m) return { cmd:'draft', text: cleanup(m[1]) };
+  m = text.match(/^(?:תרגם|תרגמי|targem)(?:\s+לי)?(?:\s+ל(אנגלית|עברית|צרפתית|ספרדית|רוסית|ערבית))?[:\s]+(.+)$/s);
+  if (m) return { cmd:'translate', lang: m[1] || 'עברית', text: cleanup(m[2]) };
+
+  // מסמכים
+  if (/^(מסמכים|רשימת מסמכים|הקבצים שלי)\??$/.test(text)) return { cmd:'doc_list' };
+  m = text.match(/^שלח מסמך\s+(\d+)$/);
+  if (m) return { cmd:'doc_send', index: parseInt(m[1],10) };
+  m = text.match(/^(?:מחק|מחקי)\s+מסמך\s+(\d+)$/);
+  if (m) return { cmd:'doc_delete', index: parseInt(m[1],10) };
+  m = text.match(/^(?:איפה|שלח לי|תשלח לי|הבא לי)\s+(?:את\s+)?(.+)$/);
+  if (m) return { cmd:'doc_find', query: cleanup(m[1]) };
+
   // חיפוש חופשי בכל מה ששמור
   m = text.match(/^(?:חפש|מצא|תמצא)\s+(.+)$/s);
   if (m) return { cmd:'search', query: cleanup(m[1]) };
 
   // יומן / אירועים
-  m = text.match(/^(?:קבע|קבעי|אירוע[:\s]|פגישה[:\s])\s*(.+)$/s);
+  m = text.match(/^(?:קבע|קבעי|תקבע|תקבעי|אירוע[:\s]|פגישה[:\s])\s*(.+)$/s);
   if (m) {
     const { at, rest } = parseWhen(m[1], now);
-    if (!at) return { cmd:'event_missing_time', text: cleanup(m[1]) };
-    return { cmd:'event_add', text: rest || 'אירוע', at };
+    if (!at) return { cmd:'event_missing_time', text: stripFiller(cleanup(m[1])) };
+    return { cmd:'event_add', text: stripFiller(rest) || 'אירוע', at };
   }
   m = text.match(/^(?:מחק|בטל|מחקי|בטלי)\s+(?:אירוע|פגישה)\s+(\d+)$/);
   if (m) return { cmd:'event_delete', index: parseInt(m[1],10) };
@@ -216,6 +265,10 @@ export function parseCommand(raw, now) {
   if (/^(מה יש לי השבוע|השבוע|מה יש לי)\??$/.test(text)) return { cmd:'agenda', range:'week' };
 
   if (/^(סיכום שבוע|סיכום שבועי|סטטיסטיקה)\??$/.test(text)) return { cmd:'week_summary' };
+  if (/^(סיכום היום|מה עשינו היום|סיכום יומי)\??$/.test(text)) return { cmd:'day_summary' };
+  m = text.match(/^(?:סיכום|ציר זמן)\s+(\d+)\s+(?:ימים|יום)(?:\s+אחרונים)?$/);
+  if (m) return { cmd:'period_summary', days: parseInt(m[1],10) };
+  if (/^ציר זמן\??$/.test(text)) return { cmd:'period_summary', days: 14 };
 
   // נתב כוונות: טקסט חופשי שמכיל זמן — כנראה תזכורת ("מחר ב-16:00 תור לרופא").
   // שאלות (סימן שאלה או מילת שאלה) הן לא תזכורת! (בלי \b — הוא לא עובד עם עברית)
@@ -223,7 +276,7 @@ export function parseCommand(raw, now) {
   if (!isQuestion) {
     const w = parseWhen(text, now);
     if (w.at && w.rest && w.rest.length >= 2 && w.rest !== text) {
-      return { cmd:'reminder_add', text: w.rest, at: w.at,
+      return { cmd:'reminder_add', text: stripFiller(w.rest), at: w.at,
                recurringDaily: w.recurringDaily, recurringWeekly: w.recurringWeekly, auto: true };
     }
   }
@@ -240,7 +293,6 @@ export function parseCommand(raw, now) {
 // ===== קריאת יומן גוגל (כתובת iCal סודית — בלי OAuth) =====
 
 function parseIcsDate(value, tzid) {
-  // 20260725 (יום שלם) / 20260725T093000Z (UTC) / 20260725T093000 (מקומי)
   let m = value.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (m) return { ms: new Date(+m[1], +m[2]-1, +m[3]).getTime(), allDay: true };
   m = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/);
@@ -249,7 +301,6 @@ function parseIcsDate(value, tzid) {
     const real = new Date(Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]));
     return { ms: ilWallMs(real), allDay: false };
   }
-  // עם TZID או בלי — מניחים שעון קיר ישראלי (נכון ליומנים ישראליים)
   return { ms: new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]).getTime(), allDay: false };
 }
 
@@ -278,7 +329,6 @@ export function parseICS(ics, from, to) {
     else if (key === 'RECURRENCE-ID') { const d = parseIcsDate(value, tzid); if (d) cur.recurrenceId = d.ms; }
   }
 
-  // מופעים שהוזזו ידנית (RECURRENCE-ID) דוחקים את המופע המקורי מהחזרתיות
   const movedByUid = new Map();
   for (const e of events) {
     if (e.recurrenceId && e.uid) {
@@ -295,7 +345,6 @@ export function parseICS(ics, from, to) {
       if (e.start.ms >= from && e.start.ms < to) out.push({ at: e.start.ms, text: title, allDay: e.start.allDay });
       continue;
     }
-    // הרחבת חזרתיות בסיסית: DAILY / WEEKLY / MONTHLY / YEARLY
     const rule = {};
     e.rrule.split(';').forEach(p => { const [k,v] = p.split('='); rule[k] = v; });
     const interval = parseInt(rule.INTERVAL || '1', 10);
@@ -338,6 +387,46 @@ async function fetchCalendar(env, from, to) {
   } catch { return []; }
 }
 
+// כתיבה ליומן גוגל דרך גשר Apps Script (ראה README)
+async function pushToGoogleCalendar(env, title, shiftedMs) {
+  if (!env || !env.CALENDAR_WEBHOOK) return false;
+  try {
+    const res = await fetch(env.CALENDAR_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: env.SECRET, title, startMs: ilToRealMs(shiftedMs), durationMin: 60 }),
+      redirect: 'follow',
+    });
+    return res.ok && (await res.text()).includes('ok');
+  } catch { return false; }
+}
+
+// ===== Workers AI: ניסוח, תרגום, ראיית תמונות =====
+
+async function aiText(env, prompt) {
+  if (!env || !env.AI) return null;
+  for (const model of ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct']) {
+    try {
+      const r = await env.AI.run(model, { prompt, max_tokens: 900 });
+      if (r?.response) return r.response.trim();
+    } catch {}
+  }
+  return null;
+}
+
+async function aiVision(env, imageBytes, instruction) {
+  if (!env || !env.AI) return null;
+  const prompt = instruction + '\nענה בעברית בלבד, בקצרה ולעניין.';
+  for (const model of ['@cf/meta/llama-3.2-11b-vision-instruct', '@cf/llava-hf/llava-1.5-7b-hf']) {
+    try {
+      const r = await env.AI.run(model, { prompt, image: [...imageBytes], max_tokens: 700 });
+      const txt = r?.response || r?.description;
+      if (txt) return txt.trim();
+    } catch {}
+  }
+  return null;
+}
+
 // ===== ניסוח =====
 
 function fmtTime(ts) {
@@ -359,52 +448,66 @@ function fmtIcsEvent(e, now) {
     ? `${fmtDate(e.at, now).replace(/ בשעה.*$/, '')} (כל היום) — ${e.text}`
     : `${fmtDate(e.at, now)} — ${e.text}`;
 }
+function firstName(S) {
+  return S.profile?.name ? S.profile.name.split(' ')[0] : null;
+}
+function greet(S) {
+  const n = firstName(S);
+  return n ? `${n}, ` : '';
+}
 
-const HELP = `היי, אני רמי — העוזר האישי שלך 🤖
+function helpText(S) {
+  const n = firstName(S);
+  return `היי${n ? ' ' + n : ''}, אני רמי — העוזר האישי שלך 🤖
 ההתראות שלי מגיעות תמיד, גם כשהכול סגור.
 
 ⏰ תזכורות
-• תזכיר לי מחר ב-9 להתקשר לדני
-• תזכיר לי בעוד 20 דקות להוריד כביסה
-• תזכיר לי כל יום ב-8 לקחת כדור
-• תזכיר לי כל יום ראשון ב-18:00 להוציא זבל
-• אפשר גם בלי "תזכיר לי": "מחר ב-16:00 תור לרופא"
-• דחה 10 — דוחה את התזכורת האחרונה ב-10 דקות
-• תזכורות / מחק תזכורת 2
-
-📋 משימות
-• משימה: לשלם ארנונה
-• משימות / סיימתי 1 / מחק משימה 3
-
-🛒 רשימת קניות
-• קניות: חלב, לחם, ביצים (אפשר כמה בבת אחת!)
-• קניות / קניתי 2 / נקה קניות
-
-🧠 זיכרונות
-• זכור: רעיון למתנה לאמא — צמח
-• זיכרונות / מחק זיכרון 1
-• חפש מתנה — מחפש בכל מה ששמור
+• תזכיר לי מחר ב-9 להתקשר לדני / בעוד 20 דקות...
+• כל יום ב-8... / כל יום ראשון ב-18:00...
+• גם בלי "תזכיר לי": "מחר ב-16:00 תור לרופא"
+• דחה 10 / תזכורות / מחק תזכורת 2
 
 📅 יומן
 • קבע פגישה עם דני ביום רביעי ב-14:00
-• מה יש לי היום / מחר / השבוע (כולל יומן גוגל אם חובר)
+• מה יש לי היום / מחר / השבוע / איזה פגישות יש לי?
+(עם חיבור יומן גוגל — רואה וקובע ביומן האמיתי)
 
-📊 סיכום שבוע — מה הספקת השבוע
-🎤 אפשר גם לשלוח הודעה קולית (אם חובר התמלול)
-🌅 כל בוקר ב-8:00 — סיכום היום שלך`;
+📋 משימות: משימה: X / משימות / סיימתי 1
+🛒 קניות: קניות: חלב, לחם / קניות / קניתי 2
+🧠 זיכרונות: זכור: X / זיכרונות / חפש X
+
+📄 מסמכים — שלח תמונה/קובץ עם כיתוב "שמור: תז של יוסי"
+ואחר כך: "איפה התז של יוסי" / מסמכים
+
+⚖️ בריאות: משקל 82 / משקל (מציג מגמה)
+✍️ נסח: הודעה לעובד על... / תרגם: Hello world
+📷 שלח תמונה עם שאלה בכיתוב — אנסה לקרוא אותה
+🎤 הודעות קוליות — מדבר אליי חופשי
+
+📊 סיכום היום / סיכום שבוע / סיכום 30 ימים / ציר זמן
+🗓️ מה התאריך העברי?
+👤 קוראים לי מאיר / אני בן 35 / עליי: ... / מי אני
+🌅 סיכום בוקר ב-8:00 וסיכום ערב ב-21:00 — אוטומטיים`;
+}
 
 // ===== אחסון ב-KV =====
 
 const EMPTY = {
-  tasks: [], reminders: [], events: [], shopping: [], notes: [],
+  tasks: [], reminders: [], events: [], shopping: [], notes: [], docs: [],
+  history: [], profile: { name: null, age: null, facts: [] },
+  health: { weight: [] },
   stats: { fired: [] }, lastFired: null,
-  nextId: 1, lastBriefDate: null, ownerChatId: null,
+  nextId: 1, lastBriefDate: null, lastSummaryDate: null, ownerChatId: null,
 };
 
 async function loadStore(env) {
   const raw = await env.DATA.get('store');
   const s = raw ? JSON.parse(raw) : {};
-  return Object.assign(structuredClone(EMPTY), s);
+  const merged = Object.assign(structuredClone(EMPTY), s);
+  merged.profile = Object.assign({ name: null, age: null, facts: [] }, s.profile || {});
+  merged.health = Object.assign({ weight: [] }, s.health || {});
+  merged.stats = Object.assign({ fired: [] }, s.stats || {});
+  return merged;
 }
 async function saveStore(env, s) {
   await env.DATA.put('store', JSON.stringify(s));
@@ -443,14 +546,85 @@ async function morningBrief(S, now, env) {
   const rems = S.reminders.filter(r => r.at >= from && r.at < to).sort((a,b) => a.at - b.at);
   const tasks = S.tasks.filter(t => !t.done);
   if (!all.length && !rems.length && !tasks.length) return null;
-  let out = `🌅 בוקר טוב! הנה היום שלך, יום ${DAY_NAMES[now.getDay()]}:\n`;
+  const n = firstName(S);
+  let out = `🌅 בוקר טוב${n ? ' ' + n : ''}! יום ${DAY_NAMES[now.getDay()]}, ${hebrewDate()}:\n`;
   if (all.length) out += '\n' + all.map(e => `📅 ${e.allDay ? 'כל היום' : fmtTime(e.at)} — ${e.text}`).join('\n');
   if (rems.length) out += '\n' + rems.map(r => `⏰ ${fmtTime(r.at)} — ${r.text}`).join('\n');
   if (tasks.length) out += `\n\n📋 משימות פתוחות:\n` + tasks.map((t,i) => `${i+1}. ${t.text}`).join('\n');
   return out;
 }
 
-// מקבל טקסט, מעדכן את S במקום ומחזיר תשובה; המתקשר שומר ל-KV.
+function daySummary(S, now) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const done = S.tasks.filter(t => t.doneAt && t.doneAt >= today);
+  const notes = S.notes.filter(n => n.created >= today);
+  const fired = (S.stats.fired || []).filter(ts => ts >= today).length;
+  const weight = (S.health.weight || []).filter(w => w.ts >= today);
+  if (!done.length && !notes.length && !fired && !weight.length) return null;
+  const n = firstName(S);
+  let out = `🌙 ${n ? n + ', ' : ''}סיכום היום:\n`;
+  if (done.length) out += `\n✅ הושלמו (${done.length}):\n` + done.map(t => `• ${t.text}`).join('\n');
+  if (notes.length) out += `\n\n🧠 נשמרו זיכרונות:\n` + notes.map(x => `• ${x.text}`).join('\n');
+  if (fired) out += `\n\n⏰ ${fired} תזכורות נשלחו`;
+  if (weight.length) out += `\n\n⚖️ נרשם משקל: ${weight[weight.length-1].kg} ק"ג`;
+  const open = S.tasks.filter(t => !t.done).length;
+  if (open) out += `\n\n📋 מחר מחכות ${open} משימות פתוחות. לילה טוב! 😴`;
+  return out;
+}
+
+function periodSummary(S, days, now) {
+  const from = now.getTime() - days * 86400000;
+  const done = S.tasks.filter(t => t.doneAt && t.doneAt >= from);
+  const notes = S.notes.filter(n => n.created >= from);
+  const fired = (S.stats.fired || []).filter(ts => ts >= from).length;
+  const weights = (S.health.weight || []).filter(w => w.ts >= from);
+  let out = `🗓️ ציר זמן — ${days} הימים האחרונים:\n`;
+  out += `\n✅ ${done.length} משימות הושלמו`;
+  if (done.length) out += ':\n' + done.slice(-12).map(t => `• ${t.text}`).join('\n');
+  if (notes.length) out += `\n\n🧠 ${notes.length} זיכרונות נשמרו:\n` + notes.slice(-10).map(x => `• ${x.text}`).join('\n');
+  out += `\n\n⏰ ${fired} תזכורות נשלחו`;
+  if (weights.length >= 2) {
+    const diff = (weights[weights.length-1].kg - weights[0].kg).toFixed(1);
+    out += `\n⚖️ משקל: ${weights[0].kg} → ${weights[weights.length-1].kg} ק"ג (${diff > 0 ? '+' : ''}${diff})`;
+  }
+  return out;
+}
+
+function doSearch(S, q, now) {
+  const hit = (t) => t.includes(q);
+  const notes = S.notes.filter(n => hit(n.text));
+  const tasks = S.tasks.filter(t => hit(t.text));
+  const rems = S.reminders.filter(r => hit(r.text));
+  const shop = S.shopping.filter(s => hit(s.text));
+  const events = S.events.filter(e => hit(e.text));
+  const docs = S.docs.filter(d => hit(d.name));
+  const hist = (S.history || []).filter(h => hit(h.text)).slice(-5);
+  if (!notes.length && !tasks.length && !rems.length && !shop.length && !events.length && !docs.length && !hist.length)
+    return `לא מצאתי כלום על "${q}" 🔍`;
+  let out = `🔍 מצאתי על "${q}":`;
+  if (notes.length) out += '\n\n🧠 זיכרונות:\n' + notes.map(n => `• ${n.text}`).join('\n');
+  if (tasks.length) out += '\n\n📋 משימות:\n' + tasks.map(t => `• ${t.text}${t.done ? ' ✅' : ''}`).join('\n');
+  if (rems.length) out += '\n\n⏰ תזכורות:\n' + rems.map(r => `• ${fmtDate(r.at, now)} — ${r.text}`).join('\n');
+  if (shop.length) out += '\n\n🛒 קניות:\n' + shop.map(s => `• ${s.text}`).join('\n');
+  if (events.length) out += '\n\n📅 אירועים:\n' + events.map(e => `• ${fmtDate(e.at, now)} — ${e.text}`).join('\n');
+  if (docs.length) out += '\n\n📄 מסמכים:\n' + docs.map(d => `• ${d.name} (כתוב "איפה ${d.name}" לשליפה)`).join('\n');
+  if (hist.length) out += '\n\n💬 מהתכתבויות קודמות:\n' + hist.map(h => {
+    const d = new Date(h.ts);
+    return `• (${d.getDate()}/${d.getMonth()+1}) ${h.text}`;
+  }).join('\n');
+  return out;
+}
+
+function findDocs(S, query) {
+  const norm = (s) => s.replace(/["'״׳]/g, '').split(/\s+/).map(w => w.replace(/^ה/, '')).filter(w => w.length >= 2);
+  const qWords = norm(query);
+  return S.docs.filter(d => {
+    const dWords = norm(d.name);
+    return qWords.some(qw => dWords.some(dw => dw.includes(qw) || qw.includes(dw)));
+  });
+}
+
+// מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
 export async function handleMessage(S, text, now, env) {
   const c = parseCommand(text, now);
   const nid = () => S.nextId++;
@@ -458,7 +632,33 @@ export async function handleMessage(S, text, now, env) {
   const sortedRems = () => S.reminders.slice().sort((a,b) => a.at - b.at);
 
   switch (c.cmd) {
-    case 'help': return HELP;
+    case 'help': return helpText(S);
+
+    case 'profile_name': {
+      S.profile.name = c.name;
+      return `נעים מאוד, ${c.name.split(' ')[0]}! 🤝 מעכשיו אני זוכר אותך.\nאפשר גם לספר לי: "אני בן 35", "עליי: אני עצמאי בתחום..."`;
+    }
+    case 'profile_age': {
+      S.profile.age = c.age;
+      return `רשמתי — בן ${c.age} ${greet(S) ? '🙂' : '🙂'}`;
+    }
+    case 'profile_fact': {
+      S.profile.facts.push(c.text);
+      return `👤 נרשם! אני כבר יודע עליך ${S.profile.facts.length + (S.profile.name ? 1 : 0) + (S.profile.age ? 1 : 0)} דברים.`;
+    }
+    case 'profile_show': {
+      const p = S.profile;
+      if (!p.name && !p.age && !p.facts.length) return 'עוד לא סיפרת לי על עצמך 🙂\nנסה: "קוראים לי מאיר", "אני בן 35", "עליי: ..."';
+      let out = '👤 מה שאני יודע עליך:';
+      if (p.name) out += `\n• שם: ${p.name}`;
+      if (p.age) out += `\n• גיל: ${p.age}`;
+      p.facts.forEach(f => out += `\n• ${f}`);
+      return out;
+    }
+
+    case 'date_info': {
+      return `📅 היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}\n🕎 ובעברי: ${hebrewDate()}`;
+    }
 
     case 'reminder_add': {
       if (!c.recurringDaily && (c.recurringWeekly === null || c.recurringWeekly === undefined)
@@ -471,7 +671,7 @@ export async function handleMessage(S, text, now, env) {
       if (c.recurringWeekly !== null && c.recurringWeekly !== undefined) when = `כל יום ${DAY_NAMES[c.recurringWeekly]} בשעה ${fmtTime(c.at)}`;
       else if (c.recurringDaily) when = `כל יום בשעה ${fmtTime(c.at)}`;
       else when = fmtDate(c.at, now);
-      return (c.auto ? '🧠 הבנתי לבד שזו תזכורת!\n' : '') + `⏰ סגור! אזכיר לך ${when}:\n"${c.text}"`;
+      return (c.auto ? '🧠 הבנתי לבד שזו תזכורת!\n' : '') + `⏰ סגור${greet(S) ? ' ' + firstName(S) : ''}! אזכיר לך ${when}:\n"${c.text}"`;
     }
     case 'reminder_missing_time':
       return `לא הצלחתי להבין מתי להזכיר לך 🤔\nנסה למשל: "תזכיר לי מחר ב-9 ${c.text}"`;
@@ -513,7 +713,7 @@ export async function handleMessage(S, text, now, env) {
       if (!t) return 'לא מצאתי משימה עם המספר הזה. כתוב "משימות" לרשימה.';
       t.done = true; t.doneAt = now.getTime();
       const left = openTasks().length;
-      return `✅ יפה! "${t.text}" בוצעה.` + (left ? `\nנשארו ${left} משימות.` : '\nסיימת הכול! 🎉');
+      return `✅ יפה${greet(S) ? ' ' + firstName(S) : ''}! "${t.text}" בוצעה.` + (left ? `\nנשארו ${left} משימות.` : '\nסיימת הכול! 🎉');
     }
     case 'task_delete': {
       const t = openTasks()[c.index - 1];
@@ -568,28 +768,83 @@ export async function handleMessage(S, text, now, env) {
       return `🗑️ מחקתי את הזיכרון: "${n.text}"`;
     }
 
-    case 'search': {
-      const q = c.query;
-      const hit = (t) => t.includes(q);
-      const notes = S.notes.filter(n => hit(n.text));
-      const tasks = S.tasks.filter(t => hit(t.text));
-      const rems = S.reminders.filter(r => hit(r.text));
-      const shop = S.shopping.filter(s => hit(s.text));
-      const events = S.events.filter(e => hit(e.text));
-      if (!notes.length && !tasks.length && !rems.length && !shop.length && !events.length)
-        return `לא מצאתי כלום על "${q}" 🔍`;
-      let out = `🔍 מצאתי על "${q}":`;
-      if (notes.length) out += '\n\n🧠 זיכרונות:\n' + notes.map(n => `• ${n.text}`).join('\n');
-      if (tasks.length) out += '\n\n📋 משימות:\n' + tasks.map(t => `• ${t.text}${t.done ? ' ✅' : ''}`).join('\n');
-      if (rems.length) out += '\n\n⏰ תזכורות:\n' + rems.map(r => `• ${fmtDate(r.at, now)} — ${r.text}`).join('\n');
-      if (shop.length) out += '\n\n🛒 קניות:\n' + shop.map(s => `• ${s.text}`).join('\n');
-      if (events.length) out += '\n\n📅 אירועים:\n' + events.map(e => `• ${fmtDate(e.at, now)} — ${e.text}`).join('\n');
+    case 'weight_log': {
+      const prev = S.health.weight[S.health.weight.length - 1];
+      S.health.weight.push({ ts: now.getTime(), kg: c.kg });
+      S.health.weight = S.health.weight.slice(-100);
+      let out = `⚖️ נרשם: ${c.kg} ק"ג`;
+      if (prev) {
+        const diff = (c.kg - prev.kg).toFixed(1);
+        out += diff == 0 ? '\nיציב כמו סלע 💪' : `\n${diff > 0 ? '+' : ''}${diff} ק"ג מהמדידה הקודמת (${new Date(prev.ts).getDate()}/${new Date(prev.ts).getMonth()+1})`;
+      }
+      out += '\n\nטיפ: "תזכיר לי כל יום ראשון ב-8 להישקל" ואעקוב איתך 🙂';
+      return out;
+    }
+    case 'weight_show': {
+      const w = S.health.weight;
+      if (!w.length) return 'עוד אין מדידות משקל ⚖️\nלרישום: "משקל 82"';
+      const last = w.slice(-8);
+      let out = '⚖️ מעקב משקל:\n' + last.map(x => {
+        const d = new Date(x.ts);
+        return `• ${d.getDate()}/${d.getMonth()+1} — ${x.kg} ק"ג`;
+      }).join('\n');
+      if (w.length >= 2) {
+        const diff = (w[w.length-1].kg - w[0].kg).toFixed(1);
+        out += `\n\nסה"כ מאז ההתחלה: ${diff > 0 ? '+' : ''}${diff} ק"ג`;
+      }
       return out;
     }
 
+    case 'draft': {
+      const result = await aiText(env, `אתה עוזר ניסוח מקצועי בעברית. המשימה: ${c.text}\nכתוב רק את הטקסט המבוקש עצמו, בעברית רהוטה, מנומסת ומקצועית. בלי הקדמות ובלי הסברים.`);
+      if (!result) return 'ניסוח דורש חיבור AI (חינם):\nב-Cloudflare: Settings → Bindings → Add → Workers AI → שם: AI ✍️';
+      return `✍️ הנה נוסח מוצע:\n\n${result}\n\n(אפשר לבקש שינויים: "נסח: אותו דבר אבל יותר קצר")`;
+    }
+    case 'translate': {
+      const result = await aiText(env, `תרגם את הטקסט הבא ל${c.lang}. כתוב רק את התרגום עצמו, בלי הסברים:\n\n${c.text}`);
+      if (!result) return 'תרגום דורש חיבור AI (חינם):\nב-Cloudflare: Settings → Bindings → Add → Workers AI → שם: AI 🌍';
+      return `🌍 תרגום ל${c.lang}:\n\n${result}`;
+    }
+
+    case 'doc_list': {
+      if (!S.docs.length) return '📄 אין מסמכים שמורים.\nשלח תמונה או קובץ עם כיתוב "שמור: תז של יוסי" ואשמור אותו.';
+      return `📄 המסמכים שלך (${S.docs.length}):\n` + S.docs.map((d,i) => {
+        const dt = new Date(d.created);
+        return `${i+1}. ${d.name}  (${dt.getDate()}/${dt.getMonth()+1})`;
+      }).join('\n') + '\n\nלשליפה: "איפה <שם>" או "שלח מסמך 2"';
+    }
+    case 'doc_send': {
+      const d = S.docs[c.index - 1];
+      if (!d) return 'לא מצאתי מסמך עם המספר הזה. כתוב "מסמכים" לרשימה.';
+      return { text: `📄 הנה "${d.name}":`, doc: d };
+    }
+    case 'doc_delete': {
+      const d = S.docs[c.index - 1];
+      if (!d) return 'לא מצאתי מסמך עם המספר הזה.';
+      S.docs = S.docs.filter(x => x.id !== d.id);
+      return `🗑️ מחקתי את "${d.name}" מהרשימה.`;
+    }
+    case 'doc_find': {
+      const matches = findDocs(S, c.query);
+      if (matches.length === 1) return { text: `📄 הנה "${matches[0].name}":`, doc: matches[0] };
+      if (matches.length > 1) {
+        return `מצאתי כמה מסמכים 📄:\n` + matches.map((d) => {
+          const idx = S.docs.indexOf(d) + 1;
+          return `${idx}. ${d.name}`;
+        }).join('\n') + '\n\nכתוב "שלח מסמך <מספר>"';
+      }
+      // אין מסמך כזה — ננסה חיפוש כללי
+      return doSearch(S, c.query, now);
+    }
+
+    case 'search': return doSearch(S, c.query, now);
+
     case 'event_add': {
       S.events.push({ id: nid(), text: c.text, at: c.at.getTime() });
-      return `📅 קבעתי: "${c.text}"\n${fmtDate(c.at, now)}`;
+      const synced = await pushToGoogleCalendar(env, c.text, c.at.getTime());
+      return `📅 קבעתי: "${c.text}"\n${fmtDate(c.at, now)}` +
+        (synced ? '\n📆 נוסף גם ליומן גוגל שלך!' :
+          (env?.CALENDAR_WEBHOOK ? '' : '\n(רשום אצלי; לקביעה ביומן גוגל האמיתי — ראה חיבור ב-README)'));
     }
     case 'event_missing_time':
       return `לא הצלחתי להבין מתי 🤔\nנסה למשל: "קבע ${c.text} ביום רביעי ב-14:00"`;
@@ -603,6 +858,9 @@ export async function handleMessage(S, text, now, env) {
     }
 
     case 'agenda': return agendaText(S, c.range, now, env);
+
+    case 'day_summary': return daySummary(S, now) || 'עוד לא קרה כלום היום 🙂';
+    case 'period_summary': return periodSummary(S, c.days, now);
 
     case 'week_summary': {
       const weekAgo = now.getTime() - 7*86400000;
@@ -620,30 +878,42 @@ export async function handleMessage(S, text, now, env) {
     }
 
     default:
-      return `לא הבנתי 🤔 אני עוזר של תזכורות, משימות, קניות, זיכרונות ויומן.\nכתוב "עזרה" כדי לראות מה אני יודע לעשות.`;
+      return `לא הבנתי 🤔 אני עוזר של תזכורות, יומן, משימות, קניות, זיכרונות, מסמכים ועוד.\nכתוב "עזרה" כדי לראות הכול.`;
   }
 }
 
 // ===== טלגרם =====
 
-async function tgSend(env, chatId, text) {
-  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
+async function tgApi(env, method, body) {
+  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) console.log('sendMessage failed:', await res.text());
+  if (!res.ok) console.log(`${method} failed:`, await res.text());
   return res.ok;
 }
+async function tgSend(env, chatId, text) {
+  return tgApi(env, 'sendMessage', { chat_id: chatId, text });
+}
+async function tgSendDoc(env, chatId, doc, caption) {
+  if (doc.type === 'photo') return tgApi(env, 'sendPhoto', { chat_id: chatId, photo: doc.fileId, caption });
+  return tgApi(env, 'sendDocument', { chat_id: chatId, document: doc.fileId, caption });
+}
 
-// תמלול הודעה קולית עם Workers AI (חינם) — אם ה-binding מוגדר
+async function tgGetFileBytes(env, fileId) {
+  const info = await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${fileId}`)).json();
+  if (!info.ok) return null;
+  const buf = await (await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${info.result.file_path}`)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+// תמלול הודעה קולית עם Workers AI (חינם)
 async function transcribeVoice(env, fileId) {
   if (!env.AI) return { error: 'no_ai' };
   try {
-    const info = await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${fileId}`)).json();
-    if (!info.ok) return { error: 'file' };
-    const buf = await (await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${info.result.file_path}`)).arrayBuffer();
-    const bytes = new Uint8Array(buf);
+    const bytes = await tgGetFileBytes(env, fileId);
+    if (!bytes) return { error: 'file' };
     let b64 = '';
     for (let i = 0; i < bytes.length; i += 8192) b64 += String.fromCharCode(...bytes.subarray(i, i + 8192));
     b64 = btoa(b64);
@@ -659,6 +929,51 @@ async function transcribeVoice(env, fileId) {
   }
 }
 
+async function handleMedia(env, S, msg, chatId, now) {
+  const isPhoto = !!msg.photo;
+  const fileId = isPhoto ? msg.photo[msg.photo.length - 1].file_id : msg.document?.file_id;
+  if (!fileId) return false;
+  const caption = cleanup(msg.caption || '');
+
+  // "שמור: תז של יוסי" — שמירה בארכיון המסמכים
+  const saveM = caption.match(/^(?:שמור|מסמך|תשמור)(?:\s+לי)?[:\s]+(.+)$/s);
+  if (saveM) {
+    const name = cleanup(saveM[1]);
+    S.docs.push({ id: S.nextId++, name, fileId, type: isPhoto ? 'photo' : 'document', created: now.getTime() });
+    await saveStore(env, S);
+    await tgSend(env, chatId, `📄 שמרתי את "${name}"!\nלשליפה בעתיד: "איפה ${name}" או "מסמכים"`);
+    return true;
+  }
+
+  // תמונה עם שאלה/הוראה בכיתוב — ניסיון קריאה עם AI (בטא)
+  if (isPhoto && env.AI) {
+    const bytes = await tgGetFileBytes(env, fileId);
+    if (bytes) {
+      const instruction = caption || 'תאר מה יש בתמונה. אם יש בה טקסט או רשימה — כתוב אותם.';
+      const result = await aiVision(env, bytes, instruction);
+      if (result) {
+        // אם ביקשו רשימת קניות — נוסיף את הפריטים ישר לרשימה
+        if (/קניות/.test(caption)) {
+          const items = result.split(/[\n,•·-]+/).map(cleanup).filter(x => x.length >= 2 && x.length <= 40).slice(0, 20);
+          if (items.length) {
+            for (const item of items) S.shopping.push({ id: S.nextId++, text: item });
+            await saveStore(env, S);
+            await tgSend(env, chatId, `📷 חילצתי מהתמונה והוספתי לקניות:\n` + items.map((x,i) => `${i+1}. ${x}`).join('\n') + '\n\n(אם משהו יצא שגוי — "מחק קניות" ותקן ידנית 🙂)');
+            return true;
+          }
+        }
+        await tgSend(env, chatId, `📷 ${result}\n\n(קריאת תמונות בעברית היא יכולת ניסיונית — לא תמיד מדויקת)`);
+        return true;
+      }
+    }
+    await tgSend(env, chatId, 'לא הצלחתי לקרוא את התמונה 😕\nכדי לשמור אותה כמסמך: שלח שוב עם כיתוב "שמור: <שם>"');
+    return true;
+  }
+
+  await tgSend(env, chatId, 'קיבלתי קובץ 📎 כדי שאשמור אותו: שלח שוב עם כיתוב "שמור: <שם>", למשל "שמור: תז של יוסי"');
+  return true;
+}
+
 async function handleWebhook(env, update) {
   const msg = update.message || update.edited_message;
   if (!msg?.chat?.id) return;
@@ -671,7 +986,7 @@ async function handleWebhook(env, update) {
   if (S.ownerChatId === null && text && /^\/start/.test(text)) {
     S.ownerChatId = chatId;
     await saveStore(env, S);
-    await tgSend(env, chatId, HELP);
+    await tgSend(env, chatId, helpText(S));
     return;
   }
   if (S.ownerChatId === null) {
@@ -683,13 +998,21 @@ async function handleWebhook(env, update) {
     return;
   }
 
+  const now = ilNow();
+
+  // תמונות וקבצים
+  if (msg.photo || msg.document) {
+    await handleMedia(env, S, msg, chatId, now);
+    return;
+  }
+
   // הודעה קולית → תמלול → ממשיכים כרגיל
   let voicePrefix = '';
   if (!text && (msg.voice || msg.audio || msg.video_note)) {
     const fileId = (msg.voice || msg.audio || msg.video_note).file_id;
     const tr = await transcribeVoice(env, fileId);
     if (tr.error === 'no_ai') {
-      await tgSend(env, chatId, 'כדי שאבין הודעות קוליות צריך לחבר את התמלול (חינם):\nב-Cloudflare: Settings → Bindings → Add → Workers AI → Variable name: AI → Deploy 🎤');
+      await tgSend(env, chatId, 'כדי שאבין הודעות קוליות צריך לחבר את התמלול (חינם):\nב-Cloudflare: Settings → Bindings → Add → Workers AI → Variable name: AI 🎤');
       return;
     }
     if (tr.error || !tr.text) {
@@ -701,9 +1024,16 @@ async function handleWebhook(env, update) {
   }
   if (!text) return;
 
-  const answer = await handleMessage(S, text, ilNow(), env);
+  // יומן התכתבות — כדי שאפשר יהיה לחפש אחורה
+  S.history = [...(S.history || []), { ts: now.getTime(), text }].slice(-200);
+
+  const answer = await handleMessage(S, text, now, env);
   await saveStore(env, S);
-  await tgSend(env, chatId, voicePrefix + answer);
+  if (typeof answer === 'object' && answer.doc) {
+    await tgSendDoc(env, chatId, answer.doc, answer.text);
+  } else {
+    await tgSend(env, chatId, voicePrefix + (typeof answer === 'string' ? answer : answer.text));
+  }
 }
 
 async function runCron(env) {
@@ -720,9 +1050,10 @@ async function runCron(env) {
       if (r.recurringDaily) suffix = '\n(תזכורת יומית — תחזור מחר)';
       else if (r.recurringWeekly !== null && r.recurringWeekly !== undefined) suffix = `\n(חוזרת כל יום ${DAY_NAMES[r.recurringWeekly]})`;
       else suffix = '\n(אפשר לכתוב "דחה 10" לנודניק)';
-      await tgSend(env, S.ownerChatId, `⏰ תזכורת: ${r.text}${suffix}`);
+      const n = firstName(S);
+      await tgSend(env, S.ownerChatId, `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
       S.lastFired = { text: r.text };
-      S.stats.fired = [...(S.stats.fired || []), nowMs].slice(-200);
+      S.stats.fired = [...(S.stats.fired || []), nowMs].slice(-300);
       if (r.recurringDaily) { while (r.at <= nowMs) r.at += 86400000; }
       else if (r.recurringWeekly !== null && r.recurringWeekly !== undefined) { while (r.at <= nowMs) r.at += 7*86400000; }
       else S.reminders = S.reminders.filter(x => x.id !== r.id);
@@ -730,13 +1061,21 @@ async function runCron(env) {
     }
   }
 
-  const briefHour = parseInt(env.BRIEF_HOUR ?? BRIEF_HOUR_DEFAULT, 10);
+  const briefHour = env.BRIEF_HOUR === 'off' ? null : parseInt(env.BRIEF_HOUR ?? '8', 10);
   const todayStr = now.toDateString();
-  if (!Number.isNaN(briefHour) && now.getHours() === briefHour && S.lastBriefDate !== todayStr) {
+  if (briefHour !== null && !Number.isNaN(briefHour) && now.getHours() === briefHour && S.lastBriefDate !== todayStr) {
     S.lastBriefDate = todayStr;
     changed = true;
     const brief = await morningBrief(S, now, env);
     if (brief) await tgSend(env, S.ownerChatId, brief);
+  }
+
+  const summaryHour = env.SUMMARY_HOUR === 'off' ? null : parseInt(env.SUMMARY_HOUR ?? '21', 10);
+  if (summaryHour !== null && !Number.isNaN(summaryHour) && now.getHours() === summaryHour && S.lastSummaryDate !== todayStr) {
+    S.lastSummaryDate = todayStr;
+    changed = true;
+    const sum = daySummary(S, now);
+    if (sum) await tgSend(env, S.ownerChatId, sum);
   }
 
   // ניקוי אירועים ישנים משבוע שעבר
