@@ -275,7 +275,7 @@ console.log('מוח AI (הבנת שפה חופשית):');
     const p = input.prompt || '';
     if (p.includes('החזר אך ורק JSON')) {
       const msg = (p.match(/ההודעה החדשה שלו: "([^"]*)"/) || [])[1] || '';
-      if (msg.includes('קפריסין')) return { response: '{"action":"event","title":"טיסה לקפריסין (30/7–1/8)","datetime":"2026-07-30 12:00","recurring":"none","reply":"בשמחה מאיר! רשמתי לך את הטיסה, שתהיה חופשה נהדרת 🙏"}' };
+      if (/קפריסי/.test(msg)) return { response: '{"action":"event","title":"טיסה לקפריסין (30/7–1/8)","datetime":"2026-07-30 12:00","recurring":"none","reply":"בשמחה מאיר! רשמתי לך את הטיסה, שתהיה חופשה נהדרת 🙏"}' };
       if (msg.includes('מה שלומך')) return { response: '{"action":"answer","reply":"הכול מצוין מאיר, תודה ששאלת! איך אפשר לעזור לך היום? 🙂"}' };
       return { response: 'לא JSON' };
     }
@@ -328,6 +328,11 @@ console.log('תזכורות חכמות (עונות במקום להדהד):');
     check('בזמן הצלצול — ה-AI עונה על השאלה', fired.some(m => m.text.includes('51 ימים')), JSON.stringify(fired.map(f=>f.text)));
   }
   env.AI.run = oldRun;
+}
+
+{
+  const r = await send('כבר לי פגישה ביומן בין ה-30 ליולי עד הראשון לאוגוסט, טיסה לקפריסים');
+  check('משפט משובש עם "ביומן" → AI קובע אירוע (לא שאלת יומן)', r.text.includes('קבעתי') && r.text.includes('קפריסי'), r.text);
 }
 
 console.log('setup:');

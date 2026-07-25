@@ -321,10 +321,10 @@ export function parseCommand(raw, now) {
     }
   }
 
-  // ניסוחים חופשיים של שאלת יומן: "איזה פגישות יש לי היום ביומן?", "מתי הפגישה מחר?" וכו'
+  // ניסוחים חופשיים של שאלת יומן — ניחוש רך (loose): ה-AI מקבל עדיפות אם הוא מחובר
   if (isShortLine && (/ביומן|פגיש/.test(text) || /^(מה יש לי|מה קורה|מה מתוכנן|מה הלו"?ז)(\s|$)/.test(text))) {
     const range = /מחר/.test(text) ? 'tomorrow' : /שבוע/.test(text) ? 'week' : 'today';
-    return { cmd:'agenda', range };
+    return { cmd:'agenda', range, loose: true };
   }
 
   // הודעה ארוכה או רב-שורתית שאינה פקודה — נשמור בזיכרון שלא תלך לאיבוד
@@ -674,7 +674,7 @@ function findDocs(S, query) {
 // כשהחוקים הפשוטים לא בטוחים — מודל שפה מקבל את ההודעה, את הפרופיל ואת ההקשר,
 // ומחזיר JSON עם הפעולה + תשובה חמה ומנומסת.
 
-async function aiBrain(env, S, text, now) {
+async function aiBrain(env, S, text, now, isVoice = false) {
   if (!env?.AI) return null;
   const n = firstName(S) || 'חבר';
   const facts = [
@@ -689,7 +689,7 @@ async function aiBrain(env, S, text, now) {
 הודעות אחרונות שלו (הקשר):
 ${hist || '(אין)'}
 ההודעה החדשה שלו: "${text}"
-
+${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וייתכנו שגיאות תמלול — תקן לפי ההיגיון (למשל "תיסה"="טיסה", "כבר לי"="קבע לי", מספרים משובשים כמו "ה-37" הם כנראה תאריך כמו 30/7).' : ''}
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
 {"action":"reminder|event|task|shopping|note|agenda|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
 
@@ -703,7 +703,7 @@ ${hist || '(אין)'}
 
   for (const model of ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct']) {
     try {
-      const r = await env.AI.run(model, { prompt, max_tokens: 600 });
+      const r = await env.AI.run(model, { prompt, max_tokens: 600, temperature: 0.15 });
       const m = (r?.response || '').match(/\{[\s\S]*\}/);
       if (!m) continue;
       const j = JSON.parse(m[0]);
@@ -787,13 +787,14 @@ async function smartReminderText(env, S, text, now) {
 }
 
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
-export async function handleMessage(S, text, now, env) {
+export async function handleMessage(S, text, now, env, isVoice = false) {
   const c = parseCommand(text, now);
 
-  // כשהחוקים לא בטוחים — המוח (AI) מקבל את ההגה
-  const weak = c.cmd === 'unknown' || c.cmd === 'reminder_missing_time' || c.cmd === 'event_missing_time' || c.auto;
+  // כשהחוקים לא בטוחים (או שזו הודעה קולית מתומללת) — המוח (AI) מקבל את ההגה
+  const weak = c.cmd === 'unknown' || c.cmd === 'reminder_missing_time' || c.cmd === 'event_missing_time'
+    || c.auto || c.loose || isVoice;
   if (weak && env?.AI) {
-    const ai = await aiBrain(env, S, text, now);
+    const ai = await aiBrain(env, S, text, now, isVoice);
     if (ai) return ai;
   }
   const nid = () => S.nextId++;
@@ -1214,7 +1215,7 @@ async function handleWebhook(env, update) {
   // יומן התכתבות — כדי שאפשר יהיה לחפש אחורה
   S.history = [...(S.history || []), { ts: now.getTime(), text }].slice(-200);
 
-  const answer = await handleMessage(S, text, now, env);
+  const answer = await handleMessage(S, text, now, env, !!voicePrefix);
   await saveStore(env, S);
   if (typeof answer === 'object' && answer.doc) {
     await tgSendDoc(env, chatId, answer.doc, answer.text);
