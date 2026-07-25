@@ -17,6 +17,11 @@
 
 const SECRET = 'remi-meir-2026'; // ← החלף לסוד שלך (אותו אחד מ-Cloudflare)
 
+// בדיקה בדפדפן: פתיחת כתובת ה-exec מציגה "הגשר של רמי חי"
+function doGet() {
+  return ContentService.createTextOutput('הגשר של רמי חי 🙂 (' + new Date() + ')');
+}
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
