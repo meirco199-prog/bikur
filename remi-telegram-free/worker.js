@@ -318,6 +318,9 @@ export function parseCommand(raw, now) {
   }
   m = text.match(/^(?:מחק|בטל|מחקי|בטלי)\s+(?:אירוע|פגישה)\s+(\d+)$/);
   if (m) return { cmd:'event_delete', index: parseInt(m[1],10) };
+  // ביטול יום שלם: "בטל את כל הפגישות ביום ראשון" / "של מחר" / "היום"
+  m = text.match(/^(?:בטל|תבטל|מחק|תמחק)\s+(?:לי\s+)?(?:את\s+)?כל\s+הפגישות(?:\s+(.+))?$/);
+  if (m) return { cmd:'events_clear_day', when: cleanup(m[1] || 'היום') };
 
   if (/^(מה יש לי היום|היום|סדר יום|יומן)\??$/.test(text)) return { cmd:'agenda', range:'today' };
   if (/^(מה יש לי מחר|מחר)\??$/.test(text)) return { cmd:'agenda', range:'tomorrow' };
@@ -1357,6 +1360,30 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
       if (!e) return 'לא מצאתי אירוע עם המספר הזה השבוע. (אירועים מיומן גוגל אפשר למחוק רק ביומן עצמו.)';
       S.events = S.events.filter(x => x.id !== e.id);
       return `🗑️ ביטלתי: "${e.text}"`;
+    }
+
+    case 'events_clear_day': {
+      // "בטל את כל הפגישות ביום ראשון" — מוחק את כל היום, גם מיומן גוגל
+      const w = parseWhen(' ' + c.when + ' ', now);
+      const day = new Date(w.at ? w.at.getTime() : now.getTime());
+      day.setHours(0, 0, 0, 0);
+      const from = day.getTime(), to = from + 86400000;
+      const local = S.events.filter(e => e.at >= from && e.at < to);
+      const gcal = (await fetchCalendar(env, from, to)).filter(e => !e.allDay);
+      const dayLabel = `${DAY_NAMES[day.getDay()]} ${day.getDate()}/${day.getMonth() + 1}`;
+      if (!local.length && !gcal.length) return `אין פגישות ביום ${dayLabel} 👌`;
+      S.events = S.events.filter(e => !(e.at >= from && e.at < to));
+      const seen = new Set();
+      const names = [];
+      for (const e of [...local, ...gcal]) {
+        const key = e.text + '|' + Math.round(e.at / 60000);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        await deleteFromGoogleCalendar(env, e.text, e.at);
+        names.push(`• ${fmtTime(e.at)} — ${e.text}`);
+      }
+      return `🗑️ ביטלתי ${names.length === 1 ? 'פגישה אחת' : names.length + ' פגישות'} ביום ${dayLabel}:\n` +
+        names.join('\n') + (env?.CALENDAR_WEBHOOK ? '\n📆 נמחקו גם מיומן גוגל.' : '');
     }
 
     case 'agenda': return agendaText(S, c.range, now, env);

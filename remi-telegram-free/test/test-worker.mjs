@@ -625,5 +625,43 @@ console.log('תיקון תמלול קולי עם קלוד:');
   globalThis.fetch = prevFetch;
 }
 
+console.log('ביטול כל הפגישות של יום שלם:');
+{
+  const prevFetch = globalThis.fetch;
+  const bridgeCalls = [];
+  // יום ראשון הקרוב (לפי שעון ישראל בערך — מספיק טוב לבדיקה)
+  const d = new Date();
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7 || 7));
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T130000`;
+  const ics = `BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:cd1@t\r\nDTSTART;TZID=Asia/Jerusalem:${stamp}\r\nSUMMARY:טיפול שיניים לביטול\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('ics.example')) return new Response(ics, { status: 200 });
+    if (u.includes('bridge.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok:deleted=1', { status: 200 }); }
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_ICS = 'https://ics.example/secret.ics';
+  env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
+
+  await send('קבע פגישה ליום ראשון ב-10 עם משקיע ראשון');
+  await send('קבע פגישה ליום ראשון ב-16 עם משקיע שני');
+  bridgeCalls.length = 0;
+
+  const r = await send('בטל את כל הפגישות ביום ראשון');
+  check('ביטול יום שלם — כל הפגישות ברשימה', r.text.includes('ביטלתי') && r.text.includes('משקיע ראשון') && r.text.includes('משקיע שני') && r.text.includes('טיפול שיניים'), r.text);
+  check('  הגשר קיבל מחיקה לכל פגישה (כולל מיומן גוגל)', bridgeCalls.filter(b => b.action === 'delete').length >= 3, JSON.stringify(bridgeCalls));
+  const S = JSON.parse(kv.get('store'));
+  check('  נמחקו מהזיכרון המקומי', !S.events.some(e => e.text.includes('משקיע')));
+
+  delete env.CALENDAR_ICS; // היומן המדומה תמיד מחזיר את האירוע — מנתקים כדי לבדוק יום ריק
+  const r2 = await send('בטל את כל הפגישות ביום ראשון');
+  check('יום ריק — תשובה נקייה', r2.text.includes('אין פגישות'), r2.text);
+
+  delete env.CALENDAR_ICS;
+  delete env.CALENDAR_WEBHOOK;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
