@@ -217,11 +217,21 @@ export function parseCommand(raw, now) {
 
   if (/^(סיכום שבוע|סיכום שבועי|סטטיסטיקה)\??$/.test(text)) return { cmd:'week_summary' };
 
-  // נתב כוונות: טקסט חופשי שמכיל זמן — כנראה תזכורת ("מחר ב-16:00 תור לרופא")
-  const w = parseWhen(text, now);
-  if (w.at && w.rest && w.rest.length >= 2 && w.rest !== text) {
-    return { cmd:'reminder_add', text: w.rest, at: w.at,
-             recurringDaily: w.recurringDaily, recurringWeekly: w.recurringWeekly, auto: true };
+  // נתב כוונות: טקסט חופשי שמכיל זמן — כנראה תזכורת ("מחר ב-16:00 תור לרופא").
+  // שאלות (סימן שאלה או מילת שאלה) הן לא תזכורת! (בלי \b — הוא לא עובד עם עברית)
+  const isQuestion = /\?/.test(text) || /^(מה|מתי|איזה|אילו|כמה|האם|מי|איך|למה|איפה)(\s|$)/.test(text);
+  if (!isQuestion) {
+    const w = parseWhen(text, now);
+    if (w.at && w.rest && w.rest.length >= 2 && w.rest !== text) {
+      return { cmd:'reminder_add', text: w.rest, at: w.at,
+               recurringDaily: w.recurringDaily, recurringWeekly: w.recurringWeekly, auto: true };
+    }
+  }
+
+  // ניסוחים חופשיים של שאלת יומן: "איזה פגישות יש לי היום ביומן?", "מתי הפגישה מחר?" וכו'
+  if (/ביומן|פגיש/.test(text) || /^(מה יש לי|מה קורה|מה מתוכנן|מה הלו"?ז)(\s|$)/.test(text)) {
+    const range = /מחר/.test(text) ? 'tomorrow' : /שבוע/.test(text) ? 'week' : 'today';
+    return { cmd:'agenda', range };
   }
 
   return { cmd:'unknown', text };
@@ -451,6 +461,10 @@ export async function handleMessage(S, text, now, env) {
     case 'help': return HELP;
 
     case 'reminder_add': {
+      if (!c.recurringDaily && (c.recurringWeekly === null || c.recurringWeekly === undefined)
+          && c.at.getTime() <= now.getTime()) {
+        return `רגע, השעה הזאת כבר עברה היום 🙂\nנסה למשל: "תזכיר לי מחר ב-${fmtTime(c.at.getTime())} ${c.text}"`;
+      }
       S.reminders.push({ id: nid(), text: c.text, at: c.at.getTime(),
         recurringDaily: !!c.recurringDaily, recurringWeekly: c.recurringWeekly ?? null });
       let when;
