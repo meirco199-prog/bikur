@@ -101,6 +101,18 @@
     font-size: 10.5px; color: var(--muted); margin-top: 3px;
   }
   .msg b { font-weight: 700; }
+  .msg a.action {
+    display: block;
+    margin-top: 8px;
+    padding: 9px 14px;
+    background: var(--send);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+  }
   .daysep {
     align-self: center;
     background: var(--bubble-in);
@@ -369,6 +381,24 @@ function fmtDate(ts, now = new Date()) {
   return `${d.getDate()}/${d.getMonth()+1} בשעה ${fmtTime(ts)}`;
 }
 
+// קישור להוספת התראה ליומן גוגל — כך הטלפון מצלצל גם כשהאפליקציה סגורה
+function gcalUrl(title, atMs, recurringDaily) {
+  const p = n => String(n).padStart(2, '0');
+  const g = ms => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}T${p(d.getHours())}${p(d.getMinutes())}00`;
+  };
+  let u = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + '&text=' + encodeURIComponent('⏰ ' + title)
+    + '&dates=' + g(atMs) + '/' + g(atMs + 15*60000)
+    + '&ctz=Asia/Jerusalem'
+    + '&details=' + encodeURIComponent('נקבע דרך רמי — העוזר האישי שלך');
+  if (recurringDaily) u += '&recur=' + encodeURIComponent('RRULE:FREQ=DAILY');
+  return u;
+}
+
+const PHONE_BUTTON = '📲 שיצלצל גם כשאני סגור — הוסף ליומן גוגל';
+
 const HELP = `היי, אני רמי — העוזר האישי שלך 🤖
 פשוט כתוב לי בעברית:
 
@@ -387,7 +417,7 @@ const HELP = `היי, אני רמי — העוזר האישי שלך 🤖
 • מה יש לי היום / מחר / השבוע
 
 💡 טיפ: הוסף אותי למסך הבית כדי שאהיה כמו אפליקציה.
-שים לב: תזכורות מצלצלות כשהאפליקציה פתוחה; כשתפתח אותי אציג כל מה שפספסת.`;
+📲 אחרי כל תזכורת שתקבע יופיע כפתור שמכניס אותה גם ליומן גוגל — ואז הטלפון יצלצל בזמן גם כשאני סגור.`;
 
 function agendaText(range, now = new Date()) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -430,7 +460,10 @@ function handleMessage(text, now = new Date()) {
     case 'reminder_add': {
       S.reminders.push({ id: nid(), text: c.text, at: c.at.getTime(), recurringDaily: c.recurringDaily }); save();
       const when = c.recurringDaily ? `כל יום בשעה ${fmtTime(c.at)}` : fmtDate(c.at, now);
-      return `⏰ סגור! אזכיר לך ${when}:\n"${c.text}"`;
+      return {
+        text: `⏰ סגור! אזכיר לך ${when}:\n"${c.text}"`,
+        actions: [{ label: PHONE_BUTTON, href: gcalUrl(c.text, c.at.getTime(), c.recurringDaily) }],
+      };
     }
     case 'reminder_missing_time':
       return `לא הצלחתי להבין מתי להזכיר לך 🤔\nנסה למשל: "תזכיר לי מחר ב-9 ${c.text}"`;
@@ -477,7 +510,10 @@ function handleMessage(text, now = new Date()) {
 
     case 'event_add': {
       S.events.push({ id: nid(), text: c.text, at: c.at.getTime() }); save();
-      return `📅 קבעתי: "${c.text}"\n${fmtDate(c.at, now)}`;
+      return {
+        text: `📅 קבעתי: "${c.text}"\n${fmtDate(c.at, now)}`,
+        actions: [{ label: PHONE_BUTTON, href: gcalUrl(c.text, c.at.getTime(), false) }],
+      };
     }
     case 'event_missing_time':
       return `לא הצלחתי להבין מתי 🤔\nנסה למשל: "קבע ${c.text} ביום רביעי ב-14:00"`;
@@ -513,26 +549,34 @@ function fmtMd(text) {
 function renderMsg(m, scroll = true) {
   const div = document.createElement('div');
   div.className = 'msg ' + (m.who === 'me' ? 'me' : 'bot');
-  div.innerHTML = fmtMd(m.text) + `<span class="t">${fmtTime(m.ts)}</span>`;
+  let html = fmtMd(m.text);
+  for (const a of m.actions || []) {
+    if (!/^https:\/\/calendar\.google\.com\//.test(a.href)) continue;
+    html += `<a class="action" href="${a.href.replace(/"/g,'&quot;')}" target="_blank" rel="noopener">${fmtMd(a.label)}</a>`;
+  }
+  div.innerHTML = html + `<span class="t">${fmtTime(m.ts)}</span>`;
   chatEl.appendChild(div);
   if (scroll) chatEl.scrollTop = chatEl.scrollHeight;
 }
 
-function pushMsg(who, text) {
+function pushMsg(who, text, actions) {
   const m = { who, text, ts: Date.now() };
+  if (actions) m.actions = actions;
   history.push(m);
   if (history.length > 300) history = history.slice(-300);
   localStorage.setItem(HIST_KEY, JSON.stringify(history));
   renderMsg(m);
 }
 
-function botSay(text, delay = 350) {
+// res = מחרוזת או { text, actions }
+function botSay(res, delay = 350) {
   const status = document.getElementById('status');
   const prev = status.textContent;
   status.textContent = 'מקליד...';
   setTimeout(() => {
     status.textContent = prev;
-    pushMsg('bot', text);
+    if (typeof res === 'string') pushMsg('bot', res);
+    else pushMsg('bot', res.text, res.actions);
   }, delay);
 }
 
