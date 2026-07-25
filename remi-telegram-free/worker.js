@@ -1670,6 +1670,22 @@ export default {
             ? '✅ כתיבה ליומן גוגל עובדת! (נוצר אירוע בדיקה מחר ב-12:00 — מחק אותו ביומן)'
             : '❌ הגשר (Apps Script) לא ענה "ok" — בדוק: הסוד בקובץ זהה ל-SECRET, הפריסה עם גישה "כולם", והכתובת מסתיימת ב-/exec');
         } catch (e) { lines.push('❌ כתיבה ליומן נכשלה: ' + e.message); }
+        // בדיקת חיפוש בג'ימייל דרך הגשר — מציגים את התשובה הגולמית כדי שאפשר יהיה לאבחן מרחוק
+        try {
+          const res = await fetch(env.CALENDAR_WEBHOOK, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret: env.SECRET, action: 'gmail_search', q: 'בדיקה' }),
+            redirect: 'follow',
+          });
+          const raw = (await res.text()).replace(/\s+/g, ' ').slice(0, 200);
+          let ok = false;
+          try { ok = !!JSON.parse(raw).ok; } catch {}
+          if (ok) lines.push("✅ חיפוש בג'ימייל עובד!");
+          else if (/[Aa]uthorization|הרשאה|נדרש אישור/.test(raw))
+            lines.push("❌ חיפוש בג'ימייל: חסרה הרשאה! בעורך הסקריפט הרץ פעם אחת את הפונקציה authorize (הוראות בקובץ הגשר)");
+          else
+            lines.push("❌ חיפוש בג'ימייל לא עובד — כנראה מודבקת גרסה ישנה של קובץ הגשר. תשובת הגשר: " + raw);
+        } catch (e) { lines.push("❌ חיפוש בג'ימייל נכשל: " + e.message); }
       }
       lines.push('', '🕎 תאריך עברי: ' + hebrewDate());
       return new Response(lines.join('\n'), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
