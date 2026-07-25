@@ -1,0 +1,17 @@
+# פריסה דרך שורת פקודה (אופציונלי — אפשר גם דרך האתר, ראה README):
+#   npm i -g wrangler
+#   wrangler kv namespace create DATA        # העתק את ה-id לכאן למטה
+#   wrangler secret put BOT_TOKEN
+#   wrangler secret put SECRET
+#   wrangler deploy
+
+name = "remi"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "DATA"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
