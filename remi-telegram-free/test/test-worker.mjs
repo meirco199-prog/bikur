@@ -514,6 +514,43 @@ console.log('משימות: הפרדה מהיומן, כפתורי בוצעה/בי
   check('ביטול תזכורת המשימות', r.text.includes('ביטלתי') && !S.reminders.some(x => x.tasksDigest), r.text);
 }
 
+console.log('ביטול פגישה שקיימת רק ביומן גוגל (לא נקבעה דרך הבוט):');
+{
+  const prevFetch = globalThis.fetch;
+  const bridgeCalls = [];
+  const d = new Date(Date.now() + 86400000); // מחר
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T110000`;
+  const ics = `BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:g1@t\r\nDTSTART;TZID=Asia/Jerusalem:${stamp}\r\nSUMMARY:רופא שיניים דוקטור לוי\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('ics.example')) return new Response(ics, { status: 200 });
+    if (u.includes('bridge.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok:deleted=1', { status: 200 }); }
+    if (u.includes('api.anthropic.com')) {
+      const p = JSON.parse(opts.body).messages[0].content;
+      const msg = (p.match(/ההודעה החדשה שלו: "([^"]*)"/) || [])[1] || '';
+      const hasGcal = p.includes('רופא שיניים דוקטור לוי');
+      const text = msg.includes('בטל') && hasGcal
+        ? JSON.stringify({ action: 'event_delete', event_id: 0, title: 'רופא שיניים דוקטור לוי', reply: '' })
+        : JSON.stringify({ action: 'answer', reply: 'לא הבנתי' });
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_ICS = 'https://ics.example/secret.ics';
+  env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
+  env.ANTHROPIC_API_KEY = 'sk-test';
+
+  const r = await send('בטל את הפגישה אצל רופא השיניים');
+  check('המוח רואה את פגישות היומן ומבטל', r.text.includes('ביטלתי') && r.text.includes('רופא שיניים'), r.text);
+  check('  הגשר קיבל מחיקה עם הכותרת המדויקת מהיומן', bridgeCalls.some(b => b.action === 'delete' && b.title === 'רופא שיניים דוקטור לוי'), JSON.stringify(bridgeCalls));
+
+  delete env.CALENDAR_ICS;
+  delete env.CALENDAR_WEBHOOK;
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log('חיפוש בג׳ימייל (קריאה בלבד) והסבר וואטסאפ:');
 {
   const prevFetch = globalThis.fetch;

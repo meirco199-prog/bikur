@@ -42,14 +42,16 @@ function doPost(e) {
       return ContentService.createTextOutput('forbidden');
     }
 
-    // מחיקת אירוע: מחפש אירועים עם אותה כותרת בחלון של ±12 שעות סביב המועד
+    // מחיקת אירוע: מחפש אירועים עם כותרת תואמת (גם חלקית) בחלון של ±12 שעות סביב המועד
     if (data.action === 'delete') {
       const from = new Date(data.startMs - 12 * 3600000);
       const to = new Date(data.startMs + 12 * 3600000);
       const events = CalendarApp.getDefaultCalendar().getEvents(from, to);
+      const want = String(data.title || '').trim();
       let deleted = 0;
       for (let i = 0; i < events.length; i++) {
-        if (events[i].getTitle() === data.title) {
+        const t = events[i].getTitle().trim();
+        if (t === want || (want.length >= 3 && t.indexOf(want) !== -1) || (t.length >= 3 && want.indexOf(t) !== -1)) {
           events[i].deleteEvent();
           deleted++;
         }
