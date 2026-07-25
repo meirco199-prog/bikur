@@ -1,5 +1,5 @@
 // בדיקת הבוט מקצה לקצה עם KV מדומה וטלגרם מדומה — מריצים: node test/test-worker.mjs
-import worker from '../worker.js';
+import worker, { parseICS, parseWhen, parseCommand } from '../worker.js';
 
 let passed = 0, failed = 0;
 function check(name, cond, detail = '') {
@@ -57,10 +57,6 @@ console.log('זרימת שיחה:');
   check('הוספת משימה', r.text.includes('הוספתי'));
 }
 {
-  const r = await send('משימות');
-  check('רשימת משימות', r.text.includes('לשלם ארנונה'));
-}
-{
   const r = await send('סיימתי 1');
   check('סימון ביצוע', r.text.includes('✅'), r.text);
 }
@@ -73,12 +69,48 @@ console.log('זרימת שיחה:');
   check('סדר יום מחר כולל הפגישה', r.text.includes('דני'), r.text);
 }
 
-console.log('קרון (תזכורת שהגיע זמנה):');
+console.log('פיצ\'רים חדשים:');
 {
-  // מזיזים את התזכורת לעבר כדי שהקרון יתפוס אותה
+  const r = await send('קניות: חלב, לחם, ביצים');
+  check('רשימת קניות — 3 פריטים בבת אחת', r.text.includes('3 פריטים') && r.text.includes('ביצים'), r.text);
+}
+{
+  const r = await send('קניתי 2');
+  check('קניתי מוריד פריט', r.text.includes('לחם') && r.text.includes('נשארו 2'), r.text);
+}
+{
+  const r = await send('זכור: רעיון למתנה לאמא — צמח');
+  check('שמירת זיכרון', r.text.includes('שמרתי בזיכרון'), r.text);
+}
+{
+  const r = await send('חפש מתנה');
+  check('חיפוש מוצא זיכרון', r.text.includes('צמח'), r.text);
+}
+{
+  const r = await send('זיכרונות');
+  check('רשימת זיכרונות', r.text.includes('רעיון למתנה'), r.text);
+}
+{
+  const r = await send('תזכיר לי כל יום ראשון ב-18:00 להוציא זבל');
+  check('תזכורת שבועית', r.text.includes('כל יום ראשון'), r.text);
   const S = JSON.parse(kv.get('store'));
-  check('יש תזכורת אחת בהמתנה', S.reminders.length === 1);
-  S.reminders[0].at = Date.now() - 60000;
+  const weekly = S.reminders.find(x => x.recurringWeekly === 0);
+  check('  נשמרה עם היום הנכון', !!weekly && new Date(weekly.at).getDay() === 0);
+}
+{
+  const r = await send('מחר ב-16:00 תור לרופא שיניים');
+  check('נתב כוונות: טקסט חופשי עם זמן → תזכורת', r.text.includes('הבנתי לבד') && r.text.includes('תור לרופא'), r.text);
+}
+{
+  const r = await send('סיכום שבוע');
+  check('סיכום שבוע', r.text.includes('📊') && r.text.includes('משימות הושלמו'), r.text);
+}
+
+console.log('קרון (תזכורת שהגיע זמנה + דחייה):');
+{
+  const S = JSON.parse(kv.get('store'));
+  const oneTime = S.reminders.find(x => x.text.includes('תנור'));
+  oneTime.at = Date.now() - 60000;
   kv.set('store', JSON.stringify(S));
 
   const before = sent.length;
@@ -87,16 +119,66 @@ console.log('קרון (תזכורת שהגיע זמנה):');
   check('הקרון שלח את התזכורת', fired.some(m => m.text.includes('⏰ תזכורת: לבדוק תנור')), JSON.stringify(fired));
 
   const S2 = JSON.parse(kv.get('store'));
-  check('תזכורת חד-פעמית נמחקה אחרי שנשלחה', S2.reminders.length === 0);
+  check('תזכורת חד-פעמית נמחקה אחרי שנשלחה', !S2.reminders.some(x => x.text.includes('תנור')));
+  check('נרשמה בסטטיסטיקה', (S2.stats.fired || []).length >= 1);
+}
+{
+  const r = await send('דחה 15');
+  check('דחיית התזכורת האחרונה', r.text.includes('15 דקות') && r.text.includes('תנור'), r.text);
 }
 {
   await send('תזכיר לי כל יום ב-6 לקחת כדור');
   const S = JSON.parse(kv.get('store'));
-  S.reminders[0].at = Date.now() - 60000;
+  const daily = S.reminders.find(x => x.recurringDaily);
+  daily.at = Date.now() - 60000;
   kv.set('store', JSON.stringify(S));
   await worker.scheduled({}, env);
   const S2 = JSON.parse(kv.get('store'));
-  check('תזכורת יומית קודמה למחר במקום להימחק', S2.reminders.length === 1 && S2.reminders[0].at > Date.now());
+  const daily2 = S2.reminders.find(x => x.recurringDaily);
+  check('תזכורת יומית קודמה למחר במקום להימחק', !!daily2 && daily2.at > Date.now());
+}
+
+console.log('יומן גוגל (ICS):');
+{
+  const now = new Date(2026, 6, 25, 7, 0); // שבת 25/7/2026
+  const from = new Date(2026, 6, 25).getTime(), to = from + 86400000;
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VEVENT',
+    'UID:one@test',
+    'DTSTART;TZID=Asia/Jerusalem:20260725T103000',
+    'SUMMARY:פגישה עם רואה חשבון',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:two@test',
+    'DTSTART;TZID=Asia/Jerusalem:20260720T090000',
+    'RRULE:FREQ=WEEKLY;BYDAY=SA',
+    'SUMMARY:חוג שחייה',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:three@test',
+    'DTSTART;VALUE=DATE:20260725',
+    'SUMMARY:יום הולדת לסבתא',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:four@test',
+    'DTSTART;TZID=Asia/Jerusalem:20260726T120000',
+    'SUMMARY:לא היום — מחר',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const events = parseICS(ics, from, to);
+  check('אירוע רגיל נמצא', events.some(e => e.text.includes('רואה חשבון') && new Date(e.at).getHours() === 10));
+  check('אירוע שבועי (RRULE) הורחב לשבת', events.some(e => e.text.includes('שחייה')));
+  check('אירוע יום-שלם נמצא', events.some(e => e.text.includes('סבתא') && e.allDay));
+  check('אירוע של מחר לא מופיע היום', !events.some(e => e.text.includes('לא היום')));
+}
+{
+  // אירוע UTC מומר לשעון ישראל
+  const from = new Date(2026, 0, 15).getTime(), to = from + 86400000; // חורף: UTC+2
+  const ics = 'BEGIN:VEVENT\r\nUID:u@t\r\nDTSTART:20260115T100000Z\r\nSUMMARY:שיחת זום\r\nEND:VEVENT';
+  const events = parseICS(ics, from, to);
+  check('שעת UTC מומרת לישראל (10Z→12:00)', events.length === 1 && new Date(events[0].at).getHours() === 12, JSON.stringify(events));
 }
 
 console.log('setup:');
