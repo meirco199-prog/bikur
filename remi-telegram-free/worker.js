@@ -224,6 +224,17 @@ export function parseCommand(raw, now) {
   if (/^(?:מה|איזה|תגיד(?: לי)?)?\s*(?:ה)?תאריך(?:\s+(?:היום|העברי|עברי))*\??$/.test(text) ||
       /^מה התאריך העברי של היום\??$/.test(text)) return { cmd:'date_info' };
 
+  // תזכורת משימות יומית: "תזכורת משימות כל בוקר (ב-8)" / "תזכיר לי כל בוקר את המשימות הפתוחות"
+  // חייב לבוא לפני זיהוי תזכורת רגילה — אחרת "תזכורת משימות..." הופכת לתזכורת-הד
+  if (/משימות/.test(text) && /כל (?:בוקר|ערב|יום)/.test(text) &&
+      /(תזכורת|תזכיר|שלח|תשלח|תן|תיתן|שיתן|הצג|תציג)/.test(text)) {
+    if (/^(בטל|מחק|עצור|תפסיק)/.test(text)) return { cmd: 'tasks_digest_off' };
+    const hm = (' ' + text + ' ').match(/\s(?:בשעה\s*|ב-?\s?)(\d{1,2})(?:[:.](\d{2}))?\s/);
+    const hour = hm ? parseInt(hm[1], 10) : (/כל ערב/.test(text) ? 20 : 8);
+    return { cmd: 'tasks_digest', hour, minute: hm && hm[2] ? parseInt(hm[2], 10) : 0 };
+  }
+  if (/^(?:בטל|מחק)\s+(?:את\s+)?תזכורת\s+ה?משימות$/.test(text)) return { cmd: 'tasks_digest_off' };
+
   // תזכורות
   m = text.match(/^(?:תזכיר לי|תזכירי לי|תזכורת[:\s])\s*(.+)$/s);
   if (m) {
@@ -241,6 +252,8 @@ export function parseCommand(raw, now) {
   m = text.match(/^(?:משימה|תוסיף משימה|הוסף משימה|הוסיפי משימה|תוסיפי משימה)[:\s]+(.+)$/s);
   if (m) return { cmd:'task_add', text: cleanup(m[1]) };
   if (/^(משימות|רשימה|רשימת משימות|מה המשימות|מה יש לי ברשימה)\??$/.test(text)) return { cmd:'task_list' };
+  // שאלות חופשיות על משימות — "איזה משימות פתוחות יש לי" — תמיד רשימת משימות, לא היומן!
+  if (/^(?:איזה|אילו|מה)?\s*(?:ה)?משימות(?:\s+ה?פתוחות)?(?:\s+(?:יש לי|שלי|נשארו(?:\s+לי)?))?\??$/.test(text)) return { cmd:'task_list' };
   m = text.match(/^(?:סיימתי|בוצע|ביצעתי|עשיתי|✓|וי)\s+(?:משימה\s+)?(\d+)$/);
   if (m) return { cmd:'task_done', index: parseInt(m[1],10) };
   m = text.match(/^(?:מחק|מחקי)\s+משימה\s+(\d+)$/);
@@ -583,7 +596,8 @@ function helpText(S) {
 • מה יש לי היום / מחר / השבוע / איזה פגישות יש לי?
 (עם חיבור יומן גוגל — רואה וקובע ביומן האמיתי)
 
-📋 משימות: משימה: X / משימות / סיימתי 1
+📋 משימות: משימה: X / משימות (עם כפתורי ✅ בוצעה / ❌ ביטול)
+   "תזכורת משימות כל בוקר" — רשימת הפתוחות כל יום
 🛒 קניות: קניות: חלב, לחם / קניות / קניתי 2
 🧠 זיכרונות: זכור: X / זיכרונות / חפש X
 
@@ -818,7 +832,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 הפגישות הקרובות שהוא קבע דרכך: ${upcoming || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|shopping|note|agenda|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -828,7 +842,8 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - task = משימה לביצוע. shopping = פריטי קניות ב-items. note = מידע/מחשבה שכדאי לשמור.
 - event_move = לבקש להעביר/לדחות/להקדים פגישה קיימת. חובה event_id (מהרשימה למעלה) + datetime חדש. אל תיצור אירוע חדש — זה מעביר את הקיים.
 - event_delete = לבטל/למחוק פגישה קיימת. חובה event_id מהרשימה למעלה.
-- agenda = שואל מה יש לו ביומן/היום/השבוע — קבע range.
+- tasks = שואל על המשימות שלו ("איזה משימות פתוחות יש לי") — מציג את רשימת המשימות בלבד. משימות ≠ פגישות! אל תחזיר agenda על שאלת משימות.
+- agenda = שואל מה יש לו ביומן/פגישות היום/השבוע — קבע range. לא לשאלות על משימות.
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
 
@@ -892,8 +907,11 @@ async function applyAiAction(S, j, now, env) {
     }
     case 'task': {
       if (!title) return null;
-      S.tasks.push({ id: nid(), text: title, done: false, created: now.getTime() });
-      return `📋 הוספתי למשימות${hey}: "${title}"`;
+      const t = { id: nid(), text: title, done: false, created: now.getTime() };
+      S.tasks.push(t);
+      return { text: `📋 הוספתי למשימות${hey}: "${title}"`,
+        buttons: [[{ text: '✅ בוצעה', callback_data: `t:done:${t.id}` },
+                   { text: '❌ בטל', callback_data: `t:del:${t.id}` }]] };
     }
     case 'shopping': {
       const items = (Array.isArray(j.items) ? j.items : [title]).map(x => cleanup(String(x))).filter(x => x.length > 0);
@@ -927,6 +945,8 @@ async function applyAiAction(S, j, now, env) {
       return `🗑️ ביטלתי${hey} את "${ev.text}" (${fmtDate(ev.at, now)})` +
         (gone ? '\n📆 נמחק גם מיומן גוגל.' : '');
     }
+    case 'tasks':
+      return taskListMsg(S);
     case 'agenda':
       return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);
     case 'answer':
@@ -950,6 +970,29 @@ async function smartReminderText(env, S, text, now) {
 }
 
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
+// רשימת משימות עם כפתורי בחירה מתחת להודעה: ✅ בוצעה / ❌ ביטול / ↩️ לא בוצעה.
+// הפרדה מלאה מהיומן — כאן רק משימות, אף פעם לא פגישות.
+function taskListMsg(S, header) {
+  const open = S.tasks.filter(t => !t.done);
+  const done = S.tasks.filter(t => t.done).slice(-5);
+  if (!open.length && !done.length) return { text: 'רשימת המשימות ריקה — כל הכבוד! 🎉' };
+  let text = (header || '📋 המשימות שלך') + ':';
+  const buttons = [];
+  open.forEach((t, i) => {
+    text += `\n${i + 1}. ⬜ ${t.text}`;
+    buttons.push([
+      { text: `✅ בוצעה ${i + 1}`, callback_data: `t:done:${t.id}` },
+      { text: `❌ בטל ${i + 1}`, callback_data: `t:del:${t.id}` },
+    ]);
+  });
+  done.forEach(t => {
+    text += `\n✅ ${t.text} — בוצעה`;
+    buttons.push([{ text: `↩️ לא בוצעה — ${t.text.slice(0, 18)}`, callback_data: `t:undo:${t.id}` }]);
+  });
+  if (!open.length) text += '\n\nאין משימות פתוחות — כל הכבוד! 🎉';
+  return { text, buttons };
+}
+
 export async function handleMessage(S, text, now, env, isVoice = false) {
   const c = parseCommand(text, now);
 
@@ -1051,13 +1094,25 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
     }
 
     case 'task_add': {
-      S.tasks.push({ id: nid(), text: c.text, done: false, created: now.getTime() });
-      return `📋 הוספתי: "${c.text}"\n(${openTasks().length} משימות פתוחות)`;
+      const t = { id: nid(), text: c.text, done: false, created: now.getTime() };
+      S.tasks.push(t);
+      return { text: `📋 הוספתי: "${c.text}"\n(${openTasks().length} משימות פתוחות)`,
+        buttons: [[{ text: '✅ בוצעה', callback_data: `t:done:${t.id}` },
+                   { text: '❌ בטל', callback_data: `t:del:${t.id}` }]] };
     }
-    case 'task_list': {
-      const open = openTasks();
-      if (!open.length) return 'רשימת המשימות ריקה — כל הכבוד! 🎉';
-      return '📋 המשימות שלך:\n' + open.map((t,i) => `${i+1}. ${t.text}`).join('\n') + '\n\nלסימון ביצוע: "סיימתי 1"';
+    case 'task_list': return taskListMsg(S);
+    case 'tasks_digest': {
+      S.reminders = S.reminders.filter(r => !r.tasksDigest);
+      const at = new Date(now); at.setHours(c.hour, c.minute, 0, 0);
+      if (at.getTime() <= now.getTime()) at.setTime(at.getTime() + 86400000);
+      S.reminders.push({ id: nid(), text: 'המשימות הפתוחות שלך', at: at.getTime(),
+        recurringDaily: true, recurringWeekly: null, tasksDigest: true });
+      return `📋⏰ סגור${greet(S) ? ' ' + firstName(S) : ''}! כל יום בשעה ${fmtTime(at.getTime())} אשלח לך את המשימות הפתוחות עם כפתורי סימון.\nלביטול: "בטל תזכורת משימות"`;
+    }
+    case 'tasks_digest_off': {
+      const had = S.reminders.some(r => r.tasksDigest);
+      S.reminders = S.reminders.filter(r => !r.tasksDigest);
+      return had ? '🗑️ ביטלתי את תזכורת המשימות היומית.' : 'אין תזכורת משימות פעילה 🙂';
     }
     case 'task_done': {
       const t = openTasks()[c.index - 1];
@@ -1245,8 +1300,10 @@ async function tgApi(env, method, body) {
   if (!res.ok) console.log(`${method} failed:`, await res.text());
   return res.ok;
 }
-async function tgSend(env, chatId, text) {
-  return tgApi(env, 'sendMessage', { chat_id: chatId, text });
+async function tgSend(env, chatId, text, buttons) {
+  const body = { chat_id: chatId, text };
+  if (buttons && buttons.length) body.reply_markup = { inline_keyboard: buttons };
+  return tgApi(env, 'sendMessage', body);
 }
 async function tgSendDoc(env, chatId, doc, caption) {
   if (doc.type === 'photo') return tgApi(env, 'sendPhoto', { chat_id: chatId, photo: doc.fileId, caption });
@@ -1326,7 +1383,35 @@ async function handleMedia(env, S, msg, chatId, now) {
   return true;
 }
 
+// לחיצה על כפתור ברשימת המשימות: ✅ בוצעה / ↩️ לא בוצעה / ❌ ביטול
+async function handleCallback(env, q) {
+  const chatId = q.message?.chat?.id;
+  const S = await loadStore(env);
+  if (!chatId || chatId !== S.ownerChatId) {
+    await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id });
+    return;
+  }
+  const m = String(q.data || '').match(/^t:(done|undo|del):(\d+)$/);
+  let toast = '';
+  if (m) {
+    const t = S.tasks.find(x => x.id === Number(m[2]));
+    if (!t) toast = 'המשימה הזאת כבר לא קיימת';
+    else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); toast = `✅ "${t.text}" סומנה כבוצעה`; }
+    else if (m[1] === 'undo') { t.done = false; delete t.doneAt; toast = `↩️ "${t.text}" חזרה לפתוחות`; }
+    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ המשימה "${t.text}" בוטלה`; }
+    if (t || m[1]) await saveStore(env, S);
+  }
+  await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id, text: toast.slice(0, 190) });
+  // מרעננים את ההודעה עצמה כדי שהרשימה והכפתורים תמיד יהיו עדכניים
+  if (m && q.message?.message_id) {
+    const msg = taskListMsg(S);
+    await tgApi(env, 'editMessageText', { chat_id: chatId, message_id: q.message.message_id,
+      text: msg.text, reply_markup: { inline_keyboard: msg.buttons || [] } });
+  }
+}
+
 async function handleWebhook(env, update) {
+  if (update.callback_query) return handleCallback(env, update.callback_query);
   const msg = update.message || update.edited_message;
   if (!msg?.chat?.id) return;
   const chatId = msg.chat.id;
@@ -1388,8 +1473,10 @@ async function handleWebhook(env, update) {
   await saveStore(env, S);
   if (typeof answer === 'object' && answer.doc) {
     await tgSendDoc(env, chatId, answer.doc, answer.text);
+  } else if (typeof answer === 'object') {
+    await tgSend(env, chatId, voicePrefix + answer.text, answer.buttons);
   } else {
-    await tgSend(env, chatId, voicePrefix + (typeof answer === 'string' ? answer : answer.text));
+    await tgSend(env, chatId, voicePrefix + answer);
   }
 }
 
@@ -1407,6 +1494,22 @@ async function runCron(env) {
   for (const r of S.reminders) {
     const due = dueOccurrence(r, C.fired[r.id], nowMs);
     if (due === null) continue;
+    // תזכורת המשימות היומית — שולחת את הרשימה החיה עם כפתורי הסימון
+    if (r.tasksDigest) {
+      const n0 = firstName(S);
+      const openCount = S.tasks.filter(t => !t.done).length;
+      if (openCount) {
+        const msg = taskListMsg(S, `📋 ${n0 ? n0 + ', ' : ''}המשימות הפתוחות שלך`);
+        await tgSend(env, S.ownerChatId, msg.text, msg.buttons);
+      } else {
+        await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
+      }
+      C.fired[r.id] = due;
+      C.lastFired = { text: r.text };
+      C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
+      changed = true;
+      continue;
+    }
     let suffix = '';
     if (r.recurringDaily) suffix = '\n(תזכורת יומית — תחזור מחר)';
     else if (r.recurringWeekly !== null && r.recurringWeekly !== undefined) suffix = `\n(חוזרת כל יום ${DAY_NAMES[r.recurringWeekly]})`;

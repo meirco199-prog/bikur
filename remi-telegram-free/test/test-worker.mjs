@@ -454,5 +454,65 @@ console.log('דיוק תאריכים (ל׳/ב׳ צמודות — הבאג של "
   check('  הכותרת בלי "רביעי"', c.text.includes('דני') && !c.text.includes('רביעי'), c.text);
 }
 
+console.log('משימות: הפרדה מהיומן, כפתורי בוצעה/ביטול, ותזכורת משימות יומית:');
+{
+  // הוספת משימה — מגיעה עם כפתורי בחירה
+  let r = await send('משימה: לסגור לעינב ביטוחים לרכב');
+  const btns = r.reply_markup?.inline_keyboard || [];
+  check('הוספת משימה מציעה כפתורי ✅/❌', btns.flat().some(b => b.text.includes('בוצעה')) && btns.flat().some(b => b.text.includes('בטל')), JSON.stringify(r.reply_markup));
+
+  // שאלה חופשית על משימות → רשימת משימות, לא פגישות מהיומן
+  r = await send('איזה משימות פתוחות יש לי');
+  check('שאלת משימות מחזירה משימות ולא יומן', r.text.includes('לסגור לעינב') && !r.text.includes('📅'), r.text);
+  check('  לכל משימה פתוחה יש כפתורים', (r.reply_markup?.inline_keyboard || []).flat().some(b => /^t:done:\d+$/.test(b.callback_data)), JSON.stringify(r.reply_markup));
+
+  // לחיצה על "✅ בוצעה" דרך callback_query
+  let S = JSON.parse(kv.get('store'));
+  const task = S.tasks.find(t => t.text.includes('לעינב'));
+  const cb = async (data) => {
+    const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query: { id: 'cb1', data, message: { message_id: 5, chat: { id: 111 } } } }),
+    });
+    await worker.fetch(req, env);
+  };
+  await cb(`t:done:${task.id}`);
+  S = JSON.parse(kv.get('store'));
+  check('כפתור "בוצעה" מסמן את המשימה', S.tasks.find(t => t.id === task.id)?.done === true);
+
+  // "↩️ לא בוצעה" מחזיר אותה לפתוחות
+  await cb(`t:undo:${task.id}`);
+  S = JSON.parse(kv.get('store'));
+  check('כפתור "לא בוצעה" מחזיר לפתוחות', S.tasks.find(t => t.id === task.id)?.done === false);
+
+  // "❌ בטל" מוחק את המשימה
+  await cb(`t:del:${task.id}`);
+  S = JSON.parse(kv.get('store'));
+  check('כפתור "בטל" מוחק את המשימה', !S.tasks.some(t => t.id === task.id));
+}
+{
+  // תזכורת משימות יומית
+  await send('משימה: להתקשר לרואה החשבון');
+  let r = await send('תזכורת משימות כל בוקר ב-7');
+  check('נקבעה תזכורת משימות יומית ב-7:00', r.text.includes('07:00') && r.text.includes('משימות'), r.text);
+  let S = JSON.parse(kv.get('store'));
+  const digest = S.reminders.find(x => x.tasksDigest);
+  check('  נשמרה כתזכורת יומית מיוחדת', !!digest && digest.recurringDaily === true);
+
+  // בזמן הצלצול — נשלחת רשימת המשימות הפתוחות עם כפתורים
+  digest.at = Date.now() - 60000;
+  kv.set('store', JSON.stringify(S));
+  const before = sent.length;
+  await worker.scheduled({}, env);
+  const fired = sent.slice(before).find(m => m.text.includes('המשימות הפתוחות'));
+  check('הקרון שלח את המשימות הפתוחות', !!fired && fired.text.includes('רואה החשבון'), JSON.stringify(sent.slice(before)));
+  check('  עם כפתורי סימון', !!fired && (fired.reply_markup?.inline_keyboard || []).flat().some(b => b.text.includes('בוצעה')));
+
+  // ביטול התזכורת
+  r = await send('בטל תזכורת משימות');
+  S = JSON.parse(kv.get('store'));
+  check('ביטול תזכורת המשימות', r.text.includes('ביטלתי') && !S.reminders.some(x => x.tasksDigest), r.text);
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
