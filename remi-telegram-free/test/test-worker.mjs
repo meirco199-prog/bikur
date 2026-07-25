@@ -514,5 +514,58 @@ console.log('משימות: הפרדה מהיומן, כפתורי בוצעה/בי
   check('ביטול תזכורת המשימות', r.text.includes('ביטלתי') && !S.reminders.some(x => x.tasksDigest), r.text);
 }
 
+console.log('אנשי קשר, מיילים מג׳ימייל ווואטסאפ:');
+{
+  let r = await send('איש קשר: עינב לוי 050-1234567 einav@gmail.com');
+  check('הוספת איש קשר עם מייל וטלפון', r.text.includes('עינב לוי') && r.text.includes('einav@gmail.com') && r.text.includes('050-1234567'), r.text);
+  r = await send('אנשי קשר');
+  check('רשימת אנשי קשר', r.text.includes('עינב לוי'), r.text);
+
+  // מייל: טיוטה → אישור → שליחה דרך הגשר
+  const prevFetch = globalThis.fetch;
+  const bridgeCalls = [];
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('bridge.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok:mail', { status: 200 }); }
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
+
+  r = await send('שלח מייל לעינב: היי, הפגישה מחר זזה לשעה 10. תודה!');
+  check('מייל — קודם טיוטה לאישור', r.text.includes('טיוטה') && r.text.includes('einav@gmail.com') && r.text.includes('זזה לשעה 10'), r.text);
+  check('  עוד לא נשלח כלום', bridgeCalls.length === 0);
+  r = await send('כן');
+  check('אישור "כן" שולח דרך הגשר', r.text.includes('נשלח') && bridgeCalls.some(b => b.action === 'email' && b.to === 'einav@gmail.com'), r.text + ' ' + JSON.stringify(bridgeCalls));
+
+  // "לא" מבטל
+  await send('שלח מייל לעינב: הודעת בדיקה שלא תישלח');
+  bridgeCalls.length = 0;
+  r = await send('לא');
+  check('ביטול "לא" לא שולח', r.text.includes('בוטל') && bridgeCalls.length === 0, r.text);
+
+  // וואטסאפ — קישור wa.me עם המספר בפורמט בינלאומי
+  r = await send('שלח וואטסאפ לעינב: מחר ב-10 אצלך?');
+  check('וואטסאפ — קישור wa.me מוכן', r.text.includes('wa.me/972501234567') && r.text.includes('%D7'), r.text);
+
+  delete env.CALENDAR_WEBHOOK;
+  globalThis.fetch = prevFetch;
+
+  // מייל בלי איש קשר מוכר
+  r = await send('שלח מייל למישהו לא מוכר: היי');
+  check('מייל לנמען לא מוכר — הסבר', r.text.includes('אין לי כתובת'), r.text);
+}
+
+console.log('זיכרון: תיוג ההודעה/המסמך המקורי בתשובה:');
+{
+  // הודעה עם message_id שנשמרת בהיסטוריה
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'זכור: הקוד של השער בבניין הוא 4433', message_id: 777, chat: { id: 111 } } }),
+  });
+  await worker.fetch(req, env);
+  const r = await send('חפש השער בבניין');
+  check('חיפוש בהיסטוריה מתייג את ההודעה המקורית', r.reply_to_message_id === 777, JSON.stringify(r));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

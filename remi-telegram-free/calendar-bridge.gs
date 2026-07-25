@@ -1,5 +1,6 @@
-// גשר יומן גוגל לרמי — Google Apps Script
-// מאפשר לבוט לקבוע פגישות אמיתיות ביומן גוגל שלך, בחינם.
+// גשר גוגל לרמי — Google Apps Script
+// מאפשר לבוט לקבוע/למחוק פגישות ביומן גוגל שלך וגם לשלוח מיילים מהג'ימייל שלך, בחינם.
+// שים לב: אחרי עדכון לגרסה הזו, בפריסה מחדש גוגל יבקש אישור הרשאות גם לג'ימייל — אשר.
 //
 // התקנה (5 דקות):
 // 1. פתח https://script.google.com → New project
@@ -42,6 +43,12 @@ function doPost(e) {
         }
       }
       return ContentService.createTextOutput('ok:deleted=' + deleted);
+    }
+
+    // שליחת מייל מחשבון הג'ימייל שלך (הבוט מבקש אישור ממך לפני כל שליחה)
+    if (data.action === 'email') {
+      GmailApp.sendEmail(data.to, data.subject || 'הודעה', data.body || '');
+      return ContentService.createTextOutput('ok:mail');
     }
 
     // ברירת מחדל: יצירת אירוע

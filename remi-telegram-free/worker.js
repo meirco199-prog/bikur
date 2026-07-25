@@ -295,6 +295,29 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'doc_send', index: parseInt(m[1],10) };
   m = text.match(/^(?:מחק|מחקי)\s+מסמך\s+(\d+)$/);
   if (m) return { cmd:'doc_delete', index: parseInt(m[1],10) };
+  // אנשי קשר: "איש קשר: עינב 050-1234567 einav@gmail.com"
+  m = text.match(/^(?:איש קשר|הוסף איש קשר|צור איש קשר)[:\s]+(.+)$/s);
+  if (m) {
+    const raw = cleanup(m[1]);
+    const email = (raw.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/) || [null])[0];
+    const phone = (raw.match(/\+?\d[\d-]{7,14}\d/) || [null])[0];
+    const name = cleanup(raw.replace(email || ' ', ' ').replace(phone || ' ', ' ').replace(/[,;|]+/g, ' '));
+    if (name) return { cmd:'contact_add', name, email, phone };
+  }
+  if (/^(אנשי קשר|רשימת אנשי קשר)\??$/.test(text)) return { cmd:'contact_list' };
+  m = text.match(/^(?:מחק|הסר)\s+איש קשר\s+(.+)$/);
+  if (m) return { cmd:'contact_delete', name: cleanup(m[1]) };
+
+  // "שלח מייל לעינב: תוכן ההודעה" — נשלח מהג'ימייל שלו דרך הגשר, עם אישור לפני
+  m = text.match(/^(?:שלח|תשלח|כתוב|תכתוב)?(?:\s+לי)?\s*(?:אי)?מייל\s+ל-?([^:,\n]+?)[:,]\s*(.+)$/s);
+  if (m) return { cmd:'email_send', to: cleanup(m[1]), body: cleanup(m[2]) };
+  // "שלח וואטסאפ לעינב: תוכן" — קישור שנפתח בוואטסאפ עם ההודעה מוכנה
+  m = text.match(/^(?:שלח|תשלח|כתוב|תכתוב)?(?:\s+לי)?\s*(?:הודעת\s+)?(?:וואטסאפ|ווטסאפ|וואצאפ|ואטסאפ|whatsapp)\s+ל-?([^:,\n]+?)[:,]\s*(.+)$/si);
+  if (m) return { cmd:'wa_send', to: cleanup(m[1]), body: cleanup(m[2]) };
+  // אישור/ביטול שליחה שממתינה
+  if (/^(כן|שלח|אשר|יאללה|יאללה שלח|שלח את זה)!?$/.test(text)) return { cmd:'confirm_yes' };
+  if (/^(לא|בטל|עזוב|אל תשלח)!?$/.test(text)) return { cmd:'confirm_no' };
+
   m = text.match(/^(?:איפה|שלח לי|תשלח לי|הבא לי)\s+(?:את\s+)?(.+)$/);
   if (m) return { cmd:'doc_find', query: cleanup(m[1]) };
 
@@ -473,6 +496,37 @@ async function pushToGoogleCalendar(env, title, shiftedMs) {
   } catch { return false; }
 }
 
+// שליחת מייל מחשבון הג'ימייל של הבעלים — דרך אותו גשר Apps Script של היומן
+async function sendEmailViaBridge(env, to, subject, body) {
+  if (!env || !env.CALENDAR_WEBHOOK) return false;
+  try {
+    const res = await fetch(env.CALENDAR_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: env.SECRET, action: 'email', to, subject, body }),
+      redirect: 'follow',
+    });
+    return res.ok && (await res.text()).includes('ok');
+  } catch { return false; }
+}
+
+// חיפוש איש קשר לפי שם (מלא/חלקי) — "עינב" מוצא את "עינב כהן"
+function findContact(S, q) {
+  const qq = cleanup(String(q || ''));
+  if (!qq) return null;
+  const list = S.contacts || [];
+  return list.find(x => x.name === qq)
+    || list.find(x => x.name.includes(qq) || qq.includes(x.name.split(' ')[0]));
+}
+
+// מספר ישראלי → פורמט בינלאומי לקישור wa.me (050-1234567 → 972501234567)
+function waPhone(phone) {
+  let p = String(phone || '').replace(/[^\d+]/g, '');
+  if (p.startsWith('+')) p = p.slice(1);
+  if (p.startsWith('0')) p = '972' + p.slice(1);
+  return p;
+}
+
 // ===== המוח החכם: Claude API (אם חובר) עם נפילה ל-Workers AI החינמי =====
 // שדרוג אופציונלי: מוסיפים Secret בשם ANTHROPIC_API_KEY — וכל ההבנה, הניסוח,
 // התרגום וקריאת התמונות עוברים ל-Claude (עברית מצוינת). בלי המפתח — הכול
@@ -609,6 +663,10 @@ function helpText(S) {
 📷 שלח תמונה עם שאלה בכיתוב — אנסה לקרוא אותה
 🎤 הודעות קוליות — מדבר אליי חופשי
 
+👥 איש קשר: עינב 050-1234567 einav@mail.com / אנשי קשר
+📧 שלח מייל לעינב: ... — יוצא מהג'ימייל שלך (עם אישור לפני)
+💬 שלח וואטסאפ לעינב: ... — נפתח בוואטסאפ מוכן לשליחה
+
 📊 סיכום היום / סיכום שבוע / סיכום 30 ימים / ציר זמן
 🗓️ מה התאריך העברי?
 👤 קוראים לי מאיר / אני בן 35 / עליי: ... / מי אני
@@ -619,6 +677,7 @@ function helpText(S) {
 
 const EMPTY = {
   tasks: [], reminders: [], events: [], shopping: [], notes: [], docs: [],
+  contacts: [], pendingSend: null,
   history: [], profile: { name: null, age: null, facts: [] },
   health: { weight: [] },
   stats: { fired: [] }, lastFired: null,
@@ -770,6 +829,8 @@ function periodSummary(S, days, now) {
   return out;
 }
 
+// חיפוש בכל הזיכרון. כשהתוצאה היא הודעה/מסמך מהעבר — התשובה "מתייגת" (עונה על)
+// ההודעה המקורית בטלגרם, כדי שרואים בדיוק מאיפה זה הגיע.
 function doSearch(S, q, now) {
   const hit = (t) => t.includes(q);
   const notes = S.notes.filter(n => hit(n.text));
@@ -778,7 +839,8 @@ function doSearch(S, q, now) {
   const shop = S.shopping.filter(s => hit(s.text));
   const events = S.events.filter(e => hit(e.text));
   const docs = S.docs.filter(d => hit(d.name));
-  const hist = (S.history || []).filter(h => hit(h.text)).slice(-5);
+  // בלי ההודעה האחרונה — היא בקשת החיפוש הנוכחית עצמה
+  const hist = (S.history || []).slice(0, -1).filter(h => hit(h.text)).slice(-5);
   if (!notes.length && !tasks.length && !rems.length && !shop.length && !events.length && !docs.length && !hist.length)
     return `לא מצאתי כלום על "${q}" 🔍`;
   let out = `🔍 מצאתי על "${q}":`;
@@ -792,7 +854,9 @@ function doSearch(S, q, now) {
     const d = new Date(h.ts);
     return `• (${d.getDate()}/${d.getMonth()+1}) ${h.text}`;
   }).join('\n');
-  return out;
+  // תיוג: עונים על ההודעה המקורית האחרונה שנמצאה (או על הודעת המסמך)
+  const tag = [...hist].reverse().find(h => h.mid)?.mid || [...docs].reverse().find(d => d.mid)?.mid || null;
+  return tag ? { text: out, replyTo: tag } : out;
 }
 
 function findDocs(S, query) {
@@ -830,9 +894,10 @@ ${hist || '(אין)'}
 ההודעה החדשה שלו: "${text}"
 ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וייתכנו שגיאות תמלול — תקן לפי ההיגיון (למשל "תיסה"="טיסה", "כבר לי"="קבע לי", מספרים משובשים כמו "ה-37" הם כנראה תאריך כמו 30/7).' : ''}
 הפגישות הקרובות שהוא קבע דרכך: ${upcoming || '(אין)'}
+אנשי הקשר ששמורים אצלך: ${(S.contacts || []).map(x => x.name + (x.email ? ' (מייל✓)' : '') + (x.phone ? ' (נייד✓)' : '')).join(', ') || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|email|whatsapp|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","to":"...","subject":"...","body":"...","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -844,6 +909,8 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - event_delete = לבטל/למחוק פגישה קיימת. חובה event_id מהרשימה למעלה.
 - tasks = שואל על המשימות שלו ("איזה משימות פתוחות יש לי") — מציג את רשימת המשימות בלבד. משימות ≠ פגישות! אל תחזיר agenda על שאלת משימות.
 - agenda = שואל מה יש לו ביומן/פגישות היום/השבוע — קבע range. לא לשאלות על משימות.
+- email = מבקש לשלוח מייל למישהו. to = שם איש הקשר (מהרשימה למעלה) או כתובת מייל. נסח subject קצר ו-body מנומס ומלא בעברית. השליחה תמיד מוצגת לו לאישור לפני — אל תגיד "שלחתי".
+- whatsapp = מבקש לשלוח הודעת וואטסאפ. to = שם איש קשר, body = ההודעה מנוסחת.
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
 
@@ -947,6 +1014,24 @@ async function applyAiAction(S, j, now, env) {
     }
     case 'tasks':
       return taskListMsg(S);
+    case 'email': {
+      const contact = findContact(S, String(j.to || ''));
+      const to = contact?.email || (/@/.test(String(j.to || '')) ? cleanup(String(j.to)) : null);
+      const body = cleanup(String(j.body || '')) || title;
+      if (!to) return `אין לי כתובת מייל של "${cleanup(String(j.to || ''))}" 🤔\nהוסף עם: "איש קשר: שם 050... כתובת@מייל.com"`;
+      if (!body) return null;
+      if (!env?.CALENDAR_WEBHOOK) return 'שליחת מיילים עוברת דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.';
+      const subject = cleanup(String(j.subject || '')) || body.split(/[.\n!?]/)[0].slice(0, 60) || 'הודעה';
+      S.pendingSend = { kind: 'email', to, name: contact?.name || to, subject, body };
+      return `📧 טיוטה למייל אל ${contact?.name || to} (${to}):\n\nנושא: ${subject}\n\n${body}\n\nלשלוח? ("כן" לשליחה / "לא" לביטול)`;
+    }
+    case 'whatsapp': {
+      const contact = findContact(S, String(j.to || ''));
+      const body = cleanup(String(j.body || '')) || title;
+      if (!contact?.phone) return `אין לי מספר וואטסאפ של "${cleanup(String(j.to || ''))}" 🤔\nהוסף עם: "איש קשר: שם 050-1234567"`;
+      if (!body) return null;
+      return `💬 ההודעה ל${contact.name} מוכנה!\nלחץ על הקישור — וואטסאפ ייפתח עם הטקסט, נשאר רק ללחוץ שלח:\nhttps://wa.me/${waPhone(contact.phone)}?text=${encodeURIComponent(body)}`;
+    }
     case 'agenda':
       return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);
     case 'answer':
@@ -1213,6 +1298,62 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
       return `🌍 תרגום ל${c.lang}:\n\n${result}`;
     }
 
+    case 'contact_add': {
+      const ex = findContact(S, c.name);
+      if (ex && ex.name === c.name) {
+        if (c.email) ex.email = c.email;
+        if (c.phone) ex.phone = c.phone;
+      } else {
+        S.contacts.push({ id: nid(), name: c.name, email: c.email || null, phone: c.phone || null });
+      }
+      return `👥 שמרתי את ${c.name}:` +
+        (c.email ? `\n📧 ${c.email}` : '') + (c.phone ? `\n📱 ${c.phone}` : '') +
+        `\n\nעכשיו אפשר: "שלח מייל ל${c.name.split(' ')[0]}: ..." או "שלח וואטסאפ ל${c.name.split(' ')[0]}: ..."`;
+    }
+    case 'contact_list': {
+      if (!S.contacts.length) return '👥 אין אנשי קשר שמורים.\nהוסף עם: "איש קשר: עינב 050-1234567 einav@gmail.com"';
+      return `👥 אנשי הקשר שלך (${S.contacts.length}):\n` + S.contacts.map((x,i) =>
+        `${i+1}. ${x.name}${x.email ? ' 📧 ' + x.email : ''}${x.phone ? ' 📱 ' + x.phone : ''}`).join('\n');
+    }
+    case 'contact_delete': {
+      const x = findContact(S, c.name);
+      if (!x) return `לא מצאתי איש קשר בשם "${c.name}" 🤔`;
+      S.contacts = S.contacts.filter(y => y.id !== x.id);
+      return `🗑️ מחקתי את ${x.name} מאנשי הקשר.`;
+    }
+
+    case 'email_send': {
+      const contact = findContact(S, c.to);
+      const to = contact?.email || (/@/.test(c.to) ? c.to : null);
+      if (!to) return `אין לי כתובת מייל של "${c.to}" 🤔\nהוסף עם: "איש קשר: ${c.to} כתובת@מייל.com"`;
+      if (!env?.CALENDAR_WEBHOOK) return 'שליחת מיילים עוברת דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) ולפרוס מחדש — ראה README.';
+      const subject = c.body.split(/[.\n!?]/)[0].trim().slice(0, 60) || 'הודעה';
+      S.pendingSend = { kind: 'email', to, name: contact?.name || to, subject, body: c.body };
+      return `📧 טיוטה למייל אל ${contact?.name || to} (${to}):\n\nנושא: ${subject}\n\n${c.body}\n\nלשלוח? ("כן" לשליחה / "לא" לביטול)`;
+    }
+    case 'wa_send': {
+      const contact = findContact(S, c.to);
+      const phone = contact?.phone || (/^\+?[\d-]{9,14}$/.test(c.to) ? c.to : null);
+      if (!phone) return `אין לי מספר וואטסאפ של "${c.to}" 🤔\nהוסף עם: "איש קשר: ${c.to} 050-1234567"`;
+      return `💬 ההודעה ל${contact?.name || phone} מוכנה!\nלחץ על הקישור — וואטסאפ ייפתח עם הטקסט, נשאר רק ללחוץ שלח:\nhttps://wa.me/${waPhone(phone)}?text=${encodeURIComponent(c.body)}`;
+    }
+    case 'confirm_yes': {
+      const p = S.pendingSend;
+      if (!p) return 'אין משהו שממתין לאישור כרגע 🙂';
+      S.pendingSend = null;
+      if (p.kind === 'email') {
+        const ok = await sendEmailViaBridge(env, p.to, p.subject, p.body);
+        return ok ? `📧 נשלח! המייל ל${p.name} יצא מהג'ימייל שלך ✅`
+          : 'לא הצלחתי לשלוח 😕 ודא שהגשר של גוגל מעודכן לגרסה עם המיילים (calendar-bridge.gs) ופרוס מחדש.';
+      }
+      return 'אין משהו שממתין לאישור כרגע 🙂';
+    }
+    case 'confirm_no': {
+      if (!S.pendingSend) return 'סבבה 🙂';
+      S.pendingSend = null;
+      return 'בוטל 👍 לא נשלח כלום.';
+    }
+
     case 'doc_list': {
       if (!S.docs.length) return '📄 אין מסמכים שמורים.\nשלח תמונה או קובץ עם כיתוב "שמור: תז של יוסי" ואשמור אותו.';
       return `📄 המסמכים שלך (${S.docs.length}):\n` + S.docs.map((d,i) => {
@@ -1223,7 +1364,7 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
     case 'doc_send': {
       const d = S.docs[c.index - 1];
       if (!d) return 'לא מצאתי מסמך עם המספר הזה. כתוב "מסמכים" לרשימה.';
-      return { text: `📄 הנה "${d.name}":`, doc: d };
+      return { text: `📄 הנה "${d.name}":`, doc: d, replyTo: d.mid };
     }
     case 'doc_delete': {
       const d = S.docs[c.index - 1];
@@ -1233,7 +1374,7 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
     }
     case 'doc_find': {
       const matches = findDocs(S, c.query);
-      if (matches.length === 1) return { text: `📄 הנה "${matches[0].name}":`, doc: matches[0] };
+      if (matches.length === 1) return { text: `📄 הנה "${matches[0].name}":`, doc: matches[0], replyTo: matches[0].mid };
       if (matches.length > 1) {
         return `מצאתי כמה מסמכים 📄:\n` + matches.map((d) => {
           const idx = S.docs.indexOf(d) + 1;
@@ -1300,14 +1441,16 @@ async function tgApi(env, method, body) {
   if (!res.ok) console.log(`${method} failed:`, await res.text());
   return res.ok;
 }
-async function tgSend(env, chatId, text, buttons) {
+async function tgSend(env, chatId, text, buttons, replyTo) {
   const body = { chat_id: chatId, text };
   if (buttons && buttons.length) body.reply_markup = { inline_keyboard: buttons };
+  if (replyTo) { body.reply_to_message_id = replyTo; body.allow_sending_without_reply = true; }
   return tgApi(env, 'sendMessage', body);
 }
-async function tgSendDoc(env, chatId, doc, caption) {
-  if (doc.type === 'photo') return tgApi(env, 'sendPhoto', { chat_id: chatId, photo: doc.fileId, caption });
-  return tgApi(env, 'sendDocument', { chat_id: chatId, document: doc.fileId, caption });
+async function tgSendDoc(env, chatId, doc, caption, replyTo) {
+  const extra = replyTo ? { reply_to_message_id: replyTo, allow_sending_without_reply: true } : {};
+  if (doc.type === 'photo') return tgApi(env, 'sendPhoto', { chat_id: chatId, photo: doc.fileId, caption, ...extra });
+  return tgApi(env, 'sendDocument', { chat_id: chatId, document: doc.fileId, caption, ...extra });
 }
 
 async function tgGetFileBytes(env, fileId) {
@@ -1348,7 +1491,7 @@ async function handleMedia(env, S, msg, chatId, now) {
   const saveM = caption.match(/^(?:שמור|מסמך|תשמור)(?:\s+לי)?[:\s]+(.+)$/s);
   if (saveM) {
     const name = cleanup(saveM[1]);
-    S.docs.push({ id: S.nextId++, name, fileId, type: isPhoto ? 'photo' : 'document', created: now.getTime() });
+    S.docs.push({ id: S.nextId++, name, fileId, type: isPhoto ? 'photo' : 'document', created: now.getTime(), mid: msg.message_id });
     await saveStore(env, S);
     await tgSend(env, chatId, `📄 שמרתי את "${name}"!\nלשליפה בעתיד: "איפה ${name}" או "מסמכים"`);
     return true;
@@ -1442,6 +1585,9 @@ async function handleWebhook(env, update) {
 
   const now = ilNow();
 
+  // "מקליד..." — שההתכתבות תרגיש חיה בזמן שהבוט חושב
+  await tgApi(env, 'sendChatAction', { chat_id: chatId, action: 'typing' });
+
   // תמונות וקבצים
   if (msg.photo || msg.document) {
     await handleMedia(env, S, msg, chatId, now);
@@ -1467,14 +1613,14 @@ async function handleWebhook(env, update) {
   if (!text) return;
 
   // יומן התכתבות — כדי שאפשר יהיה לחפש אחורה
-  S.history = [...(S.history || []), { ts: now.getTime(), text }].slice(-200);
+  S.history = [...(S.history || []), { ts: now.getTime(), text, mid: msg.message_id }].slice(-500);
 
   const answer = await handleMessage(S, text, now, env, !!voicePrefix);
   await saveStore(env, S);
   if (typeof answer === 'object' && answer.doc) {
-    await tgSendDoc(env, chatId, answer.doc, answer.text);
+    await tgSendDoc(env, chatId, answer.doc, answer.text, answer.replyTo);
   } else if (typeof answer === 'object') {
-    await tgSend(env, chatId, voicePrefix + answer.text, answer.buttons);
+    await tgSend(env, chatId, voicePrefix + answer.text, answer.buttons, answer.replyTo);
   } else {
     await tgSend(env, chatId, voicePrefix + answer);
   }
