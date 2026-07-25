@@ -1739,9 +1739,10 @@ export default {
             body: JSON.stringify({ secret: env.SECRET, action: 'gmail_search', q: 'בדיקה' }),
             redirect: 'follow',
           });
-          const raw = (await res.text()).replace(/\s+/g, ' ').slice(0, 200);
+          const full = await res.text();
           let ok = false;
-          try { ok = !!JSON.parse(raw).ok; } catch {}
+          try { ok = !!JSON.parse(full).ok; } catch {}
+          const raw = full.replace(/\s+/g, ' ').slice(0, 200);
           if (ok) lines.push("✅ חיפוש בג'ימייל עובד!");
           else if (/[Aa]uthorization|הרשאה|נדרש אישור/.test(raw))
             lines.push("❌ חיפוש בג'ימייל: חסרה הרשאה! בעורך הסקריפט הרץ פעם אחת את הפונקציה authorize (הוראות בקובץ הגשר)");
