@@ -374,6 +374,50 @@ console.log('מוח Claude API (אם חובר):');
   globalThis.fetch = prevFetch;
 }
 
+console.log('העברה ומחיקה של פגישות (דרך המוח):');
+{
+  const prevFetch = globalThis.fetch;
+  const bridgeCalls = [];
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('bridge.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok:deleted=1', { status: 200 }); }
+    if (u.includes('api.anthropic.com')) {
+      const req = JSON.parse(opts.body);
+      const p = typeof req.messages[0].content === 'string' ? req.messages[0].content : '';
+      const msg = (p.match(/ההודעה החדשה שלו: "([^"]*)"/) || [])[1] || '';
+      const S = JSON.parse(kv.get('store'));
+      const dani = S.events.find(e => e.text.includes('יוסי הבדיקה'));
+      let text = 'לא JSON';
+      if (msg.includes('תעביר') && dani) text = JSON.stringify({ action: 'event_move', event_id: dani.id, datetime: '2026-07-30 15:00', reply: '' });
+      else if (msg.includes('בטל את הפגישה') && dani) text = JSON.stringify({ action: 'event_delete', event_id: dani.id, reply: '' });
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
+  await send('קבע פגישה עם יוסי הבדיקה ביום שלישי ב-11:00');
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  bridgeCalls.length = 0;
+
+  const r1 = await send('תעביר את הפגישה עם יוסי הבדיקה ליום חמישי ב-15:00');
+  check('העברת פגישה — תשובה נכונה', r1.text.includes('הזזתי') && r1.text.includes('יוסי הבדיקה'), r1.text);
+  check('  הגשר קיבל מחיקה של הישנה + יצירה של החדשה',
+    bridgeCalls.some(b => b.action === 'delete') && bridgeCalls.some(b => !b.action), JSON.stringify(bridgeCalls));
+  const Sa = JSON.parse(kv.get('store'));
+  check('  יש רק פגישה אחת כזו (לא כפולה)', Sa.events.filter(e => e.text.includes('יוסי הבדיקה')).length === 1);
+
+  bridgeCalls.length = 0;
+  const r2 = await send('בטל את הפגישה עם יוסי הבדיקה');
+  check('ביטול פגישה — נמחקה מקומית', r2.text.includes('ביטלתי'), r2.text);
+  const Sb = JSON.parse(kv.get('store'));
+  check('  נעלמה מהרשימה', !Sb.events.some(e => e.text.includes('יוסי הבדיקה')));
+  check('  הגשר קיבל בקשת מחיקה', bridgeCalls.some(b => b.action === 'delete'));
+
+  delete env.ANTHROPIC_API_KEY;
+  delete env.CALENDAR_WEBHOOK;
+  globalThis.fetch = prevFetch;
+}
+
 console.log('setup:');
 {
   const req = new Request(`https://remi.example.workers.dev/setup?secret=s3cret`);

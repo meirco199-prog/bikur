@@ -432,6 +432,20 @@ async function fetchCalendar(env, from, to) {
   } catch { return []; }
 }
 
+// מחיקה מיומן גוגל דרך הגשר (מוצא אירועים עם אותה כותרת סביב אותו מועד)
+async function deleteFromGoogleCalendar(env, title, shiftedMs) {
+  if (!env || !env.CALENDAR_WEBHOOK) return false;
+  try {
+    const res = await fetch(env.CALENDAR_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: env.SECRET, action: 'delete', title, startMs: ilToRealMs(shiftedMs) }),
+      redirect: 'follow',
+    });
+    return res.ok && (await res.text()).includes('ok');
+  } catch { return false; }
+}
+
 // כתיבה ליומן גוגל דרך גשר Apps Script (ראה README)
 async function pushToGoogleCalendar(env, title, shiftedMs) {
   if (!env || !env.CALENDAR_WEBHOOK) return false;
@@ -564,6 +578,8 @@ function helpText(S) {
 
 📅 יומן
 • קבע פגישה עם דני ביום רביעי ב-14:00
+• תעביר את הפגישה עם דני ליום חמישי ב-15:00
+• בטל את הפגישה עם דני
 • מה יש לי היום / מחר / השבוע / איזה פגישות יש לי?
 (עם חיבור יומן גוגל — רואה וקובע ביומן האמיתי)
 
@@ -787,6 +803,11 @@ async function aiBrain(env, S, text, now, isVoice = false) {
     ...S.profile.facts.slice(-10),
   ].filter(Boolean).join(' | ');
   const hist = (S.history || []).slice(-5, -1).map(h => '- ' + h.text).join('\n');
+  const upcoming = S.events.filter(e => e.at >= now.getTime() - 3600000).sort((a,b) => a.at - b.at).slice(0, 10)
+    .map(e => {
+      const d = new Date(e.at);
+      return `(id=${e.id}) "${e.text}" — ${d.getDate()}/${d.getMonth()+1} ${fmtTime(e.at)}`;
+    }).join('; ');
   const prompt = `אתה "רמי" — עוזר אישי חם ואנושי בטלגרם. כתוב עברית תקנית וטבעית בלבד. אל תפתח משפטים ב"בבקשה" — השתמש בה רק כשמגישים משהו. פנה אליו בשמו הפרטי (${n}) לפעמים, לא בכל משפט.
 מה שאתה יודע עליו: ${facts || 'עוד כלום'}
 עכשיו: יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}, השעה ${fmtTime(now.getTime())}. התאריך העברי: ${hebrewDate()}.
@@ -794,13 +815,17 @@ async function aiBrain(env, S, text, now, isVoice = false) {
 ${hist || '(אין)'}
 ההודעה החדשה שלו: "${text}"
 ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וייתכנו שגיאות תמלול — תקן לפי ההיגיון (למשל "תיסה"="טיסה", "כבר לי"="קבע לי", מספרים משובשים כמו "ה-37" הם כנראה תאריך כמו 30/7).' : ''}
+הפגישות הקרובות שהוא קבע דרכך: ${upcoming || '(אין)'}
+
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|task|shopping|note|agenda|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|shopping|note|agenda|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
 - event = פגישה/טיסה/אירוע ליומן. חובה datetime. אם נתן טווח תאריכים — קח את תאריך ההתחלה וציין את הטווח ב-title.
 - task = משימה לביצוע. shopping = פריטי קניות ב-items. note = מידע/מחשבה שכדאי לשמור.
+- event_move = לבקש להעביר/לדחות/להקדים פגישה קיימת. חובה event_id (מהרשימה למעלה) + datetime חדש. אל תיצור אירוע חדש — זה מעביר את הקיים.
+- event_delete = לבטל/למחוק פגישה קיימת. חובה event_id מהרשימה למעלה.
 - agenda = שואל מה יש לו ביומן/היום/השבוע — קבע range.
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
@@ -879,6 +904,26 @@ async function applyAiAction(S, j, now, env) {
       if (!content) return null;
       S.notes.push({ id: nid(), text: content, created: now.getTime() });
       return `🧠 שמרתי${hey}. תמצא את זה עם "חפש" מתי שתרצה.`;
+    }
+    case 'event_move': {
+      const at = parseDt(j.datetime);
+      const ev = S.events.find(e => e.id === Number(j.event_id));
+      if (!ev || !at) return null;
+      const oldAt = ev.at;
+      ev.at = at.getTime();
+      if (title && title.length >= 2) ev.text = title;
+      await deleteFromGoogleCalendar(env, ev.text, oldAt);
+      const synced = await pushToGoogleCalendar(env, ev.text, ev.at);
+      return `הזזתי${hey} 📅 את "${ev.text}" ל${fmtDate(ev.at, now)}` +
+        (synced ? '\n📆 עודכן גם ביומן גוגל!' : '');
+    }
+    case 'event_delete': {
+      const ev = S.events.find(e => e.id === Number(j.event_id));
+      if (!ev) return null;
+      S.events = S.events.filter(x => x.id !== ev.id);
+      const gone = await deleteFromGoogleCalendar(env, ev.text, ev.at);
+      return `🗑️ ביטלתי${hey} את "${ev.text}" (${fmtDate(ev.at, now)})` +
+        (gone ? '\n📆 נמחק גם מיומן גוגל.' : '');
     }
     case 'agenda':
       return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);

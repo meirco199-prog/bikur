@@ -28,6 +28,23 @@ function doPost(e) {
     if (data.secret !== SECRET) {
       return ContentService.createTextOutput('forbidden');
     }
+
+    // מחיקת אירוע: מחפש אירועים עם אותה כותרת בחלון של ±12 שעות סביב המועד
+    if (data.action === 'delete') {
+      const from = new Date(data.startMs - 12 * 3600000);
+      const to = new Date(data.startMs + 12 * 3600000);
+      const events = CalendarApp.getDefaultCalendar().getEvents(from, to);
+      let deleted = 0;
+      for (let i = 0; i < events.length; i++) {
+        if (events[i].getTitle() === data.title) {
+          events[i].deleteEvent();
+          deleted++;
+        }
+      }
+      return ContentService.createTextOutput('ok:deleted=' + deleted);
+    }
+
+    // ברירת מחדל: יצירת אירוע
     const start = new Date(data.startMs);
     const end = new Date(data.startMs + (data.durationMin || 60) * 60000);
     CalendarApp.getDefaultCalendar().createEvent(data.title, start, end);
