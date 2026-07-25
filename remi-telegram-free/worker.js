@@ -1424,7 +1424,11 @@ async function transcribeVoice(env, fileId) {
     for (let i = 0; i < bytes.length; i += 8192) b64 += String.fromCharCode(...bytes.subarray(i, i + 8192));
     b64 = btoa(b64);
     try {
-      const r = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio: b64, language: 'he' });
+      // initial_prompt מטה את הפענוח לאוצר המילים של עוזר אישי בעברית — משפר דיוק משמעותית
+      const r = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
+        audio: b64, language: 'he', task: 'transcribe',
+        initial_prompt: 'הודעה קולית בעברית לעוזר אישי: תזכיר לי, קבע פגישה, ביומן, משימה, קניות, מחר, בשעה, תבטל, תעביר.',
+      });
       if (r?.text) return { text: r.text.trim() };
     } catch {}
     const r2 = await env.AI.run('@cf/openai/whisper', { audio: [...bytes] });
@@ -1433,6 +1437,21 @@ async function transcribeVoice(env, fileId) {
   } catch {
     return { error: 'transcribe' };
   }
+}
+
+// שכבת איכות לתמלול: קלוד מתקן שגיאות וויספר לפני שהבוט מנסה להבין.
+// מחזיר את הטקסט המתוקן, או null אם אין קלוד / התיקון חשוד.
+export async function aiFixTranscript(env, raw) {
+  if (!env?.ANTHROPIC_API_KEY || !raw) return null;
+  const out = await claudeCall(env,
+    `זהו תמלול אוטומטי של הודעה קולית בעברית לעוזר אישי שמנהל תזכורות, פגישות ביומן, משימות וקניות. ייתכנו שגיאות תמלול.
+תקן רק שגיאות ברורות: מילים חסרות היגיון בהקשר ("כבר לי"="קבע לי", "תיסה"="טיסה", "תזכיר לי מהר"="תזכיר לי מחר"), שעות ותאריכים משובשים. אל תוסיף ואל תשמיט תוכן, אל תשנה את הכוונה.
+החזר את המשפט המתוקן בלבד — בלי הסברים, בלי מרכאות. אם התמלול תקין, החזר אותו כמו שהוא.
+
+התמלול: ${raw}`, 300);
+  const t = out ? cleanup(out.replace(/^התמלול[:\s]*/, '')) : '';
+  // הגנה: תשובה ריקה/ארוכה מדי ביחס למקור — כנראה לא תיקון אלא פטפוט
+  return t && t.length >= 2 && t.length <= raw.length * 2 + 40 ? t : null;
 }
 
 async function handleMedia(env, S, msg, chatId, now) {
@@ -1562,6 +1581,9 @@ async function handleWebhook(env, update) {
       return;
     }
     text = tr.text;
+    // תיקון שגיאות תמלול עם קלוד (אם חובר) — לפני שממשיכים להבין את הבקשה
+    const fixed = await aiFixTranscript(env, text);
+    if (fixed) text = fixed;
     voicePrefix = `🎤 שמעתי: "${text}"\n\n`;
   }
   if (!text) return;
@@ -1680,6 +1702,13 @@ export default {
         lines.push('❌ אחסון (KV): לא מחובר! בדוק Binding בשם DATA. ' + e.message);
       }
       lines.push(env.AI ? '✅ Workers AI מחובר (קוליות, ניסוח, תמונות)' : '⚠️ Workers AI לא מחובר — אין קוליות/ניסוח');
+      if (!env.ANTHROPIC_API_KEY) lines.push('⚠️ Claude לא מחובר (אין ANTHROPIC_API_KEY) — ההבנה והתמלול על ה-AI החינמי בלבד');
+      else {
+        const t = await claudeCall(env, 'החזר בדיוק את המילה: תקין', 30);
+        lines.push(t && t.includes('תקין')
+          ? '✅ מוח Claude מחובר ועובד'
+          : '❌ ANTHROPIC_API_KEY מוגדר אבל Claude לא עונה — בדוק את המפתח והקרדיט ב-platform.claude.com');
+      }
       if (!env.CALENDAR_ICS) lines.push('⚠️ CALENDAR_ICS לא מוגדר — הבוט לא רואה את יומן גוגל');
       else {
         try {

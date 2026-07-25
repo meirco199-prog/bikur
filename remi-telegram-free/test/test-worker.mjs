@@ -1,5 +1,5 @@
 // בדיקת הבוט מקצה לקצה עם KV מדומה וטלגרם מדומה — מריצים: node test/test-worker.mjs
-import worker, { parseICS, parseWhen, parseCommand } from '../worker.js';
+import worker, { parseICS, parseWhen, parseCommand, aiFixTranscript } from '../worker.js';
 
 let passed = 0, failed = 0;
 function check(name, cond, detail = '') {
@@ -602,6 +602,27 @@ console.log('זיכרון: תיוג ההודעה/המסמך המקורי בתש�
   await worker.fetch(req, env);
   const r = await send('חפש השער בבניין');
   check('חיפוש בהיסטוריה מתייג את ההודעה המקורית', r.reply_to_message_id === 777, JSON.stringify(r));
+}
+
+console.log('תיקון תמלול קולי עם קלוד:');
+{
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const p = JSON.parse(opts.body).messages[0].content;
+      const raw = (p.match(/התמלול: ([\s\S]*)$/) || [])[1] || '';
+      const text = raw.replace('כבר לי', 'קבע לי').replace('תיסה', 'טיסה');
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const fixed = await aiFixTranscript(env, 'כבר לי תיסה לקפריסין מחר בתשע');
+  check('תמלול משובש מתוקן ("כבר לי"→"קבע לי")', fixed === 'קבע לי טיסה לקפריסין מחר בתשע', String(fixed));
+  delete env.ANTHROPIC_API_KEY;
+  const none = await aiFixTranscript(env, 'טקסט כלשהו');
+  check('בלי קלוד — אין תיקון (משתמשים בתמלול המקורי)', none === null);
+  globalThis.fetch = prevFetch;
 }
 
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
