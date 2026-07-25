@@ -268,6 +268,33 @@ console.log('חוכמת כוונות:');
   check('רב-שורתי עם תאריך → זיכרון ולא תזכורת', r.text.includes('בזיכרון') && !r.text.includes('אזכיר'), r.text);
 }
 
+console.log('מוח AI (הבנת שפה חופשית):');
+{
+  // מוק AI שמחזיר JSON כמו מודל אמיתי
+  env.AI = { run: async (model, input) => {
+    const p = input.prompt || '';
+    if (p.includes('החזר אך ורק JSON')) {
+      const msg = (p.match(/ההודעה החדשה שלו: "([^"]*)"/) || [])[1] || '';
+      if (msg.includes('קפריסין')) return { response: '{"action":"event","title":"טיסה לקפריסין (30/7–1/8)","datetime":"2026-07-30 12:00","recurring":"none","reply":"בשמחה מאיר! רשמתי לך את הטיסה, שתהיה חופשה נהדרת 🙏"}' };
+      if (msg.includes('מה שלומך')) return { response: '{"action":"answer","reply":"הכול מצוין מאיר, תודה ששאלת! איך אפשר לעזור לך היום? 🙂"}' };
+      return { response: 'לא JSON' };
+    }
+    return { response: 'שלום יוסי, בהמשך לשיחתנו...', text: 'תמלול' };
+  }};
+  const r = await send('תקבע לי ביומן בין ה-30 לשביעי לראשון לשמיני טיסה לקפריסין');
+  check('בקשה מסובכת → AI קובע אירוע', r.text.includes('קפריסין') && r.text.includes('בשמחה מאיר'), r.text);
+  const S = JSON.parse(kv.get('store'));
+  check('  האירוע באמת נשמר', S.events.some(e => e.text.includes('קפריסין')));
+}
+{
+  const r = await send('מה שלומך חבר');
+  check('שיחה חופשית → תשובה אנושית בשם', r.text.includes('תודה ששאלת'), r.text);
+}
+{
+  const r = await send('בלה בלה סתם קצר');
+  check('כשה-AI לא מחזיר JSON — נופל בחן לתשובת ברירת מחדל', r.text.includes('עזרה'), r.text);
+}
+
 console.log('setup:');
 {
   const req = new Request(`https://remi.example.workers.dev/setup?secret=s3cret`);

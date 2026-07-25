@@ -504,6 +504,7 @@ function greet(S) {
 function helpText(S) {
   const n = firstName(S);
   return `היי${n ? ' ' + n : ''}, אני רמי — העוזר האישי שלך 🤖
+אפשר לדבר איתי בשפה חופשית לגמרי — אני מבין 🙂
 ההתראות שלי מגיעות תמיד, גם כשהכול סגור.
 
 ⏰ תזכורות
@@ -669,9 +670,115 @@ function findDocs(S, query) {
   });
 }
 
+// ===== המוח: הבנת שפה חופשית עם Workers AI =====
+// כשהחוקים הפשוטים לא בטוחים — מודל שפה מקבל את ההודעה, את הפרופיל ואת ההקשר,
+// ומחזיר JSON עם הפעולה + תשובה חמה ומנומסת.
+
+async function aiBrain(env, S, text, now) {
+  if (!env?.AI) return null;
+  const n = firstName(S) || 'חבר';
+  const facts = [
+    S.profile.name ? 'שם מלא: ' + S.profile.name : '',
+    S.profile.age ? 'גיל: ' + S.profile.age : '',
+    ...S.profile.facts.slice(-10),
+  ].filter(Boolean).join(' | ');
+  const hist = (S.history || []).slice(-5, -1).map(h => '- ' + h.text).join('\n');
+  const prompt = `אתה "רמי" — עוזר אישי חם, אדיב ומנומס בטלגרם. פנה למשתמש בשמו הפרטי (${n}), השתמש ב"בבקשה" ו"תודה" באופן טבעי, והיה אנושי ולא רובוטי.
+מה שאתה יודע עליו: ${facts || 'עוד כלום'}
+עכשיו: יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}, השעה ${fmtTime(now.getTime())}. התאריך העברי: ${hebrewDate()}.
+הודעות אחרונות שלו (הקשר):
+${hist || '(אין)'}
+ההודעה החדשה שלו: "${text}"
+
+החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
+{"action":"reminder|event|task|shopping|note|agenda|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
+
+כללים:
+- reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
+- event = פגישה/טיסה/אירוע ליומן. חובה datetime. אם נתן טווח תאריכים — קח את תאריך ההתחלה וציין את הטווח ב-title.
+- task = משימה לביצוע. shopping = פריטי קניות ב-items. note = מידע/מחשבה שכדאי לשמור.
+- agenda = שואל מה יש לו ביומן/היום/השבוע — קבע range.
+- answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
+- reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
+
+  for (const model of ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct']) {
+    try {
+      const r = await env.AI.run(model, { prompt, max_tokens: 600 });
+      const m = (r?.response || '').match(/\{[\s\S]*\}/);
+      if (!m) continue;
+      const j = JSON.parse(m[0]);
+      const out = await applyAiAction(S, j, now, env);
+      if (out) return out;
+    } catch {}
+  }
+  return null;
+}
+
+async function applyAiAction(S, j, now, env) {
+  const nid = () => S.nextId++;
+  const reply = cleanup(String(j.reply || ''));
+  const parseDt = (s) => {
+    const m = String(s || '').match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})/);
+    return m ? new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]) : null;
+  };
+  const title = cleanup(String(j.title || ''));
+
+  switch (j.action) {
+    case 'reminder': {
+      const at = parseDt(j.datetime);
+      if (!at || !title || (j.recurring === 'none' && at.getTime() <= now.getTime())) return null;
+      const weekly = j.recurring === 'weekly' ? (Number.isInteger(j.weekday) ? j.weekday : at.getDay()) : null;
+      S.reminders.push({ id: nid(), text: title, at: at.getTime(),
+        recurringDaily: j.recurring === 'daily', recurringWeekly: weekly });
+      const when = j.recurring === 'daily' ? `כל יום בשעה ${fmtTime(at.getTime())}`
+        : weekly !== null ? `כל יום ${DAY_NAMES[weekly]} בשעה ${fmtTime(at.getTime())}`
+        : fmtDate(at.getTime(), now);
+      return (reply ? reply + '\n' : '') + `⏰ ${when}: "${title}"`;
+    }
+    case 'event': {
+      const at = parseDt(j.datetime);
+      if (!at || !title) return null;
+      S.events.push({ id: nid(), text: title, at: at.getTime() });
+      const synced = await pushToGoogleCalendar(env, title, at.getTime());
+      return (reply ? reply + '\n' : '') + `📅 ${fmtDate(at.getTime(), now)}: "${title}"` +
+        (synced ? '\n📆 נכנס גם ליומן גוגל שלך!' : '');
+    }
+    case 'task': {
+      if (!title) return null;
+      S.tasks.push({ id: nid(), text: title, done: false, created: now.getTime() });
+      return (reply ? reply + '\n' : '') + `📋 נוסף לרשימת המשימות: "${title}"`;
+    }
+    case 'shopping': {
+      const items = (Array.isArray(j.items) ? j.items : [title]).map(x => cleanup(String(x))).filter(x => x.length > 0);
+      if (!items.length) return null;
+      for (const item of items) S.shopping.push({ id: nid(), text: item });
+      return (reply ? reply + '\n' : '') + `🛒 נוסף לקניות: ${items.join(', ')}`;
+    }
+    case 'note': {
+      const content = title || cleanup(String(j.reply || ''));
+      if (!content) return null;
+      S.notes.push({ id: nid(), text: content, created: now.getTime() });
+      return (reply ? reply + '\n' : '') + `🧠 שמור אצלי.`;
+    }
+    case 'agenda':
+      return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);
+    case 'answer':
+      return reply || null;
+    default:
+      return null;
+  }
+}
+
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
 export async function handleMessage(S, text, now, env) {
   const c = parseCommand(text, now);
+
+  // כשהחוקים לא בטוחים — המוח (AI) מקבל את ההגה
+  const weak = c.cmd === 'unknown' || c.cmd === 'reminder_missing_time' || c.cmd === 'event_missing_time' || c.auto;
+  if (weak && env?.AI) {
+    const ai = await aiBrain(env, S, text, now);
+    if (ai) return ai;
+  }
   const nid = () => S.nextId++;
   const openTasks = () => S.tasks.filter(t => !t.done);
   const sortedRems = () => S.reminders.slice().sort((a,b) => a.at - b.at);
@@ -941,7 +1048,7 @@ export async function handleMessage(S, text, now, env) {
     }
 
     default:
-      return `לא הבנתי 🤔 אני עוזר של תזכורות, יומן, משימות, קניות, זיכרונות, מסמכים ועוד.\nכתוב "עזרה" כדי לראות הכול.`;
+      return `${greet(S)}לא בטוח שהבנתי 🤔 נסה לנסח קצת אחרת, או כתוב "עזרה" כדי לראות מה אני יודע לעשות.`;
   }
 }
 
