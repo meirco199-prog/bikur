@@ -295,28 +295,12 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'doc_send', index: parseInt(m[1],10) };
   m = text.match(/^(?:מחק|מחקי)\s+מסמך\s+(\d+)$/);
   if (m) return { cmd:'doc_delete', index: parseInt(m[1],10) };
-  // אנשי קשר: "איש קשר: עינב 050-1234567 einav@gmail.com"
-  m = text.match(/^(?:איש קשר|הוסף איש קשר|צור איש קשר)[:\s]+(.+)$/s);
-  if (m) {
-    const raw = cleanup(m[1]);
-    const email = (raw.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/) || [null])[0];
-    const phone = (raw.match(/\+?\d[\d-]{7,14}\d/) || [null])[0];
-    const name = cleanup(raw.replace(email || ' ', ' ').replace(phone || ' ', ' ').replace(/[,;|]+/g, ' '));
-    if (name) return { cmd:'contact_add', name, email, phone };
-  }
-  if (/^(אנשי קשר|רשימת אנשי קשר)\??$/.test(text)) return { cmd:'contact_list' };
-  m = text.match(/^(?:מחק|הסר)\s+איש קשר\s+(.+)$/);
-  if (m) return { cmd:'contact_delete', name: cleanup(m[1]) };
-
-  // "שלח מייל לעינב: תוכן ההודעה" — נשלח מהג'ימייל שלו דרך הגשר, עם אישור לפני
-  m = text.match(/^(?:שלח|תשלח|כתוב|תכתוב)?(?:\s+לי)?\s*(?:אי)?מייל\s+ל-?([^:,\n]+?)[:,]\s*(.+)$/s);
-  if (m) return { cmd:'email_send', to: cleanup(m[1]), body: cleanup(m[2]) };
-  // "שלח וואטסאפ לעינב: תוכן" — קישור שנפתח בוואטסאפ עם ההודעה מוכנה
-  m = text.match(/^(?:שלח|תשלח|כתוב|תכתוב)?(?:\s+לי)?\s*(?:הודעת\s+)?(?:וואטסאפ|ווטסאפ|וואצאפ|ואטסאפ|whatsapp)\s+ל-?([^:,\n]+?)[:,]\s*(.+)$/si);
-  if (m) return { cmd:'wa_send', to: cleanup(m[1]), body: cleanup(m[2]) };
-  // אישור/ביטול שליחה שממתינה
-  if (/^(כן|שלח|אשר|יאללה|יאללה שלח|שלח את זה)!?$/.test(text)) return { cmd:'confirm_yes' };
-  if (/^(לא|בטל|עזוב|אל תשלח)!?$/.test(text)) return { cmd:'confirm_no' };
+  // חיפוש בג'ימייל (קריאה בלבד): "חפש (לי) במייל חשבונית ארנונה"
+  m = text.match(/^(?:חפש|תחפש|מצא|תמצא)(?:\s+לי)?\s+ב(?:מייל(?:ים)?|ג'?ימייל|דוא"?ל)\s+(?:את\s+)?(.+)$/);
+  if (m) return { cmd:'gmail_search', query: cleanup(m[1]) };
+  // חיפוש בוואטסאפ — אין גישה מבחוץ (מוצפן) — עונים בכנות ומחפשים בארכיון של הבוט
+  m = text.match(/^(?:חפש|תחפש|מצא|תמצא)(?:\s+לי)?\s+ב(?:וואטסאפ|ווטסאפ|וואצאפ|ואטסאפ)\s+(?:את\s+)?(.+)$/);
+  if (m) return { cmd:'wa_search_info', query: cleanup(m[1]) };
 
   m = text.match(/^(?:איפה|שלח לי|תשלח לי|הבא לי)\s+(?:את\s+)?(.+)$/);
   if (m) return { cmd:'doc_find', query: cleanup(m[1]) };
@@ -496,35 +480,21 @@ async function pushToGoogleCalendar(env, title, shiftedMs) {
   } catch { return false; }
 }
 
-// שליחת מייל מחשבון הג'ימייל של הבעלים — דרך אותו גשר Apps Script של היומן
-async function sendEmailViaBridge(env, to, subject, body) {
-  if (!env || !env.CALENDAR_WEBHOOK) return false;
+// חיפוש בג'ימייל של הבעלים — קריאה בלבד, דרך אותו גשר Apps Script של היומן.
+// מחזיר רשימת תוצאות (נושא, שולח, תאריך, קבצים מצורפים וקישור) או null בתקלה.
+async function searchGmailViaBridge(env, query) {
+  if (!env || !env.CALENDAR_WEBHOOK) return null;
   try {
     const res = await fetch(env.CALENDAR_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: env.SECRET, action: 'email', to, subject, body }),
+      body: JSON.stringify({ secret: env.SECRET, action: 'gmail_search', q: query }),
       redirect: 'follow',
     });
-    return res.ok && (await res.text()).includes('ok');
-  } catch { return false; }
-}
-
-// חיפוש איש קשר לפי שם (מלא/חלקי) — "עינב" מוצא את "עינב כהן"
-function findContact(S, q) {
-  const qq = cleanup(String(q || ''));
-  if (!qq) return null;
-  const list = S.contacts || [];
-  return list.find(x => x.name === qq)
-    || list.find(x => x.name.includes(qq) || qq.includes(x.name.split(' ')[0]));
-}
-
-// מספר ישראלי → פורמט בינלאומי לקישור wa.me (050-1234567 → 972501234567)
-function waPhone(phone) {
-  let p = String(phone || '').replace(/[^\d+]/g, '');
-  if (p.startsWith('+')) p = p.slice(1);
-  if (p.startsWith('0')) p = '972' + p.slice(1);
-  return p;
+    if (!res.ok) return null;
+    const j = JSON.parse(await res.text());
+    return j && j.ok && Array.isArray(j.results) ? j.results : null;
+  } catch { return null; }
 }
 
 // ===== המוח החכם: Claude API (אם חובר) עם נפילה ל-Workers AI החינמי =====
@@ -663,9 +633,7 @@ function helpText(S) {
 📷 שלח תמונה עם שאלה בכיתוב — אנסה לקרוא אותה
 🎤 הודעות קוליות — מדבר אליי חופשי
 
-👥 איש קשר: עינב 050-1234567 einav@mail.com / אנשי קשר
-📧 שלח מייל לעינב: ... — יוצא מהג'ימייל שלך (עם אישור לפני)
-💬 שלח וואטסאפ לעינב: ... — נפתח בוואטסאפ מוכן לשליחה
+📧 חפש במייל חשבונית ארנונה — חיפוש בג'ימייל שלך (קריאה בלבד)
 
 📊 סיכום היום / סיכום שבוע / סיכום 30 ימים / ציר זמן
 🗓️ מה התאריך העברי?
@@ -677,7 +645,6 @@ function helpText(S) {
 
 const EMPTY = {
   tasks: [], reminders: [], events: [], shopping: [], notes: [], docs: [],
-  contacts: [], pendingSend: null,
   history: [], profile: { name: null, age: null, facts: [] },
   health: { weight: [] },
   stats: { fired: [] }, lastFired: null,
@@ -894,10 +861,9 @@ ${hist || '(אין)'}
 ההודעה החדשה שלו: "${text}"
 ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וייתכנו שגיאות תמלול — תקן לפי ההיגיון (למשל "תיסה"="טיסה", "כבר לי"="קבע לי", מספרים משובשים כמו "ה-37" הם כנראה תאריך כמו 30/7).' : ''}
 הפגישות הקרובות שהוא קבע דרכך: ${upcoming || '(אין)'}
-אנשי הקשר ששמורים אצלך: ${(S.contacts || []).map(x => x.name + (x.email ? ' (מייל✓)' : '') + (x.phone ? ' (נייד✓)' : '')).join(', ') || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|email|whatsapp|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","to":"...","subject":"...","body":"...","reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|answer","title":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -909,8 +875,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - event_delete = לבטל/למחוק פגישה קיימת. חובה event_id מהרשימה למעלה.
 - tasks = שואל על המשימות שלו ("איזה משימות פתוחות יש לי") — מציג את רשימת המשימות בלבד. משימות ≠ פגישות! אל תחזיר agenda על שאלת משימות.
 - agenda = שואל מה יש לו ביומן/פגישות היום/השבוע — קבע range. לא לשאלות על משימות.
-- email = מבקש לשלוח מייל למישהו. to = שם איש הקשר (מהרשימה למעלה) או כתובת מייל. נסח subject קצר ו-body מנומס ומלא בעברית. השליחה תמיד מוצגת לו לאישור לפני — אל תגיד "שלחתי".
-- whatsapp = מבקש לשלוח הודעת וואטסאפ. to = שם איש קשר, body = ההודעה מנוסחת.
+- gmail = מבקש לחפש משהו במיילים/בג'ימייל שלו ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
 
@@ -1014,23 +979,16 @@ async function applyAiAction(S, j, now, env) {
     }
     case 'tasks':
       return taskListMsg(S);
-    case 'email': {
-      const contact = findContact(S, String(j.to || ''));
-      const to = contact?.email || (/@/.test(String(j.to || '')) ? cleanup(String(j.to)) : null);
-      const body = cleanup(String(j.body || '')) || title;
-      if (!to) return `אין לי כתובת מייל של "${cleanup(String(j.to || ''))}" 🤔\nהוסף עם: "איש קשר: שם 050... כתובת@מייל.com"`;
-      if (!body) return null;
-      if (!env?.CALENDAR_WEBHOOK) return 'שליחת מיילים עוברת דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.';
-      const subject = cleanup(String(j.subject || '')) || body.split(/[.\n!?]/)[0].slice(0, 60) || 'הודעה';
-      S.pendingSend = { kind: 'email', to, name: contact?.name || to, subject, body };
-      return `📧 טיוטה למייל אל ${contact?.name || to} (${to}):\n\nנושא: ${subject}\n\n${body}\n\nלשלוח? ("כן" לשליחה / "לא" לביטול)`;
-    }
-    case 'whatsapp': {
-      const contact = findContact(S, String(j.to || ''));
-      const body = cleanup(String(j.body || '')) || title;
-      if (!contact?.phone) return `אין לי מספר וואטסאפ של "${cleanup(String(j.to || ''))}" 🤔\nהוסף עם: "איש קשר: שם 050-1234567"`;
-      if (!body) return null;
-      return `💬 ההודעה ל${contact.name} מוכנה!\nלחץ על הקישור — וואטסאפ ייפתח עם הטקסט, נשאר רק ללחוץ שלח:\nhttps://wa.me/${waPhone(contact.phone)}?text=${encodeURIComponent(body)}`;
+    case 'gmail': {
+      if (!title) return null;
+      if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.';
+      const results = await searchGmailViaBridge(env, title);
+      if (results === null) return 'לא הצלחתי לחפש במייל 😕 ודא שהגשר של גוגל מעודכן לגרסה החדשה ופרוס מחדש.';
+      if (!results.length) return `לא מצאתי מיילים על "${title}" 🔍`;
+      return `📧 מצאתי בג'ימייל על "${title}":\n\n` + results.map((r, i) =>
+        `${i + 1}. ${r.subject || '(בלי נושא)'}\n   מאת ${r.from} · ${r.date}` +
+        (r.files && r.files.length ? `\n   📎 ${r.files.join(', ')}` : '') +
+        (r.link ? `\n   ${r.link}` : '')).join('\n\n');
     }
     case 'agenda':
       return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);
@@ -1298,62 +1256,25 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
       return `🌍 תרגום ל${c.lang}:\n\n${result}`;
     }
 
-    case 'contact_add': {
-      const ex = findContact(S, c.name);
-      if (ex && ex.name === c.name) {
-        if (c.email) ex.email = c.email;
-        if (c.phone) ex.phone = c.phone;
-      } else {
-        S.contacts.push({ id: nid(), name: c.name, email: c.email || null, phone: c.phone || null });
-      }
-      return `👥 שמרתי את ${c.name}:` +
-        (c.email ? `\n📧 ${c.email}` : '') + (c.phone ? `\n📱 ${c.phone}` : '') +
-        `\n\nעכשיו אפשר: "שלח מייל ל${c.name.split(' ')[0]}: ..." או "שלח וואטסאפ ל${c.name.split(' ')[0]}: ..."`;
+    case 'gmail_search': {
+      if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) ולפרוס מחדש — ראה README.';
+      const results = await searchGmailViaBridge(env, c.query);
+      if (results === null) return 'לא הצלחתי לחפש במייל 😕 ודא שהגשר של גוגל מעודכן לגרסה החדשה (calendar-bridge.gs) ופרוס מחדש.';
+      if (!results.length) return `לא מצאתי מיילים על "${c.query}" 🔍\nטיפ: נסה מילה אחת מדויקת, כמו שמחפשים בג'ימייל.`;
+      return `📧 מצאתי בג'ימייל על "${c.query}":\n\n` + results.map((r, i) =>
+        `${i + 1}. ${r.subject || '(בלי נושא)'}\n   מאת ${r.from} · ${r.date}` +
+        (r.files && r.files.length ? `\n   📎 ${r.files.join(', ')}` : '') +
+        (r.snippet ? `\n   "${r.snippet}"` : '') +
+        (r.link ? `\n   ${r.link}` : '')).join('\n\n') +
+        '\n\n(לחיצה על קישור פותחת את המייל בג\'ימייל)';
     }
-    case 'contact_list': {
-      if (!S.contacts.length) return '👥 אין אנשי קשר שמורים.\nהוסף עם: "איש קשר: עינב 050-1234567 einav@gmail.com"';
-      return `👥 אנשי הקשר שלך (${S.contacts.length}):\n` + S.contacts.map((x,i) =>
-        `${i+1}. ${x.name}${x.email ? ' 📧 ' + x.email : ''}${x.phone ? ' 📱 ' + x.phone : ''}`).join('\n');
+    case 'wa_search_info': {
+      // אין דרך לחפש בוואטסאפ מבחוץ — ההודעות מוצפנות ונמצאות רק בטלפון.
+      const local = doSearch(S, c.query, now);
+      const localText = typeof local === 'string' ? local : local.text;
+      const out = `בוואטסאפ אני לא יכול לחפש 😕 ההודעות שם מוצפנות ושמורות רק בטלפון שלך — אף שירות חיצוני לא יכול לקרוא אותן.\n\n💡 מה כן עובד: כל מסמך חשוב שמגיע לך בוואטסאפ — שתף/העבר אליי עם כיתוב "שמור: <שם>", ומאותו רגע הוא בארכיון שלי לתמיד ("איפה <שם>").\n\nבינתיים חיפשתי אצלי:\n${localText}`;
+      return typeof local === 'object' && local.replyTo ? { text: out, replyTo: local.replyTo } : out;
     }
-    case 'contact_delete': {
-      const x = findContact(S, c.name);
-      if (!x) return `לא מצאתי איש קשר בשם "${c.name}" 🤔`;
-      S.contacts = S.contacts.filter(y => y.id !== x.id);
-      return `🗑️ מחקתי את ${x.name} מאנשי הקשר.`;
-    }
-
-    case 'email_send': {
-      const contact = findContact(S, c.to);
-      const to = contact?.email || (/@/.test(c.to) ? c.to : null);
-      if (!to) return `אין לי כתובת מייל של "${c.to}" 🤔\nהוסף עם: "איש קשר: ${c.to} כתובת@מייל.com"`;
-      if (!env?.CALENDAR_WEBHOOK) return 'שליחת מיילים עוברת דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) ולפרוס מחדש — ראה README.';
-      const subject = c.body.split(/[.\n!?]/)[0].trim().slice(0, 60) || 'הודעה';
-      S.pendingSend = { kind: 'email', to, name: contact?.name || to, subject, body: c.body };
-      return `📧 טיוטה למייל אל ${contact?.name || to} (${to}):\n\nנושא: ${subject}\n\n${c.body}\n\nלשלוח? ("כן" לשליחה / "לא" לביטול)`;
-    }
-    case 'wa_send': {
-      const contact = findContact(S, c.to);
-      const phone = contact?.phone || (/^\+?[\d-]{9,14}$/.test(c.to) ? c.to : null);
-      if (!phone) return `אין לי מספר וואטסאפ של "${c.to}" 🤔\nהוסף עם: "איש קשר: ${c.to} 050-1234567"`;
-      return `💬 ההודעה ל${contact?.name || phone} מוכנה!\nלחץ על הקישור — וואטסאפ ייפתח עם הטקסט, נשאר רק ללחוץ שלח:\nhttps://wa.me/${waPhone(phone)}?text=${encodeURIComponent(c.body)}`;
-    }
-    case 'confirm_yes': {
-      const p = S.pendingSend;
-      if (!p) return 'אין משהו שממתין לאישור כרגע 🙂';
-      S.pendingSend = null;
-      if (p.kind === 'email') {
-        const ok = await sendEmailViaBridge(env, p.to, p.subject, p.body);
-        return ok ? `📧 נשלח! המייל ל${p.name} יצא מהג'ימייל שלך ✅`
-          : 'לא הצלחתי לשלוח 😕 ודא שהגשר של גוגל מעודכן לגרסה עם המיילים (calendar-bridge.gs) ופרוס מחדש.';
-      }
-      return 'אין משהו שממתין לאישור כרגע 🙂';
-    }
-    case 'confirm_no': {
-      if (!S.pendingSend) return 'סבבה 🙂';
-      S.pendingSend = null;
-      return 'בוטל 👍 לא נשלח כלום.';
-    }
-
     case 'doc_list': {
       if (!S.docs.length) return '📄 אין מסמכים שמורים.\nשלח תמונה או קובץ עם כיתוב "שמור: תז של יוסי" ואשמור אותו.';
       return `📄 המסמכים שלך (${S.docs.length}):\n` + S.docs.map((d,i) => {

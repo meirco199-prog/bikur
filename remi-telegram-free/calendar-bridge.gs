@@ -1,5 +1,6 @@
 // גשר גוגל לרמי — Google Apps Script
-// מאפשר לבוט לקבוע/למחוק פגישות ביומן גוגל שלך וגם לשלוח מיילים מהג'ימייל שלך, בחינם.
+// מאפשר לבוט לקבוע/למחוק פגישות ביומן גוגל שלך, ולחפש במיילים שלך (קריאה בלבד —
+// הבוט אף פעם לא שולח ולא מוחק מיילים).
 // שים לב: אחרי עדכון לגרסה הזו, בפריסה מחדש גוגל יבקש אישור הרשאות גם לג'ימייל — אשר.
 //
 // התקנה (5 דקות):
@@ -45,10 +46,26 @@ function doPost(e) {
       return ContentService.createTextOutput('ok:deleted=' + deleted);
     }
 
-    // שליחת מייל מחשבון הג'ימייל שלך (הבוט מבקש אישור ממך לפני כל שליחה)
-    if (data.action === 'email') {
-      GmailApp.sendEmail(data.to, data.subject || 'הודעה', data.body || '');
-      return ContentService.createTextOutput('ok:mail');
+    // חיפוש במיילים — קריאה בלבד. מחזיר עד 5 תוצאות: נושא, שולח, תאריך,
+    // שמות קבצים מצורפים וקישור שפותח את המייל בג'ימייל.
+    if (data.action === 'gmail_search') {
+      var threads = GmailApp.search(data.q, 0, 5);
+      var results = [];
+      for (var i = 0; i < threads.length; i++) {
+        var msgs = threads[i].getMessages();
+        var last = msgs[msgs.length - 1];
+        var files = [];
+        var atts = last.getAttachments();
+        for (var a = 0; a < atts.length; a++) files.push(atts[a].getName());
+        results.push({
+          subject: threads[i].getFirstMessageSubject(),
+          from: last.getFrom().replace(/<[^>]*>/, '').trim(),
+          date: Utilities.formatDate(last.getDate(), 'Asia/Jerusalem', 'd/M/yyyy'),
+          files: files,
+          link: threads[i].getPermalink(),
+        });
+      }
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, results: results }));
     }
 
     // ברירת מחדל: יצירת אירוע
