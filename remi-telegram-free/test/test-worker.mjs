@@ -335,6 +335,30 @@ console.log('תזכורות חכמות (עונות במקום להדהד):');
   check('משפט משובש עם "ביומן" → AI קובע אירוע (לא שאלת יומן)', r.text.includes('קבעתי') && r.text.includes('קפריסי'), r.text);
 }
 
+console.log('מוח Claude API (אם חובר):');
+{
+  // מוק ל-api.anthropic.com
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('api.anthropic.com')) {
+      const req = JSON.parse(opts.body);
+      const userMsg = typeof req.messages[0].content === 'string' ? req.messages[0].content : '(image)';
+      let text = 'תשובה חופשית מקלוד';
+      if (userMsg.includes('החזר אך ורק JSON')) {
+        text = '{"action":"answer","reply":"בטח מאיר, הטיסה שלך לקפריסין יוצאת ב-30/7 🙂"}';
+      }
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const r = await send('מתי הטיסה שלי לקפריסין בעצם?');
+  check('קלוד עונה כשהמפתח מחובר', r.text.includes('בטח מאיר'), r.text);
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log('setup:');
 {
   const req = new Request(`https://remi.example.workers.dev/setup?secret=s3cret`);

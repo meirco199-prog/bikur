@@ -446,9 +446,52 @@ async function pushToGoogleCalendar(env, title, shiftedMs) {
   } catch { return false; }
 }
 
-// ===== Workers AI: ניסוח, תרגום, ראיית תמונות =====
+// ===== המוח החכם: Claude API (אם חובר) עם נפילה ל-Workers AI החינמי =====
+// שדרוג אופציונלי: מוסיפים Secret בשם ANTHROPIC_API_KEY — וכל ההבנה, הניסוח,
+// התרגום וקריאת התמונות עוברים ל-Claude (עברית מצוינת). בלי המפתח — הכול
+// ממשיך לעבוד על Workers AI החינמי. (קריאה ישירה ב-fetch — ב-Worker מודבק
+// בדשבורד אין אפשרות להתקין SDK.)
+
+function bytesToB64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(s);
+}
+
+async function claudeCall(env, content, maxTokens = 3000) {
+  if (!env?.ANTHROPIC_API_KEY) return null;
+  const model = env.CLAUDE_MODEL || 'claude-opus-5';
+  const body = {
+    model,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content }],
+  };
+  // effort מוריד עלות/השהיה; נתמך באופוס/סונט 5 אך לא בהאיקו
+  if (/opus-5|sonnet-5|fable/.test(model)) body.output_config = { effort: 'low' };
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) { console.log('claude error:', res.status, await res.text()); return null; }
+    const data = await res.json();
+    if (data.stop_reason === 'refusal') return null;
+    const block = (data.content || []).find(b => b.type === 'text');
+    return block?.text?.trim() || null;
+  } catch (e) {
+    console.log('claude fetch failed:', e.message);
+    return null;
+  }
+}
 
 async function aiText(env, prompt) {
+  const fromClaude = await claudeCall(env, prompt);
+  if (fromClaude) return fromClaude;
   if (!env || !env.AI) return null;
   for (const model of ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct']) {
     try {
@@ -460,8 +503,14 @@ async function aiText(env, prompt) {
 }
 
 async function aiVision(env, imageBytes, instruction) {
-  if (!env || !env.AI) return null;
   const prompt = instruction + '\nענה בעברית בלבד, בקצרה ולעניין.';
+  // Claude קורא עברית מתמונות (כולל כתב יד) ברמה גבוהה בהרבה מהמודלים החינמיים
+  const fromClaude = await claudeCall(env, [
+    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: bytesToB64(imageBytes) } },
+    { type: 'text', text: prompt },
+  ]);
+  if (fromClaude) return fromClaude;
+  if (!env || !env.AI) return null;
   for (const model of ['@cf/meta/llama-3.2-11b-vision-instruct', '@cf/llava-hf/llava-1.5-7b-hf']) {
     try {
       const r = await env.AI.run(model, { prompt, image: [...imageBytes], max_tokens: 700 });
@@ -675,7 +724,7 @@ function findDocs(S, query) {
 // ומחזיר JSON עם הפעולה + תשובה חמה ומנומסת.
 
 async function aiBrain(env, S, text, now, isVoice = false) {
-  if (!env?.AI) return null;
+  if (!env?.AI && !env?.ANTHROPIC_API_KEY) return null;
   const n = firstName(S) || 'חבר';
   const facts = [
     S.profile.name ? 'שם מלא: ' + S.profile.name : '',
@@ -701,6 +750,18 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
 
+  // קלוד קודם (אם חובר) — הבנת עברית ברמה הגבוהה ביותר
+  const fromClaude = await claudeCall(env, prompt, 800);
+  if (fromClaude) {
+    try {
+      const m = fromClaude.match(/\{[\s\S]*\}/);
+      if (m) {
+        const out = await applyAiAction(S, JSON.parse(m[0]), now, env);
+        if (out) return out;
+      }
+    } catch {}
+  }
+  if (!env?.AI) return null;
   for (const model of ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct']) {
     try {
       const r = await env.AI.run(model, { prompt, max_tokens: 600, temperature: 0.15 });
@@ -793,7 +854,7 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
   // כשהחוקים לא בטוחים (או שזו הודעה קולית מתומללת) — המוח (AI) מקבל את ההגה
   const weak = c.cmd === 'unknown' || c.cmd === 'reminder_missing_time' || c.cmd === 'event_missing_time'
     || c.auto || c.loose || isVoice;
-  if (weak && env?.AI) {
+  if (weak && (env?.AI || env?.ANTHROPIC_API_KEY)) {
     const ai = await aiBrain(env, S, text, now, isVoice);
     if (ai) return ai;
   }
@@ -1133,8 +1194,8 @@ async function handleMedia(env, S, msg, chatId, now) {
     return true;
   }
 
-  // תמונה עם שאלה/הוראה בכיתוב — ניסיון קריאה עם AI (בטא)
-  if (isPhoto && env.AI) {
+  // תמונה עם שאלה/הוראה בכיתוב — קריאה עם AI (עם קלוד: כולל כתב יד ומסמכים)
+  if (isPhoto && (env.AI || env.ANTHROPIC_API_KEY)) {
     const bytes = await tgGetFileBytes(env, fileId);
     if (bytes) {
       const instruction = caption || 'תאר מה יש בתמונה. אם יש בה טקסט או רשימה — כתוב אותם.';
