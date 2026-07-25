@@ -431,5 +431,28 @@ console.log('setup:');
   check('סוד שגוי נחסם', res.status === 403);
 }
 
+console.log('דיוק תאריכים (ל׳/ב׳ צמודות — הבאג של "הכול נופל על מחר"):');
+{
+  // שבת 25/7/2026 בצהריים — כמו ביום שהבאג דווח
+  const now = new Date(2026, 6, 25, 12, 0, 0);
+  const d = (c) => c.at instanceof Date ? c.at : new Date(c.at);
+
+  let c = parseCommand('קבע לי פגישה למחר עם עירית נתיבות ב8 בבוקר', now);
+  check('"למחר... ב8 בבוקר" → מחר 8:00', c.cmd === 'event_add' && d(c).getDate() === 26 && d(c).getHours() === 8, JSON.stringify(c));
+  check('  הכותרת נקייה ממילות זמן', c.text.includes('עירית נתיבות') && !c.text.includes('מחר') && !/\b8\b/.test(c.text), c.text);
+
+  c = parseCommand('קבע פגישה ל1/8 ל9 יום הולדת שלי', now);
+  check('"ל1/8 ל9" → 1/8 בשעה 9:00', c.cmd === 'event_add' && d(c).getDate() === 1 && d(c).getMonth() === 7 && d(c).getHours() === 9, JSON.stringify(c));
+  check('  הכותרת: רק תוכן הפגישה', c.text.includes('יום הולדת') && !c.text.includes('1/8'), c.text);
+
+  c = parseCommand('קבע פגישה ליום שני הקרוב עם דיאנה ל9', now);
+  check('"ליום שני הקרוב ל9" → יום שני 27/7 9:00', c.cmd === 'event_add' && d(c).getDate() === 27 && d(c).getDay() === 1 && d(c).getHours() === 9, JSON.stringify(c));
+  check('  הכותרת בלי "ליום שני"', c.text.includes('דיאנה') && !c.text.includes('שני'), c.text);
+
+  c = parseCommand('קבע פגישה ליום רביעי הבא עם דני ב14:00', now);
+  check('"ליום רביעי הבא ב14:00" → יום רביעי 29/7 14:00', c.cmd === 'event_add' && d(c).getDate() === 29 && d(c).getDay() === 3 && d(c).getHours() === 14, JSON.stringify(c));
+  check('  הכותרת בלי "רביעי"', c.text.includes('דני') && !c.text.includes('רביעי'), c.text);
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

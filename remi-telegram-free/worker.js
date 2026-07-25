@@ -108,12 +108,12 @@ export function parseWhen(text, now) {
   }
 
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (/\sמחרתיים\s/.test(t)) { day = new Date(today.getTime()+2*86400000); t = t.replace(/\sמחרתיים\s/,' '); }
-  else if (/\sמחר\s/.test(t)) { day = new Date(today.getTime()+86400000); t = t.replace(/\sמחר\s/,' '); }
-  else if (/\sהיום\s/.test(t)) { day = today; t = t.replace(/\sהיום\s/,' '); }
-  else if (/\sהערב\s/.test(t)) { day = today; periodHint = periodHint || 'בערב'; t = t.replace(/\sהערב\s/,' '); }
+  if (/\s[לב]?מחרתיים\s/.test(t)) { day = new Date(today.getTime()+2*86400000); t = t.replace(/\s[לב]?מחרתיים\s/,' '); }
+  else if (/\s[לב]?מחר\s/.test(t)) { day = new Date(today.getTime()+86400000); t = t.replace(/\s[לב]?מחר\s/,' '); }
+  else if (/\sל?היום\s/.test(t)) { day = today; t = t.replace(/\sל?היום\s/,' '); }
+  else if (/\sל?הערב\s/.test(t)) { day = today; periodHint = periodHint || 'בערב'; t = t.replace(/\sל?הערב\s/,' '); }
   else {
-    const dayRe = new RegExp('\\s(?:ב?יום\\s+)(' + Object.keys(DAY_WORDS).join('|') + ')\\s');
+    const dayRe = new RegExp('\\s(?:[לב]?יום\\s+)(' + Object.keys(DAY_WORDS).join('|') + ')(?:\\s+(?:הקרוב|הבא))?\\s');
     const dm = t.match(dayRe);
     if (dm) {
       let diff = (DAY_WORDS[dm[1]] - now.getDay() + 7) % 7;
@@ -123,7 +123,7 @@ export function parseWhen(text, now) {
     }
   }
 
-  const dateRe = /\s(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\s/;
+  const dateRe = /\s[לב]?-?(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\s/;
   const dateM = t.match(dateRe);
   if (dateM && !day) {
     const d = parseInt(dateM[1],10), mo = parseInt(dateM[2],10)-1;
@@ -141,7 +141,7 @@ export function parseWhen(text, now) {
     if (re.test(t)) { periodHint = periodHint || word; t = t.replace(re,' '); break; }
   }
 
-  const timeRe = /\s(?:בשעה\s*|ב-?\s?)(\d{1,2})(?:[:.](\d{2}))?\s/;
+  const timeRe = /\s(?:בשעה\s*|[בל]-?\s?)(\d{1,2})(?:[:.](\d{2}))?\s/;
   let tm = t.match(timeRe);
   if (!tm) {
     const bare = /\s(\d{1,2})[:.](\d{2})\s/;
@@ -823,6 +823,8 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
 - event = פגישה/טיסה/אירוע ליומן. חובה datetime. אם נתן טווח תאריכים — קח את תאריך ההתחלה וציין את הטווח ב-title.
+- דייק בתאריך! חשב לפי התאריך של היום שכתוב למעלה: "מחר"=יום אחד קדימה, "יום שני הקרוב"=יום השני הבא בלוח השנה, "ל-1/8"=האחד באוגוסט. אל תשים הכול על מחר.
+- ה-title חייב להיות נקי ממילות זמן: בלי "מחר", בלי "ליום שני", בלי תאריכים — רק תוכן הפגישה עצמו (למשל "פגישה עם עירית נתיבות — תשלום דוחות").
 - task = משימה לביצוע. shopping = פריטי קניות ב-items. note = מידע/מחשבה שכדאי לשמור.
 - event_move = לבקש להעביר/לדחות/להקדים פגישה קיימת. חובה event_id (מהרשימה למעלה) + datetime חדש. אל תיצור אירוע חדש — זה מעביר את הקיים.
 - event_delete = לבטל/למחוק פגישה קיימת. חובה event_id מהרשימה למעלה.
