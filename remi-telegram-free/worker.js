@@ -608,6 +608,61 @@ async function saveStore(env, s) {
   await env.DATA.put('store', JSON.stringify(s));
 }
 
+// מצב הקרון נשמר במפתח נפרד ('cron') שרק הקרון כותב אליו — כך שליחת תזכורת
+// לעולם לא דורסת תזכורת חדשה שנוצרה באותו רגע דרך הודעה (KV הוא eventually-consistent).
+const EMPTY_CRON = { fired: {}, lastBriefDate: null, lastSummaryDate: null, lastFired: null, stats: { fired: [] } };
+
+async function loadCron(env, S) {
+  const raw = await env.DATA.get('cron');
+  if (raw) {
+    const c = JSON.parse(raw);
+    return Object.assign(structuredClone(EMPTY_CRON), c, { stats: Object.assign({ fired: [] }, c.stats || {}) });
+  }
+  // הגירה חד-פעמית מהמבנה הישן שבו הכול ישב ב-store
+  const c = structuredClone(EMPTY_CRON);
+  if (S) {
+    c.lastBriefDate = S.lastBriefDate ?? null;
+    c.lastSummaryDate = S.lastSummaryDate ?? null;
+    c.lastFired = S.lastFired ?? null;
+    c.stats = Object.assign({ fired: [] }, S.stats || {});
+  }
+  return c;
+}
+async function saveCron(env, c) {
+  await env.DATA.put('cron', JSON.stringify(c));
+}
+
+// המופע שהגיע זמנו ועדיין לא נשלח (לפי רישום ה-fired של הקרון)
+function dueOccurrence(r, firedTs, nowMs) {
+  const recurring = r.recurringDaily || (r.recurringWeekly !== null && r.recurringWeekly !== undefined);
+  if (!recurring) return (!firedTs && r.at <= nowMs) ? r.at : null;
+  if (nowMs < r.at) return null;
+  const period = r.recurringDaily ? 86400000 : 7 * 86400000;
+  const k = Math.floor((nowMs - r.at) / period);
+  const candidate = r.at + k * period;
+  return candidate > (firedTs || 0) ? candidate : null;
+}
+
+// המופע הבא בטווח [from, to) — לתצוגה ביומן ובסיכום הבוקר
+function reminderTimeIn(r, from, to) {
+  const recurring = r.recurringDaily || (r.recurringWeekly !== null && r.recurringWeekly !== undefined);
+  if (!recurring) return (r.at >= from && r.at < to) ? r.at : null;
+  const period = r.recurringDaily ? 86400000 : 7 * 86400000;
+  let t = r.at;
+  if (t < from) t = r.at + Math.ceil((from - r.at) / period) * period;
+  return t < to ? t : null;
+}
+
+// ניקוי בצד ההודעות (הבעלים של store): תזכורות חד-פעמיות שכבר נשלחו + אירועים ישנים
+function pruneStore(S, C, nowMs) {
+  S.reminders = S.reminders.filter(r => {
+    const recurring = r.recurringDaily || (r.recurringWeekly !== null && r.recurringWeekly !== undefined);
+    return recurring || !C.fired[r.id];
+  });
+  const cutoff = nowMs - 7 * 86400000;
+  S.events = S.events.filter(e => e.at >= cutoff);
+}
+
 // ===== לוגיקת העוזר =====
 
 async function agendaText(S, range, now, env) {
@@ -620,13 +675,13 @@ async function agendaText(S, range, now, env) {
   const google = await fetchCalendar(env, from, to);
   const local = S.events.filter(e => e.at >= from && e.at < to).map(e => ({ at: e.at, text: e.text }));
   const all = [...google.map(g => ({ ...g, fromGoogle: true })), ...local].sort((a,b) => a.at - b.at);
-  const rems = S.reminders.filter(r => r.at >= from && r.at < to).sort((a,b) => a.at - b.at);
+  const rems = S.reminders.map(r => ({ r, occ: reminderTimeIn(r, from, to) })).filter(x => x.occ !== null).sort((a,b) => a.occ - b.occ);
   const tasks = S.tasks.filter(t => !t.done);
 
   let out = `${title}\n`;
   out += all.length === 0 ? '\nאין אירועים ביומן.'
     : '\n' + all.map((e,i) => `${i+1}. ${e.fromGoogle ? '📆 ' : ''}${fmtIcsEvent(e, now)}`).join('\n');
-  if (rems.length) out += '\n\n⏰ תזכורות:\n' + rems.map(r => `• ${fmtDate(r.at, now)} — ${r.text}`).join('\n');
+  if (rems.length) out += '\n\n⏰ תזכורות:\n' + rems.map(x => `• ${fmtDate(x.occ, now)} — ${x.r.text}`).join('\n');
   if (tasks.length) out += `\n\n📋 משימות פתוחות (${tasks.length}):\n` + tasks.map((t,i) => `${i+1}. ${t.text}`).join('\n');
   if (S.shopping.length) out += `\n\n🛒 בקניות: ${S.shopping.length} פריטים`;
   return out;
@@ -638,13 +693,13 @@ async function morningBrief(S, now, env) {
   const google = await fetchCalendar(env, from, to);
   const local = S.events.filter(e => e.at >= from && e.at < to).map(e => ({ at: e.at, text: e.text }));
   const all = [...google, ...local].sort((a,b) => a.at - b.at);
-  const rems = S.reminders.filter(r => r.at >= from && r.at < to).sort((a,b) => a.at - b.at);
+  const rems = S.reminders.map(r => ({ r, occ: reminderTimeIn(r, from, to) })).filter(x => x.occ !== null).sort((a,b) => a.occ - b.occ);
   const tasks = S.tasks.filter(t => !t.done);
   if (!all.length && !rems.length && !tasks.length) return null;
   const n = firstName(S);
   let out = `🌅 בוקר טוב${n ? ' ' + n : ''}! יום ${DAY_NAMES[now.getDay()]}, ${hebrewDate()}:\n`;
   if (all.length) out += '\n' + all.map(e => `📅 ${e.allDay ? 'כל היום' : fmtTime(e.at)} — ${e.text}`).join('\n');
-  if (rems.length) out += '\n' + rems.map(r => `⏰ ${fmtTime(r.at)} — ${r.text}`).join('\n');
+  if (rems.length) out += '\n' + rems.map(x => `⏰ ${fmtTime(x.occ)} — ${x.r.text}`).join('\n');
   if (tasks.length) out += `\n\n📋 משימות פתוחות:\n` + tasks.map((t,i) => `${i+1}. ${t.text}`).join('\n');
   return out;
 }
@@ -913,6 +968,7 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
           && c.at.getTime() <= now.getTime()) {
         return `רגע, השעה הזאת כבר עברה היום 🙂\nנסה למשל: "תזכיר לי מחר ב-${fmtTime(c.at.getTime())} ${c.text}"`;
       }
+      c.at.setSeconds(0, 0); // עיגול לתחילת הדקה — כך התזכורת יוצאת בדיוק בדקה הנכונה
       S.reminders.push({ id: nid(), text: c.text, at: c.at.getTime(),
         recurringDaily: !!c.recurringDaily, recurringWeekly: c.recurringWeekly ?? null });
       let when;
@@ -1230,6 +1286,11 @@ async function handleWebhook(env, update) {
   let text = msg.text;
 
   const S = await loadStore(env);
+  // מיזוג מצב הקרון (סטטיסטיקות, תזכורת אחרונה) וניקוי תזכורות שכבר נשלחו
+  const C = await loadCron(env, S);
+  S.stats = C.stats;
+  S.lastFired = C.lastFired;
+  pruneStore(S, C, Date.now());
 
   // המשתמש הראשון ששולח /start הופך לבעלים; כל השאר נדחים.
   if (S.ownerChatId === null && text && /^\/start/.test(text)) {
@@ -1286,58 +1347,58 @@ async function handleWebhook(env, update) {
 }
 
 async function runCron(env) {
+  // הקרון קורא את ה-store אבל לעולם לא כותב אליו — כל המצב שלו במפתח 'cron' הנפרד
   const S = await loadStore(env);
   if (S.ownerChatId === null) return;
+  const C = await loadCron(env, S);
+  S.stats = C.stats; // לתצוגה בסיכומים
 
   const now = ilNow();
   const nowMs = now.getTime();
   let changed = false;
 
-  for (const r of S.reminders.slice()) {
-    if (r.at <= nowMs) {
-      let suffix = '';
-      if (r.recurringDaily) suffix = '\n(תזכורת יומית — תחזור מחר)';
-      else if (r.recurringWeekly !== null && r.recurringWeekly !== undefined) suffix = `\n(חוזרת כל יום ${DAY_NAMES[r.recurringWeekly]})`;
-      else suffix = '\n(אפשר לכתוב "דחה 10" לנודניק)';
-      const n = firstName(S);
-      // תזכורת שהיא שאלה — שולחים את התשובה עצמה, לא הד של ההוראה
-      const smart = await smartReminderText(env, S, r.text, now);
-      await tgSend(env, S.ownerChatId, smart
-        ? `⏰ ${n ? n + ', ' : ''}${smart}${r.recurringDaily || r.recurringWeekly != null ? suffix : ''}`
-        : `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
-      S.lastFired = { text: r.text };
-      S.stats.fired = [...(S.stats.fired || []), nowMs].slice(-300);
-      if (r.recurringDaily) { while (r.at <= nowMs) r.at += 86400000; }
-      else if (r.recurringWeekly !== null && r.recurringWeekly !== undefined) { while (r.at <= nowMs) r.at += 7*86400000; }
-      else S.reminders = S.reminders.filter(x => x.id !== r.id);
-      changed = true;
-    }
+  for (const r of S.reminders) {
+    const due = dueOccurrence(r, C.fired[r.id], nowMs);
+    if (due === null) continue;
+    let suffix = '';
+    if (r.recurringDaily) suffix = '\n(תזכורת יומית — תחזור מחר)';
+    else if (r.recurringWeekly !== null && r.recurringWeekly !== undefined) suffix = `\n(חוזרת כל יום ${DAY_NAMES[r.recurringWeekly]})`;
+    else suffix = '\n(אפשר לכתוב "דחה 10" לנודניק)';
+    const n = firstName(S);
+    // תזכורת שהיא שאלה — שולחים את התשובה עצמה, לא הד של ההוראה
+    const smart = await smartReminderText(env, S, r.text, now);
+    await tgSend(env, S.ownerChatId, smart
+      ? `⏰ ${n ? n + ', ' : ''}${smart}${r.recurringDaily || r.recurringWeekly != null ? suffix : ''}`
+      : `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
+    C.fired[r.id] = due;
+    C.lastFired = { text: r.text };
+    C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
+    changed = true;
   }
 
   const briefHour = env.BRIEF_HOUR === 'off' ? null : parseInt(env.BRIEF_HOUR ?? '8', 10);
   const todayStr = now.toDateString();
-  if (briefHour !== null && !Number.isNaN(briefHour) && now.getHours() === briefHour && S.lastBriefDate !== todayStr) {
-    S.lastBriefDate = todayStr;
+  if (briefHour !== null && !Number.isNaN(briefHour) && now.getHours() === briefHour && C.lastBriefDate !== todayStr) {
+    C.lastBriefDate = todayStr;
     changed = true;
     const brief = await morningBrief(S, now, env);
     if (brief) await tgSend(env, S.ownerChatId, brief);
   }
 
   const summaryHour = env.SUMMARY_HOUR === 'off' ? null : parseInt(env.SUMMARY_HOUR ?? '21', 10);
-  if (summaryHour !== null && !Number.isNaN(summaryHour) && now.getHours() === summaryHour && S.lastSummaryDate !== todayStr) {
-    S.lastSummaryDate = todayStr;
+  if (summaryHour !== null && !Number.isNaN(summaryHour) && now.getHours() === summaryHour && C.lastSummaryDate !== todayStr) {
+    C.lastSummaryDate = todayStr;
     changed = true;
     const sum = daySummary(S, now);
     if (sum) await tgSend(env, S.ownerChatId, sum);
   }
 
-  // ניקוי אירועים ישנים משבוע שעבר
-  const cutoff = nowMs - 7*86400000;
-  const before = S.events.length;
-  S.events = S.events.filter(e => e.at >= cutoff);
-  if (S.events.length !== before) changed = true;
-
-  if (changed) await saveStore(env, S);
+  if (changed) {
+    // ניקוי רישומי fired של תזכורות שכבר נמחקו מה-store
+    const ids = new Set(S.reminders.map(r => String(r.id)));
+    for (const id of Object.keys(C.fired)) if (!ids.has(id)) delete C.fired[id];
+    await saveCron(env, C);
+  }
 }
 
 // ===== נקודות כניסה של ה-Worker =====

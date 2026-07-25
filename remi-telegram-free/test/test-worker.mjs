@@ -119,9 +119,19 @@ console.log('קרון (תזכורת שהגיע זמנה + דחייה):');
   const fired = sent.slice(before);
   check('הקרון שלח את התזכורת', fired.some(m => m.text.includes('⏰ תזכורת: לבדוק תנור')), JSON.stringify(fired));
 
+  const C = JSON.parse(kv.get('cron'));
+  check('השליחה נרשמה במפתח הקרון הנפרד', Object.keys(C.fired).length >= 1);
+  check('נרשמה בסטטיסטיקה', (C.stats.fired || []).length >= 1);
+
+  // הרצה חוזרת של הקרון — לא שולחת שוב
+  const before2 = sent.length;
+  await worker.scheduled({}, env);
+  check('אין שליחה כפולה בהרצת קרון נוספת', !sent.slice(before2).some(m => m.text.includes('תנור')));
+
+  // הודעה כלשהי מהמשתמש מנקה את התזכורת שנשלחה מה-store
+  await send('משימות');
   const S2 = JSON.parse(kv.get('store'));
-  check('תזכורת חד-פעמית נמחקה אחרי שנשלחה', !S2.reminders.some(x => x.text.includes('תנור')));
-  check('נרשמה בסטטיסטיקה', (S2.stats.fired || []).length >= 1);
+  check('תזכורת חד-פעמית נוקתה אחרי שנשלחה', !S2.reminders.some(x => x.text.includes('תנור')));
 }
 {
   const r = await send('דחה 15');
@@ -133,10 +143,15 @@ console.log('קרון (תזכורת שהגיע זמנה + דחייה):');
   const daily = S.reminders.find(x => x.recurringDaily);
   daily.at = Date.now() - 60000;
   kv.set('store', JSON.stringify(S));
+  const before = sent.length;
   await worker.scheduled({}, env);
+  check('תזכורת יומית נשלחה', sent.slice(before).some(m => m.text.includes('כדור')));
+  // נשארת ב-store (חוזרת), ולא נשלחת שוב באותו יום
   const S2 = JSON.parse(kv.get('store'));
-  const daily2 = S2.reminders.find(x => x.recurringDaily);
-  check('תזכורת יומית קודמה למחר במקום להימחק', !!daily2 && daily2.at > Date.now());
+  check('תזכורת יומית נשארת קיימת', !!S2.reminders.find(x => x.recurringDaily));
+  const before2 = sent.length;
+  await worker.scheduled({}, env);
+  check('יומית לא נשלחת פעמיים באותו יום', !sent.slice(before2).some(m => m.text.includes('⏰') && m.text.includes('כדור')));
 }
 
 console.log('יומן גוגל (ICS):');
