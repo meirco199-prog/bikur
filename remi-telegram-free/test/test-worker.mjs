@@ -282,7 +282,7 @@ console.log('מוח AI (הבנת שפה חופשית):');
     return { response: 'שלום יוסי, בהמשך לשיחתנו...', text: 'תמלול' };
   }};
   const r = await send('תקבע לי ביומן בין ה-30 לשביעי לראשון לשמיני טיסה לקפריסין');
-  check('בקשה מסובכת → AI קובע אירוע', r.text.includes('קפריסין') && r.text.includes('בשמחה מאיר'), r.text);
+  check('בקשה מסובכת → AI קובע אירוע', r.text.includes('קפריסין') && r.text.includes('קבעתי'), r.text);
   const S = JSON.parse(kv.get('store'));
   check('  האירוע באמת נשמר', S.events.some(e => e.text.includes('קפריסין')));
 }
@@ -293,6 +293,41 @@ console.log('מוח AI (הבנת שפה חופשית):');
 {
   const r = await send('בלה בלה סתם קצר');
   check('כשה-AI לא מחזיר JSON — נופל בחן לתשובת ברירת מחדל', r.text.includes('עזרה'), r.text);
+}
+
+console.log('תזכורות חכמות (עונות במקום להדהד):');
+{
+  await send('תזכיר לי כל יום ב-7 מה התאריך העברי');
+  const S = JSON.parse(kv.get('store'));
+  const r = S.reminders.find(x => x.text.includes('תאריך'));
+  check('נוצרה תזכורת יומית לתאריך', !!r && r.recurringDaily);
+  r.at = Date.now() - 60000;
+  kv.set('store', JSON.stringify(S));
+  const before = sent.length;
+  await worker.scheduled({}, env);
+  const fired = sent.slice(before);
+  check('בזמן הצלצול — עונה עם התאריך העברי עצמו', fired.some(m => m.text.includes('ובעברי') && m.text.includes('התשפ')), JSON.stringify(fired.map(f=>f.text)));
+}
+{
+  // תזכורת-שאלה כללית — עוברת ל-AI לתשובה
+  const oldRun = env.AI.run;
+  env.AI.run = async (model, input) => {
+    if ((input.prompt || '').includes('ענה בקצרה')) return { response: 'נשארו 51 ימים לראש השנה 🎉' };
+    return oldRun(model, input);
+  };
+  await send('תזכיר לי בעוד דקה כמה ימים נשארו עד ראש השנה');
+  const S = JSON.parse(kv.get('store'));
+  const r = S.reminders.find(x => x.text.includes('ראש השנה'));
+  check('נוצרה תזכורת-שאלה', !!r, JSON.stringify(S.reminders.map(x=>x.text)));
+  if (r) {
+    r.at = Date.now() - 60000;
+    kv.set('store', JSON.stringify(S));
+    const before = sent.length;
+    await worker.scheduled({}, env);
+    const fired = sent.slice(before);
+    check('בזמן הצלצול — ה-AI עונה על השאלה', fired.some(m => m.text.includes('51 ימים')), JSON.stringify(fired.map(f=>f.text)));
+  }
+  env.AI.run = oldRun;
 }
 
 console.log('setup:');

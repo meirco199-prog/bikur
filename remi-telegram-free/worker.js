@@ -683,7 +683,7 @@ async function aiBrain(env, S, text, now) {
     ...S.profile.facts.slice(-10),
   ].filter(Boolean).join(' | ');
   const hist = (S.history || []).slice(-5, -1).map(h => '- ' + h.text).join('\n');
-  const prompt = `אתה "רמי" — עוזר אישי חם, אדיב ומנומס בטלגרם. פנה למשתמש בשמו הפרטי (${n}), השתמש ב"בבקשה" ו"תודה" באופן טבעי, והיה אנושי ולא רובוטי.
+  const prompt = `אתה "רמי" — עוזר אישי חם ואנושי בטלגרם. כתוב עברית תקנית וטבעית בלבד. אל תפתח משפטים ב"בבקשה" — השתמש בה רק כשמגישים משהו. פנה אליו בשמו הפרטי (${n}) לפעמים, לא בכל משפט.
 מה שאתה יודע עליו: ${facts || 'עוד כלום'}
 עכשיו: יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}, השעה ${fmtTime(now.getTime())}. התאריך העברי: ${hebrewDate()}.
 הודעות אחרונות שלו (הקשר):
@@ -722,7 +722,11 @@ async function applyAiAction(S, j, now, env) {
     return m ? new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]) : null;
   };
   const title = cleanup(String(j.title || ''));
+  const n = firstName(S);
+  const hey = n ? ' ' + n : '';
 
+  // לפעולות — ניסוח קבוע, נקי ואישי (עברית של ה-AI החינמי לפעמים צולעת);
+  // תשובת ה-AI החופשית משמשת רק ל-action=answer.
   switch (j.action) {
     case 'reminder': {
       const at = parseDt(j.datetime);
@@ -733,32 +737,32 @@ async function applyAiAction(S, j, now, env) {
       const when = j.recurring === 'daily' ? `כל יום בשעה ${fmtTime(at.getTime())}`
         : weekly !== null ? `כל יום ${DAY_NAMES[weekly]} בשעה ${fmtTime(at.getTime())}`
         : fmtDate(at.getTime(), now);
-      return (reply ? reply + '\n' : '') + `⏰ ${when}: "${title}"`;
+      return `סגור${hey}! ⏰ אזכיר לך ${when}:\n"${title}"`;
     }
     case 'event': {
       const at = parseDt(j.datetime);
       if (!at || !title) return null;
       S.events.push({ id: nid(), text: title, at: at.getTime() });
       const synced = await pushToGoogleCalendar(env, title, at.getTime());
-      return (reply ? reply + '\n' : '') + `📅 ${fmtDate(at.getTime(), now)}: "${title}"` +
+      return `קבעתי לך${hey} 📅 ${fmtDate(at.getTime(), now)}:\n"${title}"` +
         (synced ? '\n📆 נכנס גם ליומן גוגל שלך!' : '');
     }
     case 'task': {
       if (!title) return null;
       S.tasks.push({ id: nid(), text: title, done: false, created: now.getTime() });
-      return (reply ? reply + '\n' : '') + `📋 נוסף לרשימת המשימות: "${title}"`;
+      return `📋 הוספתי למשימות${hey}: "${title}"`;
     }
     case 'shopping': {
       const items = (Array.isArray(j.items) ? j.items : [title]).map(x => cleanup(String(x))).filter(x => x.length > 0);
       if (!items.length) return null;
       for (const item of items) S.shopping.push({ id: nid(), text: item });
-      return (reply ? reply + '\n' : '') + `🛒 נוסף לקניות: ${items.join(', ')}`;
+      return `🛒 הוספתי לקניות: ${items.join(', ')}`;
     }
     case 'note': {
-      const content = title || cleanup(String(j.reply || ''));
+      const content = title || reply;
       if (!content) return null;
       S.notes.push({ id: nid(), text: content, created: now.getTime() });
-      return (reply ? reply + '\n' : '') + `🧠 שמור אצלי.`;
+      return `🧠 שמרתי${hey}. תמצא את זה עם "חפש" מתי שתרצה.`;
     }
     case 'agenda':
       return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);
@@ -767,6 +771,19 @@ async function applyAiAction(S, j, now, env) {
     default:
       return null;
   }
+}
+
+// תזכורת שהיא בעצם בקשת מידע — עונים על השאלה בזמן הצלצול במקום להדהד אותה
+async function smartReminderText(env, S, text, now) {
+  if (/תאריך/.test(text) && /עברי/.test(text)) {
+    return `היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} — ובעברי: ${hebrewDate()} 🕎`;
+  }
+  const questionLike = /\?/.test(text) || /^(מה|מתי|כמה|איזה|אילו|האם|מי|איך|למה|איפה)(\s|$)/.test(text);
+  if (questionLike && env?.AI) {
+    const ans = await aiText(env, `אתה עוזר אישי בעברית. היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}, השעה ${fmtTime(now.getTime())}, התאריך העברי: ${hebrewDate()}. ענה בקצרה ובעברית טבעית על: ${text}`);
+    if (ans) return ans;
+  }
+  return null;
 }
 
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
@@ -1221,7 +1238,11 @@ async function runCron(env) {
       else if (r.recurringWeekly !== null && r.recurringWeekly !== undefined) suffix = `\n(חוזרת כל יום ${DAY_NAMES[r.recurringWeekly]})`;
       else suffix = '\n(אפשר לכתוב "דחה 10" לנודניק)';
       const n = firstName(S);
-      await tgSend(env, S.ownerChatId, `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
+      // תזכורת שהיא שאלה — שולחים את התשובה עצמה, לא הד של ההוראה
+      const smart = await smartReminderText(env, S, r.text, now);
+      await tgSend(env, S.ownerChatId, smart
+        ? `⏰ ${n ? n + ', ' : ''}${smart}${r.recurringDaily || r.recurringWeekly != null ? suffix : ''}`
+        : `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
       S.lastFired = { text: r.text };
       S.stats.fired = [...(S.stats.fired || []), nowMs].slice(-300);
       if (r.recurringDaily) { while (r.at <= nowMs) r.at += 86400000; }
