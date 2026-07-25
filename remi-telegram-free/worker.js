@@ -31,8 +31,27 @@ function ilToRealMs(shiftedMs) {
   const offset = ilWallMs(now) - now.getTime();
   return shiftedMs - offset;
 }
-function hebrewDate() {
-  return new Intl.DateTimeFormat('he-u-ca-hebrew', { timeZone: IL_TZ, day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+// המרת מספר לגימטריה: 11 → י"א, 786 → תשפ"ו
+function gematria(n) {
+  const VALS = [[400,'ת'],[300,'ש'],[200,'ר'],[100,'ק'],[90,'צ'],[80,'פ'],[70,'ע'],[60,'ס'],[50,'נ'],[40,'מ'],[30,'ל'],[20,'כ'],[10,'י'],[9,'ט'],[8,'ח'],[7,'ז'],[6,'ו'],[5,'ה'],[4,'ד'],[3,'ג'],[2,'ב'],[1,'א']];
+  let s = '';
+  while (n > 0) {
+    if (n === 15) { s += 'טו'; break; } // ט"ו במקום י-ה
+    if (n === 16) { s += 'טז'; break; } // ט"ז במקום י-ו
+    for (const [v, l] of VALS) {
+      if (n >= v) { s += l; n -= v; break; }
+    }
+  }
+  if (s.length === 1) return s + '׳';
+  return s.slice(0, -1) + '״' + s.slice(-1);
+}
+
+export function hebrewDate() {
+  const parts = new Intl.DateTimeFormat('he-u-ca-hebrew', { timeZone: IL_TZ, day: 'numeric', month: 'long', year: 'numeric' }).formatToParts(new Date());
+  const day = parseInt(parts.find(p => p.type === 'day')?.value || '1', 10);
+  const month = parts.find(p => p.type === 'month')?.value || '';
+  const year = parseInt(parts.find(p => p.type === 'year')?.value || '5786', 10);
+  return `${gematria(day)} ב${month} ה${gematria(year % 1000)}`;
 }
 
 // ===== מפענח עברית =====
@@ -1102,6 +1121,46 @@ export default {
       return new Response(`חיבור לטלגרם: ${body}\n\nעכשיו פתח את הבוט בטלגרם ושלח לו /start`, {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
+    }
+
+    // מסך אבחון עצמי — פותחים בדפדפן: /diag?secret=<SECRET>
+    if (url.pathname === '/diag') {
+      if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });
+      const lines = ['🔍 אבחון רמי', ''];
+      try {
+        const S = await loadStore(env);
+        lines.push(`✅ אחסון (KV): מחובר — ${S.tasks.length} משימות, ${S.reminders.length} תזכורות, ${S.docs.length} מסמכים`);
+        lines.push(S.ownerChatId ? `✅ בעלים רשום (${S.ownerChatId})` : '⚠️ עוד לא נשלח /start לבוט');
+      } catch (e) {
+        lines.push('❌ אחסון (KV): לא מחובר! בדוק Binding בשם DATA. ' + e.message);
+      }
+      lines.push(env.AI ? '✅ Workers AI מחובר (קוליות, ניסוח, תמונות)' : '⚠️ Workers AI לא מחובר — אין קוליות/ניסוח');
+      if (!env.CALENDAR_ICS) lines.push('⚠️ CALENDAR_ICS לא מוגדר — הבוט לא רואה את יומן גוגל');
+      else {
+        try {
+          const res = await fetch(env.CALENDAR_ICS);
+          if (!res.ok) lines.push(`❌ קריאת יומן גוגל נכשלה (HTTP ${res.status}) — בדוק את הכתובת הסודית`);
+          else {
+            const now = ilNow();
+            const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const events = parseICS(await res.text(), from, from + 7 * 86400000);
+            lines.push(`✅ יומן גוגל (קריאה): ${events.length} אירועים בשבוע הקרוב`);
+          }
+        } catch (e) { lines.push('❌ קריאת יומן גוגל נכשלה: ' + e.message); }
+      }
+      if (!env.CALENDAR_WEBHOOK) lines.push('⚠️ CALENDAR_WEBHOOK לא מוגדר — "קבע פגישה" לא ייכנס ליומן גוגל');
+      else {
+        try {
+          const tomorrow = ilNow();
+          tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(12, 0, 0, 0);
+          const ok = await pushToGoogleCalendar(env, '✅ בדיקת חיבור מרמי — אפשר למחוק', tomorrow.getTime());
+          lines.push(ok
+            ? '✅ כתיבה ליומן גוגל עובדת! (נוצר אירוע בדיקה מחר ב-12:00 — מחק אותו ביומן)'
+            : '❌ הגשר (Apps Script) לא ענה "ok" — בדוק: הסוד בקובץ זהה ל-SECRET, הפריסה עם גישה "כולם", והכתובת מסתיימת ב-/exec');
+        } catch (e) { lines.push('❌ כתיבה ליומן נכשלה: ' + e.message); }
+      }
+      lines.push('', '🕎 תאריך עברי: ' + hebrewDate());
+      return new Response(lines.join('\n'), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     }
 
     if (url.pathname === `/webhook/${env.SECRET}` && request.method === 'POST') {
