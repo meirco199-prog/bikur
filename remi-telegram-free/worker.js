@@ -27,7 +27,11 @@ const PERIOD_DEFAULT_HOUR = {
 };
 
 function cleanup(text) {
-  return text.replace(/\s{2,}/g,' ').replace(/^[\s,.:\-–]+|[\s,.:\-–]+$/g,'').trim();
+  return text
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '') // תווי כיווניות בלתי-נראים שהמקלדת מוסיפה
+    .replace(/\s{2,}/g,' ')
+    .replace(/^[\s,.:\-–"'״׳]+|[\s,.:\-–"'״׳]+$/g,'')
+    .trim();
 }
 
 export function parseWhen(text, now) {
@@ -132,7 +136,7 @@ export function parseWhen(text, now) {
 
 export function parseCommand(raw, now) {
   const text = cleanup(raw);
-  if (/^(עזרה|help|\/help|\/start|\?|פקודות)$/i.test(text)) return { cmd:'help' };
+  if (/^(עזרה|help|\/help|\/start|\?|פקודות|מה אתה יודע( לעשות)?|מה אפשר( לעשות)?)\??$/i.test(text)) return { cmd:'help' };
 
   let m = text.match(/^(?:תזכיר לי|תזכירי לי|תזכורת[:\s])\s*(.+)$/s);
   if (m) {

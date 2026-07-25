@@ -205,7 +205,11 @@ const PERIOD_DEFAULT_HOUR = {
 };
 
 function cleanup(text) {
-  return text.replace(/\s{2,}/g,' ').replace(/^[\s,.:\-–]+|[\s,.:\-–]+$/g,'').trim();
+  return text
+    .replace(/[‎‏‪-‮⁦-⁩﻿]/g, '')
+    .replace(/\s{2,}/g,' ')
+    .replace(/^[\s,.:\-–"'״׳]+|[\s,.:\-–"'״׳]+$/g,'')
+    .trim();
 }
 
 function parseWhen(text, now = new Date()) {
@@ -310,7 +314,7 @@ function parseWhen(text, now = new Date()) {
 
 function parseCommand(raw, now = new Date()) {
   const text = cleanup(raw);
-  if (/^(עזרה|help|\?|פקודות)$/i.test(text)) return { cmd:'help' };
+  if (/^(עזרה|help|\?|פקודות|מה אתה יודע( לעשות)?|מה אפשר( לעשות)?)\??$/i.test(text)) return { cmd:'help' };
 
   let m = text.match(/^(?:תזכיר לי|תזכירי לי|תזכורת[:\s])\s*(.+)$/s);
   if (m) {
