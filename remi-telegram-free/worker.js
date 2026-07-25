@@ -179,7 +179,9 @@ export function parseWhen(text, now) {
     at = new Date(today); at.setHours(9, 0, 0, 0);
     if (at.getTime() <= now.getTime()) at = new Date(at.getTime() + 86400000);
   }
-  return { at, recurringDaily, recurringWeekly, rest };
+  // explicitTime: יש שעה/פרק זמן מפורש — לא רק מילת יום כמו "היום"/"מחר"
+  const explicitTime = hour !== null || relative !== null || recurringDaily || recurringWeekly !== null;
+  return { at, recurringDaily, recurringWeekly, rest, explicitTime };
 }
 
 // מסיר מילות מילוי מכותרת אירוע/תזכורת ("קבע לי ביומן פגישה..." → "פגישה...")
@@ -187,13 +189,31 @@ function stripFiller(text) {
   return cleanup(text.replace(/^לי\s+/, '').replace(/\sביומן\s/g, ' ').replace(/^ביומן\s+/, ''));
 }
 
+// חילוץ שם מתוך "קוראים לי מאיר כהן תז 03..." — עוצר לפני מספרים/ת"ז
+function extractName(s) {
+  const words = s.split(/\s+/);
+  const out = [];
+  for (const w of words) {
+    if (/\d/.test(w) || /^ת"?ז$/.test(w) || w === 'בן' || w === 'בת') break;
+    out.push(w);
+    if (out.length >= 3) break;
+  }
+  return out.join(' ');
+}
+
 export function parseCommand(raw, now) {
   const text = cleanup(raw);
   if (/^(עזרה|help|\/help|\/start|\?|פקודות|מה אתה יודע( לעשות)?|מה אפשר( לעשות)?)\??$/i.test(text)) return { cmd:'help' };
 
+  // הודעת "תשמור את הפרטים שלי" — פרטים אישיים מלאים, גם רב-שורתית
+  if (/(?:תשמור|שמור)\s+(?:את\s+)?הפרטים/.test(text) ||
+      (/^(?:קוראים לי|שמי)\s/.test(text) && text.includes('\n'))) {
+    return { cmd:'profile_dump', text };
+  }
+
   // פרופיל אישי
-  let m = text.match(/^(?:קוראים לי|תקרא לי|שמי)\s+(.+)$/);
-  if (m) return { cmd:'profile_name', name: cleanup(m[1]) };
+  let m = text.match(/^(?:קוראים לי|תקרא לי|שמי)\s+([^\n]+)$/);
+  if (m) return { cmd:'profile_name', name: extractName(cleanup(m[1])) || cleanup(m[1]) };
   m = text.match(/^אני בן\s+(\d+)/);
   if (m) return { cmd:'profile_age', age: parseInt(m[1],10) };
   m = text.match(/^(?:עליי|עלי|תדע עליי)[:\s]+(.+)$/s);
@@ -289,21 +309,27 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'period_summary', days: parseInt(m[1],10) };
   if (/^ציר זמן\??$/.test(text)) return { cmd:'period_summary', days: 14 };
 
-  // נתב כוונות: טקסט חופשי שמכיל זמן — כנראה תזכורת ("מחר ב-16:00 תור לרופא").
-  // שאלות (סימן שאלה או מילת שאלה) הן לא תזכורת! (בלי \b — הוא לא עובד עם עברית)
+  // נתב כוונות: טקסט חופשי קצר שמכיל זמן — כנראה תזכורת ("מחר ב-16:00 תור לרופא").
+  // שאלות הן לא תזכורת, והודעות ארוכות/רב-שורתיות הן לא תזכורת! (בלי \b — לא עובד בעברית)
   const isQuestion = /\?/.test(text) || /^(מה|מתי|איזה|אילו|כמה|האם|מי|איך|למה|איפה)(\s|$)/.test(text);
-  if (!isQuestion) {
+  const isShortLine = !text.includes('\n') && text.length <= 80;
+  if (!isQuestion && isShortLine) {
     const w = parseWhen(text, now);
-    if (w.at && w.rest && w.rest.length >= 2 && w.rest !== text) {
+    if (w.at && w.explicitTime && w.rest && w.rest.length >= 2 && w.rest !== text) {
       return { cmd:'reminder_add', text: stripFiller(w.rest), at: w.at,
                recurringDaily: w.recurringDaily, recurringWeekly: w.recurringWeekly, auto: true };
     }
   }
 
   // ניסוחים חופשיים של שאלת יומן: "איזה פגישות יש לי היום ביומן?", "מתי הפגישה מחר?" וכו'
-  if (/ביומן|פגיש/.test(text) || /^(מה יש לי|מה קורה|מה מתוכנן|מה הלו"?ז)(\s|$)/.test(text)) {
+  if (isShortLine && (/ביומן|פגיש/.test(text) || /^(מה יש לי|מה קורה|מה מתוכנן|מה הלו"?ז)(\s|$)/.test(text))) {
     const range = /מחר/.test(text) ? 'tomorrow' : /שבוע/.test(text) ? 'week' : 'today';
     return { cmd:'agenda', range };
+  }
+
+  // הודעה ארוכה או רב-שורתית שאינה פקודה — נשמור בזיכרון שלא תלך לאיבוד
+  if (text.includes('\n') || text.length >= 60) {
+    return { cmd:'note_add', text, auto: true };
   }
 
   return { cmd:'unknown', text };
@@ -653,6 +679,23 @@ export async function handleMessage(S, text, now, env) {
   switch (c.cmd) {
     case 'help': return helpText(S);
 
+    case 'profile_dump': {
+      const lines = c.text.split('\n').map(cleanup).filter(l => l.length >= 2 && !/(?:תשמור|שמור)\s+(?:את\s+)?הפרטים/.test(l));
+      for (const line of lines) {
+        const nm = line.match(/^(?:קוראים לי|שמי)\s+(.+)$/);
+        if (nm) {
+          const name = extractName(cleanup(nm[1]));
+          if (name) S.profile.name = name;
+        }
+        if (!S.profile.facts.includes(line)) S.profile.facts.push(line);
+      }
+      S.profile.facts = S.profile.facts.slice(-40);
+      const n = firstName(S);
+      return `נעים להכיר${n ? ', ' + n : ''}! 🤝 שמרתי את כל הפרטים:\n` +
+        lines.map(l => `• ${l}`).join('\n') +
+        '\n\nמעכשיו אני מכיר אותך. אפשר לבדוק עם "מי אני", ולהוסיף עוד בכל שלב עם "עליי: ..."';
+    }
+
     case 'profile_name': {
       S.profile.name = c.name;
       return `נעים מאוד, ${c.name.split(' ')[0]}! 🤝 מעכשיו אני זוכר אותך.\nאפשר גם לספר לי: "אני בן 35", "עליי: אני עצמאי בתחום..."`;
@@ -769,6 +812,7 @@ export async function handleMessage(S, text, now, env) {
 
     case 'note_add': {
       S.notes.push({ id: nid(), text: c.text, created: now.getTime() });
+      if (c.auto) return `🧠 לא זיהיתי פקודה, אז שמרתי את זה בזיכרון שלא ילך לאיבוד.\nלשליפה: "זיכרונות" או "חפש <מילה>"\n(אם התכוונת למשהו אחר — כתוב "עזרה")`;
       return `🧠 שמרתי בזיכרון:\n"${c.text}"\n\nלשליפה: "זיכרונות" או "חפש <מילה>"`;
     }
     case 'note_list': {

@@ -248,6 +248,26 @@ console.log('פיצ\'רים חדשים 2:');
   check('ציר זמן לתקופה', r.text.includes('30 הימים'), r.text);
 }
 
+console.log('חוכמת כוונות:');
+{
+  const msg = 'קוראים לי מאיר כהן תז 037775483\nתאריך לידה 1.8.83\nאני אהיה בן 43 ב 1.8.26\nאבא ל3\nאדר בן 12\nאגם בת 10\nאור בן שנה וחצי\nבת זוגתי דיאנה.\nתשמור את הפרטים שלי';
+  const r = await send(msg);
+  check('פרטים אישיים רב-שורתיים → פרופיל (לא תזכורת!)', r.text.includes('נעים להכיר') && !r.text.includes('אזכיר'), r.text);
+  check('  השם חולץ נקי', r.text.includes('מאיר'), r.text);
+}
+{
+  const r = await send('מי אני');
+  check('מי אני מציג את הפרטים', r.text.includes('דיאנה') && r.text.includes('מאיר כהן'), r.text);
+}
+{
+  const r = await send('סתם מחשבה ארוכה שעוברת לי בראש על החיים ועל מה שהיה היום בעבודה עם הלקוחות');
+  check('טקסט ארוך בלי פקודה → נשמר בזיכרון', r.text.includes('שמרתי את זה בזיכרון'), r.text);
+}
+{
+  const r = await send('שורה ראשונה\nשורה שנייה עם תאריך 1.8.26');
+  check('רב-שורתי עם תאריך → זיכרון ולא תזכורת', r.text.includes('בזיכרון') && !r.text.includes('אזכיר'), r.text);
+}
+
 console.log('setup:');
 {
   const req = new Request(`https://remi.example.workers.dev/setup?secret=s3cret`);
