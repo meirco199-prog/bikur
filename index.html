@@ -1,493 +1,903 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>מאיר כהן | יהב ביטוח ופיננסים</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --black:       #0d0d0d;
-      --dark:        #141414;
-      --dark2:       #1c1c1c;
-      --orange:      #f97316;
-      --orange2:     #fb923c;
-      --orange-glow: rgba(249,115,22,0.15);
-      --border:      rgba(249,115,22,0.25);
-      --muted:       #8a8a8a;
-      --white:       #ffffff;
-    }
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body {
-      font-family: 'Heebo', sans-serif;
-      background: #0a0a0a;
-      color: var(--white);
-      min-height: 100vh;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding: 16px 16px 32px;
-    }
-    .card {
-      width: 100%;
-      max-width: 420px;
-      background: var(--dark);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      overflow: hidden;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(249,115,22,0.08);
-    }
-    .band {
-      height: 5px;
-      background: linear-gradient(90deg, #0d0d0d 0%, var(--orange) 40%, var(--orange2) 60%, var(--orange) 80%, #0d0d0d 100%);
-    }
-    .hero {
-      padding: 22px 22px 18px;
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(135deg, #1a1a1a 0%, #111 100%);
-    }
-    .avatar {
-      width: 78px; height: 78px;
-      border-radius: 50%;
-      border: 2.5px solid var(--orange);
-      overflow: hidden;
-      flex-shrink: 0;
-      box-shadow: 0 0 0 5px var(--orange-glow), 0 4px 20px rgba(249,115,22,0.2);
-    }
-    .avatar img {
-      width: 100%; height: 100%;
-      object-fit: cover;
-      object-position: center top;
-    }
-    .brand {
-      font-size: 10px; font-weight: 700;
-      color: var(--orange); letter-spacing: 1.2px;
-      text-transform: uppercase; margin-bottom: 3px;
-    }
-    .name { font-size: 22px; font-weight: 800; line-height: 1.2; margin-bottom: 3px; }
-    .title { font-size: 12px; color: var(--muted); font-weight: 500; }
-    .tagline {
-      padding: 13px 22px;
-      font-size: 13.5px; color: #bbb;
-      line-height: 1.6;
-      border-bottom: 1px solid var(--border);
-      background: #131313;
-    }
-    .tagline strong { color: var(--white); font-weight: 700; }
-    .stats {
-      display: flex;
-      border-bottom: 1px solid var(--border);
-      background: #111;
-    }
-    .stat {
-      flex: 1; padding: 12px 8px;
-      text-align: center;
-      border-left: 1px solid var(--border);
-    }
-    .stat:last-child { border-left: none; }
-    .stat-num { font-size: 19px; font-weight: 800; color: var(--orange); line-height: 1; }
-    .stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; font-weight: 500; }
-    .services {
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
-      background: #141414;
-    }
-    .sec-title {
-      font-size: 10px; font-weight: 700; color: var(--orange);
-      letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 9px;
-    }
-    .chips { display: flex; flex-wrap: wrap; gap: 7px; }
-    .chip {
-      background: var(--orange-glow);
-      border: 1px solid var(--border);
-      border-radius: 50px;
-      padding: 5px 12px;
-      font-size: 12px; font-weight: 600;
-      color: #e0e0e0;
-    }
-    .actions {
-      padding: 15px 20px;
-      display: flex; flex-direction: column; gap: 9px;
-      border-bottom: 1px solid var(--border);
-      background: #131313;
-    }
-    .row2 { display: flex; gap: 9px; }
-    .row2 .btn { flex: 1; }
-    .btn {
-      display: flex; align-items: center; justify-content: center;
-      gap: 8px; padding: 12px 16px;
-      border-radius: 12px;
-      font-family: 'Heebo', sans-serif;
-      font-size: 14px; font-weight: 700;
-      text-decoration: none; cursor: pointer;
-      border: none; transition: all 0.2s;
-    }
-    .btn-wa {
-      background: linear-gradient(135deg, #25d366, #128c7e);
-      color: #fff; font-size: 15px;
-      animation: pulse 2.8s infinite;
-    }
-    @keyframes pulse {
-      0%,100% { box-shadow: 0 4px 16px rgba(37,211,102,0.28); }
-      50%      { box-shadow: 0 4px 28px rgba(37,211,102,0.55); }
-    }
-    .btn-orange {
-      background: linear-gradient(135deg, var(--orange), var(--orange2));
-      color: #fff;
-    }
-    .btn-dark {
-      background: var(--dark2);
-      border: 1.5px solid var(--border);
-      color: var(--white);
-    }
-    /* ── Team Section ── */
-    .team-section {
-      padding: 18px 20px 20px;
-      border-bottom: 1px solid var(--border);
-      background: #111;
-    }
-    .team-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 10px;
-    }
-    .team-card {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      background: #1a1a1a;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 14px 14px;
-      position: relative;
-      overflow: hidden;
-    }
-    .team-card::before {
-      content: '';
-      position: absolute;
-      top: 0; right: 0;
-      width: 3px; height: 100%;
-      background: linear-gradient(180deg, var(--orange), var(--orange2));
-      border-radius: 0 16px 16px 0;
-    }
-    .team-avatar {
-      width: 64px; height: 64px;
-      border-radius: 50%;
-      border: 2px solid var(--orange);
-      overflow: hidden;
-      flex-shrink: 0;
-      box-shadow: 0 0 0 3px var(--orange-glow);
-      background: var(--dark2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; font-weight: 800; color: var(--orange);
-    }
-    .team-avatar img {
-      width: 100%; height: 100%;
-      object-fit: cover; object-position: center top;
-    }
-    .team-info { flex: 1; min-width: 0; }
-    .team-name {
-      font-size: 16px; font-weight: 800;
-      color: var(--white); margin-bottom: 2px;
-    }
-    .team-role {
-      font-size: 11px; font-weight: 600;
-      color: var(--orange); margin-bottom: 6px;
-      text-transform: uppercase; letter-spacing: 0.8px;
-    }
-    .team-badges {
-      display: flex; flex-wrap: wrap; gap: 4px;
-    }
-    .team-badge {
-      font-size: 9.5px; font-weight: 600;
-      background: rgba(249,115,22,0.1);
-      border: 1px solid rgba(249,115,22,0.3);
-      color: #ccc;
-      padding: 2px 7px;
-      border-radius: 50px;
-    }
-    .team-badge.gold {
-      background: rgba(251,191,36,0.1);
-      border-color: rgba(251,191,36,0.35);
-      color: #fbbf24;
-    }
-    .video-section {
-      padding: 14px 20px 16px;
-      border-bottom: 1px solid var(--border);
-      background: #111;
-    }
-    .video-wrapper {
-      position: relative;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 1.5px solid var(--border);
-      box-shadow: 0 0 24px rgba(249,115,22,0.15), 0 8px 32px rgba(0,0,0,0.6);
-      background: #000;
-      margin-top: 8px;
-    }
-    .promo-video {
-      width: 100%;
-      display: block;
-      height: auto;
-    }
-    .video-badge {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: var(--orange);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 50px;
-      letter-spacing: 0.5px;
-      pointer-events: none;
-    }
-    .links {
-      padding: 14px 20px 10px;
-      border-bottom: 1px solid var(--border);
-      background: #141414;
-    }
-    .link-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .link-item {
-      display: flex; align-items: center; gap: 9px;
-      padding: 11px 12px;
-      background: #1a1a1a;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      text-decoration: none;
-      color: var(--white);
-      transition: all 0.18s;
-    }
-    .link-item:hover { background: var(--orange-glow); border-color: rgba(249,115,22,0.5); }
-    .link-icon {
-      width: 32px; height: 32px; flex-shrink: 0;
-      border-radius: 8px; overflow: hidden;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .link-icon svg { width: 32px; height: 32px; display: block; }
-    .link-icon img { width: 32px; height: 32px; object-fit: contain; }
-    .link-label { font-size: 9.5px; color: var(--muted); font-weight: 500; }
-    .link-name  { font-size: 12px; font-weight: 700; }
-    .link-item.full { grid-column: span 2; }
-    .footer {
-      padding: 12px 20px 16px;
-      display: flex; align-items: center; justify-content: space-between;
-      background: #111;
-    }
-    .footer-brand strong { color: var(--orange); font-weight: 800; font-size: 13px; display:block; }
-    .footer-brand span { color: var(--muted); font-size: 11px; }
-    .footer-addr { font-size: 11px; color: var(--muted); text-align: left; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#16a34a" />
+<title>יומן אוכל משפחתי</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f0fdf4;
+    --card:#ffffff;
+    --ink:#14532d;
+    --ink2:#166534;
+    --muted:#6b7280;
+    --green:#16a34a;
+    --green-soft:#dcfce7;
+    --red:#dc2626;
+    --red-soft:#fee2e2;
+    --amber:#f59e0b;
+    --amber-soft:#fef3c7;
+    --blue:#0ea5e9;
+    --blue-soft:#e0f2fe;
+    --violet:#7c3aed;
+    --violet-soft:#ede9fe;
+    --border:#e5e7eb;
+    --radius:18px;
+    --shadow:0 4px 18px rgba(20,83,45,.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:'Heebo',sans-serif;
+    background:linear-gradient(180deg,#ecfdf5 0%,#f0fdf4 40%,#f7fee7 100%);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:14px 14px 90px}
+  h1{font-size:22px;font-weight:900}
+  h2{font-size:18px;font-weight:800}
+  h3{font-size:16px;font-weight:700}
+  .card{
+    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:16px;margin-bottom:14px;border:1px solid rgba(22,101,52,.06);
+  }
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border:none;border-radius:14px;padding:12px 18px;font-family:inherit;
+    font-size:16px;font-weight:700;cursor:pointer;transition:transform .1s;
+    background:var(--green);color:#fff;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn.secondary{background:#fff;color:var(--ink);border:2px solid var(--border)}
+  .btn.small{padding:8px 12px;font-size:14px;border-radius:12px}
+  .btn.danger{background:var(--red)}
+  .btn.block{width:100%}
+  .btn:disabled{opacity:.5;cursor:default}
+  input,select{
+    font-family:inherit;font-size:16px;padding:12px;border:2px solid var(--border);
+    border-radius:12px;width:100%;background:#fff;color:var(--ink);
+  }
+  input:focus{outline:none;border-color:var(--green)}
+  .row{display:flex;gap:10px;align-items:center}
+  .muted{color:var(--muted);font-size:13px}
+  .center{text-align:center}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 2px 14px;gap:8px;
+  }
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;background:var(--green-soft);
+    color:var(--ink2);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;white-space:nowrap;
+  }
+  .banner{
+    border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;font-weight:700;
+    display:flex;gap:10px;align-items:center;font-size:15px;line-height:1.45;
+  }
+  .banner.cheat{background:linear-gradient(135deg,#fdf4ff,#fae8ff);color:#86198f;border:1px solid #f0abfc}
+  .banner.warn{background:var(--red-soft);color:var(--red);border:1px solid #fecaca}
+  .banner.info{background:var(--blue-soft);color:#075985;border:1px solid #bae6fd}
+  .banner.weigh{background:var(--amber-soft);color:#92400e;border:1px solid #fde68a}
+  .meal{border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;background:#fff}
+  .meal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .meal-title{font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .meal-hint{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+  .water{
+    display:flex;align-items:center;gap:6px;background:var(--blue-soft);
+    border-radius:12px;padding:8px 12px;margin-bottom:10px;font-size:13px;font-weight:600;color:#075985;flex-wrap:wrap;
+  }
+  .cup{
+    font-size:22px;background:none;border:none;cursor:pointer;filter:grayscale(1);opacity:.45;transition:.15s;
+  }
+  .cup.on{filter:none;opacity:1;transform:scale(1.1)}
+  .fooditem{
+    display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;
+    margin-bottom:7px;font-weight:600;font-size:15px;
+  }
+  .fooditem.ok{background:var(--green-soft);color:var(--ink2)}
+  .fooditem.bad{background:var(--red-soft);color:var(--red)}
+  .fooditem.cheat{background:var(--violet-soft);color:var(--violet)}
+  .fooditem .mark{font-size:18px;font-weight:900}
+  .fooditem .why{font-size:12px;font-weight:500;opacity:.85}
+  .fooditem .del{
+    margin-inline-start:auto;background:none;border:none;cursor:pointer;
+    color:inherit;opacity:.5;font-size:16px;padding:4px;
+  }
+  .addrow{display:flex;gap:8px;margin-top:8px}
+  .addrow input{flex:1}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{
+    background:#f3f4f6;border:1px solid var(--border);border-radius:999px;
+    padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink2);
+  }
+  .chip:active{background:var(--green-soft)}
+  .usergrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .userbtn{
+    background:#fff;border:2px solid var(--border);border-radius:var(--radius);
+    padding:18px 10px;text-align:center;cursor:pointer;font-family:inherit;
+  }
+  .userbtn .emoji{font-size:34px;display:block;margin-bottom:6px}
+  .userbtn .name{font-size:16px;font-weight:800;color:var(--ink)}
+  .userbtn:active{border-color:var(--green)}
+  .codeinput{letter-spacing:12px;text-align:center;font-size:26px;font-weight:800;direction:ltr}
+  .rule{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--border);font-size:15px;line-height:1.55}
+  .rule:last-child{border-bottom:none}
+  .rule .ic{font-size:20px;flex-shrink:0}
+  .tabbar{
+    position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);
+    display:flex;justify-content:space-around;padding:8px 0 max(10px,env(safe-area-inset-bottom));z-index:40;
+  }
+  .tab{
+    background:none;border:none;font-family:inherit;cursor:pointer;text-align:center;
+    color:var(--muted);font-size:11px;font-weight:700;display:flex;flex-direction:column;gap:2px;align-items:center;
+  }
+  .tab .ic{font-size:22px}
+  .tab.on{color:var(--green)}
+  .kidsec{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;background:#fff}
+  .kidsec-head{
+    display:flex;justify-content:space-between;align-items:center;padding:13px 14px;
+    background:#f9fafb;cursor:pointer;gap:8px;
+  }
+  .daybox{padding:10px 14px;border-top:1px dashed var(--border)}
+  .daybox h4{font-size:14px;font-weight:800;margin-bottom:6px}
+  .mini{font-size:14px;padding:6px 10px;margin-bottom:5px}
+  .weightrow{display:flex;justify-content:space-between;padding:7px 4px;border-bottom:1px dashed var(--border);font-size:14px;font-weight:600}
+  .weightrow:last-child{border-bottom:none}
+  .sync{
+    position:fixed;top:8px;left:8px;z-index:60;font-size:11px;font-weight:700;
+    padding:4px 10px;border-radius:999px;background:var(--amber-soft);color:#92400e;display:none;
+  }
+  .sync.show{display:block}
+  .codechip{background:#111827;color:#fff;border-radius:8px;padding:3px 10px;font-weight:800;letter-spacing:2px;direction:ltr;display:inline-block}
+  svg.chart{width:100%;height:130px;display:block}
+  .fade{animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
 </head>
 <body>
-<div class="card">
-  <div class="band"></div>
+<div class="sync" id="syncBadge">⏳ מסנכרן…</div>
+<div class="wrap" id="app"></div>
 
-  <div class="hero">
-    <div class="avatar">
-      <img src="data:image/jpeg;base64,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" alt="מאיר כהן" />
+<script>
+/* ================= יומן אוכל משפחתי =================
+   רישום ארוחות (בלי ספירת קלוריות) + חוקים + סנכרון משפחתי.
+   סנכרון: JSON משותף בענן (jsonblob.com) — כל המשתמשים רואים הכל.
+====================================================== */
+
+const API = 'https://jsonblob.com/api/jsonBlob';
+const POLL_MS = 15000;
+
+/* ---------- תפריט וחוקים ---------- */
+const MEALS = [
+  {key:'breakfast', name:'ארוחת בוקר',  emoji:'🍳', hint:'עדיפות לחלבון: חביתה / טונה / קוטג׳ — עם פיתה או לחמנייה',
+   chips:['חביתה','טונה','קוטג׳','פיתה','לחמנייה','ירקות']},
+  {key:'lunch',     name:'ארוחת צהריים', emoji:'🍗', hint:'אוכלים טוב! בלי תוספות שמנות כמו צ׳יפס וכדומה',
+   chips:['עוף','אורז','פסטה','קציצות','תפוח אדמה','סלט']},
+  {key:'snack',     name:'ארוחת ביניים', emoji:'🍎', hint:'חטיף בריאות או פרי — עדיפות לפירות!',
+   chips:['תפוח','בננה','אבטיח','ענבים','חטיף בריאות']},
+  {key:'dinner',    name:'ארוחת ערב',   emoji:'🥗', hint:'עד 19:00 בלבד! חלבון בלבד: ביצים / טונה / סלט',
+   chips:['ביצים','חביתה','טונה','סלט','קוטג׳']},
+];
+
+const RULES = [
+  ['💧','לפני כל ארוחה שותים כוס מים — עדיף 2 כוסות!'],
+  ['🚫','לא אוכלים אחרי השעה 19:00 בערב!!!'],
+  ['🍳','ארוחת בוקר: עדיפות לחלבון — חביתה, טונה או קוטג׳, עם פיתה או לחמנייה.'],
+  ['🍗','צהריים: אוכלים טוב. בלי תוספות שמנות כמו צ׳יפס וכדומה.'],
+  ['🍎','ארוחת ביניים (בין צהריים לערב): חטיף בריאות או פרי — עדיפות לפירות.'],
+  ['🥗','ארוחת ערב: עד השעה 19:00, וחלבון בלבד — ביצים, טונה, סלט.'],
+  ['⚖️','שקילה פעם בשבוע.'],
+  ['🎉','יום צ׳יט אחד בשבוע — יום שישי!'],
+  ['🎂','יש אירוע או יום הולדת? אוכלים בצהריים את ארוחת הערב.'],
+];
+
+/* מילות מפתח לבדיקת התפריט. ההתאמה לפי "הטקסט מכיל". */
+const DINNER_OK = ['ביצה','ביצים','ביצת','חביתה','חביתת','טונה','סלט','ירקות','קוטג','גבינה','מלפפון','עגבני'];
+const BREAKFAST_OK = [...DINNER_OK,'פיתה','לחמניה','לחמנייה','לחם','אבוקדו','יוגורט'];
+const SNACK_OK = ['פרי','פירות','תפוח','בננה','אגס','אבטיח','מלון','ענבים','אפרסק','נקטרינה','שזיף','תות','מנגו','קלמנטינה','תפוז','מנדרינה','רימון','אננס','קיווי','אפרסמון','גזר','מלפפון','חטיף בריאות','חטיף דגנים','חטיף חלבון'];
+const FRUITS = ['פרי','פירות','תפוח','בננה','אבטיח','ענבים','מלון','אגס','אפרסק','תות','מנגו','שזיף','קלמנטינה','תפוז'];
+const JUNK = ['ציפס','ציפס','בורקס','מטוגן','שוקולד','עוגה','עוגיה','עוגיות','עוגיי','גלידה','ממתק','סוכריה','סוכריות','במבה','ביסלי','דוריטוס','ציטוס','קולה','שתיה מתוקה','משקה מתוק','מאפה','מלאווח','גחנון','סופגניה','סופגניות','פיצה','נקניקיה','נקניקיות','וופל','חטיף מלוח','שווארמה בלאפה','קרואסון','דונאט'];
+
+function norm(t){
+  return (t||'').replace(/['"׳״`]/g,'').replace(/\s+/g,' ').trim();
+}
+function hasAny(text, list){
+  const n = norm(text);
+  return list.some(w => n.includes(norm(w)));
+}
+
+/* בדיקת פריט: מחזיר {status:'ok'|'bad'|'cheat', why} */
+function checkFood(mealKey, text, {cheat=false, late=false, eventLunch=false}={}){
+  if (cheat) return {status:'cheat', why:'יום צ׳יט — הכל מותר 🎉'};
+  if (mealKey==='dinner' && late) return {status:'bad', why:'אחרי 19:00 — לא אוכלים!'};
+  const asDinner = mealKey==='dinner' || (mealKey==='lunch' && eventLunch);
+  if (asDinner){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'לא בתפריט ערב'};
+    if (hasAny(text, DINNER_OK)) return {status:'ok', why:'חלבון — מעולה!'};
+    return {status:'bad', why:'בערב חלבון בלבד: ביצים / טונה / סלט'};
+  }
+  if (mealKey==='breakfast'){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'לא בתפריט הבוקר'};
+    if (hasAny(text, BREAKFAST_OK)) return {status:'ok', why:'לפי התפריט!'};
+    return {status:'bad', why:'לא בתפריט — עדיף חלבון עם פיתה/לחמנייה'};
+  }
+  if (mealKey==='lunch'){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'תוספת שמנה / לא בריא'};
+    return {status:'ok', why:'בתיאבון!'};
+  }
+  if (mealKey==='snack'){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'לא בתפריט'};
+    if (hasAny(text, SNACK_OK)) return {status:'ok', why: hasAny(text,FRUITS)?'פרי — הכי טוב!':'חטיף בריאות — סבבה'};
+    return {status:'bad', why:'רק פרי או חטיף בריאות'};
+  }
+  return {status:'ok', why:''};
+}
+
+/* ---------- עזרי תאריך ---------- */
+function todayKey(d=new Date()){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function isFriday(d=new Date()){ return d.getDay()===5; }
+function after19(d=new Date()){ return d.getHours()>=19; }
+function hebDate(d=new Date()){
+  return new Intl.DateTimeFormat('he-IL',{weekday:'long', day:'numeric', month:'long'}).format(d);
+}
+function hebDateShort(key){
+  const [y,m,dd]=key.split('-').map(Number);
+  const d=new Date(y,m-1,dd);
+  return new Intl.DateTimeFormat('he-IL',{weekday:'short', day:'numeric', month:'numeric'}).format(d);
+}
+function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+
+/* ---------- מצב ---------- */
+let DATA = null;
+let familyId = localStorage.getItem('fam.id') || null;
+let currentUserId = localStorage.getItem('fam.user') || null;
+let view = 'today';
+let dirty = false;
+let syncing = false;
+let pollTimer = null;
+
+function emptyData(name){
+  return {
+    familyName: name||'המשפחה שלנו',
+    parent: {name:'הורה', code: randCode(), codeTs: Date.now()},
+    kids: [],
+    logs: {},
+    weights: {},
+    updatedAt: Date.now()
+  };
+}
+function randCode(){ return String(Math.floor(1000+Math.random()*9000)); }
+
+/* ---------- סנכרון ---------- */
+function showSync(txt){
+  const b=document.getElementById('syncBadge');
+  if(!txt){ b.classList.remove('show'); return; }
+  b.textContent=txt; b.classList.add('show');
+}
+
+async function apiCreate(data){
+  const r = await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok) throw new Error('create failed '+r.status);
+  const loc = r.headers.get('Location') || r.headers.get('X-jsonblob') || '';
+  const id = loc.split('/').filter(Boolean).pop();
+  if(!id) throw new Error('no blob id');
+  return id;
+}
+async function apiGet(id){
+  const r = await fetch(API+'/'+id,{headers:{'Accept':'application/json'},cache:'no-store'});
+  if(!r.ok) throw new Error('get failed '+r.status);
+  return r.json();
+}
+async function apiPut(id,data){
+  const r = await fetch(API+'/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok) throw new Error('put failed '+r.status);
+  return data;
+}
+
+/* מיזוג בין הגרסה בענן לגרסה המקומית, לפי חותמות זמן */
+function mergeData(a,b){
+  if(!a) return b; if(!b) return a;
+  const [x,y]=[a,b];
+  const out = {familyName: x.updatedAt>=y.updatedAt?x.familyName:y.familyName};
+  out.parent = (x.parent?.codeTs||0) >= (y.parent?.codeTs||0) ? {...x.parent} : {...y.parent};
+  const kidMap = {};
+  [...(x.kids||[]),...(y.kids||[])].forEach(k=>{
+    const ex = kidMap[k.id];
+    if(!ex || (k.codeTs||0)>(ex.codeTs||0)) kidMap[k.id]={...ex,...k};
+  });
+  // ילד שהוסר (קיים רק בצד אחד ויש לו tombstone) — מכבדים הסרה
+  const removed = new Set([...(x.removedKids||[]),...(y.removedKids||[])]);
+  out.removedKids = [...removed];
+  out.kids = Object.values(kidMap).filter(k=>!removed.has(k.id));
+  out.logs = {};
+  const kidIds = new Set([...Object.keys(x.logs||{}),...Object.keys(y.logs||{})]);
+  kidIds.forEach(kid=>{
+    out.logs[kid]={};
+    const days = new Set([...Object.keys(x.logs?.[kid]||{}),...Object.keys(y.logs?.[kid]||{})]);
+    days.forEach(day=>{
+      const da=x.logs?.[kid]?.[day], db=y.logs?.[kid]?.[day];
+      if(!da){ out.logs[kid][day]=db; return; }
+      if(!db){ out.logs[kid][day]=da; return; }
+      const d={event:(da.eventTs||0)>=(db.eventTs||0)?da.event:db.event,
+               eventTs:Math.max(da.eventTs||0,db.eventTs||0), meals:{}};
+      MEALS.forEach(m=>{
+        const ma=da.meals?.[m.key], mb=db.meals?.[m.key];
+        if(!ma && !mb) return;
+        const items={};
+        [...(ma?.items||[]),...(mb?.items||[])].forEach(it=>{
+          const ex=items[it.id];
+          if(!ex || (it.ts||0)>(ex.ts||0)) items[it.id]=it;
+        });
+        d.meals[m.key]={
+          water: (ma?.waterTs||0)>=(mb?.waterTs||0)?(ma?.water||0):(mb?.water||0),
+          waterTs: Math.max(ma?.waterTs||0, mb?.waterTs||0),
+          items: Object.values(items).sort((p,q)=>(p.ts||0)-(q.ts||0)),
+        };
+      });
+      out.logs[kid][day]=d;
+    });
+  });
+  out.weights={};
+  const wIds=new Set([...Object.keys(x.weights||{}),...Object.keys(y.weights||{})]);
+  wIds.forEach(kid=>{
+    out.weights[kid]={};
+    const weeks=new Set([...Object.keys(x.weights?.[kid]||{}),...Object.keys(y.weights?.[kid]||{})]);
+    weeks.forEach(w=>{
+      const wa=x.weights?.[kid]?.[w], wb=y.weights?.[kid]?.[w];
+      out.weights[kid][w] = !wa?wb : !wb?wa : ((wa.ts||0)>=(wb.ts||0)?wa:wb);
+    });
+  });
+  out.updatedAt = Math.max(x.updatedAt||0, y.updatedAt||0);
+  return out;
+}
+
+let syncQueued=false;
+function queueSync(){
+  dirty=true;
+  localStorage.setItem('fam.cache', JSON.stringify(DATA));
+  if(syncQueued) return;
+  syncQueued=true;
+  setTimeout(()=>{syncQueued=false; syncNow();}, 900);
+}
+async function syncNow(){
+  if(!familyId || syncing) return;
+  syncing=true; showSync('⏳ מסנכרן…');
+  try{
+    const remote = await apiGet(familyId);
+    const merged = mergeData(remote, DATA);
+    if(dirty){
+      merged.updatedAt = Date.now();
+      await apiPut(familyId, merged);
+      dirty=false;
+    }
+    DATA = merged;
+    localStorage.setItem('fam.cache', JSON.stringify(DATA));
+    showSync('');
+    render();
+  }catch(e){
+    showSync('📴 אין חיבור — יסתנכרן אוטומטית');
+  }finally{ syncing=false; }
+}
+function startPolling(){
+  clearInterval(pollTimer);
+  pollTimer=setInterval(()=>{ if(!document.hidden) syncNow(); }, POLL_MS);
+}
+
+/* ---------- עזרי נתונים ---------- */
+function getDay(kidId, dayKey, create){
+  DATA.logs[kidId] = DATA.logs[kidId]||{};
+  if(!DATA.logs[kidId][dayKey] && create){
+    DATA.logs[kidId][dayKey]={event:false,eventTs:0,meals:{}};
+  }
+  return DATA.logs[kidId][dayKey];
+}
+function getMeal(day, key, create){
+  if(!day.meals[key] && create) day.meals[key]={water:0,waterTs:0,items:[]};
+  return day.meals[key];
+}
+function weekKey(d=new Date()){
+  const t=new Date(d); t.setDate(t.getDate()-t.getDay());
+  return todayKey(t);
+}
+function kidById(id){ return (DATA.kids||[]).find(k=>k.id===id); }
+function lastWeight(kidId){
+  const arr=weightList(kidId);
+  return arr[arr.length-1]||null;
+}
+function weightList(kidId){
+  const w=DATA.weights?.[kidId]||{};
+  return Object.values(w).filter(e=>!e.del).sort((a,b)=>a.date<b.date?-1:1);
+}
+
+/* ---------- רנדור ---------- */
+const app=document.getElementById('app');
+function h(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content; }
+function esc(s){ return (s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
+function render(){
+  if(!familyId){ renderStart(); renderTabs(); return; }
+  if(!DATA){ renderLoading(); return; }
+  if(!currentUserId){ renderUserPick(); renderTabs(); return; }
+  if(currentUserId==='parent'){ renderParent(); renderTabs(); return; }
+  if(!kidById(currentUserId)){ currentUserId=null; localStorage.removeItem('fam.user'); renderUserPick(); renderTabs(); return; }
+  if(view==='weight') renderWeight();
+  else if(view==='rules') renderRules();
+  else renderToday();
+  renderTabs();
+}
+
+function renderLoading(){
+  app.innerHTML='<div class="card center" style="margin-top:35vh"><h2>⏳ טוען…</h2><p class="muted">מתחבר ליומן המשפחתי</p></div>';
+}
+
+/* --- מסך פתיחה: יצירה / הצטרפות --- */
+function renderStart(){
+  app.innerHTML=`
+  <div class="fade">
+    <div class="center" style="padding:30px 0 10px">
+      <div style="font-size:60px">🥗</div>
+      <h1 style="font-size:28px">יומן אוכל משפחתי</h1>
+      <p class="muted" style="margin-top:6px">רושמים מה אכלנו, שומרים על החוקים, וכולם מסונכרנים 💚</p>
     </div>
-    <div class="hero-text">
-      <div class="brand">יהב ביטוח ופיננסים</div>
-      <div class="name">מאיר כהן</div>
-      <div class="title">מנכ"ל ובעלים | סוכן ביטוח פנסיוני וכללי</div>
+    <div class="card">
+      <h2>🚀 פעם ראשונה?</h2>
+      <p class="muted" style="margin:8px 0 12px">ההורה יוצר את היומן המשפחתי פעם אחת, ואז שולח קישור לכל הילדים.</p>
+      <div style="margin-bottom:10px"><input id="famName" placeholder="שם המשפחה (למשל: משפחת כהן)" /></div>
+      <button class="btn block" onclick="createFamily()">צור יומן משפחתי חדש</button>
     </div>
-  </div>
-
-  <div class="tagline">
-    <strong>כאן כדי לוודא שמה שבנית — מוגן.</strong><br/>
-    ייעוץ ביטוחי ופיננסי אישי ומקצועי לאנשים, משפחות ועסקים.
-  </div>
-
-  <div class="stats">
-    <div class="stat"><div class="stat-num">15+</div><div class="stat-label">שנות ניסיון</div></div>
-    <div class="stat"><div class="stat-num">1,500+</div><div class="stat-label">לקוחות מרוצים</div></div>
-    <div class="stat"><div class="stat-num">24/7</div><div class="stat-label">זמין לתביעות</div></div>
-  </div>
-
-  <div class="services">
-    <div class="sec-title">תחומי התמחות</div>
-    <div class="chips">
-      <div class="chip">🏥 בריאות</div>
-      <div class="chip">📈 פנסיה וחיסכון</div>
-      <div class="chip">🏠 דירה ורכב</div>
-      <div class="chip">🏢 ביטוח עסקי</div>
-      <div class="chip">💰 השקעות</div>
-      <div class="chip">🧓 סיעוד</div>
-    </div>
-  </div>
-
-  <div class="actions">
-    <a href="https://api.whatsapp.com/send?phone=9720505554446&text=שלום+מאיר,+אשמח+לשיחת+ייעוץ" class="btn btn-wa">
-      💬 שלח הודעה ב-WhatsApp
-    </a>
-    <div class="row2">
-      <a href="tel:0505554446" class="btn btn-orange">📞 050-555-4446</a>
-      <a href="tel:0722998998" class="btn btn-dark">☎️ 072-299-8998</a>
-    </div>
-    <a href="https://myb.bio/Projects/1098/meircohen.vcf" class="btn btn-dark">👤 שמור איש קשר</a>
-  </div>
-
-  <!-- Team Section -->
-  <div class="team-section">
-    <div class="sec-title">הצוות שלנו</div>
-    <div class="team-grid">
-
-      <!-- שקמה טויטו -->
-      <div class="team-card">
-        <div class="team-avatar" id="av-shakma">ש</div>
-        <div class="team-info">
-          <div class="team-name">שקמה טויטו</div>
-          <div class="team-role">סוכנת ביטוח בכירה</div>
-          <div class="team-badges">
-            <span class="team-badge gold">⭐ ותק 20+ שנה</span>
-            <span class="team-badge">לשכת סוכני הביטוח</span>
-            <span class="team-badge">ביטוח פנסיוני</span>
-            <span class="team-badge">ביטוח אלמנטרי</span>
-          </div>
-        </div>
+    <div class="card">
+      <h2>🔗 קיבלתם קישור או קוד?</h2>
+      <p class="muted" style="margin:8px 0 12px">אם ההורה שלח לכם קישור — פשוט לוחצים עליו. אפשר גם להדביק כאן את קוד המשפחה:</p>
+      <div class="row">
+        <input id="joinCode" placeholder="קוד משפחה" style="direction:ltr" />
+        <button class="btn" onclick="joinFamily()">הצטרפות</button>
       </div>
+      <p class="muted" id="joinErr" style="color:var(--red);margin-top:8px"></p>
+    </div>
+  </div>`;
+}
 
-      <!-- רועי כהן -->
-      <div class="team-card">
-        <div class="team-avatar" id="av-roi">ר</div>
-        <div class="team-info">
-          <div class="team-name">רועי כהן</div>
-          <div class="team-role">סוכן ביטוח בכיר</div>
-          <div class="team-badges">
-            <span class="team-badge gold">⭐ ותק 20+ שנה</span>
-            <span class="team-badge">לשכת סוכני הביטוח</span>
-            <span class="team-badge">ביטוח פנסיוני</span>
-            <span class="team-badge">ביטוח אלמנטרי</span>
-          </div>
-        </div>
+async function createFamily(){
+  const name=document.getElementById('famName').value.trim();
+  const d=emptyData(name);
+  showSync('⏳ יוצר יומן…');
+  try{
+    familyId=await apiCreate(d);
+    localStorage.setItem('fam.id',familyId);
+    DATA=d;
+    localStorage.setItem('fam.cache',JSON.stringify(DATA));
+    currentUserId='parent';
+    localStorage.setItem('fam.user','parent');
+    showSync('');
+    startPolling();
+    alert('היומן נוצר! 🎉\nקוד ההורה שלך: '+d.parent.code+'\n(שומרים אותו!)\nעכשיו מוסיפים את הילדים ושולחים להם קישור.');
+    render();
+  }catch(e){
+    showSync('');
+    alert('לא הצלחתי להתחבר לשרת הסנכרון. בדקו חיבור אינטרנט ונסו שוב.');
+  }
+}
+async function joinFamily(){
+  let code=(document.getElementById('joinCode').value||'').trim();
+  code=code.split('/').filter(Boolean).pop().replace(/[#?].*$/,'').replace(/^family=/,'');
+  if(!code){ document.getElementById('joinErr').textContent='נא להזין קוד'; return; }
+  showSync('⏳ מתחבר…');
+  try{
+    const d=await apiGet(code);
+    if(!d || !d.parent) throw new Error('bad');
+    familyId=code; DATA=d;
+    localStorage.setItem('fam.id',familyId);
+    localStorage.setItem('fam.cache',JSON.stringify(DATA));
+    showSync('');
+    startPolling();
+    render();
+  }catch(e){
+    showSync('');
+    document.getElementById('joinErr').textContent='קוד לא נכון או שאין חיבור. נסו שוב.';
+  }
+}
+
+/* --- בחירת משתמש + קוד אישי --- */
+function renderUserPick(){
+  const kids=DATA.kids||[];
+  app.innerHTML=`
+  <div class="fade">
+    <div class="center" style="padding:22px 0 8px">
+      <div style="font-size:46px">👋</div>
+      <h1>מי נכנס עכשיו?</h1>
+      <p class="muted">${esc(DATA.familyName)}</p>
+    </div>
+    <div class="usergrid" style="margin-bottom:12px">
+      ${kids.map(k=>`
+        <button class="userbtn" onclick="pickUser('${k.id}')">
+          <span class="emoji">${k.emoji||'🙂'}</span>
+          <span class="name">${esc(k.name)}</span>
+        </button>`).join('')}
+      <button class="userbtn" onclick="pickUser('parent')">
+        <span class="emoji">👨‍👩‍👧</span>
+        <span class="name">הורה</span>
+      </button>
+    </div>
+    ${kids.length===0?'<p class="muted center">עדיין אין ילדים ביומן — ההורה מוסיף אותם בפאנל ההורה.</p>':''}
+    <div id="codeBox"></div>
+  </div>`;
+}
+let pendingUser=null;
+function pickUser(id){
+  pendingUser=id;
+  const name = id==='parent' ? 'הורה' : (kidById(id)?.name||'');
+  document.getElementById('codeBox').innerHTML=`
+    <div class="card fade">
+      <h3 class="center">🔒 הקוד של ${esc(name)}</h3>
+      <div style="margin:12px 0"><input id="pcode" class="codeinput" inputmode="numeric" maxlength="4" placeholder="••••" /></div>
+      <button class="btn block" onclick="tryLogin()">כניסה</button>
+      <p class="muted center" id="codeErr" style="color:var(--red);margin-top:8px"></p>
+    </div>`;
+  const inp=document.getElementById('pcode');
+  inp.focus();
+  inp.addEventListener('input',()=>{ if(inp.value.length===4) tryLogin(); });
+}
+function tryLogin(){
+  const code=document.getElementById('pcode').value.trim();
+  const real = pendingUser==='parent' ? DATA.parent.code : kidById(pendingUser)?.code;
+  if(code && code===real){
+    currentUserId=pendingUser;
+    localStorage.setItem('fam.user',currentUserId);
+    view = currentUserId==='parent' ? 'parent' : 'today';
+    render();
+  }else{
+    document.getElementById('codeErr').textContent='קוד לא נכון 🙈 נסו שוב';
+    document.getElementById('pcode').value='';
+  }
+}
+function logout(){
+  currentUserId=null; localStorage.removeItem('fam.user'); render();
+}
+
+/* --- טאבים תחתונים (לילדים) --- */
+function renderTabs(){
+  const old=document.querySelector('.tabbar'); if(old) old.remove();
+  if(!currentUserId || currentUserId==='parent' || !DATA || !kidById(currentUserId)) return;
+  document.body.appendChild(h(`
+    <div class="tabbar">
+      <button class="tab ${view==='today'?'on':''}" onclick="setView('today')"><span class="ic">🍽️</span>היום</button>
+      <button class="tab ${view==='weight'?'on':''}" onclick="setView('weight')"><span class="ic">⚖️</span>שקילה</button>
+      <button class="tab ${view==='rules'?'on':''}" onclick="setView('rules')"><span class="ic">📜</span>חוקים</button>
+      <button class="tab" onclick="logout()"><span class="ic">🔄</span>החלפה</button>
+    </div>`));
+}
+function setView(v){ view=v; render(); }
+
+/* --- מסך היום של ילד --- */
+function renderToday(){
+  const kid=kidById(currentUserId);
+  const dayKey=todayKey();
+  const day=getDay(currentUserId,dayKey,true);
+  const cheat=isFriday();
+  const late=after19();
+  const ev=!!day.event;
+
+  let banners='';
+  if(cheat) banners+=`<div class="banner cheat">🎉 יום שישי — יום צ׳יט! היום הכל מותר 😎</div>`;
+  if(ev && !cheat) banners+=`<div class="banner info">🎂 יום אירוע: בצהריים אוכלים את ארוחת הערב (חלבון), ובערב — האירוע!</div>`;
+  if(late && !cheat) banners+=`<div class="banner warn">🚫 השעה אחרי 19:00 — לא אוכלים יותר היום!</div>`;
+
+  const lw=lastWeight(currentUserId);
+  const needWeigh = !lw || (Date.now()-new Date(lw.date).getTime()) > 7*24*3600*1000;
+  if(needWeigh) banners+=`<div class="banner weigh" onclick="setView('weight')" style="cursor:pointer">⚖️ הגיע הזמן לשקילה השבועית! לחצו כאן</div>`;
+
+  const mealsHtml = MEALS.map(m=>{
+    const isEventLunch = ev && m.key==='lunch' && !cheat;
+    const isEventDinner = ev && m.key==='dinner' && !cheat;
+    const meal=getMeal(day,m.key,false)||{water:0,items:[]};
+    const items=(meal.items||[]).filter(i=>!i.del);
+    const title = isEventLunch ? 'ארוחת צהריים 🎂 (אוכלים בה את ארוחת הערב)' :
+                  isEventDinner ? 'ערב — האירוע 🎉' : m.name;
+    const hint = isEventLunch ? 'יום אירוע: בצהריים אוכלים חלבון כמו בערב — ביצים / טונה / סלט' :
+                 isEventDinner ? 'בתיאבון באירוע! מחר חוזרים לתפריט 💪' : m.hint;
+    const itemsHtml = items.map(it=>{
+      const cls = it.status==='ok'?'ok': it.status==='cheat'?'cheat':'bad';
+      const mark = it.status==='ok'?'✓': it.status==='cheat'?'🎉':'✗';
+      return `<div class="fooditem ${cls}">
+        <span class="mark">${mark}</span>
+        <span>${esc(it.text)}${it.why?` <span class="why">· ${esc(it.why)}</span>`:''}</span>
+        <button class="del" onclick="delItem('${m.key}','${it.id}')" title="מחיקה">🗑</button>
+      </div>`;
+    }).join('');
+    const chipList = isEventLunch ? MEALS.find(mm=>mm.key==='dinner').chips : m.chips;
+    const chips = chipList.map(c=>
+      `<span class="chip" onclick="addFood('${m.key}','${esc(c)}')">+ ${esc(c)}</span>`).join('');
+    return `
+    <div class="meal">
+      <div class="meal-head">
+        <div class="meal-title">${m.emoji} ${title}</div>
       </div>
-
-      <!-- לירן קוצר -->
-      <div class="team-card">
-        <div class="team-avatar" id="av-liran">ל</div>
-        <div class="team-info">
-          <div class="team-name">לירן קוצר</div>
-          <div class="team-role">פקידת משרד</div>
-          <div class="team-badges">
-            <span class="team-badge">שירות לקוחות</span>
-            <span class="team-badge">ניהול תיקים</span>
-            <span class="team-badge">תיאום תביעות</span>
-          </div>
-        </div>
+      <div class="meal-hint">${hint}</div>
+      <div class="water">
+        💧 מים לפני האוכל:
+        <button class="cup ${meal.water>=1?'on':''}" onclick="setWater('${m.key}',${meal.water>=1?0:1})">🥤</button>
+        <button class="cup ${meal.water>=2?'on':''}" onclick="setWater('${m.key}',${meal.water>=2?1:2})">🥤</button>
+        <span class="muted" style="font-size:11px">(עדיף 2 כוסות)</span>
       </div>
+      ${itemsHtml}
+      <div class="addrow">
+        <input id="inp-${m.key}" placeholder="מה אכלת? (למשל: חביתה ופיתה)" onkeydown="if(event.key==='Enter')addFromInput('${m.key}')" />
+        <button class="btn small" onclick="addFromInput('${m.key}')">הוספה</button>
+      </div>
+      <div class="chips">${chips}</div>
+    </div>`;
+  }).join('');
 
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar">
+      <div>
+        <h1>שלום ${esc(kid.name)} ${kid.emoji||''}</h1>
+        <p class="muted">${hebDate()}</p>
+      </div>
+      <span class="badge">${esc(DATA.familyName)}</span>
     </div>
-  </div>
+    ${banners}
+    <label class="card" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <input type="checkbox" style="width:22px;height:22px;flex-shrink:0" ${ev?'checked':''} onchange="toggleEvent(this.checked)" />
+      <div><b>🎂 יש היום אירוע / יום הולדת</b><div class="muted">אם מסמנים — בצהריים אוכלים את ארוחת הערב</div></div>
+    </label>
+    ${mealsHtml}
+  </div>`;
+}
 
-  <!-- Video Section -->
-  <div class="video-section">
-    <div class="sec-title">סרטון היכרות</div>
-    <div class="video-wrapper">
-      <video
-        src="meir_card.mp4"
-        controls
-        playsinline
-        preload="metadata"
-        poster=""
-        class="promo-video"
-      ></video>
-      <div class="video-badge">▶ הכר אותי</div>
-    </div>
-  </div>
+function toggleEvent(on){
+  const day=getDay(currentUserId,todayKey(),true);
+  day.event=on; day.eventTs=Date.now();
+  queueSync(); render();
+}
+function addFromInput(mealKey){
+  const inp=document.getElementById('inp-'+mealKey);
+  addFood(mealKey, inp.value);
+  inp.value='';
+}
+function addFood(mealKey,text){
+  text=norm(text);
+  if(!text) return;
+  const day=getDay(currentUserId,todayKey(),true);
+  const meal=getMeal(day,mealKey,true);
+  const res=checkFood(mealKey,text,{
+    cheat:isFriday(),
+    late: mealKey==='dinner' && after19(),
+    eventLunch: !!day.event,
+  });
+  meal.items.push({id:uid(), text, ts:Date.now(), status:res.status, why:res.why});
+  queueSync(); render();
+}
+function delItem(mealKey,id){
+  const day=getDay(currentUserId,todayKey(),true);
+  const meal=getMeal(day,mealKey,true);
+  const it=(meal.items||[]).find(i=>i.id===id);
+  if(it){ it.del=true; it.ts=Date.now(); }
+  queueSync(); render();
+}
+function setWater(mealKey,n){
+  const day=getDay(currentUserId,todayKey(),true);
+  const meal=getMeal(day,mealKey,true);
+  meal.water=n; meal.waterTs=Date.now();
+  queueSync(); render();
+}
 
-  <div class="links">
-    <div class="sec-title" style="margin-bottom:10px;">קישורים</div>
-    <div class="link-grid">
-      <!-- Facebook -->
-      <a href="https://www.facebook.com/yahavins/" class="link-item" target="_blank">
-        <div class="link-icon">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#1877F2"/>
-            <path d="M22 16C22 12.686 19.314 10 16 10C12.686 10 10 12.686 10 16C10 19.007 12.176 21.494 15.063 21.934V17.766H13.563V16H15.063V14.716C15.063 13.234 15.929 12.438 17.279 12.438C17.926 12.438 18.602 12.554 18.602 12.554V14.008H17.855C17.118 14.008 16.938 14.46 16.938 14.922V16H18.531L18.27 17.766H16.938V21.934C19.824 21.494 22 19.007 22 16Z" fill="white"/>
-          </svg>
-        </div>
-        <div><div class="link-label">רשת חברתית</div><div class="link-name">Facebook</div></div>
-      </a>
-      <!-- Website -->
-      <a href="yahav-site.html" class="link-item">
-        <div class="link-icon">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#f97316"/>
-            <circle cx="16" cy="16" r="7" stroke="white" stroke-width="1.5" fill="none"/>
-            <ellipse cx="16" cy="16" rx="3" ry="7" stroke="white" stroke-width="1.5" fill="none"/>
-            <line x1="9" y1="13" x2="23" y2="13" stroke="white" stroke-width="1.5"/>
-            <line x1="9" y1="19" x2="23" y2="19" stroke="white" stroke-width="1.5"/>
-          </svg>
-        </div>
-        <div><div class="link-label">האתר שלנו</div><div class="link-name">יהב ביטוח ופיננסים</div></div>
-      </a>
-      <!-- YouTube -->
-      <a href="https://youtu.be/n5gzM1gjzI8?si=_XNyNbNbH7k6J181" class="link-item full" target="_blank">
-        <div class="link-icon">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#FF0000"/>
-            <polygon points="14,13 14,19 20,16" fill="white"/>
-          </svg>
-        </div>
-        <div><div class="link-label">ריאיון טלוויזיה</div><div class="link-name">ראיון — מלחמה וכספים | YouTube</div></div>
-      </a>
-      <!-- Walla -->
-      <a href="https://mumlazim.walla.co.il/item/3407007" class="link-item full" target="_blank">
-        <div class="link-icon">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#E8002D"/>
-            <text x="16" y="22" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="17" fill="white">W!</text>
-          </svg>
-        </div>
-        <div><div class="link-label">כתבה בתקשורת</div><div class="link-name">כתבה ב-Walla! מומלצים</div></div>
-      </a>
-      <!-- Waze -->
-      <a href="waze://?q=מתחם פריז נתיבות" class="link-item" target="_blank">
-        <div class="link-icon">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#05C8F7"/>
-            <ellipse cx="16" cy="15" rx="8" ry="7.5" fill="white"/>
-            <circle cx="13" cy="13.5" r="1.2" fill="#333"/>
-            <circle cx="19" cy="13.5" r="1.2" fill="#333"/>
-            <path d="M12.5 17C13.2 18.2 14.5 19 16 19C17.5 19 18.8 18.2 19.5 17" stroke="#333" stroke-width="1.3" stroke-linecap="round" fill="none"/>
-            <circle cx="21" cy="24" r="2" fill="#FFCC00" stroke="#333" stroke-width="0.8"/>
-            <circle cx="11" cy="24" r="2" fill="#FFCC00" stroke="#333" stroke-width="0.8"/>
-          </svg>
-        </div>
-        <div><div class="link-label">ניווט למשרד</div><div class="link-name">Waze</div></div>
-      </a>
-      <!-- WhatsApp -->
-      <a href="https://api.whatsapp.com/send?phone=9720505554446" class="link-item" target="_blank">
-        <div class="link-icon">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="8" fill="#25D366"/>
-            <path d="M16 8.5C11.858 8.5 8.5 11.858 8.5 16C8.5 17.612 8.99 19.112 9.83 20.352L8.75 23.75L12.24 22.69C13.44 23.44 14.868 23.878 16.4 23.878C20.542 23.878 23.9 20.52 23.9 16.378C23.9 12.236 20.142 8.5 16 8.5Z" fill="white"/>
-            <path d="M12.8 13.2C12.6 12.8 12.35 12.78 12.15 12.77C11.98 12.76 11.78 12.76 11.58 12.76C11.38 12.76 11.06 12.84 10.8 13.12C10.54 13.4 9.8 14.1 9.8 15.52C9.8 16.94 10.82 18.32 10.96 18.52C11.1 18.72 12.98 21.7 15.9 22.84C18.36 23.8 18.82 23.62 19.3 23.58C19.78 23.54 20.84 22.88 21.08 22.2C21.32 21.52 21.32 20.94 21.24 20.82C21.16 20.7 20.96 20.62 20.66 20.46C20.36 20.3 18.94 19.6 18.66 19.5C18.38 19.4 18.18 19.35 17.98 19.65C17.78 19.95 17.24 20.62 17.06 20.82C16.88 21.02 16.7 21.04 16.4 20.88C16.1 20.72 15.14 20.41 14 19.38C13.12 18.59 12.54 17.62 12.36 17.32C12.18 17.02 12.34 16.86 12.5 16.7C12.64 16.56 12.8 16.34 12.96 16.16C13.12 15.98 13.18 15.86 13.28 15.66C13.38 15.46 13.33 15.28 13.25 15.12C13.17 14.96 12.62 13.52 12.8 13.2Z" fill="#25D366"/>
-          </svg>
-        </div>
-        <div><div class="link-label">הודעה מהירה</div><div class="link-name">WhatsApp</div></div>
-      </a>
+/* --- מסך שקילה --- */
+function renderWeight(){
+  const kid=kidById(currentUserId);
+  const list=weightList(currentUserId);
+  const wk=weekKey();
+  const thisWeek=DATA.weights?.[currentUserId]?.[wk];
+  const msg = thisWeek && !thisWeek.del
+    ? `<div class="banner info">✅ נשקלת השבוע (${thisWeek.kg} ק״ג). שקילה הבאה — שבוע הבא.</div>`
+    : `<div class="banner weigh">⚖️ שקילה שבועית — עולים על המשקל ורושמים!</div>`;
+  const rows=[...list].reverse().slice(0,12).map(e=>
+    `<div class="weightrow"><span>${hebDateShort(e.date)}</span><b>${e.kg} ק״ג</b></div>`).join('');
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar">
+      <h1>⚖️ שקילה — ${esc(kid.name)}</h1>
+      <span class="badge">פעם בשבוע</span>
     </div>
-  </div>
+    ${msg}
+    <div class="card">
+      <div class="row">
+        <input id="wkg" type="number" step="0.1" inputmode="decimal" placeholder="משקל בק״ג" />
+        <button class="btn" onclick="saveWeight()">שמירה</button>
+      </div>
+      <p class="muted" style="margin-top:8px">אם רושמים שוב באותו שבוע — המשקל מתעדכן.</p>
+    </div>
+    ${list.length?`<div class="card"><h3 style="margin-bottom:8px">📉 הגרף שלי</h3>${weightChart(list)}</div>`:''}
+    ${rows?`<div class="card"><h3 style="margin-bottom:6px">ההיסטוריה</h3>${rows}</div>`:''}
+  </div>`;
+}
+function saveWeight(){
+  const v=parseFloat(document.getElementById('wkg').value);
+  if(!v || v<=0 || v>250){ alert('נא להזין משקל תקין בק״ג'); return; }
+  DATA.weights[currentUserId]=DATA.weights[currentUserId]||{};
+  DATA.weights[currentUserId][weekKey()]={kg:v, date:todayKey(), ts:Date.now()};
+  queueSync(); render();
+}
+function weightChart(list){
+  const pts=list.slice(-10);
+  if(pts.length<2) return '<p class="muted">אחרי עוד שקילה יופיע כאן גרף 📈</p>';
+  const kgs=pts.map(p=>p.kg);
+  const min=Math.min(...kgs), max=Math.max(...kgs);
+  const pad=(max-min)*0.2||1;
+  const lo=min-pad, hi=max+pad;
+  const W=300,H=120;
+  const xy=pts.map((p,i)=>{
+    const x=10+(W-20)*i/(pts.length-1);
+    const y=H-10-(H-20)*((p.kg-lo)/(hi-lo));
+    return [x,y];
+  });
+  const line=xy.map(p=>p.join(',')).join(' ');
+  const dots=xy.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#16a34a"/><text x="${p[0]}" y="${p[1]-8}" font-size="9" text-anchor="middle" fill="#166534" font-weight="700">${pts[i].kg}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}"><polyline points="${line}" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>`;
+}
 
-  <div class="footer">
-    <div class="footer-brand">
-      <strong>יהב ביטוח ופיננסים</strong>
-      <span>סוכן ביטוח מורשה</span>
+/* --- חוקים --- */
+function renderRules(){
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar"><h1>📜 החוקים שלנו</h1></div>
+    <div class="card">
+      ${RULES.map(r=>`<div class="rule"><span class="ic">${r[0]}</span><span>${r[1]}</span></div>`).join('')}
     </div>
-    <div class="footer-addr">📍 קומפלקס פריז, נתיבות</div>
-  </div>
-</div>
+    <div class="card center" style="background:var(--green-soft)">
+      <b>💪 שומרים על החוקים — מצליחים ביחד!</b>
+    </div>
+  </div>`;
+}
+
+/* --- פאנל הורה: צפייה בלבד + ניהול קודים --- */
+let openKid=null;
+function renderParent(){
+  const kids=DATA.kids||[];
+  const days=[0,1,2,3,4,5,6].map(n=>todayKey(daysAgo(n)));
+  const kidsHtml=kids.map(k=>{
+    const open=openKid===k.id;
+    const lw=lastWeight(k.id);
+    const daysHtml=!open?'':days.map(dk=>{
+      const day=DATA.logs?.[k.id]?.[dk];
+      const wkEntry = Object.values(DATA.weights?.[k.id]||{}).find(e=>!e.del&&e.date===dk);
+      let inner='';
+      if(day?.event) inner+=`<div class="muted" style="margin-bottom:4px">🎂 יום אירוע — ארוחת הערב נאכלה בצהריים</div>`;
+      MEALS.forEach(m=>{
+        const meal=day?.meals?.[m.key];
+        const items=(meal?.items||[]).filter(i=>!i.del);
+        if(!items.length && !(meal?.water)) return;
+        const water=meal?.water?` <span class="muted">💧×${meal.water}</span>`:'';
+        inner+=`<div style="margin:4px 0 2px"><b style="font-size:13px">${m.emoji} ${m.name}</b>${water}</div>`;
+        inner+=items.map(it=>{
+          const cls=it.status==='ok'?'ok':it.status==='cheat'?'cheat':'bad';
+          const mark=it.status==='ok'?'✓':it.status==='cheat'?'🎉':'✗';
+          return `<div class="fooditem mini ${cls}"><span class="mark">${mark}</span><span>${esc(it.text)}${it.why?` <span class="why">· ${esc(it.why)}</span>`:''}</span></div>`;
+        }).join('');
+      });
+      if(wkEntry) inner+=`<div class="fooditem mini ok"><span class="mark">⚖️</span><span>שקילה: <b>${wkEntry.kg} ק״ג</b></span></div>`;
+      if(!inner) return '';
+      return `<div class="daybox"><h4>${hebDateShort(dk)}</h4>${inner}</div>`;
+    }).join('');
+    const wl=weightList(k.id);
+    const chart = open&&wl.length ? `<div class="daybox"><h4>📉 מעקב משקל</h4>${weightChart(wl)}</div>` : '';
+    return `
+    <div class="kidsec">
+      <div class="kidsec-head" onclick="toggleKid('${k.id}')">
+        <div>
+          <b style="font-size:16px">${k.emoji||'🙂'} ${esc(k.name)}</b>
+          <div class="muted" style="margin-top:2px">${lw?`משקל אחרון: ${lw.kg} ק״ג (${hebDateShort(lw.date)})`:'עדיין לא נשקל/ה'} · קוד: <span class="codechip">${k.code}</span></div>
+        </div>
+        <span style="font-size:18px">${open?'▲':'▼'}</span>
+      </div>
+      ${open?`
+        <div class="daybox row" style="gap:8px">
+          <button class="btn small secondary" onclick="resetKidCode('${k.id}')">🔑 איפוס קוד</button>
+          <button class="btn small danger" onclick="removeKid('${k.id}')">🗑 הסרה</button>
+        </div>
+        ${chart}
+        ${daysHtml||'<div class="daybox muted">אין רישומים בשבוע האחרון</div>'}
+      `:''}
+    </div>`;
+  }).join('');
+
+  const shareLink = location.origin + location.pathname + '#family=' + familyId;
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar">
+      <div><h1>👨‍👩‍👧 פאנל הורה</h1><p class="muted">${esc(DATA.familyName)} · צפייה בלבד</p></div>
+      <button class="btn small secondary" onclick="logout()">🔄 יציאה</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">➕ הוספת ילד/ה</h3>
+      <div class="row">
+        <input id="newKidName" placeholder="שם הילד/ה" />
+        <button class="btn" onclick="addKid()">הוספה</button>
+      </div>
+    </div>
+    ${kidsHtml || '<div class="card center muted">עדיין אין ילדים — מוסיפים למעלה 👆</div>'}
+    <div class="card">
+      <h3 style="margin-bottom:8px">🔗 חיבור מכשירים</h3>
+      <p class="muted" style="margin-bottom:10px">שולחים לכל ילד את הקישור — הוא נכנס, בוחר את השם שלו ומקליד את הקוד האישי שלו:</p>
+      <input readonly value="${shareLink}" style="direction:ltr;font-size:12px" onclick="this.select()" />
+      <div class="row" style="margin-top:10px">
+        <a class="btn small block" style="text-decoration:none" href="https://wa.me/?text=${encodeURIComponent('הצטרפו ליומן האוכל המשפחתי שלנו! 🥗\n'+shareLink)}" target="_blank">📲 שיתוף בוואטסאפ</a>
+        <button class="btn small secondary" onclick="copyLink('${shareLink}')">העתקה</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">🔑 קוד הורה</h3>
+      <p class="muted">הקוד הנוכחי: <span class="codechip">${DATA.parent.code}</span></p>
+      <button class="btn small secondary" style="margin-top:8px" onclick="resetParentCode()">איפוס קוד הורה</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">📜 החוקים</h3>
+      ${RULES.map(r=>`<div class="rule"><span class="ic">${r[0]}</span><span>${r[1]}</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+function toggleKid(id){ openKid = openKid===id?null:id; render(); }
+const KID_EMOJIS=['🦁','🐯','🐼','🦊','🐸','🦄','🐬','🦋','🐢','🦖'];
+function addKid(){
+  const name=document.getElementById('newKidName').value.trim();
+  if(!name) return;
+  const code=randCode();
+  DATA.kids.push({id:uid(), name, code, codeTs:Date.now(), emoji:KID_EMOJIS[DATA.kids.length%KID_EMOJIS.length]});
+  queueSync(); render();
+  alert('נוסף! 🎉 הקוד של '+name+' הוא: '+code);
+}
+function resetKidCode(id){
+  const k=kidById(id); if(!k) return;
+  const c=prompt('קוד חדש (4 ספרות) עבור '+k.name+':', randCode());
+  if(c===null) return;
+  if(!/^\d{4}$/.test(c)){ alert('הקוד חייב להיות 4 ספרות'); return; }
+  k.code=c; k.codeTs=Date.now();
+  queueSync(); render();
+  alert('הקוד של '+k.name+' אופס ל־'+c);
+}
+function removeKid(id){
+  const k=kidById(id); if(!k) return;
+  if(!confirm('להסיר את '+k.name+' מהיומן?')) return;
+  DATA.kids=DATA.kids.filter(x=>x.id!==id);
+  DATA.removedKids=[...(DATA.removedKids||[]), id];
+  queueSync(); render();
+}
+function resetParentCode(){
+  const c=prompt('קוד הורה חדש (4 ספרות):', randCode());
+  if(c===null) return;
+  if(!/^\d{4}$/.test(c)){ alert('הקוד חייב להיות 4 ספרות'); return; }
+  DATA.parent.code=c; DATA.parent.codeTs=Date.now();
+  queueSync(); render();
+  alert('קוד ההורה אופס ל־'+c);
+}
+function copyLink(l){
+  navigator.clipboard?.writeText(l).then(()=>alert('הקישור הועתק! 📋')).catch(()=>{});
+}
+
+/* ---------- אתחול ---------- */
+(function init(){
+  const m=location.hash.match(/family=([A-Za-z0-9]+)/);
+  if(m && m[1] && m[1]!==familyId){
+    familyId=m[1];
+    localStorage.setItem('fam.id',familyId);
+    currentUserId=null; localStorage.removeItem('fam.user');
+    localStorage.removeItem('fam.cache'); DATA=null;
+    history.replaceState(null,'',location.pathname);
+  }
+  const cache=localStorage.getItem('fam.cache');
+  if(cache && !DATA){ try{ DATA=JSON.parse(cache); }catch(e){} }
+  render();
+  if(familyId){
+    startPolling();
+    syncNow();
+  }
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && familyId) syncNow(); });
+})();
+</script>
 </body>
 </html>
