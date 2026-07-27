@@ -682,5 +682,59 @@ console.log('תזכורת "רשימת הפגישות של היום" שולחת �
   check('  תזכורת רגילה שמזכירה פגישה נשארת הד', fired.some(m => m.text.includes('תזכורת: פגישה עם דני החבר')), JSON.stringify(fired.map(f => f.text)));
 }
 
+console.log('התראה לפני פגישות + מיקום ביומן:');
+{
+  // פגישה בעוד 7 דקות עם מיקום — הקרון שולח התראה
+  const ilNowMs = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })).getTime();
+  let S = JSON.parse(kv.get('store'));
+  S.events.push({ id: 9910, text: 'פגישה עם ישראל בוזגלו', at: ilNowMs + 7 * 60000, loc: 'רחוב המסגר 11, אופקים' });
+  kv.set('store', JSON.stringify(S));
+
+  let before = sent.length;
+  await worker.scheduled({}, env);
+  const ping = sent.slice(before).find(m => m.text.includes('🔔') && m.text.includes('ישראל בוזגלו'));
+  check('התראה 10 דקות לפני פגישה', !!ping && /בעוד \d+ דקות/.test(ping.text), JSON.stringify(sent.slice(before).map(x => x.text)));
+  check('  כולל את המיקום 📍', !!ping && ping.text.includes('רחוב המסגר 11'), ping && ping.text);
+
+  before = sent.length;
+  await worker.scheduled({}, env);
+  check('  לא נשלחת פעמיים', !sent.slice(before).some(m => m.text.includes('🔔') && m.text.includes('ישראל בוזגלו')));
+
+  // שינוי וכיבוי
+  let r = await send('תזכורת פגישות 15 דקות');
+  check('שינוי זמן ההתראה', r.text.includes('15 דקות'), r.text);
+  r = await send('בטל תזכורת פגישות');
+  check('כיבוי התראות פגישות', r.text.includes('🔕'), r.text);
+  S = JSON.parse(kv.get('store'));
+  check('  נשמר בהגדרות', S.meetingPingMin === 0);
+  await send('תזכורת פגישות 10 דקות'); // החזרה לברירת מחדל להמשך הבדיקות
+}
+{
+  // המוח מפריד כתובת מכותרת + סדר היום בלי כפילויות
+  const prevFetch = globalThis.fetch;
+  const bridgeCalls = [];
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('bridge.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok', { status: 200 }); }
+    if (u.includes('api.anthropic.com')) {
+      const text = JSON.stringify({ action: 'event', title: 'פגישה עם ישראל בוזגלו',
+        location: 'רחוב המסגר 11, אופקים', datetime: '2026-07-28 13:30', reply: '' });
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
+  env.ANTHROPIC_API_KEY = 'sk-test';
+
+  const r = await send('קבע לי פגישה מחר ב13:30 עם ישראל בוזגלו רחוב המסגר 11 אופקים');
+  check('כתובת נכנסת ל-📍 ולא לכותרת', r.text.includes('📍 רחוב המסגר 11') && r.text.includes('"פגישה עם ישראל בוזגלו"'), r.text);
+  check('  הגשר קיבל location נפרד', bridgeCalls.some(b => (b.location || '').includes('רחוב המסגר 11') && b.title === 'פגישה עם ישראל בוזגלו'), JSON.stringify(bridgeCalls));
+  check('  מבטיח התראה לפני', r.text.includes('🔔'), r.text);
+
+  delete env.CALENDAR_WEBHOOK;
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
