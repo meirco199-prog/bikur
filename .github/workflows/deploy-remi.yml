@@ -1,0 +1,44 @@
+# פריסה אוטומטית של הבוט ל-Cloudflare — בלי הדבקות ידניות.
+# כל דחיפה ל-main שמשנה את worker.js מעלה אותו ישר ל-Worker בשם remi,
+# באותה דרך שהדשבורד עושה "Edit code" — הקוד מתחלף, וכל ההגדרות
+# (Secrets, KV, Workers AI, Cron) נשארות בדיוק כמו שהן.
+#
+# הגדרה חד-פעמית (Settings → Secrets and variables → Actions):
+#   CF_API_TOKEN  — טוקן מ-dash.cloudflare.com (תבנית "Edit Cloudflare Workers")
+#   CF_ACCOUNT_ID — מזהה החשבון (מופיע במסך Workers & Pages בצד)
+
+name: Deploy remi to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'remi-telegram-free/worker.js'
+      - '.github/workflows/deploy-remi.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload worker.js (content-only, keeps all bindings)
+        run: |
+          if [ -z "${{ secrets.CF_API_TOKEN }}" ] || [ -z "${{ secrets.CF_ACCOUNT_ID }}" ]; then
+            echo "::error::חסרים הסודות CF_API_TOKEN / CF_ACCOUNT_ID בהגדרות הריפו (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          resp=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/workers/scripts/remi/content" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -F 'metadata={"main_module":"worker.js"};type=application/json' \
+            -F 'worker.js=@remi-telegram-free/worker.js;type=application/javascript+module')
+          echo "$resp"
+          echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
+
+      - name: Verify worker answers
+        run: |
+          code=$(curl -sS -o /dev/null -w "%{http_code}" https://remi.meirco199.workers.dev/)
+          echo "worker HTTP status: $code"
+          test "$code" = "200"
