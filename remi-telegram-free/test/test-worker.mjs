@@ -663,5 +663,24 @@ console.log('ביטול כל הפגישות של יום שלם:');
   globalThis.fetch = prevFetch;
 }
 
+console.log('תזכורת "רשימת הפגישות של היום" שולחת את הפגישות עצמן:');
+{
+  // שעון ישראל כמו שהבוט מחשב אותו — כדי שהאירוע ייפול על "היום" מבחינתו
+  const ilNowMs = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })).getTime();
+  let S = JSON.parse(kv.get('store'));
+  S.events.push({ id: 9901, text: 'פגישת בדיקה חשובה', at: ilNowMs + 30 * 60000 });
+  S.reminders.push({ id: 9902, text: 'רשימת הפגישות של היום', at: Date.now() - 60000, recurringDaily: true, recurringWeekly: null });
+  S.reminders.push({ id: 9903, text: 'פגישה עם דני החבר', at: Date.now() - 60000, recurringDaily: false, recurringWeekly: null });
+  kv.set('store', JSON.stringify(S));
+
+  const before = sent.length;
+  await worker.scheduled({}, env);
+  const fired = sent.slice(before);
+  const agendaMsg = fired.find(m => m.text.includes('פגישת בדיקה חשובה'));
+  check('התזכורת שלחה את הפגישות של היום (לא הד)', !!agendaMsg, JSON.stringify(fired.map(f => f.text)));
+  check('  בלי להדהד את נוסח התזכורת', !fired.some(m => m.text.includes('תזכורת: רשימת הפגישות')), JSON.stringify(fired.map(f => f.text)));
+  check('  תזכורת רגילה שמזכירה פגישה נשארת הד', fired.some(m => m.text.includes('תזכורת: פגישה עם דני החבר')), JSON.stringify(fired.map(f => f.text)));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

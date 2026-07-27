@@ -1035,13 +1035,28 @@ async function applyAiAction(S, j, now, env, gcal = []) {
   }
 }
 
-// תזכורת שהיא בעצם בקשת מידע — עונים על השאלה בזמן הצלצול במקום להדהד אותה
+// תזכורת שהיא בעצם בקשת מידע — עונים עם התוכן החי בזמן הצלצול במקום להדהד אותה.
+// "רשימת הפגישות של היום" → הפגישות עצמן; "המשימות" → המשימות; "תאריך עברי" → התאריך;
+// אפשר גם לשלב ("תאריך עברי, פגישות היום ומשימות פתוחות").
 async function smartReminderText(env, S, text, now) {
+  const parts = [];
   if (/תאריך/.test(text) && /עברי/.test(text)) {
-    return `היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} — ובעברי: ${hebrewDate()} 🕎`;
+    parts.push(`היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} — ובעברי: ${hebrewDate()} 🕎`);
   }
+  // רק ניסוחים שהם בקשת-רשימה — לא תזכורת רגילה שמזכירה פגישה ("פגישה עם דני")
+  const wantsAgenda = /רשימת ה?פגישות|ה?פגישות של היום|פגישות היום|מה הפגישות|סדר ה?יום|מה יש (?:לי )?ביומן|האירועים של היום/.test(text);
+  if (wantsAgenda) {
+    parts.push(await agendaText(S, /מחר/.test(text) ? 'tomorrow' : 'today', now, env));
+  } else if (/רשימת ה?משימות|ה?משימות הפתוחות|מה המשימות|משימות פתוחות/.test(text)) {
+    // (אם ביקש גם פגישות — סדר היום כבר כולל את המשימות הפתוחות)
+    const open = S.tasks.filter(t => !t.done);
+    parts.push(open.length
+      ? '📋 המשימות הפתוחות שלך:\n' + open.map((t, i) => `${i+1}. ${t.text}`).join('\n')
+      : '📋 אין משימות פתוחות — כל הכבוד! 🎉');
+  }
+  if (parts.length) return parts.join('\n\n');
   const questionLike = /\?/.test(text) || /^(מה|מתי|כמה|איזה|אילו|האם|מי|איך|למה|איפה)(\s|$)/.test(text);
-  if (questionLike && env?.AI) {
+  if (questionLike && (env?.AI || env?.ANTHROPIC_API_KEY)) {
     const ans = await aiText(env, `אתה עוזר אישי בעברית. היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}, השעה ${fmtTime(now.getTime())}, התאריך העברי: ${hebrewDate()}. ענה בקצרה ובעברית טבעית על: ${text}`);
     if (ans) return ans;
   }
