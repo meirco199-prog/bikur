@@ -25,12 +25,24 @@ jobs:
 
       - name: Upload worker.js (content-only, keeps all bindings)
         run: |
-          if [ -z "${{ secrets.CF_API_TOKEN }}" ] || [ -z "${{ secrets.CF_ACCOUNT_ID }}" ]; then
-            echo "::error::חסרים הסודות CF_API_TOKEN / CF_ACCOUNT_ID בהגדרות הריפו (Settings → Secrets and variables → Actions)"
+          if [ -z "${{ secrets.CF_API_TOKEN }}" ]; then
+            echo "::error::חסר הסוד CF_API_TOKEN בהגדרות הריפו (Settings → Secrets and variables → Actions)"
             exit 1
           fi
+          # מגלים את מזהה החשבון אוטומטית מהטוקן — לא צריך CF_ACCOUNT_ID
+          ACCOUNT_ID="${{ secrets.CF_ACCOUNT_ID }}"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "::error::לא הצלחתי לגלות את מזהה החשבון מהטוקן — בדוק שהטוקן נוצר מתבנית Edit Cloudflare Workers"
+            exit 1
+          fi
+          echo "account: ${ACCOUNT_ID:0:6}..."
           resp=$(curl -sS -X PUT \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/workers/scripts/remi/content" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/remi/content" \
             -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
             -F 'metadata={"main_module":"worker.js"};type=application/json' \
             -F 'worker.js=@remi-telegram-free/worker.js;type=application/javascript+module')
