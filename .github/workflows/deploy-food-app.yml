@@ -43,7 +43,7 @@ jobs:
               '  }\n'
               '};\n'
           )
-          open('app-worker.js', 'w').write(worker)
+          open('worker.js', 'w').write(worker)
           print('worker size:', len(worker))
           EOF
 
@@ -69,7 +69,7 @@ jobs:
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/food" \
             -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
             -F 'metadata={"main_module":"worker.js"};type=application/json' \
-            -F 'worker.js=@app-worker.js;type=application/javascript+module')
+            -F 'worker.js=@worker.js;type=application/javascript+module')
           echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("upload success:", d.get("success"), json.dumps(d.get("errors"), ensure_ascii=False)); sys.exit(0 if d.get("success") else 1)'
 
           sub=$(curl -sS -X POST \
