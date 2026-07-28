@@ -151,6 +151,14 @@
   .sync.show{display:block}
   .codechip{background:#111827;color:#fff;border-radius:8px;padding:3px 10px;font-weight:800;letter-spacing:2px;direction:ltr;display:inline-block}
   svg.chart{width:100%;height:130px;display:block}
+  .goalgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+  .goalbox{background:#f9fafb;border:1px solid var(--border);border-radius:14px;padding:10px 6px;text-align:center}
+  .goalbox .val{font-size:19px;font-weight:900;color:var(--ink)}
+  .goalbox .lbl{font-size:11px;color:var(--muted);font-weight:600}
+  .pbar{background:#e5e7eb;border-radius:999px;height:14px;overflow:hidden}
+  .pbar>div{background:linear-gradient(90deg,var(--green),#4ade80);height:100%;border-radius:999px;transition:width .4s}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:14px;font-weight:700;margin-bottom:6px}
   .fade{animation:fade .25s ease}
   @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 </style>
@@ -307,7 +315,14 @@ function mergeData(a,b){
   const kidMap = {};
   [...(x.kids||[]),...(y.kids||[])].forEach(k=>{
     const ex = kidMap[k.id];
-    if(!ex || (k.codeTs||0)>(ex.codeTs||0)) kidMap[k.id]={...ex,...k};
+    if(!ex){ kidMap[k.id]={...k}; return; }
+    const merged={...ex,...k};
+    if((ex.codeTs||0)>(k.codeTs||0)){ merged.code=ex.code; merged.codeTs=ex.codeTs; }
+    if((ex.profileTs||0)>(k.profileTs||0)){
+      merged.height=ex.height; merged.targetKg=ex.targetKg;
+      merged.startKg=ex.startKg; merged.profileTs=ex.profileTs;
+    }
+    kidMap[k.id]=merged;
   });
   // ילד שהוסר (קיים רק בצד אחד ויש לו tombstone) — מכבדים הסרה
   const removed = new Set([...(x.removedKids||[]),...(y.removedKids||[])]);
@@ -424,6 +439,7 @@ function render(){
   if(!currentUserId){ renderUserPick(); renderTabs(); return; }
   if(currentUserId==='parent'){ renderParent(); renderTabs(); return; }
   if(!kidById(currentUserId)){ currentUserId=null; localStorage.removeItem('fam.user'); renderUserPick(); renderTabs(); return; }
+  if(!kidById(currentUserId).profileTs || view==='profile'){ renderProfileSetup(); renderTabs(); return; }
   if(view==='weight') renderWeight();
   else if(view==='rules') renderRules();
   else renderToday();
@@ -572,6 +588,82 @@ function renderTabs(){
 }
 function setView(v){ view=v; render(); }
 
+/* --- כניסה ראשונה של ילד: גובה, משקל ויעד --- */
+function renderProfileSetup(){
+  const kid=kidById(currentUserId);
+  const firstTime=!kid.profileTs;
+  const lw=lastWeight(currentUserId);
+  app.innerHTML=`
+  <div class="fade">
+    <div class="center" style="padding:24px 0 8px">
+      <div style="font-size:50px">${kid.emoji||'🙂'}</div>
+      <h1>${firstTime?'ברוך הבא, '+esc(kid.name)+'!':'עדכון פרטים — '+esc(kid.name)}</h1>
+      <p class="muted" style="margin-top:6px">${firstTime?'לפני שמתחילים — כמה פרטים קצרים:':'אפשר לעדכן גובה ויעד:'}</p>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>📏 גובה (בס״מ)</label>
+        <input id="pfHeight" type="number" inputmode="numeric" placeholder="למשל: 150" value="${kid.height||''}" />
+      </div>
+      <div class="field">
+        <label>⚖️ משקל נוכחי (בק״ג)</label>
+        <input id="pfWeight" type="number" step="0.1" inputmode="decimal" placeholder="למשל: 48.5" value="${lw?lw.kg:''}" />
+      </div>
+      <div class="field">
+        <label>🎯 יעד משקל רצוי (בק״ג)</label>
+        <input id="pfTarget" type="number" step="0.1" inputmode="decimal" placeholder="למשל: 42" value="${kid.targetKg||''}" />
+      </div>
+      <button class="btn block" onclick="saveProfile()">${firstTime?'מתחילים! 🚀':'שמירה'}</button>
+      ${firstTime?'':'<button class="btn ghost block" style="margin-top:6px" onclick="setView(\'weight\')">ביטול</button>'}
+    </div>
+  </div>`;
+}
+function saveProfile(){
+  const height=parseFloat(document.getElementById('pfHeight').value);
+  const kg=parseFloat(document.getElementById('pfWeight').value);
+  const target=parseFloat(document.getElementById('pfTarget').value);
+  if(!height || height<80 || height>230){ alert('נא להזין גובה תקין בס״מ'); return; }
+  if(!kg || kg<=0 || kg>250){ alert('נא להזין משקל תקין בק״ג'); return; }
+  if(!target || target<=0 || target>250){ alert('נא להזין יעד משקל תקין בק״ג'); return; }
+  const kid=kidById(currentUserId);
+  kid.height=height;
+  kid.targetKg=target;
+  if(!kid.startKg) kid.startKg=kg;
+  kid.profileTs=Date.now();
+  DATA.weights[currentUserId]=DATA.weights[currentUserId]||{};
+  DATA.weights[currentUserId][weekKey()]={kg, date:todayKey(), ts:Date.now()};
+  view='today';
+  queueSync(); render();
+}
+
+/* התקדמות לעבר היעד */
+function progressInfo(kid){
+  const lw=lastWeight(kid.id);
+  if(!lw || !kid.targetKg) return null;
+  const start=kid.startKg||lw.kg;
+  const cur=lw.kg, target=kid.targetKg;
+  const total=start-target;
+  const done=start-cur;
+  const pct = Math.abs(total)<0.01 ? 100 : Math.max(0,Math.min(100,Math.round(done/total*100)));
+  const remain=+(cur-target).toFixed(1);
+  const reached = (total>=0 && cur<=target) || (total<0 && cur>=target);
+  return {start,cur,target,pct:reached?100:pct,remain,reached};
+}
+function progressBarHtml(p){
+  if(!p) return '';
+  const txt = p.reached
+    ? '🎉 הגעת ליעד! כל הכבוד!'
+    : 'נשארו עוד '+Math.abs(p.remain)+' ק״ג ליעד 💪';
+  return `
+    <div class="goalgrid">
+      <div class="goalbox"><div class="val">${p.start}</div><div class="lbl">התחלה</div></div>
+      <div class="goalbox" style="border-color:var(--green);background:var(--green-soft)"><div class="val">${p.cur}</div><div class="lbl">עכשיו</div></div>
+      <div class="goalbox"><div class="val">${p.target}</div><div class="lbl">🎯 היעד</div></div>
+    </div>
+    <div class="pbar"><div style="width:${p.pct}%"></div></div>
+    <p class="center" style="font-size:14px;font-weight:700;margin-top:8px">${txt} (${p.pct}%)</p>`;
+}
+
 /* --- מסך היום של ילד --- */
 function renderToday(){
   const kid=kidById(currentUserId);
@@ -698,6 +790,7 @@ function renderWeight(){
     : `<div class="banner weigh">⚖️ שקילה שבועית — עולים על המשקל ורושמים!</div>`;
   const rows=[...list].reverse().slice(0,12).map(e=>
     `<div class="weightrow"><span>${hebDateShort(e.date)}</span><b>${e.kg} ק״ג</b></div>`).join('');
+  const prog=progressInfo(kid);
   app.innerHTML=`
   <div class="fade">
     <div class="topbar">
@@ -705,6 +798,7 @@ function renderWeight(){
       <span class="badge">פעם בשבוע</span>
     </div>
     ${msg}
+    ${prog?`<div class="card"><h3 style="margin-bottom:10px">🎯 הדרך ליעד</h3>${progressBarHtml(prog)}</div>`:''}
     <div class="card">
       <div class="row">
         <input id="wkg" type="number" step="0.1" inputmode="decimal" placeholder="משקל בק״ג" />
@@ -714,6 +808,10 @@ function renderWeight(){
     </div>
     ${list.length?`<div class="card"><h3 style="margin-bottom:8px">📉 הגרף שלי</h3>${weightChart(list)}</div>`:''}
     ${rows?`<div class="card"><h3 style="margin-bottom:6px">ההיסטוריה</h3>${rows}</div>`:''}
+    <div class="card row" style="justify-content:space-between">
+      <div><b>📏 גובה: ${kid.height||'—'} ס״מ</b><div class="muted">🎯 יעד: ${kid.targetKg||'—'} ק״ג</div></div>
+      <button class="btn small secondary" onclick="setView('profile')">✏️ עדכון פרטים</button>
+    </div>
   </div>`;
 }
 function saveWeight(){
@@ -785,13 +883,21 @@ function renderParent(){
       return `<div class="daybox"><h4>${hebDateShort(dk)}</h4>${inner}</div>`;
     }).join('');
     const wl=weightList(k.id);
+    const prog=progressInfo(k);
+    const progBox = open&&prog ? `<div class="daybox"><h4>🎯 הדרך ליעד</h4>${progressBarHtml(prog)}</div>` : '';
     const chart = open&&wl.length ? `<div class="daybox"><h4>📉 מעקב משקל</h4>${weightChart(wl)}</div>` : '';
+    const details=[
+      lw?`משקל: ${lw.kg} ק״ג (${hebDateShort(lw.date)})`:'עדיין לא נשקל/ה',
+      k.height?`גובה: ${k.height} ס״מ`:null,
+      k.targetKg?`יעד: ${k.targetKg} ק״ג`:null,
+    ].filter(Boolean).join(' · ');
     return `
     <div class="kidsec">
       <div class="kidsec-head" onclick="toggleKid('${k.id}')">
         <div>
           <b style="font-size:16px">${k.emoji||'🙂'} ${esc(k.name)}</b>
-          <div class="muted" style="margin-top:2px">${lw?`משקל אחרון: ${lw.kg} ק״ג (${hebDateShort(lw.date)})`:'עדיין לא נשקל/ה'} · קוד: <span class="codechip">${k.code}</span></div>
+          <div class="muted" style="margin-top:2px">${details}</div>
+          <div class="muted" style="margin-top:2px">קוד: <span class="codechip">${k.code}</span></div>
         </div>
         <span style="font-size:18px">${open?'▲':'▼'}</span>
       </div>
@@ -800,6 +906,7 @@ function renderParent(){
           <button class="btn small secondary" onclick="resetKidCode('${k.id}')">🔑 איפוס קוד</button>
           <button class="btn small danger" onclick="removeKid('${k.id}')">🗑 הסרה</button>
         </div>
+        ${progBox}
         ${chart}
         ${daysHtml||'<div class="daybox muted">אין רישומים בשבוע האחרון</div>'}
       `:''}
