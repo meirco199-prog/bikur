@@ -170,10 +170,10 @@
 <script>
 /* ================= יומן אוכל משפחתי =================
    רישום ארוחות (בלי ספירת קלוריות) + חוקים + סנכרון משפחתי.
-   סנכרון: JSON משותף בענן (jsonblob.com) — כל המשתמשים רואים הכל.
+   סנכרון: אחסון KV באותו שרת שמגיש את האפליקציה (Cloudflare Worker).
 ====================================================== */
 
-const API = 'https://jsonblob.com/api/jsonBlob';
+const API = '/api/family';
 const POLL_MS = 15000;
 
 /* ---------- תפריט וחוקים ---------- */
@@ -267,6 +267,7 @@ let view = 'today';
 let dirty = false;
 let syncing = false;
 let pollTimer = null;
+let notFound = false;
 
 function emptyData(name){
   return {
@@ -288,20 +289,20 @@ function showSync(txt){
 }
 
 async function apiCreate(data){
-  const r = await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)});
+  const r = await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   if(!r.ok) throw new Error('create failed '+r.status);
-  const loc = r.headers.get('Location') || r.headers.get('X-jsonblob') || '';
-  const id = loc.split('/').filter(Boolean).pop();
-  if(!id) throw new Error('no blob id');
-  return id;
+  const j = await r.json();
+  if(!j.id) throw new Error('no id');
+  return j.id;
 }
 async function apiGet(id){
-  const r = await fetch(API+'/'+id,{headers:{'Accept':'application/json'},cache:'no-store'});
+  const r = await fetch(API+'/'+id,{cache:'no-store'});
+  if(r.status===404) throw new Error('notfound');
   if(!r.ok) throw new Error('get failed '+r.status);
   return r.json();
 }
 async function apiPut(id,data){
-  const r = await fetch(API+'/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)});
+  const r = await fetch(API+'/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   if(!r.ok) throw new Error('put failed '+r.status);
   return data;
 }
@@ -383,6 +384,7 @@ async function syncNow(){
   syncing=true; showSync('⏳ מסנכרן…');
   try{
     const remote = await apiGet(familyId);
+    notFound = false;
     const merged = mergeData(remote, DATA);
     if(dirty){
       merged.updatedAt = Date.now();
@@ -394,7 +396,13 @@ async function syncNow(){
     showSync('');
     render();
   }catch(e){
-    showSync('📴 אין חיבור — יסתנכרן אוטומטית');
+    if(e && e.message==='notfound' && !DATA){
+      showSync('');
+      notFound=true;
+    }else{
+      showSync('📴 אין חיבור — יסתנכרן אוטומטית');
+    }
+    render();
   }finally{ syncing=false; }
 }
 function startPolling(){
@@ -447,7 +455,16 @@ function render(){
 }
 
 function renderLoading(){
-  app.innerHTML='<div class="card center" style="margin-top:35vh"><h2>⏳ טוען…</h2><p class="muted">מתחבר ליומן המשפחתי</p></div>';
+  const head = notFound
+    ? '<h2>🤔 היומן לא נמצא</h2><p class="muted" style="margin-top:6px">אולי הקישור ישן או שהיומן נוצר מחדש.<br>בקשו מההורה קישור חדש, או התחילו מחדש.</p>'
+    : '<h2>⏳ טוען…</h2><p class="muted">מתחבר ליומן המשפחתי</p>';
+  app.innerHTML=`<div class="card center fade" style="margin-top:22vh">
+    ${head}
+    <div class="row" style="justify-content:center;margin-top:16px">
+      <button class="btn small" onclick="syncNow()">🔄 נסו שוב</button>
+      <button class="btn small secondary" onclick="disconnectDevice()">🔌 התחלה מחדש</button>
+    </div>
+  </div>`;
 }
 
 /* --- מסך פתיחה: יצירה / הצטרפות --- */

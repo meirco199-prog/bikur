@@ -34,8 +34,35 @@ jobs:
               '  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);\n'
               '  return new TextDecoder().decode(bytes);\n'
               '}\n'
+              'function json(obj, status) {\n'
+              '  return new Response(JSON.stringify(obj), { status: status || 200,\n'
+              '    headers: { "content-type": "application/json", "cache-control": "no-store" } });\n'
+              '}\n'
               'export default {\n'
-              '  async fetch() {\n'
+              '  async fetch(req, env) {\n'
+              '    const url = new URL(req.url);\n'
+              '    if (url.pathname.startsWith("/api/")) {\n'
+              '      if (url.pathname === "/api/family" && req.method === "POST") {\n'
+              '        const id = crypto.randomUUID().replace(/-/g, "");\n'
+              '        const body = await req.text();\n'
+              '        if (body.length > 1000000) return json({ error: "too_big" }, 413);\n'
+              '        await env.KV.put("fam:" + id, body);\n'
+              '        return json({ id });\n'
+              '      }\n'
+              '      const m = url.pathname.match(/^\\/api\\/family\\/([A-Za-z0-9]{8,64})$/);\n'
+              '      if (m && req.method === "GET") {\n'
+              '        const v = await env.KV.get("fam:" + m[1]);\n'
+              '        if (v === null) return json({ error: "not_found" }, 404);\n'
+              '        return new Response(v, { headers: { "content-type": "application/json", "cache-control": "no-store" } });\n'
+              '      }\n'
+              '      if (m && req.method === "PUT") {\n'
+              '        const body = await req.text();\n'
+              '        if (body.length > 1000000) return json({ error: "too_big" }, 413);\n'
+              '        await env.KV.put("fam:" + m[1], body);\n'
+              '        return json({ ok: true });\n'
+              '      }\n'
+              '      return json({ error: "bad_request" }, 400);\n'
+              '    }\n'
               '    return new Response(page(), { headers: {\n'
               '      "content-type": "text/html; charset=utf-8",\n'
               '      "cache-control": "no-store"\n'
@@ -65,10 +92,27 @@ jobs:
           fi
           echo "account: ${ACCOUNT_ID:0:6}..."
 
+          # מוודאים שקיים KV namespace לנתוני המשפחות (נוצר פעם אחת)
+          NS_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/storage/kv/namespaces?per_page=100" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((n["id"] for n in d.get("result") or [] if n.get("title")=="food-app-data"), ""))')
+          if [ -z "$NS_ID" ]; then
+            NS_ID=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/storage/kv/namespaces" \
+              -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              --data '{"title":"food-app-data"}' \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("result") or {}).get("id",""))')
+          fi
+          if [ -z "$NS_ID" ]; then
+            echo "::error::לא הצלחתי ליצור/למצוא KV namespace — בדוק שלטוקן יש הרשאת Workers KV Storage:Edit"
+            exit 1
+          fi
+          echo "kv namespace: ${NS_ID:0:6}..."
+
           resp=$(curl -sS -X PUT \
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/food" \
             -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
-            -F 'metadata={"main_module":"worker.js"};type=application/json' \
+            -F 'metadata={"main_module":"worker.js","bindings":[{"type":"kv_namespace","name":"KV","namespace_id":"'"$NS_ID"'"}]};type=application/json' \
             -F 'worker.js=@worker.js;type=application/javascript+module')
           echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("upload success:", d.get("success"), json.dumps(d.get("errors"), ensure_ascii=False)); sys.exit(0 if d.get("success") else 1)'
 
@@ -85,16 +129,26 @@ jobs:
           echo "APP_URL=https://food.$SUBDOMAIN.workers.dev" >> "$GITHUB_ENV"
           echo "app url: https://food.$SUBDOMAIN.workers.dev"
 
-      - name: Verify app answers
+      - name: Verify app and storage answer
         run: |
+          ok=""
           for i in $(seq 1 12); do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/" || true)
             echo "attempt $i: HTTP $code"
-            if [ "$code" = "200" ]; then
-              echo "::notice::האפליקציה באוויר: $APP_URL"
-              exit 0
-            fi
+            if [ "$code" = "200" ]; then ok=1; break; fi
             sleep 10
           done
-          echo "::error::האפליקציה לא עונה ב-$APP_URL"
-          exit 1
+          if [ -z "$ok" ]; then
+            echo "::error::האפליקציה לא עונה ב-$APP_URL"
+            exit 1
+          fi
+          # בדיקת עגול מלא של האחסון: יצירה, קריאה
+          FAM_ID=$(curl -sS -X POST "$APP_URL/api/family" \
+            -H "Content-Type: application/json" --data '{"healthcheck":true}' \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))')
+          if [ -z "$FAM_ID" ]; then
+            echo "::error::יצירת רשומת בדיקה ב-KV נכשלה"
+            exit 1
+          fi
+          curl -sS "$APP_URL/api/family/$FAM_ID" | grep -q healthcheck || { echo "::error::קריאת KV נכשלה"; exit 1; }
+          echo "::notice::האפליקציה + אחסון באוויר: $APP_URL"
