@@ -463,7 +463,12 @@ function renderStart(){
       <h2>🚀 פעם ראשונה?</h2>
       <p class="muted" style="margin:8px 0 12px">ההורה יוצר את היומן המשפחתי פעם אחת, ואז שולח קישור לכל הילדים.</p>
       <div style="margin-bottom:10px"><input id="famName" placeholder="שם המשפחה (למשל: משפחת כהן)" /></div>
+      <div style="margin-bottom:10px">
+        <input id="famCode" class="codeinput" inputmode="numeric" maxlength="4" placeholder="••••" />
+        <p class="muted" style="margin-top:6px">🔑 בחרו קוד הורה — 4 ספרות שקל לכם לזכור (איתו נכנסים לפאנל ההורה)</p>
+      </div>
       <button class="btn block" onclick="createFamily()">צור יומן משפחתי חדש</button>
+      <p class="muted" id="createErr" style="color:var(--red);margin-top:8px"></p>
     </div>
     <div class="card">
       <h2>🔗 קיבלתם קישור או קוד?</h2>
@@ -479,7 +484,12 @@ function renderStart(){
 
 async function createFamily(){
   const name=document.getElementById('famName').value.trim();
+  const code=document.getElementById('famCode').value.trim();
+  const err=document.getElementById('createErr');
+  if(!/^\d{4}$/.test(code)){ err.textContent='נא לבחור קוד הורה של 4 ספרות'; return; }
+  err.textContent='';
   const d=emptyData(name);
+  d.parent.code=code;
   showSync('⏳ יוצר יומן…');
   try{
     familyId=await apiCreate(d);
@@ -490,7 +500,7 @@ async function createFamily(){
     localStorage.setItem('fam.user','parent');
     showSync('');
     startPolling();
-    alert('היומן נוצר! 🎉\nקוד ההורה שלך: '+d.parent.code+'\n(שומרים אותו!)\nעכשיו מוסיפים את הילדים ושולחים להם קישור.');
+    alert('היומן נוצר! 🎉\nקוד ההורה שבחרת: '+code+'\nעכשיו מוסיפים את הילדים ושולחים להם קישור.');
     render();
   }catch(e){
     showSync('');
@@ -540,7 +550,19 @@ function renderUserPick(){
     </div>
     ${kids.length===0?'<p class="muted center">עדיין אין ילדים ביומן — ההורה מוסיף אותם בפאנל ההורה.</p>':''}
     <div id="codeBox"></div>
+    <p class="center" style="margin-top:18px">
+      <button class="btn ghost" style="font-size:13px;color:var(--muted)" onclick="disconnectDevice()">🔌 ניתוק המכשיר מהיומן והתחלה מחדש</button>
+    </p>
   </div>`;
+}
+function disconnectDevice(){
+  if(!confirm('לנתק את המכשיר הזה מהיומן?\nהנתונים בענן לא נמחקים — אפשר תמיד להתחבר שוב עם הקישור.')) return;
+  localStorage.removeItem('fam.id');
+  localStorage.removeItem('fam.user');
+  localStorage.removeItem('fam.cache');
+  familyId=null; currentUserId=null; DATA=null; dirty=false;
+  clearInterval(pollTimer);
+  render();
 }
 let pendingUser=null;
 function pickUser(id){
@@ -552,6 +574,9 @@ function pickUser(id){
       <div style="margin:12px 0"><input id="pcode" class="codeinput" inputmode="numeric" maxlength="4" placeholder="••••" /></div>
       <button class="btn block" onclick="tryLogin()">כניסה</button>
       <p class="muted center" id="codeErr" style="color:var(--red);margin-top:8px"></p>
+      <p class="center" style="margin-top:6px">
+        <button class="btn ghost" style="font-size:13px" onclick="forgotCode()">🙈 שכחתי את הקוד</button>
+      </p>
     </div>`;
   const inp=document.getElementById('pcode');
   inp.focus();
@@ -572,6 +597,26 @@ function tryLogin(){
 }
 function logout(){
   currentUserId=null; localStorage.removeItem('fam.user'); render();
+}
+function forgotCode(){
+  if(pendingUser!=='parent'){
+    const k=kidById(pendingUser);
+    alert('אין בעיה! ההורה רואה את הקוד של '+(k?k.name:'הילד/ה')+' בפאנל ההורה, ויכול גם לאפס אותו שם 👨‍👩‍👧');
+    return;
+  }
+  const fam=prompt('כדי לאפס את קוד ההורה, הדביקו כאן את קוד המשפחה\n(המחרוזת הארוכה מקישור ההצטרפות ששלחתם לילדים):');
+  if(fam===null) return;
+  const cleaned=(fam||'').trim().split('/').filter(Boolean).pop().replace(/[#?].*$/,'').replace(/^family=/,'');
+  if(cleaned!==familyId){
+    alert('קוד המשפחה לא תואם. אפשר למצוא אותו בקישור ששלחתם בוואטסאפ (החלק שאחרי ‎#family=).');
+    return;
+  }
+  const c=prompt('קוד הורה חדש (4 ספרות):');
+  if(c===null) return;
+  if(!/^\d{4}$/.test(c)){ alert('הקוד חייב להיות 4 ספרות'); return; }
+  DATA.parent.code=c; DATA.parent.codeTs=Date.now();
+  queueSync();
+  alert('קוד ההורה עודכן ל־'+c+' — עכשיו אפשר להיכנס איתו!');
 }
 
 /* --- טאבים תחתונים (לילדים) --- */
