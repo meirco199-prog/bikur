@@ -1695,7 +1695,11 @@ async function runCron(env) {
   const nowMs = now.getTime();
   let changed = false;
 
+  // דופק חיים — כדי שמסך האבחון ידע אם השעון באמת רץ (נכתב לכל היותר פעם ברבע שעה)
+  if (nowMs - (C.beat || 0) > 15 * 60000) { C.beat = nowMs; changed = true; }
+
   for (const r of S.reminders) {
+   try {
     const due = dueOccurrence(r, C.fired[r.id], nowMs);
     if (due === null) continue;
     // תזכורת המשימות היומית — שולחת את הרשימה החיה עם כפתורי הסימון
@@ -1728,12 +1732,15 @@ async function runCron(env) {
     C.lastFired = { text: r.text };
     C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
     changed = true;
+   } catch (e) { console.log('reminder failed:', r.id, e.message); }
   }
 
   // 🔔 התראה אוטומטית לפני כל פגישה (ברירת מחדל: 10 דקות; "תזכורת פגישות 15 דקות" לשינוי)
   const pingMin = S.meetingPingMin === 0 ? 0 : (S.meetingPingMin || parseInt(env.MEETING_PING_MIN ?? '10', 10));
-  if (pingMin > 0) {
-    const gEvents = await fetchCalendar(env, nowMs - 3600000, nowMs + 12 * 3600000);
+  if (pingMin > 0) try {
+    // את היומן של גוגל בודקים רק כל 5 דקות (חלון ההתראה רחב מזה) — חוסך עבודה כל דקה
+    const gEvents = (pingMin < 5 || now.getMinutes() % 5 === 0)
+      ? await fetchCalendar(env, nowMs - 3600000, nowMs + 12 * 3600000) : [];
     const upcoming = [
       ...S.events.map(e => ({ at: e.at, text: e.text, loc: e.loc || '' })),
       ...gEvents.filter(e => !e.allDay),
@@ -1755,7 +1762,7 @@ async function runCron(env) {
     for (const k of Object.keys(C.pinged)) {
       if (C.pinged[k] < nowMs - 86400000) { delete C.pinged[k]; changed = true; }
     }
-  }
+  } catch (e) { console.log('meeting ping failed:', e.message); }
 
   const briefHour = env.BRIEF_HOUR === 'off' ? null : parseInt(env.BRIEF_HOUR ?? '8', 10);
   const todayStr = now.toDateString();
@@ -1807,6 +1814,13 @@ export default {
         const S = await loadStore(env);
         lines.push(`✅ אחסון (KV): מחובר — ${S.tasks.length} משימות, ${S.reminders.length} תזכורות, ${S.docs.length} מסמכים`);
         lines.push(S.ownerChatId ? `✅ בעלים רשום (${S.ownerChatId})` : '⚠️ עוד לא נשלח /start לבוט');
+        // דופק השעון — אם הקרון לא רץ, שום תזכורת לא תישלח
+        const cRaw = await env.DATA.get('cron');
+        const beat = cRaw ? (JSON.parse(cRaw).beat || 0) : 0;
+        const beatMin = beat ? Math.round((ilNow().getTime() - beat) / 60000) : null;
+        if (!beat) lines.push('❌ השעון (Cron) עוד לא דיווח — אם זה נמשך רבע שעה: Settings → Trigger Events → ודא שיש Cron ‎* * * * *');
+        else if (beatMin <= 20) lines.push(`✅ השעון פועל (רץ לפני ${beatMin} דק')`);
+        else lines.push(`❌ השעון לא רץ כבר ${beatMin} דקות! תזכורות לא יישלחו — Settings → Trigger Events → הוסף Cron ‎* * * * *`);
       } catch (e) {
         lines.push('❌ אחסון (KV): לא מחובר! בדוק Binding בשם DATA. ' + e.message);
       }

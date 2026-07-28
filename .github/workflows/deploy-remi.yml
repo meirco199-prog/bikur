@@ -48,6 +48,14 @@ jobs:
             -F 'worker.js=@remi-telegram-free/worker.js;type=application/javascript+module')
           echo "$resp"
           echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
+          # מוודאים שהשעון (Cron Trigger כל דקה) קיים — פריסת תוכן עלולה למחוק אותו
+          sched=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/remi/schedules" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '[{"cron":"* * * * *"}]')
+          echo "$sched"
+          echo "$sched" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
 
       - name: Verify worker answers
         run: |
