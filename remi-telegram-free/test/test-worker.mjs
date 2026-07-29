@@ -459,7 +459,7 @@ console.log('משימות: הפרדה מהיומן, כפתורי בוצעה/בי
   // הוספת משימה — מגיעה עם כפתורי בחירה
   let r = await send('משימה: לסגור לעינב ביטוחים לרכב');
   const btns = r.reply_markup?.inline_keyboard || [];
-  check('הוספת משימה מציעה כפתורי ✅/❌', btns.flat().some(b => b.text.includes('בוצעה')) && btns.flat().some(b => b.text.includes('בטל')), JSON.stringify(r.reply_markup));
+  check('הוספת משימה מציעה כפתורי ✅/❌', btns.flat().some(b => b.text.includes('✅')) && btns.flat().some(b => b.text.includes('❌')), JSON.stringify(r.reply_markup));
 
   // שאלה חופשית על משימות → רשימת משימות, לא פגישות מהיומן
   r = await send('איזה משימות פתוחות יש לי');
@@ -504,9 +504,11 @@ console.log('משימות: הפרדה מהיומן, כפתורי בוצעה/בי
   kv.set('store', JSON.stringify(S));
   const before = sent.length;
   await worker.scheduled({}, env);
-  const fired = sent.slice(before).find(m => m.text.includes('המשימות הפתוחות'));
-  check('הקרון שלח את המשימות הפתוחות', !!fired && fired.text.includes('רואה החשבון'), JSON.stringify(sent.slice(before)));
-  check('  עם כפתורי סימון', !!fired && (fired.reply_markup?.inline_keyboard || []).flat().some(b => b.text.includes('בוצעה')));
+  const digestMsgs = sent.slice(before);
+  const header = digestMsgs.find(m => m.text.includes('המשימות הפתוחות'));
+  const card = digestMsgs.find(m => m.text.includes('רואה החשבון'));
+  check('הקרון שלח את המשימות הפתוחות', !!header && !!card, JSON.stringify(digestMsgs));
+  check('  עם כפתורי סימון', !!card && (card.reply_markup?.inline_keyboard || []).flat().some(b => b.text.includes('✅')));
 
   // ביטול התזכורת
   r = await send('בטל תזכורת משימות');

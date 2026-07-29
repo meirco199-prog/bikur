@@ -1007,8 +1007,8 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       const t = { id: nid(), text: title, done: false, created: now.getTime() };
       S.tasks.push(t);
       return { text: `📋 הוספתי למשימות${hey}: "${title}"`,
-        buttons: [[{ text: '✅ בוצעה', callback_data: `t:done:${t.id}` },
-                   { text: '❌ בטל', callback_data: `t:del:${t.id}` }]] };
+        buttons: [[{ text: '✅ בוצע', callback_data: `t:done:${t.id}` },
+                   { text: '❌ לא בוצע', callback_data: `t:del:${t.id}` }]] };
     }
     case 'shopping': {
       const items = (Array.isArray(j.items) ? j.items : [title]).map(x => cleanup(String(x))).filter(x => x.length > 0);
@@ -1061,7 +1061,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
         : `לא הצלחתי למחוק את "${g.text}" מיומן גוגל 😕 בדוק שהגשר מעודכן (פתח /diag)`;
     }
     case 'tasks':
-      return taskListMsg(S);
+      return taskCards(S);
     case 'gmail': {
       if (!title) return null;
       if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.';
@@ -1113,20 +1113,21 @@ async function smartReminderText(env, S, text, now) {
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
 // רשימת משימות עם כפתורי בחירה מתחת להודעה: ✅ בוצעה / ❌ ביטול / ↩️ לא בוצעה.
 // הפרדה מלאה מהיומן — כאן רק משימות, אף פעם לא פגישות.
-function taskListMsg(S, header) {
-  // מציגים רק משימות פתוחות — בלי היסטוריית "בוצעה" ובלי כפתורי חרטה
+// כרטיס לכל משימה: ההודעה היא המשימה עצמה, ומתחתיה ✅ בוצע / ❌ לא בוצע.
+// לחיצה הופכת את הכרטיס לשורת סטטוס — פשוט ונקי.
+function taskCard(t) {
+  return {
+    text: `⬜ ${t.text}`,
+    buttons: [[
+      { text: '✅ בוצע', callback_data: `t:done:${t.id}` },
+      { text: '❌ לא בוצע', callback_data: `t:del:${t.id}` },
+    ]],
+  };
+}
+function taskCards(S, header) {
   const open = S.tasks.filter(t => !t.done);
   if (!open.length) return { text: '📋 אין משימות פתוחות — כל הכבוד! 🎉' };
-  let text = (header || '📋 המשימות שלך') + ':';
-  const buttons = [];
-  open.forEach((t, i) => {
-    text += `\n${i + 1}. ⬜ ${t.text}`;
-    buttons.push([
-      { text: `✅ בוצעה ${i + 1}`, callback_data: `t:done:${t.id}` },
-      { text: `❌ בטל ${i + 1}`, callback_data: `t:del:${t.id}` },
-    ]);
-  });
-  return { text, buttons };
+  return { text: header || `📋 המשימות שלך (${open.length}):`, cards: open.map(taskCard) };
 }
 
 export async function handleMessage(S, text, now, env, isVoice = false) {
@@ -1233,10 +1234,10 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
       const t = { id: nid(), text: c.text, done: false, created: now.getTime() };
       S.tasks.push(t);
       return { text: `📋 הוספתי: "${c.text}"\n(${openTasks().length} משימות פתוחות)`,
-        buttons: [[{ text: '✅ בוצעה', callback_data: `t:done:${t.id}` },
-                   { text: '❌ בטל', callback_data: `t:del:${t.id}` }]] };
+        buttons: [[{ text: '✅ בוצע', callback_data: `t:done:${t.id}` },
+                   { text: '❌ לא בוצע', callback_data: `t:del:${t.id}` }]] };
     }
-    case 'task_list': return taskListMsg(S);
+    case 'task_list': return taskCards(S);
     case 'tasks_digest': {
       S.reminders = S.reminders.filter(r => !r.tasksDigest);
       const at = new Date(now); at.setHours(c.hour, c.minute, 0, 0);
@@ -1618,21 +1619,19 @@ async function handleCallback(env, q) {
     return;
   }
   const m = String(q.data || '').match(/^t:(done|undo|del):(\d+)$/);
-  let toast = '';
+  let toast = '', statusLine = null;
   if (m) {
     const t = S.tasks.find(x => x.id === Number(m[2]));
     if (!t) toast = 'המשימה הזאת כבר לא קיימת';
-    else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); toast = `✅ "${t.text}" סומנה כבוצעה`; }
-    else if (m[1] === 'undo') { t.done = false; delete t.doneAt; toast = `↩️ "${t.text}" חזרה לפתוחות`; }
-    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ המשימה "${t.text}" בוטלה`; }
+    else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); toast = `✅ "${t.text}" בוצעה`; statusLine = `✅ ${t.text}`; }
+    else if (m[1] === 'undo') { t.done = false; delete t.doneAt; toast = `↩️ "${t.text}" חזרה לפתוחות`; statusLine = `⬜ ${t.text}`; }
+    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ "${t.text}" — לא בוצעה, ירדה מהרשימה`; statusLine = `❌ ${t.text}`; }
     if (t || m[1]) await saveStore(env, S);
   }
   await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id, text: toast.slice(0, 190) });
-  // מרעננים את ההודעה עצמה כדי שהרשימה והכפתורים תמיד יהיו עדכניים
-  if (m && q.message?.message_id) {
-    const msg = taskListMsg(S);
-    await tgApi(env, 'editMessageText', { chat_id: chatId, message_id: q.message.message_id,
-      text: msg.text, reply_markup: { inline_keyboard: msg.buttons || [] } });
+  // הכרטיס שנלחץ הופך לשורת סטטוס נקייה (בלי כפתורים)
+  if (m && q.message?.message_id && statusLine) {
+    await tgApi(env, 'editMessageText', { chat_id: chatId, message_id: q.message.message_id, text: statusLine });
   }
 }
 
@@ -1705,6 +1704,9 @@ async function handleWebhook(env, update) {
   await saveStore(env, S);
   if (typeof answer === 'object' && answer.doc) {
     await tgSendDoc(env, chatId, answer.doc, answer.text, answer.replyTo);
+  } else if (typeof answer === 'object' && answer.cards) {
+    if (answer.text) await tgSend(env, chatId, voicePrefix + answer.text);
+    for (const card of answer.cards) await tgSend(env, chatId, card.text, card.buttons);
   } else if (typeof answer === 'object') {
     await tgSend(env, chatId, voicePrefix + answer.text, answer.buttons, answer.replyTo);
   } else {
@@ -1742,8 +1744,9 @@ async function runCron(env) {
       const openCount = S.tasks.filter(t => !t.done).length;
       let okD;
       if (openCount) {
-        const msg = taskListMsg(S, `📋 ${n0 ? n0 + ', ' : ''}המשימות הפתוחות שלך`);
-        okD = await tgSend(env, S.ownerChatId, msg.text, msg.buttons);
+        const msg = taskCards(S, `📋 ${n0 ? n0 + ', ' : ''}המשימות הפתוחות שלך (${openCount}):`);
+        okD = await tgSend(env, S.ownerChatId, msg.text);
+        for (const card of (msg.cards || [])) await tgSend(env, S.ownerChatId, card.text, card.buttons);
       } else {
         okD = await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
       }
