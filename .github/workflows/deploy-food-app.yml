@@ -11,6 +11,7 @@ on:
     branches: [claude/kids-nutrition-app-ek0f9r]
     paths:
       - 'index.html'
+      - 'food-app-icons/**'
       - '.github/workflows/deploy-food-app.yml'
   workflow_dispatch:
 
@@ -23,16 +24,45 @@ jobs:
       - name: Build worker with the app embedded
         run: |
           python3 - <<'EOF'
-          import base64
+          import base64, json as jsonlib
           html = open('index.html', 'rb').read()
           b64 = base64.b64encode(html).decode()
+          icon192 = base64.b64encode(open('food-app-icons/icon-192.png','rb').read()).decode()
+          icon512 = base64.b64encode(open('food-app-icons/icon-512.png','rb').read()).decode()
+          apple = base64.b64encode(open('food-app-icons/apple-touch-icon.png','rb').read()).decode()
+          manifest = jsonlib.dumps({
+              "name": "יומן אוכל משפחתי",
+              "short_name": "יומן אוכל",
+              "start_url": "/",
+              "display": "standalone",
+              "background_color": "#f0fdf4",
+              "theme_color": "#16a34a",
+              "dir": "rtl",
+              "lang": "he",
+              "icons": [
+                  {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+                  {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+              ],
+          }, ensure_ascii=False)
+          sw = ('self.addEventListener("install",e=>self.skipWaiting());'
+                'self.addEventListener("activate",e=>e.waitUntil(clients.claim()));'
+                'self.addEventListener("fetch",e=>{e.respondWith(fetch(e.request));});')
           worker = (
               'const HTML_B64 = "' + b64 + '";\n'
-              'function page() {\n'
-              '  const bin = atob(HTML_B64);\n'
-              '  const bytes = new Uint8Array(bin.length);\n'
-              '  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);\n'
-              '  return new TextDecoder().decode(bytes);\n'
+              'const ICON192_B64 = "' + icon192 + '";\n'
+              'const ICON512_B64 = "' + icon512 + '";\n'
+              'const APPLE_B64 = "' + apple + '";\n'
+              'const MANIFEST = ' + jsonlib.dumps(manifest, ensure_ascii=False) + ';\n'
+              'const SW = ' + jsonlib.dumps(sw) + ';\n'
+              'function bytes(b64) {\n'
+              '  const bin = atob(b64);\n'
+              '  const arr = new Uint8Array(bin.length);\n'
+              '  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);\n'
+              '  return arr;\n'
+              '}\n'
+              'function page() { return new TextDecoder().decode(bytes(HTML_B64)); }\n'
+              'function png(b64) {\n'
+              '  return new Response(bytes(b64), { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });\n'
               '}\n'
               'function json(obj, status) {\n'
               '  return new Response(JSON.stringify(obj), { status: status || 200,\n'
@@ -41,6 +71,13 @@ jobs:
               'export default {\n'
               '  async fetch(req, env) {\n'
               '    const url = new URL(req.url);\n'
+              '    if (url.pathname === "/manifest.webmanifest")\n'
+              '      return new Response(MANIFEST, { headers: { "content-type": "application/manifest+json; charset=utf-8", "cache-control": "no-store" } });\n'
+              '    if (url.pathname === "/sw.js")\n'
+              '      return new Response(SW, { headers: { "content-type": "application/javascript", "cache-control": "no-store" } });\n'
+              '    if (url.pathname === "/icon-192.png") return png(ICON192_B64);\n'
+              '    if (url.pathname === "/icon-512.png") return png(ICON512_B64);\n'
+              '    if (url.pathname === "/apple-touch-icon.png") return png(APPLE_B64);\n'
               '    if (url.pathname.startsWith("/api/")) {\n'
               '      if (url.pathname === "/api/family" && req.method === "POST") {\n'
               '        const id = crypto.randomUUID().replace(/-/g, "");\n'
@@ -151,4 +188,7 @@ jobs:
             exit 1
           fi
           curl -sS "$APP_URL/api/family/$FAM_ID" | grep -q healthcheck || { echo "::error::קריאת KV נכשלה"; exit 1; }
-          echo "::notice::האפליקציה + אחסון באוויר: $APP_URL"
+          curl -sS "$APP_URL/manifest.webmanifest" | grep -q short_name || { echo "::error::manifest לא מוגש"; exit 1; }
+          mcode=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/icon-192.png")
+          test "$mcode" = "200" || { echo "::error::אייקון לא מוגש"; exit 1; }
+          echo "::notice::האפליקציה + אחסון + PWA באוויר: $APP_URL"

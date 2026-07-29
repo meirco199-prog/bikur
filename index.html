@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#16a34a" />
 <title>יומן אוכל משפחתי</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" type="image/png" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="יומן אוכל" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 <style>
@@ -520,6 +526,7 @@ function renderStart(){
       </div>
       <p class="muted" id="joinErr" style="color:var(--red);margin-top:8px"></p>
     </div>
+    ${installBanner()}
   </div>`;
 }
 
@@ -590,6 +597,7 @@ function renderUserPick(){
       </button>
     </div>
     ${kids.length===0?'<p class="muted center">עדיין אין ילדים ביומן — ההורה מוסיף אותם בפאנל ההורה.</p>':''}
+    ${installBanner()}
     <div id="codeBox"></div>
     <p class="center" style="margin-top:18px">
       <button class="btn ghost" style="font-size:13px;color:var(--muted)" onclick="disconnectDevice()">🔌 ניתוק המכשיר מהיומן והתחלה מחדש</button>
@@ -767,6 +775,7 @@ function renderToday(){
   const lw=lastWeight(currentUserId);
   const needWeigh = !lw || (Date.now()-new Date(lw.date).getTime()) > 7*24*3600*1000;
   if(needWeigh) banners+=`<div class="banner weigh" onclick="setView('weight')" style="cursor:pointer">⚖️ הגיע הזמן לשקילה השבועית! לחצו כאן</div>`;
+  banners+=installBanner();
 
   const mealsHtml = MEALS.map(m=>{
     const isEventLunch = ev && m.key==='lunch' && !cheat;
@@ -1023,6 +1032,7 @@ function renderParent(){
         <button class="btn small secondary" onclick="copyLink('${shareLink}')">העתקה</button>
       </div>
     </div>
+    ${installBanner()}
     <div class="card">
       <h3 style="margin-bottom:8px">🔑 קוד הורה</h3>
       <p class="muted">הקוד הנוכחי: <span class="codechip">${DATA.parent.code}</span></p>
@@ -1070,6 +1080,38 @@ function resetParentCode(){
 }
 function copyLink(l){
   navigator.clipboard?.writeText(l).then(()=>alert('הקישור הועתק! 📋')).catch(()=>{});
+}
+
+/* ---------- התקנה כאפליקציה (PWA) ---------- */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  render();
+});
+window.addEventListener('appinstalled',()=>{ deferredPrompt=null; render(); });
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
+}
+function installBanner(){
+  if(isStandalone()) return '';
+  return `<div class="banner info" style="cursor:pointer" onclick="installApp()">📲 התקינו כאפליקציה — לחצו כאן ותקבלו אייקון במסך הבית</div>`;
+}
+async function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    try{ await deferredPrompt.userChoice; }catch(e){}
+    deferredPrompt=null;
+    render();
+    return;
+  }
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  alert(ios
+    ? 'להתקנה באייפון:\n1. לוחצים על כפתור השיתוף (הריבוע עם החץ) למטה\n2. בוחרים "הוסף למסך הבית"\n3. לוחצים "הוסף"'
+    : 'להתקנה:\n1. לוחצים על תפריט הדפדפן (⋮)\n2. בוחרים "הוספה למסך הבית" או "התקנת אפליקציה"');
+}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
 }
 
 /* ---------- אתחול ---------- */
