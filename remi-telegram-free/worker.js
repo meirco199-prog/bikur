@@ -1862,10 +1862,31 @@ export default {
             lines.push(`${due !== null ? '❗ ממתינה לשליחה עכשיו!' : '✅'} "${(r.text || '').slice(0, 35)}" — ${sched} · ${lastF}`);
           }
         }
+        // רנטגן התראות פגישות: כל פגישה קרובה — האם ומתי נשלח הפעמון
+        try {
+          const pingM = S.meetingPingMin === 0 ? 0 : (S.meetingPingMin || parseInt(env.MEETING_PING_MIN ?? '10', 10));
+          const nowMs2 = nowI.getTime();
+          const gEv = (await fetchCalendar(env, nowMs2 - 6 * 3600000, nowMs2 + 12 * 3600000)).filter(e => !e.allDay);
+          const localEv = S.events.filter(e => e.at >= nowMs2 - 6 * 3600000 && e.at < nowMs2 + 12 * 3600000)
+            .map(e => ({ at: e.at, text: e.text, loc: e.loc || '' }));
+          const evs = mergeEvents(gEv, localEv);
+          lines.push('', `🔔 התראות פגישות (${pingM ? pingM + " דק' לפני" : 'כבויות!'}):`);
+          if (!evs.length) lines.push('(אין פגישות בטווח 6 שעות אחורה / 12 קדימה)');
+          for (const e of evs.slice(0, 8)) {
+            const key = e.text.trim() + '|' + Math.round(e.at / 60000);
+            const p = (C2.pinged || {})[key];
+            const status = p ? `🔔 נשלחה ב-${fmtTime(p)}`
+              : nowMs2 >= e.at ? '❗ עברה בלי התראה!'
+              : `🕐 תישלח ב-${fmtTime(e.at - pingM * 60000)}`;
+            lines.push(`• ${fmtTime(e.at)} "${(e.text || '').slice(0, 30)}" — ${status}`);
+          }
+        } catch (e) { lines.push('🔔 בדיקת התראות פגישות נכשלה: ' + e.message); }
         const errs = (C2.errors || []).slice(-5);
         if (errs.length) {
           lines.push('', '🐞 שגיאות אחרונות של השעון:');
           errs.forEach(x => lines.push(`• ${fmtDate(x.ts, nowI)} — ${x.what}: ${x.msg}`));
+        } else {
+          lines.push('', '🐞 יומן שגיאות: ריק (לא נרשמו כשלים מאז העדכון האחרון)');
         }
       } catch (e) {
         lines.push('❌ אחסון (KV): לא מחובר! בדוק Binding בשם DATA. ' + e.message);
