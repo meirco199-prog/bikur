@@ -902,7 +902,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - דייק בתאריך! חשב לפי התאריך של היום שכתוב למעלה: "מחר"=יום אחד קדימה, "יום שני הקרוב"=יום השני הבא בלוח השנה, "ל-1/8"=האחד באוגוסט. אל תשים הכול על מחר.
 - ה-title חייב להיות נקי ממילות זמן: בלי "מחר", בלי "ליום שני", בלי תאריכים — רק תוכן הפגישה עצמו (למשל "פגישה עם עירית נתיבות — תשלום דוחות").
 - כתובת/רחוב/מקום/טלפון של פגישה — שים ב-location, לא ב-title! ("פגישה עם ישראל ברחוב המסגר 11 אופקים" → title="פגישה עם ישראל", location="רחוב המסגר 11, אופקים"). כל פגישה מקבלת אוטומטית התראה מהבוט 10 דקות לפני — אל תיצור תזכורת נפרדת לזה.
-- task = משימה לביצוע. shopping = פריטי קניות ב-items. note = מידע/מחשבה שכדאי לשמור.
+- task = משימה לביצוע. shopping = פריטי קניות ב-items. note = מידע/מחשבה שכדאי לשמור. פרטים אישיים (שם, ת\"ז, תאריך לידה, כתובת) הם תמיד note — לעולם לא reminder, גם אם יש בהם תאריך!
 - event_move = לבקש להעביר/לדחות/להקדים פגישה קיימת. אם היא ברשימת "דרכך" — תן event_id + datetime חדש. אם היא רק ביומן גוגל — event_id=0, title = הכותרת המדויקת מרשימת היומן, datetime = המועד החדש. אל תיצור אירוע חדש.
 - event_delete = לבטל/למחוק פגישה קיימת. אם ברשימת "דרכך" — event_id. אם רק ביומן גוגל — event_id=0 ו-title = הכותרת המדויקת מרשימת היומן.
 - tasks = שואל על המשימות שלו ("איזה משימות פתוחות יש לי") — מציג את רשימת המשימות בלבד. משימות ≠ פגישות! אל תחזיר agenda על שאלת משימות.
@@ -1468,14 +1468,25 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
 
 // ===== טלגרם =====
 
+let lastTgError = '';
 async function tgApi(env, method, body) {
-  const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) console.log(`${method} failed:`, await res.text());
-  return res.ok;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      lastTgError = `${method} → HTTP ${res.status}: ${(await res.text()).slice(0, 150)}`;
+      console.log('telegram failed:', lastTgError);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    lastTgError = `${method} → ${e.message}`;
+    console.log('telegram failed:', lastTgError);
+    return false;
+  }
 }
 async function tgSend(env, chatId, text, buttons, replyTo) {
   const body = { chat_id: chatId, text };
@@ -1713,7 +1724,7 @@ async function runCron(env) {
       } else {
         okD = await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
       }
-      if (!okD) throw new Error('טלגרם לא אישר את השליחה');
+      if (!okD) throw new Error(lastTgError || 'טלגרם לא אישר את השליחה');
       C.fired[r.id] = due;
       C.lastFired = { text: r.text };
       C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
@@ -1730,7 +1741,7 @@ async function runCron(env) {
     const okR = await tgSend(env, S.ownerChatId, smart
       ? `⏰ ${n ? n + ', ' : ''}${smart}${r.recurringDaily || r.recurringWeekly != null ? suffix : ''}`
       : `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
-    if (!okR) throw new Error('טלגרם לא אישר את השליחה');
+    if (!okR) throw new Error(lastTgError || 'טלגרם לא אישר את השליחה');
     C.fired[r.id] = due;
     C.lastFired = { text: r.text };
     C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
