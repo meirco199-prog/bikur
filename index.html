@@ -391,18 +391,20 @@ async function syncNow(){
       await apiPut(familyId, merged);
       dirty=false;
     }
+    const changed = JSON.stringify(merged) !== JSON.stringify(DATA);
     DATA = merged;
     localStorage.setItem('fam.cache', JSON.stringify(DATA));
     showSync('');
-    render();
+    if(changed) render();
   }catch(e){
+    const hadData = !!DATA;
     if(e && e.message==='notfound' && !DATA){
       showSync('');
       notFound=true;
     }else{
       showSync('📴 אין חיבור — יסתנכרן אוטומטית');
     }
-    render();
+    if(!hadData) render();
   }finally{ syncing=false; }
 }
 function startPolling(){
@@ -442,6 +444,28 @@ function h(html){ const t=document.createElement('template'); t.innerHTML=html.t
 function esc(s){ return (s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
 
 function render(){
+  // שומרים מה שהוקלד ואת הפוקוס — שרינדור מחדש (למשל בסנכרון) לא ימחק הקלדה
+  const active=document.activeElement;
+  const focusId=(active && app.contains(active) && active.id) ? active.id : null;
+  const selStart=(focusId && active.selectionStart!=null) ? active.selectionStart : null;
+  const vals={};
+  app.querySelectorAll('input').forEach(i=>{ if(i.id && i.type!=='checkbox') vals[i.id]=i.value; });
+
+  renderView();
+
+  Object.entries(vals).forEach(([id,v])=>{
+    const el=document.getElementById(id);
+    if(el && v!=='' ) el.value=v;
+  });
+  if(focusId){
+    const el=document.getElementById(focusId);
+    if(el){
+      el.focus();
+      if(selStart!=null){ try{ el.setSelectionRange(selStart,selStart); }catch(e){} }
+    }
+  }
+}
+function renderView(){
   if(!familyId){ renderStart(); renderTabs(); return; }
   if(!DATA){ renderLoading(); return; }
   if(!currentUserId){ renderUserPick(); renderTabs(); return; }
