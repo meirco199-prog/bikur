@@ -641,7 +641,7 @@ console.log('ביטול כל הפגישות של יום שלם:');
     if (u.includes('bridge.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok:deleted=1', { status: 200 }); }
     return prevFetch(url, opts);
   };
-  env.CALENDAR_ICS = 'https://ics.example/secret.ics';
+  env.CALENDAR_ICS = 'https://ics.example/day-clear.ics';
   env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
 
   await send('קבע פגישה ליום ראשון ב-10 עם משקיע ראשון');

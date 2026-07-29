@@ -20,11 +20,27 @@ const IL_TZ = 'Asia/Jerusalem';
 // ===== זמן ישראל =====
 // כל הלוגיקה עובדת ב"שעון קיר" ישראלי: Date מוזז כך שה-getters (getHours וכו')
 // מחזירים שעה ישראלית גם כשהשרת רץ ב-UTC.
+// חישוב הפרש שעון ישראל עם מטמון לפי יום — Intl יקר מאוד במעבד, ואסור לנו
+// להריץ אותו עשרות פעמים בכל דקה (התוכנית החינמית מגבילה CPU לכל הרצה)
+const ilOffCache = new Map();
+function ilOffset(ms) {
+  const day = Math.floor(ms / 86400000);
+  let off = ilOffCache.get(day);
+  if (off === undefined) {
+    const raw = new Date(new Date(ms).toLocaleString('en-US', { timeZone: IL_TZ })).getTime() - ms;
+    off = Math.round(raw / 900000) * 900000; // ההפרש תמיד כפולה של רבע שעה (2 או 3 שעות)
+    if (ilOffCache.size > 200) ilOffCache.clear();
+    ilOffCache.set(day, off);
+  }
+  return off;
+}
 function ilNow() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: IL_TZ }));
+  const t = Date.now();
+  return new Date(t + ilOffset(t));
 }
 function ilWallMs(realDate) {
-  return new Date(realDate.toLocaleString('en-US', { timeZone: IL_TZ })).getTime();
+  const t = realDate.getTime();
+  return t + ilOffset(t);
 }
 // המרה משעון קיר ישראלי חזרה לזמן אמיתי (בשביל יומן גוגל)
 function ilToRealMs(shiftedMs) {
@@ -453,12 +469,18 @@ export function parseICS(ics, from, to) {
   return out.sort((a,b) => a.at - b.at);
 }
 
+// מטמון ליומן גוגל — במקום להוריד ולפענח את כל הקובץ בכל דקה
+let icsCache = { url: '', ts: 0, text: '' };
 async function fetchCalendar(env, from, to) {
   if (!env || !env.CALENDAR_ICS) return [];
   try {
-    const res = await fetch(env.CALENDAR_ICS);
-    if (!res.ok) return [];
-    return parseICS(await res.text(), from, to);
+    const nowT = Date.now();
+    if (icsCache.url !== env.CALENDAR_ICS || nowT - icsCache.ts > 5 * 60000) {
+      const res = await fetch(env.CALENDAR_ICS);
+      if (!res.ok) return [];
+      icsCache = { url: env.CALENDAR_ICS, ts: nowT, text: await res.text() };
+    }
+    return parseICS(icsCache.text, from, to);
   } catch { return []; }
 }
 
@@ -1695,6 +1717,9 @@ async function handleWebhook(env, update) {
   }
 }
 
+// דופק ריצות של השעון — לזיהוי ריצות דלילות (נשמר בזיכרון האיזולט + ב-KV כל 10 דק')
+const cronTicks = [];
+
 async function runCron(env) {
   // הקרון קורא את ה-store אבל לעולם לא כותב אליו — כל המצב שלו במפתח 'cron' הנפרד
   const S = await loadStore(env);
@@ -1708,6 +1733,9 @@ async function runCron(env) {
 
   // דופק חיים — כדי שמסך האבחון ידע אם השעון באמת רץ (נכתב לכל היותר פעם ברבע שעה)
   if (nowMs - (C.beat || 0) > 15 * 60000) { C.beat = nowMs; changed = true; }
+  cronTicks.push(nowMs);
+  if (cronTicks.length > 40) cronTicks.shift();
+  if (now.getMinutes() % 10 === 0) { C.runs = [...(C.runs || []), nowMs].slice(-12); changed = true; }
 
   for (const r of S.reminders) {
    try {
@@ -1862,6 +1890,11 @@ export default {
             lines.push(`${due !== null ? '❗ ממתינה לשליחה עכשיו!' : '✅'} "${(r.text || '').slice(0, 35)}" — ${sched} · ${lastF}`);
           }
         }
+        // דופק ריצות — כמה באמת רץ השעון לאחרונה
+        const ticksTxt = cronTicks.slice(-10).map(t => fmtTime(t)).join(', ');
+        lines.push(`🫀 ריצות אחרונות (זיכרון): ${ticksTxt || '(אין בזיכרון הנוכחי)'}`);
+        const runsTxt = (C2.runs || []).slice(-6).map(t => fmtTime(t)).join(', ');
+        if (runsTxt) lines.push(`🫀 ריצות שנרשמו (דגימה כל 10 דק'): ${runsTxt}`);
         // רנטגן התראות פגישות: כל פגישה קרובה — האם ומתי נשלח הפעמון
         try {
           const pingM = S.meetingPingMin === 0 ? 0 : (S.meetingPingMin || parseInt(env.MEETING_PING_MIN ?? '10', 10));
