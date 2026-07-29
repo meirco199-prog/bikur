@@ -168,17 +168,19 @@ jobs:
 
       - name: Verify app and storage answer
         run: |
+          # מחכים שהגרסה החדשה תתפשט: בודקים שה-manifest (שקיים רק בגרסה החדשה) מוגש
           ok=""
-          for i in $(seq 1 12); do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/" || true)
-            echo "attempt $i: HTTP $code"
-            if [ "$code" = "200" ]; then ok=1; break; fi
-            sleep 10
+          for i in $(seq 1 18); do
+            if curl -sS "$APP_URL/manifest.webmanifest" 2>/dev/null | grep -q short_name; then ok=1; break; fi
+            echo "attempt $i: new version not live yet"
+            sleep 5
           done
           if [ -z "$ok" ]; then
-            echo "::error::האפליקציה לא עונה ב-$APP_URL"
+            echo "::error::הגרסה החדשה לא עלתה ב-$APP_URL"
             exit 1
           fi
+          code=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/" || true)
+          test "$code" = "200" || { echo "::error::האפליקציה לא עונה (HTTP $code)"; exit 1; }
           # בדיקת עגול מלא של האחסון: יצירה, קריאה
           FAM_ID=$(curl -sS -X POST "$APP_URL/api/family" \
             -H "Content-Type: application/json" --data '{"healthcheck":true}' \
@@ -188,7 +190,6 @@ jobs:
             exit 1
           fi
           curl -sS "$APP_URL/api/family/$FAM_ID" | grep -q healthcheck || { echo "::error::קריאת KV נכשלה"; exit 1; }
-          curl -sS "$APP_URL/manifest.webmanifest" | grep -q short_name || { echo "::error::manifest לא מוגש"; exit 1; }
           mcode=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/icon-192.png")
           test "$mcode" = "200" || { echo "::error::אייקון לא מוגש"; exit 1; }
           echo "::notice::האפליקציה + אחסון + PWA באוויר: $APP_URL"
