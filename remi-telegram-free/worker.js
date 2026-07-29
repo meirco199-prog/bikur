@@ -1114,9 +1114,9 @@ async function smartReminderText(env, S, text, now) {
 // רשימת משימות עם כפתורי בחירה מתחת להודעה: ✅ בוצעה / ❌ ביטול / ↩️ לא בוצעה.
 // הפרדה מלאה מהיומן — כאן רק משימות, אף פעם לא פגישות.
 function taskListMsg(S, header) {
+  // מציגים רק משימות פתוחות — בלי היסטוריית "בוצעה" ובלי כפתורי חרטה
   const open = S.tasks.filter(t => !t.done);
-  const done = S.tasks.filter(t => t.done).slice(-5);
-  if (!open.length && !done.length) return { text: 'רשימת המשימות ריקה — כל הכבוד! 🎉' };
+  if (!open.length) return { text: '📋 אין משימות פתוחות — כל הכבוד! 🎉' };
   let text = (header || '📋 המשימות שלך') + ':';
   const buttons = [];
   open.forEach((t, i) => {
@@ -1126,11 +1126,6 @@ function taskListMsg(S, header) {
       { text: `❌ בטל ${i + 1}`, callback_data: `t:del:${t.id}` },
     ]);
   });
-  done.forEach(t => {
-    text += `\n✅ ${t.text} — בוצעה`;
-    buttons.push([{ text: `↩️ לא בוצעה — ${t.text.slice(0, 18)}`, callback_data: `t:undo:${t.id}` }]);
-  });
-  if (!open.length) text += '\n\nאין משימות פתוחות — כל הכבוד! 🎉';
   return { text, buttons };
 }
 
