@@ -1706,12 +1706,14 @@ async function runCron(env) {
     if (r.tasksDigest) {
       const n0 = firstName(S);
       const openCount = S.tasks.filter(t => !t.done).length;
+      let okD;
       if (openCount) {
         const msg = taskListMsg(S, `📋 ${n0 ? n0 + ', ' : ''}המשימות הפתוחות שלך`);
-        await tgSend(env, S.ownerChatId, msg.text, msg.buttons);
+        okD = await tgSend(env, S.ownerChatId, msg.text, msg.buttons);
       } else {
-        await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
+        okD = await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
       }
+      if (!okD) throw new Error('טלגרם לא אישר את השליחה');
       C.fired[r.id] = due;
       C.lastFired = { text: r.text };
       C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
@@ -1725,14 +1727,19 @@ async function runCron(env) {
     const n = firstName(S);
     // תזכורת שהיא שאלה — שולחים את התשובה עצמה, לא הד של ההוראה
     const smart = await smartReminderText(env, S, r.text, now);
-    await tgSend(env, S.ownerChatId, smart
+    const okR = await tgSend(env, S.ownerChatId, smart
       ? `⏰ ${n ? n + ', ' : ''}${smart}${r.recurringDaily || r.recurringWeekly != null ? suffix : ''}`
       : `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
+    if (!okR) throw new Error('טלגרם לא אישר את השליחה');
     C.fired[r.id] = due;
     C.lastFired = { text: r.text };
     C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
     changed = true;
-   } catch (e) { console.log('reminder failed:', r.id, e.message); }
+   } catch (e) {
+    console.log('reminder failed:', r.id, e.message);
+    C.errors = [...(C.errors || []), { ts: nowMs, what: `תזכורת "${(r.text || '').slice(0, 25)}"`, msg: e.message }].slice(-8);
+    changed = true;
+   }
   }
 
   // 🔔 התראה אוטומטית לפני כל פגישה (ברירת מחדל: 10 דקות; "תזכורת פגישות 15 דקות" לשינוי)
@@ -1762,7 +1769,11 @@ async function runCron(env) {
     for (const k of Object.keys(C.pinged)) {
       if (C.pinged[k] < nowMs - 86400000) { delete C.pinged[k]; changed = true; }
     }
-  } catch (e) { console.log('meeting ping failed:', e.message); }
+  } catch (e) {
+    console.log('meeting ping failed:', e.message);
+    C.errors = [...(C.errors || []), { ts: nowMs, what: 'התראת פגישה', msg: e.message }].slice(-8);
+    changed = true;
+  }
 
   const briefHour = env.BRIEF_HOUR === 'off' ? null : parseInt(env.BRIEF_HOUR ?? '8', 10);
   const todayStr = now.toDateString();
@@ -1810,6 +1821,11 @@ export default {
     if (url.pathname === '/diag') {
       if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });
       const lines = ['🔍 אבחון רמי', ''];
+      // הרצה ידנית של השעון: /diag?secret=...&run=1 — שולח מיד כל תזכורת שממתינה
+      if (url.searchParams.get('run') === '1') {
+        try { await runCron(env); lines.push('▶️ הרצת שעון ידנית: הושלמה בלי שגיאה', ''); }
+        catch (e) { lines.push('▶️ הרצת שעון ידנית קרסה: ' + e.message + '\n' + (e.stack || '').split('\n')[1], ''); }
+      }
       try {
         const S = await loadStore(env);
         lines.push(`✅ אחסון (KV): מחובר — ${S.tasks.length} משימות, ${S.reminders.length} תזכורות, ${S.docs.length} מסמכים`);
@@ -1821,6 +1837,25 @@ export default {
         if (!beat) lines.push('❌ השעון (Cron) עוד לא דיווח — אם זה נמשך רבע שעה: Settings → Trigger Events → ודא שיש Cron ‎* * * * *');
         else if (beatMin <= 20) lines.push(`✅ השעון פועל (רץ לפני ${beatMin} דק')`);
         else lines.push(`❌ השעון לא רץ כבר ${beatMin} דקות! תזכורות לא יישלחו — Settings → Trigger Events → הוסף Cron ‎* * * * *`);
+        // רנטגן תזכורות: מה כל תזכורת "חושבת" ברגע זה
+        const C2 = cRaw ? JSON.parse(cRaw) : { fired: {} };
+        const nowI = ilNow();
+        if (S.reminders.length) {
+          lines.push('', `⏰ מצב תזכורות (${S.reminders.length}):`);
+          for (const r of S.reminders.slice(0, 12)) {
+            const due = dueOccurrence(r, (C2.fired || {})[r.id], nowI.getTime());
+            const sched = r.recurringDaily ? `כל יום ב-${fmtTime(r.at)}`
+              : (r.recurringWeekly !== null && r.recurringWeekly !== undefined) ? `כל יום ${DAY_NAMES[r.recurringWeekly]} ב-${fmtTime(r.at)}`
+              : fmtDate(r.at, nowI);
+            const lastF = (C2.fired || {})[r.id] ? `נשלחה לאחרונה: ${fmtDate((C2.fired || {})[r.id], nowI)}` : 'טרם נשלחה';
+            lines.push(`${due !== null ? '❗ ממתינה לשליחה עכשיו!' : '✅'} "${(r.text || '').slice(0, 35)}" — ${sched} · ${lastF}`);
+          }
+        }
+        const errs = (C2.errors || []).slice(-5);
+        if (errs.length) {
+          lines.push('', '🐞 שגיאות אחרונות של השעון:');
+          errs.forEach(x => lines.push(`• ${fmtDate(x.ts, nowI)} — ${x.what}: ${x.msg}`));
+        }
       } catch (e) {
         lines.push('❌ אחסון (KV): לא מחובר! בדוק Binding בשם DATA. ' + e.message);
       }
