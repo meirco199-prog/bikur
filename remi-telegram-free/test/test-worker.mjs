@@ -461,6 +461,10 @@ console.log('משימות: הפרדה מהיומן, כפתורי בוצעה/בי
   const btns = r.reply_markup?.inline_keyboard || [];
   check('הוספת משימה מציעה כפתורי ✅/❌', btns.flat().some(b => b.text.includes('✅')) && btns.flat().some(b => b.text.includes('❌')), JSON.stringify(r.reply_markup));
 
+  // "שלח לי משימות" → רשימת משימות, לא חיפוש מסמכים
+  r = await send('שלח לי את המשימות שלי');
+  check('"שלח לי משימות" מחזיר משימות ולא חיפוש', !r.text.includes('מצאתי על'), r.text);
+
   // שאלה חופשית על משימות → רשימת משימות, לא פגישות מהיומן
   r = await send('איזה משימות פתוחות יש לי');
   check('שאלת משימות מחזירה משימות ולא יומן', r.text.includes('לסגור לעינב') && !r.text.includes('📅'), r.text);
