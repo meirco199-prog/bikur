@@ -1062,7 +1062,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
         : `לא הצלחתי למחוק את "${g.text}" מיומן גוגל 😕 בדוק שהגשר מעודכן (פתח /diag)`;
     }
     case 'tasks':
-      return taskCards(S);
+      return taskGroupMsg(S);
     case 'gmail': {
       if (!title) return null;
       if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.';
@@ -1114,21 +1114,20 @@ async function smartReminderText(env, S, text, now) {
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
 // רשימת משימות עם כפתורי בחירה מתחת להודעה: ✅ בוצעה / ❌ ביטול / ↩️ לא בוצעה.
 // הפרדה מלאה מהיומן — כאן רק משימות, אף פעם לא פגישות.
-// כרטיס לכל משימה: ההודעה היא המשימה עצמה, ומתחתיה ✅ בוצע / ❌ לא בוצע.
-// לחיצה הופכת את הכרטיס לשורת סטטוס — פשוט ונקי.
-function taskCard(t) {
-  return {
-    text: `⬜ ${t.text}`,
-    buttons: [[
-      { text: '✅ בוצע', callback_data: `t:done:${t.id}` },
-      { text: '❌ לא בוצע', callback_data: `t:del:${t.id}` },
-    ]],
-  };
-}
-function taskCards(S, header) {
+// הודעת משימות אחת: הרשימה למעלה, ומתחתיה שורת כפתורים לכל משימה —
+// ✅ עם שם המשימה (בוצע) ו-❌ (לא בוצע). לחיצה מרעננת את אותה הודעה.
+function taskGroupMsg(S, header) {
   const open = S.tasks.filter(t => !t.done);
   if (!open.length) return { text: '📋 אין משימות פתוחות — כל הכבוד! 🎉' };
-  return { text: header || `📋 המשימות שלך (${open.length}):`, cards: open.map(taskCard) };
+  const short = (x) => x.length > 16 ? x.slice(0, 15) + '…' : x;
+  return {
+    text: (header || `📋 המשימות שלך (${open.length}):`) + '\n' +
+      open.map((t, i) => `${i + 1}. ${t.text}`).join('\n'),
+    buttons: open.map((t, i) => ([
+      { text: `✅ ${i + 1} · ${short(t.text)}`, callback_data: `t:done:${t.id}` },
+      { text: `❌ ${i + 1}`, callback_data: `t:del:${t.id}` },
+    ])),
+  };
 }
 
 export async function handleMessage(S, text, now, env, isVoice = false) {
@@ -1238,7 +1237,7 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
         buttons: [[{ text: '✅ בוצע', callback_data: `t:done:${t.id}` },
                    { text: '❌ לא בוצע', callback_data: `t:del:${t.id}` }]] };
     }
-    case 'task_list': return taskCards(S);
+    case 'task_list': return taskGroupMsg(S);
     case 'tasks_digest': {
       S.reminders = S.reminders.filter(r => !r.tasksDigest);
       const at = new Date(now); at.setHours(c.hour, c.minute, 0, 0);
@@ -1620,19 +1619,21 @@ async function handleCallback(env, q) {
     return;
   }
   const m = String(q.data || '').match(/^t:(done|undo|del):(\d+)$/);
-  let toast = '', statusLine = null;
+  let toast = '';
   if (m) {
     const t = S.tasks.find(x => x.id === Number(m[2]));
     if (!t) toast = 'המשימה הזאת כבר לא קיימת';
-    else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); toast = `✅ "${t.text}" בוצעה`; statusLine = `✅ ${t.text}`; }
-    else if (m[1] === 'undo') { t.done = false; delete t.doneAt; toast = `↩️ "${t.text}" חזרה לפתוחות`; statusLine = `⬜ ${t.text}`; }
-    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ "${t.text}" — לא בוצעה, ירדה מהרשימה`; statusLine = `❌ ${t.text}`; }
+    else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); toast = `✅ "${t.text}" בוצעה`; }
+    else if (m[1] === 'undo') { t.done = false; delete t.doneAt; toast = `↩️ "${t.text}" חזרה לפתוחות`; }
+    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ "${t.text}" — לא בוצעה, ירדה מהרשימה`; }
     if (t || m[1]) await saveStore(env, S);
   }
   await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id, text: toast.slice(0, 190) });
-  // הכרטיס שנלחץ הופך לשורת סטטוס נקייה (בלי כפתורים)
-  if (m && q.message?.message_id && statusLine) {
-    await tgApi(env, 'editMessageText', { chat_id: chatId, message_id: q.message.message_id, text: statusLine });
+  // מרעננים את אותה הודעה — הרשימה מתעדכנת במקום, בלי הודעות חדשות
+  if (m && q.message?.message_id) {
+    const g = taskGroupMsg(S);
+    await tgApi(env, 'editMessageText', { chat_id: chatId, message_id: q.message.message_id,
+      text: g.text, reply_markup: { inline_keyboard: g.buttons || [] } });
   }
 }
 
@@ -1745,9 +1746,8 @@ async function runCron(env) {
       const openCount = S.tasks.filter(t => !t.done).length;
       let okD;
       if (openCount) {
-        const msg = taskCards(S, `📋 ${n0 ? n0 + ', ' : ''}המשימות הפתוחות שלך (${openCount}):`);
-        okD = await tgSend(env, S.ownerChatId, msg.text);
-        for (const card of (msg.cards || [])) await tgSend(env, S.ownerChatId, card.text, card.buttons);
+        const msg = taskGroupMsg(S, `📋 ${n0 ? n0 + ', ' : ''}המשימות הפתוחות שלך (${openCount}):`);
+        okD = await tgSend(env, S.ownerChatId, msg.text, msg.buttons);
       } else {
         okD = await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
       }
