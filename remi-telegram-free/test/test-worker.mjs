@@ -30,6 +30,9 @@ globalThis.fetch = async (url, opts) => {
   return realFetch(url, opts);
 };
 
+// שעון קיר ישראלי, כמו שהבוט מחשב — תזכורות חוזרות נבחנות מולו
+const ilMs = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })).getTime();
+
 async function send(text, chatId = 111) {
   const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
     method: 'POST',
@@ -141,7 +144,7 @@ console.log('קרון (תזכורת שהגיע זמנה + דחייה):');
   await send('תזכיר לי כל יום ב-6 לקחת כדור');
   const S = JSON.parse(kv.get('store'));
   const daily = S.reminders.find(x => x.recurringDaily);
-  daily.at = Date.now() - 60000;
+  daily.at = ilMs() - 60000;
   kv.set('store', JSON.stringify(S));
   const before = sent.length;
   await worker.scheduled({}, env);
@@ -316,7 +319,7 @@ console.log('תזכורות חכמות (עונות במקום להדהד):');
   const S = JSON.parse(kv.get('store'));
   const r = S.reminders.find(x => x.text.includes('תאריך'));
   check('נוצרה תזכורת יומית לתאריך', !!r && r.recurringDaily);
-  r.at = Date.now() - 60000;
+  r.at = ilMs() - 60000;
   kv.set('store', JSON.stringify(S));
   const before = sent.length;
   await worker.scheduled({}, env);
@@ -335,7 +338,7 @@ console.log('תזכורות חכמות (עונות במקום להדהד):');
   const r = S.reminders.find(x => x.text.includes('ראש השנה'));
   check('נוצרה תזכורת-שאלה', !!r, JSON.stringify(S.reminders.map(x=>x.text)));
   if (r) {
-    r.at = Date.now() - 60000;
+    r.at = ilMs() - 60000;
     kv.set('store', JSON.stringify(S));
     const before = sent.length;
     await worker.scheduled({}, env);
@@ -504,7 +507,7 @@ console.log('משימות: הפרדה מהיומן, כפתורי בוצעה/בי
   check('  נשמרה כתזכורת יומית מיוחדת', !!digest && digest.recurringDaily === true);
 
   // בזמן הצלצול — נשלחת רשימת המשימות הפתוחות עם כפתורים
-  digest.at = Date.now() - 60000;
+  digest.at = ilMs() - 60000;
   kv.set('store', JSON.stringify(S));
   const before = sent.length;
   await worker.scheduled({}, env);
@@ -675,7 +678,7 @@ console.log('תזכורת "רשימת הפגישות של היום" שולחת �
   const ilNowMs = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })).getTime();
   let S = JSON.parse(kv.get('store'));
   S.events.push({ id: 9901, text: 'פגישת בדיקה חשובה', at: ilNowMs + 30 * 60000 });
-  S.reminders.push({ id: 9902, text: 'רשימת הפגישות של היום', at: Date.now() - 60000, recurringDaily: true, recurringWeekly: null });
+  S.reminders.push({ id: 9902, text: 'רשימת הפגישות של היום', at: ilMs() - 60000, recurringDaily: true, recurringWeekly: null });
   S.reminders.push({ id: 9903, text: 'פגישה עם דני החבר', at: Date.now() - 60000, recurringDaily: false, recurringWeekly: null });
   kv.set('store', JSON.stringify(S));
 
@@ -740,6 +743,19 @@ console.log('התראה לפני פגישות + מיקום ביומן:');
   delete env.CALENDAR_WEBHOOK;
   delete env.ANTHROPIC_API_KEY;
   globalThis.fetch = prevFetch;
+}
+
+console.log('תזכורת חוזרת שפוספסה מזמן לא נשלחת באיחור מגוחך:');
+{
+  let S = JSON.parse(kv.get('store'));
+  // תזכורת יומית שהמופע שלה היום היה לפני 6 שעות (כאילו "נשכחה")
+  S.reminders.push({ id: 9950, text: 'תזכורת בוקר ישנה מאוד', at: ilMs() - 6 * 3600000, recurringDaily: true, recurringWeekly: null });
+  kv.set('store', JSON.stringify(S));
+  const before = sent.length;
+  await worker.scheduled({}, env);
+  check('לא נשלחה באיחור של 6 שעות', !sent.slice(before).some(m => m.text.includes('תזכורת בוקר ישנה')), JSON.stringify(sent.slice(before).map(x => x.text)));
+  const C = JSON.parse(kv.get('cron'));
+  check('  סומנה כ"טופלה" כדי לחכות למחר', !!C.fired[9950]);
 }
 
 console.log(`\n${passed} עברו, ${failed} נכשלו`);

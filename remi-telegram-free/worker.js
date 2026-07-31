@@ -1740,6 +1740,14 @@ async function runCron(env) {
    try {
     const due = dueOccurrence(r, C.fired[r.id], nowMs);
     if (due === null) continue;
+    // תזכורת חוזרת שהתפספסה ביותר מ-3 שעות — מוותרים בשקט עד המופע הבא,
+    // כדי שתזכורת בוקר לא תופיע פתאום אחר הצהריים (למשל אחרי שיהוק של האחסון)
+    const isRecurring = r.recurringDaily || (r.recurringWeekly !== null && r.recurringWeekly !== undefined);
+    if (isRecurring && nowMs - due > 3 * 3600000) {
+      C.fired[r.id] = due;
+      changed = true;
+      continue;
+    }
     // תזכורת המשימות היומית — שולחת את הרשימה החיה עם כפתורי הסימון
     if (r.tasksDigest) {
       const n0 = firstName(S);
