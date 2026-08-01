@@ -758,5 +758,21 @@ console.log('תזכורת חוזרת שפוספסה מזמן לא נשלחת ב�
   check('  סומנה כ"טופלה" כדי לחכות למחר', !!C.fired[9950]);
 }
 
+console.log('שעון הגיבוי לא מכפיל תזכורות:');
+{
+  let S = JSON.parse(kv.get('store'));
+  S.reminders.push({ id: 9960, text: 'בדיקת גיבוי טרייה', at: ilMs() - 60000, recurringDaily: false, recurringWeekly: null });
+  S.reminders.push({ id: 9961, text: 'בדיקת גיבוי ותיקה', at: ilMs() - 3 * 60000, recurringDaily: false, recurringWeekly: null });
+  kv.set('store', JSON.stringify(S));
+  const before = sent.length;
+  await worker.fetch(new Request(`https://remi.example.workers.dev/tick?secret=${env.SECRET}`), env);
+  const out = sent.slice(before);
+  check('שעון הגיבוי מדלג על תזכורת טרייה (של השעון הראשי)', !out.some(m => m.text.includes('גיבוי טרייה')), JSON.stringify(out.map(x => x.text)));
+  check('  אבל תופס תזכורת שאיחרה מעל 2 דקות', out.some(m => m.text.includes('גיבוי ותיקה')), JSON.stringify(out.map(x => x.text)));
+  const before2 = sent.length;
+  await worker.scheduled({}, env);
+  check('  השעון הראשי שולח את הטרייה כרגיל', sent.slice(before2).some(m => m.text.includes('גיבוי טרייה')));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

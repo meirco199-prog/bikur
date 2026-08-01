@@ -1719,8 +1719,11 @@ async function handleWebhook(env, update) {
 // דופק ריצות של השעון — לזיהוי ריצות דלילות (נשמר בזיכרון האיזולט + ב-KV כל 10 דק')
 const cronTicks = [];
 
-async function runCron(env) {
-  // הקרון קורא את ה-store אבל לעולם לא כותב אליו — כל המצב שלו במפתח 'cron' הנפרד
+async function runCron(env, opts = {}) {
+  // הקרון קורא את ה-store אבל לעולם לא כותב אליו — כל המצב שלו במפתח 'cron' הנפרד.
+  // opts.minLateMs: שעון הגיבוי מטפל רק במה שאיחר לפחות כך — כדי לא להתנגש
+  // בשעון הראשי לפני שרישום "כבר נשלח" הספיק להסתנכרן בין השרתים.
+  const minLate = opts.minLateMs || 0;
   const S = await loadStore(env);
   if (S.ownerChatId === null) return;
   const C = await loadCron(env, S);
@@ -1740,6 +1743,7 @@ async function runCron(env) {
    try {
     const due = dueOccurrence(r, C.fired[r.id], nowMs);
     if (due === null) continue;
+    if (minLate && nowMs - due < minLate) continue; // טרייה — שייכת לשעון הראשי
     // תזכורת חוזרת שהתפספסה ביותר מ-3 שעות — מוותרים בשקט עד המופע הבא,
     // כדי שתזכורת בוקר לא תופיע פתאום אחר הצהריים (למשל אחרי שיהוק של האחסון)
     const isRecurring = r.recurringDaily || (r.recurringWeekly !== null && r.recurringWeekly !== undefined);
@@ -1800,6 +1804,7 @@ async function runCron(env) {
     ];
     for (const e of upcoming) {
       if (!(e.at - pingMin * 60000 <= nowMs && nowMs < e.at)) continue;
+      if (minLate && nowMs - (e.at - pingMin * 60000) < minLate) continue; // טרי — לשעון הראשי
       const key = e.text.trim() + '|' + Math.round(e.at / 60000);
       if (C.pinged[key]) continue;
       C.pinged[key] = nowMs;
@@ -1823,7 +1828,8 @@ async function runCron(env) {
 
   const briefHour = env.BRIEF_HOUR === 'off' ? null : parseInt(env.BRIEF_HOUR ?? '8', 10);
   const todayStr = now.toDateString();
-  if (briefHour !== null && !Number.isNaN(briefHour) && now.getHours() === briefHour && C.lastBriefDate !== todayStr) {
+  if (briefHour !== null && !Number.isNaN(briefHour) && now.getHours() === briefHour && C.lastBriefDate !== todayStr
+      && (!minLate || now.getMinutes() >= 2)) {
     C.lastBriefDate = todayStr;
     changed = true;
     const brief = await morningBrief(S, now, env);
@@ -1831,7 +1837,8 @@ async function runCron(env) {
   }
 
   const summaryHour = env.SUMMARY_HOUR === 'off' ? null : parseInt(env.SUMMARY_HOUR ?? '21', 10);
-  if (summaryHour !== null && !Number.isNaN(summaryHour) && now.getHours() === summaryHour && C.lastSummaryDate !== todayStr) {
+  if (summaryHour !== null && !Number.isNaN(summaryHour) && now.getHours() === summaryHour && C.lastSummaryDate !== todayStr
+      && (!minLate || now.getMinutes() >= 2)) {
     C.lastSummaryDate = todayStr;
     changed = true;
     const sum = daySummary(S, now);
@@ -1988,7 +1995,7 @@ export default {
     // בטוח להריץ שוב ושוב — רישום ה-fired מונע שליחות כפולות.
     if (url.pathname === '/tick') {
       if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });
-      try { await runCron(env); return new Response('tick ok'); }
+      try { await runCron(env, { minLateMs: 2 * 60000 }); return new Response('tick ok'); }
       catch (e) { return new Response('tick error: ' + e.message, { status: 500 }); }
     }
 
