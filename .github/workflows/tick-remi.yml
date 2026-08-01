@@ -1,0 +1,21 @@
+# שעון גיבוי לבוט: השעון של Cloudflare בתוכנית החינמית מדלג לפעמים —
+# GitHub מעיר את הבוט כל ~5 דקות דרך /tick, כך שתזכורות לא מאחרות שעות.
+# ההשהיה האקראית מפזרת את הקריאה בתוך הדקה כדי לא להתנגש בשעון הראשי.
+
+name: Tick remi (backup clock)
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake the worker
+        run: |
+          sleep $((RANDOM % 20 + 25))
+          resp=$(curl -sS --max-time 45 "https://remi.meirco199.workers.dev/tick?secret=remi-meir-2026")
+          echo "$resp"
+          echo "$resp" | grep -q 'tick ok'

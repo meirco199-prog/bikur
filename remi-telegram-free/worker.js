@@ -1984,6 +1984,14 @@ export default {
       return new Response(lines.join('\n'), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     }
 
+    // שעון גיבוי חיצוני: GitHub (או כל שירות) מעיר את הבוט אם השעון של Cloudflare מדלג.
+    // בטוח להריץ שוב ושוב — רישום ה-fired מונע שליחות כפולות.
+    if (url.pathname === '/tick') {
+      if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });
+      try { await runCron(env); return new Response('tick ok'); }
+      catch (e) { return new Response('tick error: ' + e.message, { status: 500 }); }
+    }
+
     if (url.pathname === `/webhook/${env.SECRET}` && request.method === 'POST') {
       const update = await request.json();
       await handleWebhook(env, update);
