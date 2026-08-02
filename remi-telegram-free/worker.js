@@ -917,7 +917,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -930,6 +930,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - event_delete = לבטל/למחוק פגישה קיימת. אם ברשימת "דרכך" — event_id. אם רק ביומן גוגל — event_id=0 ו-title = הכותרת המדויקת מרשימת היומן.
 - tasks = שואל על המשימות שלו ("איזה משימות פתוחות יש לי") — מציג את רשימת המשימות בלבד. משימות ≠ פגישות! אל תחזיר agenda על שאלת משימות.
 - agenda = שואל מה יש לו ביומן/פגישות היום/השבוע — קבע range. לא לשאלות על משימות.
+- routine = שולח לוז יומי חדש — כמה שורות של שעה+פעולה שיחזרו כל יום ("מעכשיו יהיה לוז חדש: 7:00 ... 21:00 ..."). מלא את routine עם כל השורות; שמור ב-title את מלוא התוכן של השורה (כולל ברכות). אל תשמור את זה כ-note!
 - gmail = מבקש לחפש משהו במיילים/בג'ימייל שלו ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
@@ -1074,6 +1075,31 @@ async function applyAiAction(S, j, now, env, gcal = []) {
         (r.files && r.files.length ? `\n   📎 ${r.files.join(', ')}` : '') +
         (r.link ? `\n   ${r.link}` : '')).join('\n\n');
     }
+    case 'routine': {
+      const items = (Array.isArray(j.routine) ? j.routine : [])
+        .map(x => {
+          const t = cleanup(String(x.title || ''));
+          const m = String(x.time || '').match(/^(\d{1,2})(?::(\d{2}))?$/);
+          return m && t ? { h: +m[1], min: m[2] ? +m[2] : 0, title: t } : null;
+        })
+        .filter(x => x && x.h >= 0 && x.h <= 23 && x.min <= 59)
+        .sort((a, b) => a.h * 60 + a.min - (b.h * 60 + b.min));
+      if (!items.length) return null;
+      // הלוז החדש מחליף את התזכורות היומיות הקיימות (שבועיות וחד-פעמיות נשארות)
+      S.reminders = S.reminders.filter(r => !r.recurringDaily);
+      for (const it of items) {
+        const at = new Date(now); at.setHours(it.h, it.min, 0, 0);
+        if (at.getTime() <= now.getTime()) at.setTime(at.getTime() + 86400000);
+        S.reminders.push({ id: nid(), text: it.title, at: at.getTime(),
+          recurringDaily: true, recurringWeekly: null,
+          tasksDigest: /משימות/.test(it.title) ? true : undefined });
+      }
+      // מכבים את סיכומי הבוקר/ערב המובנים — הלוז החדש מחליף אותם
+      S.briefOff = true; S.summaryOff = true;
+      return `🗓️ סידרתי${hey} את הלוז היומי החדש — כל יום:\n` +
+        items.map(it => `• ${String(it.h).padStart(2, '0')}:${String(it.min).padStart(2, '0')} — ${it.title}`).join('\n') +
+        '\n\n(הלוז הקודם הוחלף, וסיכומי הבוקר/ערב האוטומטיים כובו כדי שלא יהיו כפילויות. רוצה לשנות? פשוט שלח לוז חדש.)';
+    }
     case 'agenda':
       return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);
     case 'answer':
@@ -1088,8 +1114,18 @@ async function applyAiAction(S, j, now, env, gcal = []) {
 // אפשר גם לשלב ("תאריך עברי, פגישות היום ומשימות פתוחות").
 async function smartReminderText(env, S, text, now) {
   const parts = [];
+  const nm = firstName(S);
+  if (/בוקר טוב|ברכת בוקר/.test(text)) {
+    parts.push(`☀️ בוקר טוב${nm ? ' ' + nm : ''}! שיהיה לך יום נפלא 🙂`);
+  }
   if (/תאריך/.test(text) && /עברי/.test(text)) {
     parts.push(`היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} — ובעברי: ${hebrewDate()} 🕎`);
+  }
+  if (/סיכום (?:ה?יום|יומי)/.test(text)) {
+    parts.push(daySummary(S, now) || '🌙 יום רגוע עבר עלינו — בלי אירועים מיוחדים.');
+  }
+  if (/לילה טוב|ברכת לילה/.test(text)) {
+    parts.push(`לילה טוב${nm ? ' ' + nm : ''}, שתישן מתוק 😴`);
   }
   // רק ניסוחים שהם בקשת-רשימה — לא תזכורת רגילה שמזכירה פגישה ("פגישה עם דני")
   const wantsAgenda = /רשימת ה?פגישות|ה?פגישות של היום|פגישות היום|מה הפגישות|סדר ה?יום|מה יש (?:לי )?ביומן|האירועים של היום/.test(text);
@@ -1826,7 +1862,7 @@ async function runCron(env, opts = {}) {
     changed = true;
   }
 
-  const briefHour = env.BRIEF_HOUR === 'off' ? null : parseInt(env.BRIEF_HOUR ?? '8', 10);
+  const briefHour = (S.briefOff || env.BRIEF_HOUR === 'off') ? null : parseInt(env.BRIEF_HOUR ?? '8', 10);
   const todayStr = now.toDateString();
   if (briefHour !== null && !Number.isNaN(briefHour) && now.getHours() === briefHour && C.lastBriefDate !== todayStr
       && (!minLate || now.getMinutes() >= 2)) {
@@ -1836,7 +1872,7 @@ async function runCron(env, opts = {}) {
     if (brief) await tgSend(env, S.ownerChatId, brief);
   }
 
-  const summaryHour = env.SUMMARY_HOUR === 'off' ? null : parseInt(env.SUMMARY_HOUR ?? '21', 10);
+  const summaryHour = (S.summaryOff || env.SUMMARY_HOUR === 'off') ? null : parseInt(env.SUMMARY_HOUR ?? '21', 10);
   if (summaryHour !== null && !Number.isNaN(summaryHour) && now.getHours() === summaryHour && C.lastSummaryDate !== todayStr
       && (!minLate || now.getMinutes() >= 2)) {
     C.lastSummaryDate = todayStr;

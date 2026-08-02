@@ -774,5 +774,46 @@ console.log('שעון הגיבוי לא מכפיל תזכורות:');
   check('  השעון הראשי שולח את הטרייה כרגיל', sent.slice(before2).some(m => m.text.includes('גיבוי טרייה')));
 }
 
+console.log('לוז יומי חדש בהודעה אחת:');
+{
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const p = JSON.parse(opts.body).messages[0].content;
+      const msg = (p.match(/ההודעה החדשה שלו: "([^"]*)"/) || [])[1] || '';
+      const text = msg.includes('לוז חדש')
+        ? JSON.stringify({ action: 'routine', routine: [
+            { time: '7:00', title: 'תאריך עברי ולועזי וברכת בוקר טוב' },
+            { time: '9:00', title: 'משימות פתוחות' },
+            { time: '22:00', title: 'סיכום יום וברכת לילה טוב' },
+          ], reply: '' })
+        : JSON.stringify({ action: 'answer', reply: 'בסדר' });
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+
+  const r = await send('מעכשיו יהיה לוז חדש. 7:00 תאריך עברי וברכת בוקר 9:00 משימות פתוחות 22:00 סיכום יום וברכת לילה טוב');
+  check('הלוז הוקם עם אישור מסודר', r.text.includes('סידרתי') && r.text.includes('07:00') && r.text.includes('22:00'), r.text);
+  let S = JSON.parse(kv.get('store'));
+  const dailies = S.reminders.filter(x => x.recurringDaily);
+  check('  היומיות הישנות הוחלפו בשלוש החדשות', dailies.length === 3 && dailies.some(x => x.tasksDigest), JSON.stringify(dailies.map(d => d.text)));
+  check('  השבועית נשארה', S.reminders.some(x => x.recurringWeekly === 0));
+  check('  סיכומי הבוקר/ערב המובנים כובו', S.briefOff === true && S.summaryOff === true);
+
+  // צלצול של שורת "סיכום יום וברכת לילה טוב" — תוכן חי, לא הד
+  const night = S.reminders.find(x => x.text.includes('לילה טוב'));
+  night.at = ilMs() - 60000;
+  kv.set('store', JSON.stringify(S));
+  const before = sent.length;
+  await worker.scheduled({}, env);
+  const msg = sent.slice(before).find(m => m.text.includes('לילה טוב'));
+  check('  בלילה: ברכת לילה טוב אמיתית (לא הד)', !!msg && !msg.text.includes('תזכורת: סיכום'), msg && msg.text);
+
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
