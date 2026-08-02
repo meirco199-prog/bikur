@@ -2001,8 +2001,11 @@ export default {
           const tomorrow = ilNow();
           tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(12, 0, 0, 0);
           const ok = await pushToGoogleCalendar(env, '✅ בדיקת חיבור מרמי — אפשר למחוק', tomorrow.getTime());
+          let cleaned = false;
+          if (ok) cleaned = await deleteFromGoogleCalendar(env, '✅ בדיקת חיבור מרמי — אפשר למחוק', tomorrow.getTime());
           lines.push(ok
-            ? '✅ כתיבה ליומן גוגל עובדת! (נוצר אירוע בדיקה מחר ב-12:00 — מחק אותו ביומן)'
+            ? (cleaned ? '✅ כתיבה ומחיקה ביומן גוגל עובדות! (אירוע הבדיקה נוצר ונמחק מיד)'
+                       : '✅ כתיבה ליומן עובדת, אבל המחיקה לא — נשאר אירוע בדיקה מחר ב-12:00, מחק ידנית ובדוק שהגשר מעודכן')
             : '❌ הגשר (Apps Script) לא ענה "ok" — בדוק: הסוד בקובץ זהה ל-SECRET, הפריסה עם גישה "כולם", והכתובת מסתיימת ב-/exec');
         } catch (e) { lines.push('❌ כתיבה ליומן נכשלה: ' + e.message); }
         // בדיקת חיפוש בג'ימייל דרך הגשר — מציגים את התשובה הגולמית כדי שאפשר יהיה לאבחן מרחוק
