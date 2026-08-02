@@ -854,7 +854,7 @@ function doSearch(S, q, now) {
   const events = S.events.filter(e => hit(e.text));
   const docs = S.docs.filter(d => hit(d.name));
   // בלי ההודעה האחרונה — היא בקשת החיפוש הנוכחית עצמה
-  const hist = (S.history || []).slice(0, -1).filter(h => hit(h.text)).slice(-5);
+  const hist = (S.history || []).slice(0, -1).filter(h => !h.bot && hit(h.text)).slice(-5);
   if (!notes.length && !tasks.length && !rems.length && !shop.length && !events.length && !docs.length && !hist.length)
     return `לא מצאתי כלום על "${q}" 🔍`;
   let out = `🔍 מצאתי על "${q}":`;
@@ -894,7 +894,8 @@ async function aiBrain(env, S, text, now, isVoice = false) {
     S.profile.age ? 'גיל: ' + S.profile.age : '',
     ...S.profile.facts.slice(-10),
   ].filter(Boolean).join(' | ');
-  const hist = (S.history || []).slice(-5, -1).map(h => '- ' + h.text).join('\n');
+  const hist = (S.history || []).slice(-9, -1)
+    .map(h => (h.bot ? '- (אתה ענית): ' : '- (הוא כתב): ') + h.text.slice(0, 160)).join('\n');
   const upcoming = S.events.filter(e => e.at >= now.getTime() - 3600000).sort((a,b) => a.at - b.at).slice(0, 10)
     .map(e => {
       const d = new Date(e.at);
@@ -933,6 +934,8 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - routine = שולח לוז יומי חדש — כמה שורות של שעה+פעולה שיחזרו כל יום ("מעכשיו יהיה לוז חדש: 7:00 ... 21:00 ..."). מלא את routine עם כל השורות; שמור ב-title את מלוא התוכן של השורה (כולל ברכות). אל תשמור את זה כ-note!
 - gmail = מבקש לחפש משהו במיילים/בג'ימייל שלו ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
+- הודעה קצרה שהיא המשך שיחה ("כן", "לא", "ח.פ", "ומה עוד") — הבן מההקשר למעלה וענה (answer). לעולם אל תשמור note מהודעה כזו.
+- אל תציע פעולות המשך שאינך יכול לבצע — תן את המידע המלא מיד בתשובה.
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
 
   // קלוד קודם (אם חובר) — הבנת עברית ברמה הגבוהה ביותר
@@ -1020,7 +1023,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
     }
     case 'note': {
       const content = title || reply;
-      if (!content) return null;
+      if (!content || content.length < 4) return null;
       S.notes.push({ id: nid(), text: content, created: now.getTime() });
       return `🧠 שמרתי${hey}. תמצא את זה עם "חפש" מתי שתרצה.`;
     }
@@ -1760,6 +1763,9 @@ async function handleWebhook(env, update) {
   S.history = [...(S.history || []), { ts: now.getTime(), text, mid: msg.message_id }].slice(-500);
 
   const answer = await handleMessage(S, text, now, env, !!voicePrefix);
+  // גם התשובה של הבוט נשמרת בהיסטוריה — כדי שהמוח יבין המשכי שיחה ("כן", "ח.פ")
+  const answerText = typeof answer === 'string' ? answer : (answer && answer.text) || '';
+  if (answerText) S.history = [...(S.history || []), { ts: now.getTime(), text: answerText.slice(0, 300), bot: true }].slice(-500);
   await saveStore(env, S);
   if (typeof answer === 'object' && answer.doc) {
     await tgSendDoc(env, chatId, answer.doc, answer.text, answer.replyTo);

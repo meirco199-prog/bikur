@@ -832,5 +832,32 @@ console.log('שריון מפני כפילות כשהאחסון מחזיר גרס
   check('לא נשלחה שוב למרות האחסון הישן (הזיכרון המקומי תפס)', !sent.slice(before2).some(m => m.text.includes('כפילות שריון')), JSON.stringify(sent.slice(before2).map(x => x.text)));
 }
 
+console.log('המוח רואה גם את התשובות של עצמו (המשכי שיחה):');
+{
+  // התשובות של הבוט נרשמות בהיסטוריה
+  await send('משימות');
+  let S = JSON.parse(kv.get('store'));
+  check('תשובת הבוט נשמרת בהיסטוריה', S.history.length >= 2 && S.history[S.history.length - 1].bot === true, JSON.stringify(S.history.slice(-2)));
+
+  // וההקשר הזה מגיע למוח: "כן" אחרי הצעה — עונים, לא שומרים פתק
+  const prevFetch = globalThis.fetch;
+  let sawBotContext = false;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const p = JSON.parse(opts.body).messages[0].content;
+      sawBotContext = p.includes('(אתה ענית)');
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text',
+        text: JSON.stringify({ action: 'answer', reply: 'הח.פ הוא 517318267' }) }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const r = await send('כן');
+  check('"כן" מקבל תשובה מההקשר ולא נשמר כפתק', r.text.includes('517318267') && !r.text.includes('שמרתי'), r.text);
+  check('  המוח קיבל את התשובות הקודמות של הבוט כהקשר', sawBotContext);
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
