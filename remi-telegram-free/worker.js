@@ -1109,6 +1109,20 @@ async function applyAiAction(S, j, now, env, gcal = []) {
   }
 }
 
+// רשימת פגישות בלבד — לצלצול "רשימת הפגישות של היום": בלי תזכורות, בלי משימות
+async function eventsOnlyText(S, range, now, env) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = range === 'tomorrow' ? today.getTime() + 86400000 : today.getTime();
+  const to = from + 86400000;
+  const google = await fetchCalendar(env, from, to);
+  const local = S.events.filter(e => e.at >= from && e.at < to).map(e => ({ at: e.at, text: e.text, loc: e.loc || '' }));
+  const all = mergeEvents(google, local);
+  const label = range === 'tomorrow' ? 'מחר' : 'היום';
+  if (!all.length) return `📅 אין פגישות ${label} — יום פנוי 🙂`;
+  return `📅 הפגישות של ${label}:\n` + all.map((e, i) =>
+    `${i + 1}. ${e.allDay ? 'כל היום' : fmtTime(e.at)} — ${e.text}${e.loc ? `\n   📍 ${e.loc}` : ''}`).join('\n');
+}
+
 // תזכורת שהיא בעצם בקשת מידע — עונים עם התוכן החי בזמן הצלצול במקום להדהד אותה.
 // "רשימת הפגישות של היום" → הפגישות עצמן; "המשימות" → המשימות; "תאריך עברי" → התאריך;
 // אפשר גם לשלב ("תאריך עברי, פגישות היום ומשימות פתוחות").
@@ -1130,9 +1144,10 @@ async function smartReminderText(env, S, text, now) {
   // רק ניסוחים שהם בקשת-רשימה — לא תזכורת רגילה שמזכירה פגישה ("פגישה עם דני")
   const wantsAgenda = /רשימת ה?פגישות|ה?פגישות של היום|פגישות היום|מה הפגישות|סדר ה?יום|מה יש (?:לי )?ביומן|האירועים של היום/.test(text);
   if (wantsAgenda) {
-    parts.push(await agendaText(S, /מחר/.test(text) ? 'tomorrow' : 'today', now, env));
-  } else if (/רשימת ה?משימות|ה?משימות הפתוחות|מה המשימות|משימות פתוחות/.test(text)) {
-    // (אם ביקש גם פגישות — סדר היום כבר כולל את המשימות הפתוחות)
+    // רק הפגישות — בלי רשימת התזכורות ובלי המשימות
+    parts.push(await eventsOnlyText(S, /מחר/.test(text) ? 'tomorrow' : 'today', now, env));
+  }
+  if (/רשימת ה?משימות|ה?משימות הפתוחות|מה המשימות|משימות פתוחות/.test(text)) {
     const open = S.tasks.filter(t => !t.done);
     parts.push(open.length
       ? '📋 המשימות הפתוחות שלך:\n' + open.map((t, i) => `${i+1}. ${t.text}`).join('\n')

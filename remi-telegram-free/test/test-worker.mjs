@@ -687,6 +687,7 @@ console.log('תזכורת "רשימת הפגישות של היום" שולחת �
   const fired = sent.slice(before);
   const agendaMsg = fired.find(m => m.text.includes('פגישת בדיקה חשובה'));
   check('התזכורת שלחה את הפגישות של היום (לא הד)', !!agendaMsg, JSON.stringify(fired.map(f => f.text)));
+  check('  רק פגישות — בלי רשימת התזכורות ובלי משימות', !!agendaMsg && !agendaMsg.text.includes('תזכורות:') && !agendaMsg.text.includes('משימות פתוחות'), agendaMsg && agendaMsg.text);
   check('  בלי להדהד את נוסח התזכורת', !fired.some(m => m.text.includes('תזכורת: רשימת הפגישות')), JSON.stringify(fired.map(f => f.text)));
   check('  תזכורת רגילה שמזכירה פגישה נשארת הד', fired.some(m => m.text.includes('תזכורת: פגישה עם דני החבר')), JSON.stringify(fired.map(f => f.text)));
 }
