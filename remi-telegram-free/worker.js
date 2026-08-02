@@ -1010,7 +1010,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       S.tasks.push(t);
       return { text: `📋 הוספתי למשימות${hey}: "${title}"`,
         buttons: [[{ text: '✅ בוצע', callback_data: `t:done:${t.id}` },
-                   { text: '❌ לא בוצע', callback_data: `t:del:${t.id}` }]] };
+                   { text: '❌ ביטול', callback_data: `t:del:${t.id}` }]] };
     }
     case 'shopping': {
       const items = (Array.isArray(j.items) ? j.items : [title]).map(x => cleanup(String(x))).filter(x => x.length > 0);
@@ -1165,19 +1165,24 @@ async function smartReminderText(env, S, text, now) {
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
 // רשימת משימות עם כפתורי בחירה מתחת להודעה: ✅ בוצעה / ❌ ביטול / ↩️ לא בוצעה.
 // הפרדה מלאה מהיומן — כאן רק משימות, אף פעם לא פגישות.
-// הודעת משימות אחת: הרשימה למעלה, ומתחתיה שורת כפתורים לכל משימה —
-// ✅ עם שם המשימה (בוצע) ו-❌ (לא בוצע). לחיצה מרעננת את אותה הודעה.
+// הודעת משימות אחת: לכל משימה — שורת כפתור עם השם שלה, ומתחתיה ✅ בוצע / ❌ ביטול.
+// לחיצה על שם המשימה מציגה את הטקסט המלא; לחיצה על פעולה מרעננת את אותה הודעה.
 function taskGroupMsg(S, header) {
   const open = S.tasks.filter(t => !t.done);
   if (!open.length) return { text: '📋 אין משימות פתוחות — כל הכבוד! 🎉' };
-  const short = (x) => x.length > 16 ? x.slice(0, 15) + '…' : x;
+  const short = (x) => x.length > 38 ? x.slice(0, 37) + '…' : x;
+  const buttons = [];
+  open.forEach((t, i) => {
+    buttons.push([{ text: `${i + 1}. ${short(t.text)}`, callback_data: `t:show:${t.id}` }]);
+    buttons.push([
+      { text: '✅ בוצע', callback_data: `t:done:${t.id}` },
+      { text: '❌ ביטול', callback_data: `t:del:${t.id}` },
+    ]);
+  });
   return {
     text: (header || `📋 המשימות שלך (${open.length}):`) + '\n' +
       open.map((t, i) => `${i + 1}. ${t.text}`).join('\n'),
-    buttons: open.map((t, i) => ([
-      { text: `✅ ${i + 1} · ${short(t.text)}`, callback_data: `t:done:${t.id}` },
-      { text: `❌ ${i + 1}`, callback_data: `t:del:${t.id}` },
-    ])),
+    buttons,
   };
 }
 
@@ -1286,7 +1291,7 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
       S.tasks.push(t);
       return { text: `📋 הוספתי: "${c.text}"\n(${openTasks().length} משימות פתוחות)`,
         buttons: [[{ text: '✅ בוצע', callback_data: `t:done:${t.id}` },
-                   { text: '❌ לא בוצע', callback_data: `t:del:${t.id}` }]] };
+                   { text: '❌ ביטול', callback_data: `t:del:${t.id}` }]] };
     }
     case 'task_list': return taskGroupMsg(S);
     case 'tasks_digest': {
@@ -1669,19 +1674,20 @@ async function handleCallback(env, q) {
     await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id });
     return;
   }
-  const m = String(q.data || '').match(/^t:(done|undo|del):(\d+)$/);
+  const m = String(q.data || '').match(/^t:(done|undo|del|show):(\d+)$/);
   let toast = '';
   if (m) {
     const t = S.tasks.find(x => x.id === Number(m[2]));
     if (!t) toast = 'המשימה הזאת כבר לא קיימת';
+    else if (m[1] === 'show') toast = `📋 ${t.text}`;
     else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); toast = `✅ "${t.text}" בוצעה`; }
     else if (m[1] === 'undo') { t.done = false; delete t.doneAt; toast = `↩️ "${t.text}" חזרה לפתוחות`; }
-    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ "${t.text}" — לא בוצעה, ירדה מהרשימה`; }
-    if (t || m[1]) await saveStore(env, S);
+    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ "${t.text}" בוטלה ונמחקה מהרשימה`; }
+    if (m[1] !== 'show') await saveStore(env, S);
   }
   await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id, text: toast.slice(0, 190) });
   // מרעננים את אותה הודעה — הרשימה מתעדכנת במקום, בלי הודעות חדשות
-  if (m && q.message?.message_id) {
+  if (m && m[1] !== 'show' && q.message?.message_id) {
     const g = taskGroupMsg(S);
     await tgApi(env, 'editMessageText', { chat_id: chatId, message_id: q.message.message_id,
       text: g.text, reply_markup: { inline_keyboard: g.buttons || [] } });
