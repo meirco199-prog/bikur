@@ -1770,6 +1770,15 @@ async function handleWebhook(env, update) {
 // דופק ריצות של השעון — לזיהוי ריצות דלילות (נשמר בזיכרון האיזולט + ב-KV כל 10 דק')
 const cronTicks = [];
 
+// שריון בזיכרון מפני שליחה כפולה: אם האחסון החזיר לרגע גרסה ישנה של רישום
+// "מה כבר נשלח", האיזולט זוכר בעצמו מה נשלח לאחרונה ולא שולח שוב
+const sentGuard = new Map();
+function guardHas(k) {
+  const nowT = Date.now();
+  for (const [key, ts] of sentGuard) if (nowT - ts > 15 * 60000) sentGuard.delete(key);
+  return sentGuard.has(k);
+}
+
 async function runCron(env, opts = {}) {
   // הקרון קורא את ה-store אבל לעולם לא כותב אליו — כל המצב שלו במפתח 'cron' הנפרד.
   // opts.minLateMs: שעון הגיבוי מטפל רק במה שאיחר לפחות כך — כדי לא להתנגש
@@ -1804,6 +1813,8 @@ async function runCron(env, opts = {}) {
       continue;
     }
     // תזכורת המשימות היומית — שולחת את הרשימה החיה עם כפתורי הסימון
+    const gk = 'r' + r.id + '|' + due;
+    if (guardHas(gk)) { C.fired[r.id] = due; changed = true; continue; }
     if (r.tasksDigest) {
       const n0 = firstName(S);
       const openCount = S.tasks.filter(t => !t.done).length;
@@ -1815,6 +1826,7 @@ async function runCron(env, opts = {}) {
         okD = await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
       }
       if (!okD) throw new Error(lastTgError || 'טלגרם לא אישר את השליחה');
+      sentGuard.set(gk, Date.now());
       C.fired[r.id] = due;
       C.lastFired = { text: r.text };
       C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
@@ -1832,6 +1844,7 @@ async function runCron(env, opts = {}) {
       ? `⏰ ${n ? n + ', ' : ''}${smart}${r.recurringDaily || r.recurringWeekly != null ? suffix : ''}`
       : `⏰ ${n ? n + ', ' : ''}תזכורת: ${r.text}${suffix}`);
     if (!okR) throw new Error(lastTgError || 'טלגרם לא אישר את השליחה');
+    sentGuard.set(gk, Date.now());
     C.fired[r.id] = due;
     C.lastFired = { text: r.text };
     C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
@@ -1858,6 +1871,8 @@ async function runCron(env, opts = {}) {
       if (minLate && nowMs - (e.at - pingMin * 60000) < minLate) continue; // טרי — לשעון הראשי
       const key = e.text.trim() + '|' + Math.round(e.at / 60000);
       if (C.pinged[key]) continue;
+      if (guardHas('p' + key)) { C.pinged[key] = nowMs; changed = true; continue; }
+      sentGuard.set('p' + key, Date.now());
       C.pinged[key] = nowMs;
       const minsLeft = Math.max(1, Math.round((e.at - nowMs) / 60000));
       const n = firstName(S);
@@ -1883,8 +1898,11 @@ async function runCron(env, opts = {}) {
       && (!minLate || now.getMinutes() >= 2)) {
     C.lastBriefDate = todayStr;
     changed = true;
-    const brief = await morningBrief(S, now, env);
-    if (brief) await tgSend(env, S.ownerChatId, brief);
+    if (!guardHas('brief|' + todayStr)) {
+      sentGuard.set('brief|' + todayStr, Date.now());
+      const brief = await morningBrief(S, now, env);
+      if (brief) await tgSend(env, S.ownerChatId, brief);
+    }
   }
 
   const summaryHour = (S.summaryOff || env.SUMMARY_HOUR === 'off') ? null : parseInt(env.SUMMARY_HOUR ?? '21', 10);
@@ -1892,8 +1910,11 @@ async function runCron(env, opts = {}) {
       && (!minLate || now.getMinutes() >= 2)) {
     C.lastSummaryDate = todayStr;
     changed = true;
-    const sum = daySummary(S, now);
-    if (sum) await tgSend(env, S.ownerChatId, sum);
+    if (!guardHas('sum|' + todayStr)) {
+      sentGuard.set('sum|' + todayStr, Date.now());
+      const sum = daySummary(S, now);
+      if (sum) await tgSend(env, S.ownerChatId, sum);
+    }
   }
 
   if (changed) {
@@ -2049,7 +2070,7 @@ export default {
     // בטוח להריץ שוב ושוב — רישום ה-fired מונע שליחות כפולות.
     if (url.pathname === '/tick') {
       if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });
-      try { await runCron(env, { minLateMs: 2 * 60000 }); return new Response('tick ok'); }
+      try { await runCron(env, { minLateMs: 3 * 60000 }); return new Response('tick ok'); }
       catch (e) { return new Response('tick error: ' + e.message, { status: 500 }); }
     }
 

@@ -816,5 +816,21 @@ console.log('לוז יומי חדש בהודעה אחת:');
   globalThis.fetch = prevFetch;
 }
 
+console.log('שריון מפני כפילות כשהאחסון מחזיר גרסה ישנה:');
+{
+  let S = JSON.parse(kv.get('store'));
+  S.reminders.push({ id: 9970, text: 'בדיקת כפילות שריון', at: ilMs() - 60000, recurringDaily: false, recurringWeekly: null });
+  kv.set('store', JSON.stringify(S));
+  const staleCron = kv.get('cron'); // צילום מצב מלפני השליחה
+  const before = sent.length;
+  await worker.scheduled({}, env);
+  check('נשלחה פעם אחת', sent.slice(before).filter(m => m.text.includes('כפילות שריון')).length === 1, JSON.stringify(sent.slice(before).map(x => x.text)));
+  // "שיהוק" של האחסון: מחזירים את הגרסה הישנה שבה השליחה לא רשומה
+  kv.set('cron', staleCron);
+  const before2 = sent.length;
+  await worker.scheduled({}, env);
+  check('לא נשלחה שוב למרות האחסון הישן (הזיכרון המקומי תפס)', !sent.slice(before2).some(m => m.text.includes('כפילות שריון')), JSON.stringify(sent.slice(before2).map(x => x.text)));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
