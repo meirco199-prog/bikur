@@ -859,5 +859,22 @@ console.log('המוח רואה גם את התשובות של עצמו (המשכ�
   globalThis.fetch = prevFetch;
 }
 
+console.log('שמירת מסמך בניסוח חופשי:');
+{
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { photo: [{ file_id: 'photo123' }],
+      caption: 'זה תז שלי עם ספח.תשמור לי', message_id: 888, chat: { id: 111 } } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  check('"זה תז שלי, תשמור לי" נשמר בארכיון', r.text.includes('שמרתי'), r.text);
+  const S = JSON.parse(kv.get('store'));
+  const doc = S.docs.find(d => d.name.includes('ספח'));
+  check('  עם שם הגיוני ותיוג להודעה', !!doc && doc.mid === 888, JSON.stringify(S.docs.map(d => d.name)));
+  await send('שלח מסמך 2');
+  check('  ונשלף לפי מספר', sent.some(m => m.photo === 'photo123'), JSON.stringify(sent.slice(-2)));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

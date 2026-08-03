@@ -1579,7 +1579,7 @@ async function tgSendDoc(env, chatId, doc, caption, replyTo) {
 
 async function tgGetFileBytes(env, fileId) {
   const info = await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${fileId}`)).json();
-  if (!info.ok) return null;
+  if (!info.ok || !info.result) return null;
   const buf = await (await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${info.result.file_path}`)).arrayBuffer();
   return new Uint8Array(buf);
 }
@@ -1630,10 +1630,18 @@ async function handleMedia(env, S, msg, chatId, now) {
   if (!fileId) return false;
   const caption = cleanup(msg.caption || '');
 
-  // "שמור: תז של יוסי" — שמירה בארכיון המסמכים
+  // כוונת שמירה בכל ניסוח: "שמור: תז של יוסי" / "זה התז שלי, תשמור לי" / "תשמרי את זה"
+  let saveName = null;
   const saveM = caption.match(/^(?:שמור|מסמך|תשמור)(?:\s+לי)?[:\s]+(.+)$/s);
-  if (saveM) {
-    const name = cleanup(saveM[1]);
+  if (saveM) saveName = cleanup(saveM[1]);
+  else if (/(?:^|[\s.,!])(?:שמור|תשמור|תשמרי|שמרי)(?:\s|$|[.,!])/.test(caption)) {
+    saveName = cleanup(caption
+      .replace(/(?:^|[\s.,!])(?:תשמור|שמור|תשמרי|שמרי)(?:\s+(?:לי|את זה|אותו|אותה))?/g, ' ')
+      .replace(/^זה\s+/, '')
+      .replace(/[.,!]+\s*$/, '')) || 'מסמך';
+  }
+  if (saveName) {
+    const name = saveName;
     S.docs.push({ id: S.nextId++, name, fileId, type: isPhoto ? 'photo' : 'document', created: now.getTime(), mid: msg.message_id });
     await saveStore(env, S);
     await tgSend(env, chatId, `📄 שמרתי את "${name}"!\nלשליפה בעתיד: "איפה ${name}" או "מסמכים"`);
