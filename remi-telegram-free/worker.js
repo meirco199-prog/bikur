@@ -337,7 +337,9 @@ export function parseCommand(raw, now) {
   if (m) {
     const { at, rest } = parseWhen(m[1], now);
     if (!at) return { cmd:'event_missing_time', text: stripFiller(cleanup(m[1])) };
-    return { cmd:'event_add', text: stripFiller(rest) || 'אירוע', at };
+    // אם נשארו בטקסט עוד תאריך או שעה — כנראה כמה אירועים בהודעה אחת; המוח יפצל
+    const more = /\s[ובל]{0,2}-?\d{1,2}[./]\d{1,2}(\s|$)/.test(' ' + rest + ' ') || /\d{1,2}:\d{2}/.test(rest);
+    return { cmd:'event_add', text: stripFiller(rest) || 'אירוע', at, loose: more };
   }
   m = text.match(/^(?:מחק|בטל|מחקי|בטלי)\s+(?:אירוע|פגישה)\s+(\d+)$/);
   if (m) return { cmd:'event_delete', index: parseInt(m[1],10) };
@@ -924,11 +926,12 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|document|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|document|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"..."}],"reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
 - event = פגישה/טיסה/אירוע ליומן. חובה datetime. אם נתן טווח תאריכים — קח את תאריך ההתחלה וציין את הטווח ב-title.
+- אם יש בהודעה כמה אירועים (תאריכים/שעות שונים) — action=event ומלא את המערך events עם כולם, כל אחד עם title נקי, datetime ו-location משלו. לעולם אל תדחס שני אירועים לאחד!
 - דייק בתאריך! חשב לפי התאריך של היום שכתוב למעלה: "מחר"=יום אחד קדימה, "יום שני הקרוב"=יום השני הבא בלוח השנה, "ל-1/8"=האחד באוגוסט. אל תשים הכול על מחר.
 - ה-title חייב להיות נקי ממילות זמן: בלי "מחר", בלי "ליום שני", בלי תאריכים — רק תוכן הפגישה עצמו (למשל "פגישה עם עירית נתיבות — תשלום דוחות").
 - כתובת/רחוב/מקום/טלפון של פגישה — שים ב-location, לא ב-title! ("פגישה עם ישראל ברחוב המסגר 11 אופקים" → title="פגישה עם ישראל", location="רחוב המסגר 11, אופקים"). כל פגישה מקבלת אוטומטית התראה מהבוט 10 דקות לפני — אל תיצור תזכורת נפרדת לזה.
@@ -1004,15 +1007,24 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       return `סגור${hey}! ⏰ אזכיר לך ${when}:\n"${title}"`;
     }
     case 'event': {
-      const at = parseDt(j.datetime);
-      if (!at || !title) return null;
-      const loc = cleanup(String(j.location || ''));
-      S.events.push({ id: nid(), text: title, at: at.getTime(), loc });
-      const synced = await pushToGoogleCalendar(env, title, at.getTime(), loc);
-      return `קבעתי לך${hey} 📅 ${fmtDate(at.getTime(), now)}:\n"${title}"` +
-        (loc ? `\n📍 ${loc}` : '') +
-        (synced ? '\n📆 נכנס גם ליומן גוגל שלך!' : '') +
-        '\n🔔 אזכיר לך 10 דקות לפני.';
+      const list = (Array.isArray(j.events) && j.events.length)
+        ? j.events : [{ title: j.title, datetime: j.datetime, location: j.location }];
+      const made = [];
+      let anySynced = false;
+      for (const ev of list.slice(0, 8)) {
+        const at = parseDt(ev.datetime);
+        const t = cleanup(String(ev.title || ''));
+        if (!at || !t) continue;
+        const loc = cleanup(String(ev.location || ''));
+        S.events.push({ id: nid(), text: t, at: at.getTime(), loc });
+        if (await pushToGoogleCalendar(env, t, at.getTime(), loc)) anySynced = true;
+        made.push(`📅 ${fmtDate(at.getTime(), now)} — "${t}"${loc ? `\n   📍 ${loc}` : ''}`);
+      }
+      if (!made.length) return null;
+      return (made.length === 1 ? `קבעתי לך${hey}:` : `קבעתי לך${hey} ${made.length} אירועים:`) +
+        '\n' + made.join('\n') +
+        (anySynced ? '\n📆 נכנסו גם ליומן גוגל שלך!' : '') +
+        '\n🔔 אזכיר לך 10 דקות לפני כל אחד.';
     }
     case 'task': {
       if (!title) return null;

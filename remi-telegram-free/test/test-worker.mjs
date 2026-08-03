@@ -896,5 +896,38 @@ console.log('כפתור מחיקה לזיכרונות קצרי-טווח:');
   check('לחיצה מוחקת את הזיכרון', !S.notes.some(n => n.text.includes('999888')));
 }
 
+console.log('כמה אירועים בהודעה אחת:');
+{
+  const prevFetch = globalThis.fetch;
+  const bridgeCalls = [];
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('bridge.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok', { status: 200 }); }
+    if (u.includes('api.anthropic.com')) {
+      const text = JSON.stringify({ action: 'event', events: [
+        { title: 'אירוע הראל', datetime: '2026-09-02 19:30', location: 'אמפי מקס ראשל"צ' },
+        { title: 'אירוע כלל', datetime: '2026-09-03 18:30', location: 'אקספו תל אביב' },
+      ], reply: '' });
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
+  env.ANTHROPIC_API_KEY = 'sk-test';
+
+  const r = await send('קבע לי 2.9 אירוע הראל ב19:30 אמפי מקס ראשלצ וב3.9 אירוע של כלל באקספו תל אביב ב18:30');
+  check('שני אירועים נקבעו בנפרד', r.text.includes('2 אירועים') && r.text.includes('אירוע הראל') && r.text.includes('אירוע כלל'), r.text);
+  const S = JSON.parse(kv.get('store'));
+  const harel = S.events.find(e => e.text === 'אירוע הראל');
+  const clal = S.events.find(e => e.text === 'אירוע כלל');
+  check('  כל אחד בתאריך שלו', !!harel && !!clal && new Date(harel.at).getDate() === 2 && new Date(clal.at).getDate() === 3,
+    JSON.stringify(S.events.map(e => e.text)));
+  check('  שניהם נשלחו ליומן גוגל עם מיקום', bridgeCalls.filter(b => !b.action && b.location).length === 2, JSON.stringify(bridgeCalls));
+
+  delete env.CALENDAR_WEBHOOK;
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
