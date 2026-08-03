@@ -870,7 +870,13 @@ function doSearch(S, q, now) {
   }).join('\n');
   // תיוג: עונים על ההודעה המקורית האחרונה שנמצאה (או על הודעת המסמך)
   const tag = [...hist].reverse().find(h => h.mid)?.mid || [...docs].reverse().find(d => d.mid)?.mid || null;
-  return tag ? { text: out, replyTo: tag } : out;
+  // כפתורי מחיקה לזיכרונות שנמצאו — לזיכרונות קצרי-טווח שסיימו את תפקידם
+  const noteBtns = notes.slice(0, 4).map(n => ([{
+    text: `🗑️ מחק: ${n.text.slice(0, 30)}${n.text.length > 30 ? '…' : ''}`,
+    callback_data: `n:del:${n.id}`,
+  }]));
+  if (tag || noteBtns.length) return { text: out, replyTo: tag || undefined, buttons: noteBtns.length ? noteBtns : undefined };
+  return out;
 }
 
 function findDocs(S, query) {
@@ -1025,8 +1031,10 @@ async function applyAiAction(S, j, now, env, gcal = []) {
     case 'note': {
       const content = title || reply;
       if (!content || content.length < 4) return null;
-      S.notes.push({ id: nid(), text: content, created: now.getTime() });
-      return `🧠 שמרתי${hey}. תמצא את זה עם "חפש" מתי שתרצה.`;
+      const noteT = { id: nid(), text: content, created: now.getTime() };
+      S.notes.push(noteT);
+      return { text: `🧠 שמרתי${hey}. תמצא את זה עם "חפש" מתי שתרצה.`,
+        buttons: [[{ text: '🗑️ מחק את הזיכרון הזה', callback_data: `n:del:${noteT.id}` }]] };
     }
     case 'event_move': {
       const at = parseDt(j.datetime);
@@ -1365,9 +1373,11 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
     }
 
     case 'note_add': {
-      S.notes.push({ id: nid(), text: c.text, created: now.getTime() });
-      if (c.auto) return `🧠 לא זיהיתי פקודה, אז שמרתי את זה בזיכרון שלא ילך לאיבוד.\nלשליפה: "זיכרונות" או "חפש <מילה>"\n(אם התכוונת למשהו אחר — כתוב "עזרה")`;
-      return `🧠 שמרתי בזיכרון:\n"${c.text}"\n\nלשליפה: "זיכרונות" או "חפש <מילה>"`;
+      const noteT = { id: nid(), text: c.text, created: now.getTime() };
+      S.notes.push(noteT);
+      const delBtn = [[{ text: '🗑️ מחק את הזיכרון הזה', callback_data: `n:del:${noteT.id}` }]];
+      if (c.auto) return { text: `🧠 לא זיהיתי פקודה, אז שמרתי את זה בזיכרון שלא ילך לאיבוד.\nלשליפה: "זיכרונות" או "חפש <מילה>"\n(אם התכוונת למשהו אחר — כתוב "עזרה")`, buttons: delBtn };
+      return { text: `🧠 שמרתי בזיכרון:\n"${c.text}"\n\nלשליפה: "זיכרונות" או "חפש <מילה>"`, buttons: delBtn };
     }
     case 'note_list': {
       if (!S.notes.length) return 'הזיכרון ריק 🧠\nלשמירה: "זכור: ..."';
@@ -1691,6 +1701,23 @@ async function handleCallback(env, q) {
   const S = await loadStore(env);
   if (!chatId || chatId !== S.ownerChatId) {
     await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id });
+    return;
+  }
+  // מחיקת זיכרון מכפתור 🗑️
+  const nm = String(q.data || '').match(/^n:del:(\d+)$/);
+  if (nm) {
+    const note = S.notes.find(x => x.id === Number(nm[1]));
+    if (note) {
+      S.notes = S.notes.filter(x => x.id !== note.id);
+      await saveStore(env, S);
+      await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id, text: `🗑️ נמחק: "${note.text.slice(0, 100)}"` });
+      if (q.message?.message_id) {
+        await tgApi(env, 'editMessageText', { chat_id: chatId, message_id: q.message.message_id,
+          text: (q.message.text || '🧠') + `\n\n🗑️ הזיכרון "${note.text.slice(0, 40)}" נמחק.` });
+      }
+    } else {
+      await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id, text: 'הזיכרון הזה כבר נמחק' });
+    }
     return;
   }
   const m = String(q.data || '').match(/^t:(done|undo|del|show):(\d+)$/);

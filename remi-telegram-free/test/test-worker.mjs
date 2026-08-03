@@ -876,5 +876,25 @@ console.log('שמירת מסמך בניסוח חופשי:');
   check('  ונשלף גם עם "שלח 2" בלי המילה מסמך', sent.some(m => m.photo === 'photo123'), JSON.stringify(sent.slice(-2)));
 }
 
+console.log('כפתור מחיקה לזיכרונות קצרי-טווח:');
+{
+  let r = await send('זכור: מספר פוליסה 999888 זמני');
+  const btn = (r.reply_markup?.inline_keyboard || []).flat().find(b => /^n:del:\d+$/.test(b.callback_data));
+  check('שמירת זיכרון מציעה כפתור מחיקה', !!btn, JSON.stringify(r.reply_markup));
+
+  r = await send('חפש 999888');
+  const searchBtn = (r.reply_markup?.inline_keyboard || []).flat().find(b => /^n:del:\d+$/.test(b.callback_data));
+  check('גם תוצאת חיפוש מציעה מחיקה', !!searchBtn, JSON.stringify(r.reply_markup));
+
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callback_query: { id: 'cbn1', data: btn.callback_data,
+      message: { message_id: 77, text: 'טקסט מקורי', chat: { id: 111 } } } }),
+  });
+  await worker.fetch(req, env);
+  const S = JSON.parse(kv.get('store'));
+  check('לחיצה מוחקת את הזיכרון', !S.notes.some(n => n.text.includes('999888')));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
