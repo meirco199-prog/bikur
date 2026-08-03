@@ -872,8 +872,8 @@ console.log('שמירת מסמך בניסוח חופשי:');
   const S = JSON.parse(kv.get('store'));
   const doc = S.docs.find(d => d.name.includes('ספח'));
   check('  עם שם הגיוני ותיוג להודעה', !!doc && doc.mid === 888, JSON.stringify(S.docs.map(d => d.name)));
-  await send('שלח מסמך 2');
-  check('  ונשלף לפי מספר', sent.some(m => m.photo === 'photo123'), JSON.stringify(sent.slice(-2)));
+  await send('שלח 2');
+  check('  ונשלף גם עם "שלח 2" בלי המילה מסמך', sent.some(m => m.photo === 'photo123'), JSON.stringify(sent.slice(-2)));
 }
 
 console.log(`\n${passed} עברו, ${failed} נכשלו`);

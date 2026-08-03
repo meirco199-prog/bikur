@@ -314,7 +314,7 @@ export function parseCommand(raw, now) {
 
   // מסמכים
   if (/^(מסמכים|רשימת מסמכים|הקבצים שלי)\??$/.test(text)) return { cmd:'doc_list' };
-  m = text.match(/^שלח מסמך\s+(\d+)$/);
+  m = text.match(/^(?:שלח|תשלח)(?:\s+לי)?\s+(?:מסמך\s+)?(\d+)$/) || text.match(/^מסמך\s+(\d+)$/);
   if (m) return { cmd:'doc_send', index: parseInt(m[1],10) };
   m = text.match(/^(?:מחק|מחקי)\s+מסמך\s+(\d+)$/);
   if (m) return { cmd:'doc_delete', index: parseInt(m[1],10) };
@@ -918,7 +918,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|document|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -932,6 +932,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - tasks = שואל על המשימות שלו ("איזה משימות פתוחות יש לי") — מציג את רשימת המשימות בלבד. משימות ≠ פגישות! אל תחזיר agenda על שאלת משימות.
 - agenda = שואל מה יש לו ביומן/פגישות היום/השבוע — קבע range. לא לשאלות על משימות.
 - routine = שולח לוז יומי חדש — כמה שורות של שעה+פעולה שיחזרו כל יום ("מעכשיו יהיה לוז חדש: 7:00 ... 21:00 ..."). מלא את routine עם כל השורות; שמור ב-title את מלוא התוכן של השורה (כולל ברכות). אל תשמור את זה כ-note!
+- document = מבקש מסמך/קובץ מהארכיון ("שלח לי את התז") — title = שם המסמך. לעולם אל תטען ב-answer ששלחת או צירפת קובץ — אתה לא מסוגל לצרף; השתמש ב-document.
 - gmail = מבקש לחפש משהו במיילים/בג'ימייל שלו ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - הודעה קצרה שהיא המשך שיחה ("כן", "לא", "ח.פ", "ומה עוד") — הבן מההקשר למעלה וענה (answer). לעולם אל תשמור note מהודעה כזו.
@@ -1067,6 +1068,13 @@ async function applyAiAction(S, j, now, env, gcal = []) {
     }
     case 'tasks':
       return taskGroupMsg(S);
+    case 'document': {
+      if (!title) return null;
+      const matches = findDocs(S, title);
+      if (matches.length === 1) return { text: `📄 הנה "${matches[0].name}":`, doc: matches[0], replyTo: matches[0].mid };
+      if (matches.length > 1) return 'מצאתי כמה מסמכים 📄:\n' + matches.map(d => `• ${d.name}`).join('\n') + '\n\nדייק לי: "איפה <שם>"';
+      return `לא מצאתי מסמך בשם "${title}" 🤔 כתוב "מסמכים" לרשימה.`;
+    }
     case 'gmail': {
       if (!title) return null;
       if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.';
@@ -1637,7 +1645,7 @@ async function handleMedia(env, S, msg, chatId, now) {
   else if (/(?:^|[\s.,!])(?:שמור|תשמור|תשמרי|שמרי)(?:\s|$|[.,!])/.test(caption)) {
     saveName = cleanup(caption
       .replace(/(?:^|[\s.,!])(?:תשמור|שמור|תשמרי|שמרי)(?:\s+(?:לי|את זה|אותו|אותה))?/g, ' ')
-      .replace(/^זה\s+/, '')
+      .replace(/^(?:את\s+זה[.\s]*|זה\s+)+/, '')
       .replace(/[.,!]+\s*$/, '')) || 'מסמך';
   }
   if (saveName) {
