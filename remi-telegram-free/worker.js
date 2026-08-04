@@ -318,6 +318,8 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'doc_send', index: parseInt(m[1],10) };
   m = text.match(/^(?:מחק|מחקי)\s+מסמך\s+(\d+)$/);
   if (m) return { cmd:'doc_delete', index: parseInt(m[1],10) };
+  m = text.match(/^(?:מחק|תמחק|מחקי|תמחקי)\s+(?:לי\s+)?(?:את\s+)?ה?(?:מסמך|תמונה|צילום|קובץ)\s+(?:של\s+)?(.+)$/);
+  if (m) return { cmd:'doc_delete_name', query: cleanup(m[1]) };
   // חיפוש בג'ימייל (קריאה בלבד): "חפש (לי) במייל חשבונית ארנונה"
   m = text.match(/^(?:חפש|תחפש|מצא|תמצא)(?:\s+לי)?\s+ב(?:מייל(?:ים)?|ג'?ימייל|דוא"?ל)\s+(?:את\s+)?(.+)$/);
   if (m) return { cmd:'gmail_search', query: cleanup(m[1]) };
@@ -881,6 +883,20 @@ function doSearch(S, q, now) {
   return out;
 }
 
+// זיכרונות שמורים שקשורים לנושא ההודעה — כדי שהמוח יענה מהזיכרון
+// ("מה מספר הפוליסה בשלמה?" → הזיכרון עם מספר הפוליסה נכנס להקשר של ה-AI)
+function relevantNotes(S, text) {
+  const strip = (w) => w.replace(/^(?:וש|וב|ול|וכ|ומ|וה|ש|ב|ל|כ|מ|ה|ו)/, '');
+  const words = [...new Set(String(text || '').split(/[^\u0590-\u05FFa-zA-Z0-9]+/)
+    .flatMap(w => [w, strip(w)]).filter(w => w.length >= 3))];
+  if (!words.length) return [];
+  return (S.notes || [])
+    .map(n => ({ n, score: words.filter(w => n.text.includes(w)).length }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score || b.n.created - a.n.created)
+    .slice(0, 8).map(x => x.n);
+}
+
 function findDocs(S, query) {
   const norm = (s) => s.replace(/["'״׳]/g, '').split(/\s+/).map(w => w.replace(/^ה/, '')).filter(w => w.length >= 2);
   const qWords = norm(query);
@@ -904,6 +920,7 @@ async function aiBrain(env, S, text, now, isVoice = false) {
   ].filter(Boolean).join(' | ');
   const hist = (S.history || []).slice(-9, -1)
     .map(h => (h.bot ? '- (אתה ענית): ' : '- (הוא כתב): ') + h.text.slice(0, 160)).join('\n');
+  const memCtx = relevantNotes(S, text).map(x => '• ' + x.text.slice(0, 200)).join('\n');
   const upcoming = S.events.filter(e => e.at >= now.getTime() - 3600000).sort((a,b) => a.at - b.at).slice(0, 10)
     .map(e => {
       const d = new Date(e.at);
@@ -920,13 +937,15 @@ async function aiBrain(env, S, text, now, isVoice = false) {
 עכשיו: יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}, השעה ${fmtTime(now.getTime())}. התאריך העברי: ${hebrewDate()}.
 הודעות אחרונות שלו (הקשר):
 ${hist || '(אין)'}
+זיכרונות שמורים שאולי קשורים להודעה:
+${memCtx || '(אין)'}
 ההודעה החדשה שלו: "${text}"
 ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וייתכנו שגיאות תמלול — תקן לפי ההיגיון (למשל "תיסה"="טיסה", "כבר לי"="קבע לי", מספרים משובשים כמו "ה-37" הם כנראה תאריך כמו 30/7).' : ''}
 הפגישות הקרובות שהוא קבע דרכך: ${upcoming || '(אין)'}
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|document|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"..."}],"reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|document|document_delete|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"..."}],"reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -942,8 +961,10 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - agenda = שואל מה יש לו ביומן/פגישות היום/השבוע — קבע range. לא לשאלות על משימות.
 - routine = שולח לוז יומי חדש — כמה שורות של שעה+פעולה שיחזרו כל יום ("מעכשיו יהיה לוז חדש: 7:00 ... 21:00 ..."). מלא את routine עם כל השורות; שמור ב-title את מלוא התוכן של השורה (כולל ברכות). אל תשמור את זה כ-note!
 - document = מבקש מסמך/קובץ מהארכיון ("שלח לי את התז") — title = שם המסמך. לעולם אל תטען ב-answer ששלחת או צירפת קובץ — אתה לא מסוגל לצרף; השתמש ב-document.
-- gmail = מבקש לחפש משהו במיילים/בג'ימייל שלו ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
+- document_delete = מבקש למחוק מסמך/תמונה/קובץ מהארכיון ("תמחק את התמונה של פרטי החברה") — title = שם המסמך. אתה כן יודע למחוק מסמכים — אל תסרב ואל תגיד שאי אפשר!
+- gmail = מבקש לחפש משהו במיילים, רק כשהוא מזכיר במפורש מייל/ג'ימייל ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
+- אם השאלה שלו נענית מתוך "זיכרונות שמורים" למעלה (למשל "מה מספר הפוליסה?" והמספר שמור בזיכרון) — action=answer, וכתוב ב-reply את המידע המלא מהזיכרון, כולל המספרים המדויקים. לעולם אל תחפש במייל מידע שכבר נמצא בזיכרונות!
 - הודעה קצרה שהיא המשך שיחה ("כן", "לא", "ח.פ", "ומה עוד") — הבן מההקשר למעלה וענה (answer). לעולם אל תשמור note מהודעה כזו.
 - אל תציע פעולות המשך שאינך יכול לבצע — תן את המידע המלא מיד בתשובה.
 - reply חובה תמיד: משפט אישי חם, עם השם שלו.`;
@@ -1095,12 +1116,26 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       if (matches.length > 1) return 'מצאתי כמה מסמכים 📄:\n' + matches.map(d => `${S.docs.indexOf(d) + 1}. ${d.name}`).join('\n') + '\n\nשלח את המספר (למשל "2")';
       return `לא מצאתי מסמך בשם "${title}" 🤔 כתוב "מסמכים" לרשימה.`;
     }
+    case 'document_delete': {
+      if (!title) return null;
+      const matches = findDocs(S, title);
+      if (!matches.length) return `לא מצאתי מסמך בשם "${title}" 🤔 כתוב "מסמכים" לרשימה.`;
+      if (matches.length > 1) return 'מצאתי כמה מסמכים 📄 — איזה למחוק?\n' +
+        matches.map(d => `${S.docs.indexOf(d) + 1}. ${d.name}`).join('\n') + '\n\nכתוב "מחק מסמך <מספר>"';
+      S.docs = S.docs.filter(x => x.id !== matches[0].id);
+      return `🗑️ מחקתי${hey} את "${matches[0].name}" מהארכיון.`;
+    }
     case 'gmail': {
       if (!title) return null;
-      if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.';
+      // רשת ביטחון: אם התשובה בכלל שמורה בזיכרונות — עונים משם, לא מהמייל
+      const fromMemory = () => {
+        const rel = relevantNotes(S, title);
+        return rel.length ? '\n\n🧠 אבל מצאתי בזיכרונות שלי:\n' + rel.slice(0, 3).map(x => `• ${x.text}`).join('\n') : '';
+      };
+      if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) — ראה README.' + fromMemory();
       const results = await searchGmailViaBridge(env, title);
-      if (results === null) return 'לא הצלחתי לחפש במייל 😕 ודא שהגשר של גוגל מעודכן לגרסה החדשה ופרוס מחדש.';
-      if (!results.length) return `לא מצאתי מיילים על "${title}" 🔍`;
+      if (results === null) return 'לא הצלחתי לחפש במייל 😕 ודא שהגשר של גוגל מעודכן לגרסה החדשה ופרוס מחדש.' + fromMemory();
+      if (!results.length) return `לא מצאתי מיילים על "${title}" 🔍` + fromMemory();
       return `📧 מצאתי בג'ימייל על "${title}":\n\n` + results.map((r, i) =>
         `${i + 1}. ${r.subject || '(בלי נושא)'}\n   מאת ${r.from} · ${r.date}` +
         (r.files && r.files.length ? `\n   📎 ${r.files.join(', ')}` : '') +
@@ -1221,9 +1256,11 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
   let c = parseCommand(text, now);
 
   // המשך-הקשר: מספר בודד מיד אחרי שהבוט הציג רשימת מסמכים = "שלח מסמך N"
+  // (ואם הרשימה הייתה שאלת מחיקה — "מחק מסמך N")
   if (c.cmd === 'unknown' && /^\d{1,2}$/.test((c.text || '').trim())) {
     const lastBot = [...(S.history || [])].reverse().find(h => h.bot);
-    if (lastBot && /מסמכ/.test(lastBot.text)) c = { cmd: 'doc_send', index: parseInt(c.text, 10) };
+    if (lastBot && /מסמכ/.test(lastBot.text))
+      c = { cmd: /למחוק/.test(lastBot.text) ? 'doc_delete' : 'doc_send', index: parseInt(c.text, 10) };
   }
 
   // כשהחוקים לא בטוחים (או שזו הודעה קולית מתומללת) — המוח (AI) מקבל את ההגה
@@ -1452,10 +1489,15 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
     }
 
     case 'gmail_search': {
-      if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) ולפרוס מחדש — ראה README.';
+      // רשת ביטחון: גם כשהמייל לא זמין — אם התשובה שמורה בזיכרונות, מציגים אותה
+      const fromMemory = () => {
+        const rel = relevantNotes(S, c.query);
+        return rel.length ? '\n\n🧠 אבל מצאתי בזיכרונות שלי:\n' + rel.slice(0, 3).map(x => `• ${x.text}`).join('\n') : '';
+      };
+      if (!env?.CALENDAR_WEBHOOK) return 'חיפוש במיילים עובר דרך הגשר של גוגל 📧\nצריך לעדכן את הגשר לגרסה החדשה (calendar-bridge.gs) ולפרוס מחדש — ראה README.' + fromMemory();
       const results = await searchGmailViaBridge(env, c.query);
-      if (results === null) return 'לא הצלחתי לחפש במייל 😕 ודא שהגשר של גוגל מעודכן לגרסה החדשה (calendar-bridge.gs) ופרוס מחדש.';
-      if (!results.length) return `לא מצאתי מיילים על "${c.query}" 🔍\nטיפ: נסה מילה אחת מדויקת, כמו שמחפשים בג'ימייל.`;
+      if (results === null) return 'לא הצלחתי לחפש במייל 😕 ודא שהגשר של גוגל מעודכן לגרסה החדשה (calendar-bridge.gs) ופרוס מחדש.' + fromMemory();
+      if (!results.length) return `לא מצאתי מיילים על "${c.query}" 🔍\nטיפ: נסה מילה אחת מדויקת, כמו שמחפשים בג'ימייל.` + fromMemory();
       return `📧 מצאתי בג'ימייל על "${c.query}":\n\n` + results.map((r, i) =>
         `${i + 1}. ${r.subject || '(בלי נושא)'}\n   מאת ${r.from} · ${r.date}` +
         (r.files && r.files.length ? `\n   📎 ${r.files.join(', ')}` : '') +
@@ -1487,6 +1529,14 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
       if (!d) return 'לא מצאתי מסמך עם המספר הזה.';
       S.docs = S.docs.filter(x => x.id !== d.id);
       return `🗑️ מחקתי את "${d.name}" מהרשימה.`;
+    }
+    case 'doc_delete_name': {
+      const matches = findDocs(S, c.query);
+      if (!matches.length) return `לא מצאתי מסמך בשם "${c.query}" 🤔 כתוב "מסמכים" לרשימה.`;
+      if (matches.length > 1) return 'מצאתי כמה מסמכים 📄 — איזה למחוק?\n' +
+        matches.map(d => `${S.docs.indexOf(d) + 1}. ${d.name}`).join('\n') + '\n\nכתוב "מחק מסמך <מספר>"';
+      S.docs = S.docs.filter(x => x.id !== matches[0].id);
+      return `🗑️ מחקתי את "${matches[0].name}" מהארכיון.`;
     }
     case 'doc_find': {
       const matches = findDocs(S, c.query);

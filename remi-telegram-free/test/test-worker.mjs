@@ -938,5 +938,72 @@ console.log('מספר בודד אחרי רשימת מסמכים:');
   check('"2" לבד שולח את מסמך 2', sent.slice(before).some(m => m.photo === 'photo123'), JSON.stringify(sent.slice(before)));
 }
 
+console.log('המוח עונה מהזיכרון (מספר פוליסה):');
+{
+  await send('זכור: מספר פוליסה 110643685526 של נגרר הידראוליקה בשלמה');
+  const prevFetch = globalThis.fetch;
+  let seenPrompt = '';
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const req = JSON.parse(opts.body);
+      seenPrompt = typeof req.messages[0].content === 'string' ? req.messages[0].content : '';
+      // המוק מתנהג כמו המודל האמיתי: עונה מהזיכרון רק אם הזיכרון באמת בהקשר
+      const text = seenPrompt.includes('110643685526')
+        ? '{"action":"answer","reply":"מאיר, מספר הפוליסה של הנגרר בשלמה הוא 110643685526 🙂"}'
+        : '{"action":"gmail","title":"פוליסה שלמה","reply":""}';
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const r = await send('מה מס פוליסה בשלמה');
+  check('הזיכרון השמור נכנס להקשר של המוח', seenPrompt.includes('זיכרונות שמורים') && seenPrompt.includes('110643685526'), seenPrompt.slice(0, 600));
+  check('הבוט עונה עם המספר מהזיכרון (לא רץ למייל)', r.text.includes('110643685526'), r.text);
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
+console.log('חיפוש מייל שנכשל נופל לזיכרונות:');
+{
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('bridge.example')) return new Response('oops', { status: 500 });
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_WEBHOOK = 'https://bridge.example/exec';
+  const r = await send('חפש במייל פוליסה בשלמה');
+  check('כשהמייל לא זמין — הזיכרון עם הפוליסה מוצג בכל זאת', r.text.includes('110643685526') && r.text.includes('🧠'), r.text);
+  delete env.CALENDAR_WEBHOOK;
+  globalThis.fetch = prevFetch;
+}
+
+console.log('מחיקת מסמך בשפה חופשית:');
+{
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { photo: [{ file_id: 'photoBank' }],
+      caption: 'שמור: צילום חשבון בנק דיסקונט', message_id: 999, chat: { id: 111 } } }),
+  });
+  await worker.fetch(req, env);
+  let S = JSON.parse(kv.get('store'));
+  check('המסמך נשמר בארכיון', S.docs.some(d => d.name.includes('דיסקונט')));
+  const r = await send('תמחק את התמונה של חשבון בנק דיסקונט');
+  S = JSON.parse(kv.get('store'));
+  check('"תמחק את התמונה של..." מוחק מהארכיון', r.text.includes('מחקתי') && !S.docs.some(d => d.name.includes('דיסקונט')), r.text);
+}
+
+console.log('מחיקה כשכמה מסמכים מתאימים — שאלה וברירה במספר:');
+{
+  const r = await send('תמחק את המסמך של תז שלי');
+  check('כמה התאמות → שואל איזה למחוק', r.text.includes('איזה למחוק'), r.text);
+  const S0 = JSON.parse(kv.get('store'));
+  const countBefore = S0.docs.length;
+  const target = S0.docs[0];
+  await send('1');
+  const S1 = JSON.parse(kv.get('store'));
+  check('מספר בודד אחרי שאלת מחיקה — מוחק (לא שולח)', S1.docs.length === countBefore - 1 && !S1.docs.some(d => d.id === target.id),
+    JSON.stringify(S1.docs.map(d => d.name)));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
