@@ -383,9 +383,9 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'translate', lang: m[1] || 'עברית', text: cleanup(m[2]) };
 
   // תהילים יומי לפי התאריך העברי
-  m = text.match(/^(?:שלח\s+לי\s+)?(?:תהילים|תהלים)\s+כל\s+(?:בוקר|יום)(?:\s+ב-?(\d{1,2})(?::(\d{2}))?)?$/);
+  m = text.match(/^(?:(?:שלח|תשלח|תביא|הבא|תן)(?:\s+לי)?\s+)?(?:את\s+)?ה?(?:תהילים|תהלים)\s+כל\s+(?:בוקר|יום)(?:\s+ב-?(\d{1,2})(?::(\d{2}))?)?$/);
   if (m) return { cmd:'tehillim_daily', hour: m[1] ? +m[1] : 7, minute: m[2] ? +m[2] : 0 };
-  if (/^(?:שלח\s+לי\s+)?(?:תהילים|תהלים)(?:\s+של)?(?:\s+ה?יום)?\??$/.test(text)) return { cmd:'tehillim_now' };
+  if (/^(?:(?:שלח|תשלח|תביא|הבא|תן)(?:\s+לי)?\s+)?(?:את\s+)?ה?(?:תהילים|תהלים)(?:\s+של)?(?:\s+ה?יום)?(?:\s+לפי\s+התאריך(?:\s+העברי)?)?\??$/.test(text)) return { cmd:'tehillim_now' };
   if (/^(?:בטל|מחק|תבטל|תמחק)\s+(?:את\s+)?ה?(?:תהילים|תהלים)(?:\s+.*)?$/.test(text)) return { cmd:'tehillim_off' };
 
   // מסמכים
@@ -1063,11 +1063,12 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"...","details":"..."}],"details":"...","reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|tehillim|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"...","details":"..."}],"details":"...","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
 - בקשת תהילים יומי ("שלח לי כל בוקר תהילים") = reminder יומי (recurring=daily) עם title "תהילים של היום" — בזמן המשלוח הבוט שולח אוטומטית את פרקי היום לפי התאריך העברי.
+- tehillim = מבקש את התהילים של היום עכשיו ("תשלח תהילים של היום") — הבוט ישלח את הטקסט המלא של הפרקים. לעולם אל תסתפק בתיאור הפרקים ב-answer — השתמש ב-tehillim!
 - event = פגישה/טיסה/אירוע ליומן. חובה datetime. אם נתן טווח תאריכים — קח את תאריך ההתחלה וציין את הטווח ב-title.
 - אם יש בהודעה כמה אירועים (תאריכים/שעות שונים) — action=event ומלא את המערך events עם כולם, כל אחד עם title נקי, datetime ו-location משלו. לעולם אל תדחס שני אירועים לאחד!
 - דייק בתאריך! חשב לפי התאריך של היום שכתוב למעלה: "מחר"=יום אחד קדימה, "יום שני הקרוב"=יום השני הבא בלוח השנה, "ל-1/8"=האחד באוגוסט. אל תשים הכול על מחר.
@@ -1299,6 +1300,11 @@ async function applyAiAction(S, j, now, env, gcal = []) {
     }
     case 'agenda':
       return agendaText(S, ['today','tomorrow','week'].includes(j.range) ? j.range : 'today', now, env);
+    case 'tehillim': {
+      const chunks = await tehillimChunks();
+      if (!chunks) return '📖 לא הצלחתי להביא כרגע את פרקי התהילים 😕 נסה שוב עוד רגע, או קרא בינתיים ב-sefaria.org.il/Psalms';
+      return { text: chunks[0], cards: chunks.slice(1).map(t => ({ text: t })) };
+    }
     case 'answer':
       return reply || null;
     default:

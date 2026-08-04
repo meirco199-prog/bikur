@@ -1158,6 +1158,35 @@ console.log('תהילים יומי לפי התאריך העברי:');
   S = JSON.parse(kv.get('store'));
   check('ביטול מסיר את המשלוח היומי', r3.text.includes('ביטלתי') && !S.reminders.some(x => /תהילים/.test(x.text)), r3.text);
 
+  // ניסוחים חופשיים — "תשלח תהילים של היום" שולח את הפרקים, לא תיאור שלהם
+  const r4 = await send('תשלח תהילים של היום');
+  check('"תשלח תהילים של היום" שולח את הפרקים עצמם', r4.text.includes('הַלְלוּ') || r4.text.includes('— פרק'), r4.text.slice(0, 150));
+  const r5 = await send('תן לי את התהילים');
+  check('"תן לי את התהילים" גם עובד', r5.text.includes('הַלְלוּ') || r5.text.includes('— פרק'), r5.text.slice(0, 150));
+
+  globalThis.fetch = prevFetch;
+}
+
+console.log('המוח שולח תהילים במקום לתאר אותם:');
+{
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('sefaria.org')) {
+      const verses = ['בָּרְכִי נַפְשִׁי אֶת ה׳', 'הוֹדוּ לַה׳ קִרְאוּ בִשְׁמוֹ'];
+      return new Response(JSON.stringify({ he: verses }), { status: 200 });
+    }
+    if (String(url).includes('api.anthropic.com')) {
+      const text = '{"action":"tehillim","reply":""}';
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const before = sent.length;
+  await send('אשמח שתביא לי עכשיו את פרקי התהילים היומיים');
+  const msgs = sent.slice(before);
+  check('ניסוח חופשי לגמרי → פעולת tehillim שולחת את הטקסט', msgs.some(m => m.text.includes('תהילים ליום')), JSON.stringify(msgs.map(m => m.text.slice(0, 60))));
+  delete env.ANTHROPIC_API_KEY;
   globalThis.fetch = prevFetch;
 }
 
