@@ -1077,5 +1077,47 @@ console.log('תגובה (reply) על הודעה — הבוט מבין למה מ�
   globalThis.fetch = prevFetch;
 }
 
+console.log('פגישה עם כתובת ופרטים — הכול נשמר ביומן:');
+{
+  const prevFetch = globalThis.fetch;
+  const bridgeCalls = [];
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('bridge2.example')) { bridgeCalls.push(JSON.parse(opts.body)); return new Response('ok', { status: 200 }); }
+    if (u.includes('api.anthropic.com')) {
+      const text = JSON.stringify({ action: 'event',
+        title: "תור לפרופ' אהוד ראט", datetime: '2026-09-03 11:20',
+        location: 'בריאותא, יצחק נפח"א 25, באר שבע',
+        details: 'התשלום במזומן/אשראי בלבד, בהתאם לזכאות', reply: '' });
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.CALENDAR_WEBHOOK = 'https://bridge2.example/exec';
+  env.ANTHROPIC_API_KEY = 'sk-test';
+
+  const r = await send('קבע לי פגישה\nתורך לפרופ\' אהוד ראט נקבע לתאריך 03/09 בשעה 11:20, כתובת בWAZE: בריאותא, יצחק נפח"א 25, באר שבע. התשלום במזומן/אשראי בלבד.');
+  check('האישור מציג כתובת וגם פרטים', r.text.includes('📍') && r.text.includes('📝') && r.text.includes('מזומן'), r.text);
+  const call = bridgeCalls.find(b => !b.action);
+  check('הגשר קיבל גם location וגם description', !!call && call.location.includes('בריאותא') && call.description.includes('מזומן'), JSON.stringify(bridgeCalls));
+  const S = JSON.parse(kv.get('store'));
+  const ev = S.events.find(e => e.text.includes('אהוד ראט'));
+  check('האירוע נשמר עם הפרטים', !!ev && ev.desc.includes('מזומן'), JSON.stringify(ev));
+
+  // ההתראה 10 דקות לפני כוללת את הכתובת והפרטים
+  if (ev) {
+    ev.at = ilMs() + 9 * 60000;
+    kv.set('store', JSON.stringify(S));
+    const before = sent.length;
+    await worker.scheduled({}, env);
+    const ping = sent.slice(before).find(m => m.text.includes('אהוד ראט'));
+    check('ההתראה לפני הפגישה כוללת 📍 ו-📝', !!ping && ping.text.includes('בריאותא') && ping.text.includes('מזומן'), JSON.stringify(sent.slice(before).map(m => m.text)));
+  }
+
+  delete env.CALENDAR_WEBHOOK;
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

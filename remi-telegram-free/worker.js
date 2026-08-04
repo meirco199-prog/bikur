@@ -504,13 +504,14 @@ async function deleteFromGoogleCalendar(env, title, shiftedMs) {
 }
 
 // כתיבה ליומן גוגל דרך גשר Apps Script (ראה README)
-async function pushToGoogleCalendar(env, title, shiftedMs, location) {
+async function pushToGoogleCalendar(env, title, shiftedMs, location, description) {
   if (!env || !env.CALENDAR_WEBHOOK) return false;
   try {
     const res = await fetch(env.CALENDAR_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: env.SECRET, title, startMs: ilToRealMs(shiftedMs), durationMin: 60, location: location || '' }),
+      body: JSON.stringify({ secret: env.SECRET, title, startMs: ilToRealMs(shiftedMs), durationMin: 60,
+        location: location || '', description: description || '' }),
       redirect: 'follow',
     });
     return res.ok && (await res.text()).includes('ok');
@@ -986,7 +987,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"..."}],"reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"...","details":"..."}],"details":"...","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -995,6 +996,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - דייק בתאריך! חשב לפי התאריך של היום שכתוב למעלה: "מחר"=יום אחד קדימה, "יום שני הקרוב"=יום השני הבא בלוח השנה, "ל-1/8"=האחד באוגוסט. אל תשים הכול על מחר.
 - ה-title חייב להיות נקי ממילות זמן: בלי "מחר", בלי "ליום שני", בלי תאריכים — רק תוכן הפגישה עצמו (למשל "פגישה עם עירית נתיבות — תשלום דוחות").
 - כתובת/רחוב/מקום/טלפון של פגישה — שים ב-location, לא ב-title! ("פגישה עם ישראל ברחוב המסגר 11 אופקים" → title="פגישה עם ישראל", location="רחוב המסגר 11, אופקים"). כל פגישה מקבלת אוטומטית התראה מהבוט 10 דקות לפני — אל תיצור תזכורת נפרדת לזה.
+- שום מידע לא הולך לאיבוד! כל פרט חשוב בהודעת אירוע שלא נכנס ל-title או ל-location (אופן תשלום, הוראות הגעה, מספר אישור, מה להביא, שם רופא/מחלקה) — שים ב-details של האירוע, והוא יישמר בתיאור האירוע ביומן.
 - task = משימה לביצוע. shopping = פריטי קניות ב-items. note = מידע/מחשבה שכדאי לשמור. פרטים אישיים (שם, ת\"ז, תאריך לידה, כתובת) הם תמיד note — לעולם לא reminder, גם אם יש בהם תאריך!
 - event_move = לבקש להעביר/לדחות/להקדים פגישה קיימת. אם היא ברשימת "דרכך" — תן event_id + datetime חדש. אם היא רק ביומן גוגל — event_id=0, title = הכותרת המדויקת מרשימת היומן, datetime = המועד החדש. אל תיצור אירוע חדש.
 - event_delete = לבטל/למחוק פגישה קיימת. אם ברשימת "דרכך" — event_id. אם רק ביומן גוגל — event_id=0 ו-title = הכותרת המדויקת מרשימת היומן.
@@ -1071,7 +1073,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
     }
     case 'event': {
       const list = (Array.isArray(j.events) && j.events.length)
-        ? j.events : [{ title: j.title, datetime: j.datetime, location: j.location }];
+        ? j.events : [{ title: j.title, datetime: j.datetime, location: j.location, details: j.details }];
       const made = [];
       let anySynced = false;
       for (const ev of list.slice(0, 8)) {
@@ -1079,9 +1081,10 @@ async function applyAiAction(S, j, now, env, gcal = []) {
         const t = cleanup(String(ev.title || ''));
         if (!at || !t) continue;
         const loc = cleanup(String(ev.location || ''));
-        S.events.push({ id: nid(), text: t, at: at.getTime(), loc });
-        if (await pushToGoogleCalendar(env, t, at.getTime(), loc)) anySynced = true;
-        made.push(`📅 ${fmtDate(at.getTime(), now)} — "${t}"${loc ? `\n   📍 ${loc}` : ''}`);
+        const desc = cleanup(String(ev.details || ''));
+        S.events.push({ id: nid(), text: t, at: at.getTime(), loc, desc });
+        if (await pushToGoogleCalendar(env, t, at.getTime(), loc, desc)) anySynced = true;
+        made.push(`📅 ${fmtDate(at.getTime(), now)} — "${t}"${loc ? `\n   📍 ${loc}` : ''}${desc ? `\n   📝 ${desc}` : ''}`);
       }
       if (!made.length) return null;
       return (made.length === 1 ? `קבעתי לך${hey}:` : `קבעתי לך${hey} ${made.length} אירועים:`) +
@@ -1120,7 +1123,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
         ev.at = at.getTime();
         if (title && title.length >= 2) ev.text = title;
         await deleteFromGoogleCalendar(env, ev.text, oldAt);
-        const synced = await pushToGoogleCalendar(env, ev.text, ev.at, ev.loc);
+        const synced = await pushToGoogleCalendar(env, ev.text, ev.at, ev.loc, ev.desc);
         return `הזזתי${hey} 📅 את "${ev.text}" ל${fmtDate(ev.at, now)}` +
           (synced ? '\n📆 עודכן גם ביומן גוגל!' : '');
       }
@@ -1128,7 +1131,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       const g = findGcalEvent(gcal, title);
       if (!g) return null;
       await deleteFromGoogleCalendar(env, g.text, g.at);
-      const synced = await pushToGoogleCalendar(env, g.text, at.getTime(), g.loc);
+      const synced = await pushToGoogleCalendar(env, g.text, at.getTime(), g.loc, g.desc);
       S.events.push({ id: nid(), text: g.text, at: at.getTime(), loc: g.loc || '' });
       return `הזזתי${hey} 📅 את "${g.text}" ל${fmtDate(at.getTime(), now)}` +
         (synced ? '\n📆 עודכן גם ביומן גוגל!' : '\n⚠️ ביומן גוגל צריך גשר מעודכן — בדוק ב-/diag');
@@ -2051,7 +2054,7 @@ async function runCron(env, opts = {}) {
     const gEvents = (pingMin < 5 || now.getMinutes() % 5 === 0)
       ? await fetchCalendar(env, nowMs - 3600000, nowMs + 12 * 3600000) : [];
     const upcoming = [
-      ...S.events.map(e => ({ at: e.at, text: e.text, loc: e.loc || '' })),
+      ...S.events.map(e => ({ at: e.at, text: e.text, loc: e.loc || '', desc: e.desc || '' })),
       ...gEvents.filter(e => !e.allDay),
     ];
     for (const e of upcoming) {
@@ -2066,7 +2069,7 @@ async function runCron(env, opts = {}) {
       const n = firstName(S);
       await tgSend(env, S.ownerChatId,
         `🔔 ${n ? n + ', ' : ''}בעוד ${minsLeft} דקות (${fmtTime(e.at)}): ${e.text}` +
-        (e.loc ? `\n📍 ${e.loc}` : ''));
+        (e.loc ? `\n📍 ${e.loc}` : '') + (e.desc ? `\n📝 ${e.desc}` : ''));
       C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
       changed = true;
     }

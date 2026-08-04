@@ -81,10 +81,11 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({ ok: true, results: results }));
     }
 
-    // ברירת מחדל: יצירת אירוע (עם כתובת בשדה המיקום, אם נשלחה)
+    // ברירת מחדל: יצירת אירוע (כתובת בשדה המיקום, ופרטים נוספים בתיאור — אם נשלחו)
     const start = new Date(data.startMs);
     const end = new Date(data.startMs + (data.durationMin || 60) * 60000);
-    CalendarApp.getDefaultCalendar().createEvent(data.title, start, end, { location: data.location || '' });
+    CalendarApp.getDefaultCalendar().createEvent(data.title, start, end,
+      { location: data.location || '', description: data.description || '' });
     return ContentService.createTextOutput('ok');
   } catch (err) {
     return ContentService.createTextOutput('error: ' + err);
