@@ -883,18 +883,57 @@ function doSearch(S, q, now) {
   return out;
 }
 
+// כמה מהמילים המשמעותיות של a מופיעות ב-b (עם קילוף אותיות שימוש: "בשלמה"→"שלמה")
+function wordScore(a, b) {
+  const strip = (w) => w.replace(/^(?:וש|וב|ול|וכ|ומ|וה|ש|ב|ל|כ|מ|ה|ו)/, '');
+  const words = [...new Set(String(a || '').split(/[^\u0590-\u05FFa-zA-Z0-9]+/)
+    .flatMap(w => [w, strip(w)]).filter(w => w.length >= 3))];
+  const t = String(b || '');
+  return words.filter(w => t.includes(w)).length;
+}
+
 // זיכרונות שמורים שקשורים לנושא ההודעה — כדי שהמוח יענה מהזיכרון
 // ("מה מספר הפוליסה בשלמה?" → הזיכרון עם מספר הפוליסה נכנס להקשר של ה-AI)
 function relevantNotes(S, text) {
-  const strip = (w) => w.replace(/^(?:וש|וב|ול|וכ|ומ|וה|ש|ב|ל|כ|מ|ה|ו)/, '');
-  const words = [...new Set(String(text || '').split(/[^\u0590-\u05FFa-zA-Z0-9]+/)
-    .flatMap(w => [w, strip(w)]).filter(w => w.length >= 3))];
-  if (!words.length) return [];
   return (S.notes || [])
-    .map(n => ({ n, score: words.filter(w => n.text.includes(w)).length }))
+    .map(n => ({ n, score: wordScore(text, n.text) }))
     .filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score || b.n.created - a.n.created)
     .slice(0, 8).map(x => x.n);
+}
+
+// תגובה (reply) עם "תמחק" על הודעה — מזהים מה שמור אצלנו שתואם להודעה המצוטטת ומוחקים.
+// מסמך מזוהה לפי מזהה ההודעה המקורית; השאר לפי חפיפת מילים (הכי דומה מנצח, מינימום 2 מילים).
+async function deleteQuoted(S, quoted, env) {
+  const doc = quoted.mid ? (S.docs || []).find(d => d.mid === quoted.mid) : null;
+  if (doc) {
+    S.docs = S.docs.filter(d => d !== doc);
+    return `🗑️ מחקתי את המסמך "${doc.name}" מהארכיון.`;
+  }
+  const cands = [
+    ...(S.notes || []).map(x => ({ x, kind: 'note' })),
+    ...(S.tasks || []).filter(x => !x.done).map(x => ({ x, kind: 'task' })),
+    ...(S.events || []).map(x => ({ x, kind: 'event' })),
+    ...(S.reminders || []).map(x => ({ x, kind: 'rem' })),
+  ].map(c => ({ ...c, s: wordScore(c.x.text, quoted.text) }))
+   .filter(c => c.s >= 2).sort((a, b) => b.s - a.s);
+  const best = cands[0];
+  if (!best) return null;
+  if (best.kind === 'note') {
+    S.notes = S.notes.filter(n => n !== best.x);
+    return `🗑️ מחקתי את הזיכרון: "${best.x.text}"`;
+  }
+  if (best.kind === 'task') {
+    S.tasks = S.tasks.filter(t => t !== best.x);
+    return `🗑️ מחקתי את המשימה: "${best.x.text}"`;
+  }
+  if (best.kind === 'rem') {
+    S.reminders = S.reminders.filter(r => r !== best.x);
+    return `🗑️ מחקתי את התזכורת: "${best.x.text}"`;
+  }
+  S.events = S.events.filter(e => e !== best.x);
+  const gone = await deleteFromGoogleCalendar(env, best.x.text, best.x.at);
+  return `🗑️ ביטלתי את "${best.x.text}"` + (gone ? '\n📆 נמחק גם מיומן גוגל.' : '');
 }
 
 function findDocs(S, query) {
@@ -910,7 +949,7 @@ function findDocs(S, query) {
 // כשהחוקים הפשוטים לא בטוחים — מודל שפה מקבל את ההודעה, את הפרופיל ואת ההקשר,
 // ומחזיר JSON עם הפעולה + תשובה חמה ומנומסת.
 
-async function aiBrain(env, S, text, now, isVoice = false) {
+async function aiBrain(env, S, text, now, isVoice = false, replyCtx = null) {
   if (!env?.AI && !env?.ANTHROPIC_API_KEY) return null;
   const n = firstName(S) || 'חבר';
   const facts = [
@@ -939,13 +978,15 @@ async function aiBrain(env, S, text, now, isVoice = false) {
 ${hist || '(אין)'}
 זיכרונות שמורים שאולי קשורים להודעה:
 ${memCtx || '(אין)'}
+${replyCtx ? `ההודעה החדשה שלו נשלחה כתגובה (reply) על ההודעה הזו${replyCtx.fromBot === false ? ' (שהוא עצמו שלח בעבר)' : ' שאתה שלחת לו'}: "${String(replyCtx.text || '').slice(0, 300)}"
+חשוב: ההודעה שלו מתייחסת להודעה המצוטטת! "תמחק"/"תשנה"/"תעביר" = על מה שכתוב שם. אם המצוטטת היא אישור פגישה — event_move/event_delete עם ה-title משם; אם היא זיכרון או תשובה מזיכרון — note_delete עם המילים המרכזיות משם.` : ''}
 ההודעה החדשה שלו: "${text}"
 ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וייתכנו שגיאות תמלול — תקן לפי ההיגיון (למשל "תיסה"="טיסה", "כבר לי"="קבע לי", מספרים משובשים כמו "ה-37" הם כנראה תאריך כמו 30/7).' : ''}
 הפגישות הקרובות שהוא קבע דרכך: ${upcoming || '(אין)'}
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|agenda|gmail|routine|document|document_delete|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"..."}],"reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"..."}],"reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -962,6 +1003,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - routine = שולח לוז יומי חדש — כמה שורות של שעה+פעולה שיחזרו כל יום ("מעכשיו יהיה לוז חדש: 7:00 ... 21:00 ..."). מלא את routine עם כל השורות; שמור ב-title את מלוא התוכן של השורה (כולל ברכות). אל תשמור את זה כ-note!
 - document = מבקש מסמך/קובץ מהארכיון ("שלח לי את התז") — title = שם המסמך. לעולם אל תטען ב-answer ששלחת או צירפת קובץ — אתה לא מסוגל לצרף; השתמש ב-document.
 - document_delete = מבקש למחוק מסמך/תמונה/קובץ מהארכיון ("תמחק את התמונה של פרטי החברה") — title = שם המסמך. אתה כן יודע למחוק מסמכים — אל תסרב ואל תגיד שאי אפשר!
+- note_delete = מבקש למחוק זיכרון שמור ("תמחק את הזיכרון של הפוליסה", או "תמחק" כתגובה על הודעה עם תוכן מהזיכרון) — title = המילים המרכזיות של הזיכרון (למשל מספר או שם ייחודי). אתה כן יודע למחוק זיכרונות!
 - gmail = מבקש לחפש משהו במיילים, רק כשהוא מזכיר במפורש מייל/ג'ימייל ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
 - אם השאלה שלו נענית מתוך "זיכרונות שמורים" למעלה (למשל "מה מספר הפוליסה?" והמספר שמור בזיכרון) — action=answer, וכתוב ב-reply את המידע המלא מהזיכרון, כולל המספרים המדויקים. לעולם אל תחפש במייל מידע שכבר נמצא בזיכרונות!
@@ -1116,6 +1158,15 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       if (matches.length > 1) return 'מצאתי כמה מסמכים 📄:\n' + matches.map(d => `${S.docs.indexOf(d) + 1}. ${d.name}`).join('\n') + '\n\nשלח את המספר (למשל "2")';
       return `לא מצאתי מסמך בשם "${title}" 🤔 כתוב "מסמכים" לרשימה.`;
     }
+    case 'note_delete': {
+      if (!title) return null;
+      const bestNote = (S.notes || [])
+        .map(x => ({ x, s: wordScore(title, x.text) }))
+        .filter(e => e.s >= 1).sort((a, b) => b.s - a.s)[0]?.x;
+      if (!bestNote) return `לא מצאתי זיכרון שמתאים ל"${title}" 🤔 כתוב "זיכרונות" לרשימה.`;
+      S.notes = S.notes.filter(x => x !== bestNote);
+      return `🗑️ מחקתי${hey} את הזיכרון: "${bestNote.text}"`;
+    }
     case 'document_delete': {
       if (!title) return null;
       const matches = findDocs(S, title);
@@ -1252,7 +1303,7 @@ function taskGroupMsg(S, header) {
   };
 }
 
-export async function handleMessage(S, text, now, env, isVoice = false) {
+export async function handleMessage(S, text, now, env, isVoice = false, replyCtx = null) {
   let c = parseCommand(text, now);
 
   // המשך-הקשר: מספר בודד מיד אחרי שהבוט הציג רשימת מסמכים = "שלח מסמך N"
@@ -1263,11 +1314,17 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
       c = { cmd: /למחוק/.test(lastBot.text) ? 'doc_delete' : 'doc_send', index: parseInt(c.text, 10) };
   }
 
+  // תגובה (reply) על הודעה עם "תמחק"/"בטל" — מוחקים את מה שההודעה המצוטטת מדברת עליו
+  if (replyCtx && /^(?:תמחק|מחק|בטל|תבטל)(?:\s+(?:את\s+)?(?:זה|אותו|אותה))?[.!]?$/.test(cleanup(text))) {
+    const out = await deleteQuoted(S, replyCtx, env);
+    if (out) return out;
+  }
+
   // כשהחוקים לא בטוחים (או שזו הודעה קולית מתומללת) — המוח (AI) מקבל את ההגה
   const weak = c.cmd === 'unknown' || c.cmd === 'reminder_missing_time' || c.cmd === 'event_missing_time'
-    || c.auto || c.loose || isVoice;
+    || c.auto || c.loose || isVoice || !!replyCtx;
   if (weak && (env?.AI || env?.ANTHROPIC_API_KEY)) {
-    const ai = await aiBrain(env, S, text, now, isVoice);
+    const ai = await aiBrain(env, S, text, now, isVoice, replyCtx);
     if (ai) return ai;
   }
   const nid = () => S.nextId++;
@@ -1873,7 +1930,15 @@ async function handleWebhook(env, update) {
   // יומן התכתבות — כדי שאפשר יהיה לחפש אחורה
   S.history = [...(S.history || []), { ts: now.getTime(), text, mid: msg.message_id }].slice(-500);
 
-  const answer = await handleMessage(S, text, now, env, !!voicePrefix);
+  // תגובה (reply) על הודעה קודמת — ההודעה המצוטטת היא הקשר חיוני להבנה
+  const rt = msg.reply_to_message;
+  const replyCtx = rt ? {
+    mid: rt.message_id,
+    text: rt.text || rt.caption || '',
+    fromBot: !!(rt.from && rt.from.is_bot),
+  } : null;
+
+  const answer = await handleMessage(S, text, now, env, !!voicePrefix, replyCtx);
   // גם התשובה של הבוט נשמרת בהיסטוריה — כדי שהמוח יבין המשכי שיחה ("כן", "ח.פ")
   const answerText = typeof answer === 'string' ? answer : (answer && answer.text) || '';
   if (answerText) S.history = [...(S.history || []), { ts: now.getTime(), text: answerText.slice(0, 300), bot: true }].slice(-500);

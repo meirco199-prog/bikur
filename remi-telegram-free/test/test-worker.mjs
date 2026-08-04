@@ -1005,5 +1005,77 @@ console.log('מחיקה כשכמה מסמכים מתאימים — שאלה וב
     JSON.stringify(S1.docs.map(d => d.name)));
 }
 
+console.log('תגובה (reply) על הודעה — הבוט מבין למה מתכוונים:');
+{
+  // "תמחק" כתגובה על הודעת בוט עם תוכן מהזיכרון → מוחק את הזיכרון עצמו
+  const S0 = JSON.parse(kv.get('store'));
+  check('הזיכרון עם הפוליסה קיים לפני המחיקה', S0.notes.some(n => n.text.includes('110643685526')));
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'תמחק', chat: { id: 111 },
+      reply_to_message: { message_id: 4321, from: { is_bot: true },
+        text: 'מצאתי אצלי מאיר — מספר הפוליסה בשלמה הוא 110643685526, זו הפוליסה של נגרר ההידראוליקה' } } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  const S1 = JSON.parse(kv.get('store'));
+  check('"תמחק" כתגובה מוחק את הזיכרון שמדובר בו', r.text.includes('מחקתי') && !S1.notes.some(n => n.text.includes('110643685526')), r.text);
+}
+{
+  // "תמחק" כתגובה על הודעת התמונה המקורית → מוחק את המסמך מהארכיון
+  const up = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { photo: [{ file_id: 'photoDel' }],
+      caption: 'שמור: אישור ניכוי מס', message_id: 1234, chat: { id: 111 } } }),
+  });
+  await worker.fetch(up, env);
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'תמחק', chat: { id: 111 },
+      reply_to_message: { message_id: 1234, caption: 'שמור: אישור ניכוי מס' } } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  const S = JSON.parse(kv.get('store'));
+  check('"תמחק" כתגובה על תמונה מוחק את המסמך מהארכיון', r.text.includes('מחקתי') && !S.docs.some(d => d.name.includes('ניכוי')), r.text);
+}
+{
+  // תגובה על אישור פגישה עם בקשת שינוי → המוח מקבל את ההודעה המצוטטת ומזיז את הפגישה הנכונה
+  await send('קבע פגישה עם יוסי ביטוח ביום רביעי ב-10:00');
+  let S = JSON.parse(kv.get('store'));
+  const ev = S.events.find(e => e.text.includes('יוסי ביטוח'));
+  check('הפגישה נקבעה', !!ev, JSON.stringify(S.events.map(e => e.text)));
+  const prevFetch = globalThis.fetch;
+  let seenPrompt = '';
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const reqB = JSON.parse(opts.body);
+      seenPrompt = typeof reqB.messages[0].content === 'string' ? reqB.messages[0].content : '';
+      // המוק מתנהג כמו המודל האמיתי: מזהה מההודעה המצוטטת לאיזו פגישה הכוונה
+      const ok = seenPrompt.includes('כתגובה (reply)') || seenPrompt.includes('נשלחה כתגובה');
+      const text = ok && seenPrompt.includes('יוסי ביטוח')
+        ? JSON.stringify({ action: 'event_move', event_id: ev.id, datetime: '2027-01-05 15:00', reply: '' })
+        : '{"action":"answer","reply":"לא הבנתי למה הכוונה"}';
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'תעביר את זה לשעה 15:00', chat: { id: 111 },
+      reply_to_message: { message_id: 5555, from: { is_bot: true },
+        text: 'קבעתי לך:\n📅 יום רביעי — "פגישה עם יוסי ביטוח"\n🔔 אזכיר לך 10 דקות לפני כל אחד.' } } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  check('המוח קיבל את ההודעה המצוטטת כהקשר', seenPrompt.includes('יוסי ביטוח') && /תגובה/.test(seenPrompt), seenPrompt.slice(0, 500));
+  S = JSON.parse(kv.get('store'));
+  const moved = S.events.find(e => e.id === ev.id);
+  check('הפגישה מההודעה המצוטטת הוזזה', r.text.includes('הזזתי') && !!moved && new Date(moved.at).getHours() === 15, r.text);
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
