@@ -71,6 +71,76 @@ export function hebrewDate() {
   return `${gematria(day)} ב${month} ה${gematria(year % 1000)}`;
 }
 
+// ===== תהילים יומי — החלוקה המסורתית של הספר ל-30 ימי החודש העברי =====
+const TEHILLIM_DAYS = [
+  { a: 1, b: 9 }, { a: 10, b: 17 }, { a: 18, b: 22 }, { a: 23, b: 28 }, { a: 29, b: 34 },
+  { a: 35, b: 38 }, { a: 39, b: 43 }, { a: 44, b: 48 }, { a: 49, b: 54 }, { a: 55, b: 59 },
+  { a: 60, b: 65 }, { a: 66, b: 68 }, { a: 69, b: 71 }, { a: 72, b: 76 }, { a: 77, b: 78 },
+  { a: 79, b: 82 }, { a: 83, b: 87 }, { a: 88, b: 89 }, { a: 90, b: 96 }, { a: 97, b: 103 },
+  { a: 104, b: 105 }, { a: 106, b: 107 }, { a: 108, b: 112 }, { a: 113, b: 118 },
+  { a: 119, b: 119, v1: 1, v2: 96, label: 'קי״ט (חלק א׳)' },
+  { a: 119, b: 119, v1: 97, v2: 176, label: 'קי״ט (חלק ב׳)' },
+  { a: 120, b: 134 }, { a: 135, b: 139 }, { a: 140, b: 144 }, { a: 145, b: 150 },
+];
+
+function hebrewDayOfMonth(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('he-u-ca-hebrew', { timeZone: IL_TZ, day: 'numeric' }).formatToParts(date);
+  return parseInt(parts.find(p => p.type === 'day')?.value || '1', 10);
+}
+
+// הטקסט המלא מגיע מ-Sefaria (ספרייה תורנית חינמית) — פרק אחד לכל בקשה
+async function fetchPsalmVerses(ref) {
+  const res = await fetch(`https://www.sefaria.org/api/texts/${ref}?context=0&commentary=0`);
+  if (!res.ok) throw new Error('sefaria ' + res.status);
+  const j = await res.json();
+  const clean = (v) => String(v).replace(/<[^>]*>/g, '').replace(/\{[פס]\}/g, '')
+    .replace(/&[a-z#0-9]+;/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  let he = Array.isArray(j.he) ? j.he : [];
+  if (he.length && Array.isArray(he[0])) he = he.flat(); // טווח שחוצה פרקים חוזר מקונן
+  return he.map(clean).filter(Boolean);
+}
+
+const tehillimCache = new Map();
+
+// מחזיר את פרקי היום כרשימת הודעות (מפוצלות מתחת למגבלת טלגרם), או null בתקלה
+async function tehillimChunks() {
+  try {
+    const d = hebrewDayOfMonth();
+    const portions = [TEHILLIM_DAYS[d - 1]];
+    // בחודש חסר (29 ימים) קוראים ביום כ"ט גם את מנת יום ל'
+    if (d === 29 && hebrewDayOfMonth(new Date(Date.now() + 86400000)) === 1) portions.push(TEHILLIM_DAYS[29]);
+    const key = d + '|' + portions.length;
+    if (tehillimCache.has(key)) return tehillimCache.get(key);
+    const chapters = [];
+    for (const p of portions) {
+      if (p.v1) {
+        chapters.push({ name: p.label, verses: await fetchPsalmVerses(`Psalms.119.${p.v1}-${p.v2}`) });
+      } else {
+        const nums = [];
+        for (let n = p.a; n <= p.b; n++) nums.push(n);
+        const fetched = await Promise.all(nums.map(n => fetchPsalmVerses(`Psalms.${n}`)));
+        nums.forEach((n, i) => chapters.push({ name: gematria(n), verses: fetched[i] }));
+      }
+    }
+    if (!chapters.length || chapters.some(c => !c.verses.length)) return null;
+    const label = portions.map(p => p.label || (p.a === p.b ? gematria(p.a) : `${gematria(p.a)}–${gematria(p.b)}`)).join(' + ');
+    const chunks = [];
+    let cur = `📖 תהילים ליום ${gematria(d)} בחודש — פרקים ${label} 🙏`;
+    const push = (s) => {
+      if (cur.length + s.length > 3500) { chunks.push(cur); cur = s.replace(/^\n+/, ''); }
+      else cur += s;
+    };
+    for (const ch of chapters) {
+      push(`\n\n— פרק ${ch.name} —`);
+      for (const v of ch.verses) push('\n' + v);
+    }
+    chunks.push(cur);
+    tehillimCache.clear(); // היום מתחלף — לא צריך יותר מהמנה של היום
+    tehillimCache.set(key, chunks);
+    return chunks;
+  } catch { return null; }
+}
+
 // ===== מפענח עברית =====
 
 const DAY_WORDS = { 'ראשון':0,'שני':1,'שלישי':2,'רביעי':3,'חמישי':4,'שישי':5,'שבת':6 };
@@ -311,6 +381,12 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'draft', text: cleanup(m[1]) };
   m = text.match(/^(?:תרגם|תרגמי|targem)(?:\s+לי)?(?:\s+ל(אנגלית|עברית|צרפתית|ספרדית|רוסית|ערבית))?[:\s]+(.+)$/s);
   if (m) return { cmd:'translate', lang: m[1] || 'עברית', text: cleanup(m[2]) };
+
+  // תהילים יומי לפי התאריך העברי
+  m = text.match(/^(?:שלח\s+לי\s+)?(?:תהילים|תהלים)\s+כל\s+(?:בוקר|יום)(?:\s+ב-?(\d{1,2})(?::(\d{2}))?)?$/);
+  if (m) return { cmd:'tehillim_daily', hour: m[1] ? +m[1] : 7, minute: m[2] ? +m[2] : 0 };
+  if (/^(?:שלח\s+לי\s+)?(?:תהילים|תהלים)(?:\s+של)?(?:\s+ה?יום)?\??$/.test(text)) return { cmd:'tehillim_now' };
+  if (/^(?:בטל|מחק|תבטל|תמחק)\s+(?:את\s+)?ה?(?:תהילים|תהלים)(?:\s+.*)?$/.test(text)) return { cmd:'tehillim_off' };
 
   // מסמכים
   if (/^(מסמכים|רשימת מסמכים|הקבצים שלי)\??$/.test(text)) return { cmd:'doc_list' };
@@ -991,6 +1067,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
+- בקשת תהילים יומי ("שלח לי כל בוקר תהילים") = reminder יומי (recurring=daily) עם title "תהילים של היום" — בזמן המשלוח הבוט שולח אוטומטית את פרקי היום לפי התאריך העברי.
 - event = פגישה/טיסה/אירוע ליומן. חובה datetime. אם נתן טווח תאריכים — קח את תאריך ההתחלה וציין את הטווח ב-title.
 - אם יש בהודעה כמה אירועים (תאריכים/שעות שונים) — action=event ומלא את המערך events עם כולם, כל אחד עם title נקי, datetime ו-location משלו. לעולם אל תדחס שני אירועים לאחד!
 - דייק בתאריך! חשב לפי התאריך של היום שכתוב למעלה: "מחר"=יום אחד קדימה, "יום שני הקרוב"=יום השני הבא בלוח השנה, "ל-1/8"=האחד באוגוסט. אל תשים הכול על מחר.
@@ -1572,6 +1649,26 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
       const out = `בוואטסאפ אני לא יכול לחפש 😕 ההודעות שם מוצפנות ושמורות רק בטלפון שלך — אף שירות חיצוני לא יכול לקרוא אותן.\n\n💡 מה כן עובד: כל מסמך חשוב שמגיע לך בוואטסאפ — שתף/העבר אליי עם כיתוב "שמור: <שם>", ומאותו רגע הוא בארכיון שלי לתמיד ("איפה <שם>").\n\nבינתיים חיפשתי אצלי:\n${localText}`;
       return typeof local === 'object' && local.replyTo ? { text: out, replyTo: local.replyTo } : out;
     }
+    case 'tehillim_now': {
+      const chunks = await tehillimChunks();
+      if (!chunks) return '📖 לא הצלחתי להביא כרגע את פרקי התהילים 😕 נסה שוב עוד רגע, או קרא בינתיים ב-sefaria.org.il/Psalms';
+      return { text: chunks[0], cards: chunks.slice(1).map(t => ({ text: t })) };
+    }
+    case 'tehillim_daily': {
+      if (c.hour > 23 || c.minute > 59) return 'שעה לא חוקית 🙂 נסה למשל "תהילים כל בוקר ב-7"';
+      S.reminders = S.reminders.filter(r => !(r.recurringDaily && /תהילים|תהלים/.test(r.text)));
+      const at = new Date(now); at.setHours(c.hour, c.minute, 0, 0);
+      if (at.getTime() <= now.getTime()) at.setTime(at.getTime() + 86400000);
+      S.reminders.push({ id: nid(), text: 'תהילים של היום לפי התאריך העברי', at: at.getTime(),
+        recurringDaily: true, recurringWeekly: null });
+      return `📖 סגור! כל יום ב-${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')} אשלח לך את פרקי התהילים של אותו יום לפי התאריך העברי 🙏\n(לביטול: "בטל תהילים")`;
+    }
+    case 'tehillim_off': {
+      const before = S.reminders.length;
+      S.reminders = S.reminders.filter(r => !/תהילים|תהלים/.test(r.text));
+      return before > S.reminders.length ? '🗑️ ביטלתי את משלוח התהילים היומי.' : 'אין משלוח תהילים פעיל כרגע 🙂';
+    }
+
     case 'doc_list': {
       if (!S.docs.length) return '📄 אין מסמכים שמורים.\nשלח תמונה או קובץ עם כיתוב "שמור: תז של יוסי" ואשמור אותו.';
       return `📄 המסמכים שלך (${S.docs.length}):\n` + S.docs.map((d,i) => {
@@ -2017,6 +2114,25 @@ async function runCron(env, opts = {}) {
         okD = await tgSend(env, S.ownerChatId, `📋 ${n0 ? n0 + ', ' : ''}אין משימות פתוחות היום — כל הכבוד! 🎉`);
       }
       if (!okD) throw new Error(lastTgError || 'טלגרם לא אישר את השליחה');
+      sentGuard.set(gk, Date.now());
+      C.fired[r.id] = due;
+      C.lastFired = { text: r.text };
+      C.stats.fired = [...(C.stats.fired || []), nowMs].slice(-300);
+      changed = true;
+      continue;
+    }
+    // תהילים יומי — שולחים את פרקי היום עצמם לפי התאריך העברי (לרוב 2-3 הודעות)
+    if (/תהילים|תהלים/.test(r.text)) {
+      const chunks = await tehillimChunks();
+      let okT = true;
+      if (chunks) {
+        for (const chunk of chunks) {
+          if (!await tgSend(env, S.ownerChatId, chunk)) { okT = false; break; }
+        }
+      } else {
+        okT = await tgSend(env, S.ownerChatId, '📖 לא הצלחתי להביא הבוקר את פרקי התהילים 😕 כתוב לי "תהילים" ואנסה שוב, או קרא ב-sefaria.org.il/Psalms');
+      }
+      if (!okT) throw new Error(lastTgError || 'טלגרם לא אישר את השליחה');
       sentGuard.set(gk, Date.now());
       C.fired[r.id] = due;
       C.lastFired = { text: r.text };

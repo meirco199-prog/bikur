@@ -1119,5 +1119,47 @@ console.log('פגישה עם כתובת ופרטים — הכול נשמר בי�
   globalThis.fetch = prevFetch;
 }
 
+console.log('תהילים יומי לפי התאריך העברי:');
+{
+  const prevFetch = globalThis.fetch;
+  let sefariaCalls = 0;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('sefaria.org')) {
+      sefariaCalls++;
+      // 60 פסוקים ארוכים לכל פרק — כדי לוודא שהפיצול להודעות עובד
+      const verses = Array.from({ length: 60 }, (_, i) => `פסוק ${i + 1} הַלְלוּ־יָהּ הַלְלוּ אֵל בְּקׇדְשׁוֹ הַלְלוּהוּ בִּרְקִיעַ עֻזּוֹ`);
+      return new Response(JSON.stringify({ he: verses }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+
+  const before = sent.length;
+  const r = await send('תהילים');
+  const thMsgs = sent.slice(before);
+  check('"תהילים" שולח את פרקי היום', thMsgs[0].text.includes('תהילים ליום') && thMsgs[0].text.includes('— פרק'), thMsgs[0].text.slice(0, 200));
+  check('  הטקסט המלא מגיע מהמקור', sefariaCalls > 0 && thMsgs[0].text.includes('הַלְלוּ'), `calls=${sefariaCalls}`);
+  check('  הודעות ארוכות מפוצלות מתחת למגבלת טלגרם', thMsgs.length >= 2 && thMsgs.every(m => m.text.length <= 4096), `msgs=${thMsgs.length}`);
+
+  const r2 = await send('תהילים כל בוקר ב-6');
+  check('הפעלת משלוח יומי', r2.text.includes('06:00') && r2.text.includes('התאריך העברי'), r2.text);
+  let S = JSON.parse(kv.get('store'));
+  const rem = S.reminders.find(x => /תהילים/.test(x.text) && x.recurringDaily);
+  check('  נוצרה תזכורת יומית', !!rem, JSON.stringify(S.reminders.map(x => x.text)));
+
+  // בזמן הצלצול — נשלחים הפרקים עצמם
+  rem.at = ilMs() - 60000;
+  kv.set('store', JSON.stringify(S));
+  const beforeCron = sent.length;
+  await worker.scheduled({}, env);
+  const fired = sent.slice(beforeCron);
+  check('בזמן הצלצול נשלחים פרקי היום עצמם', fired.some(m => m.text.includes('תהילים ליום') && m.text.includes('הַלְלוּ')), JSON.stringify(fired.map(f => f.text.slice(0, 80))));
+
+  const r3 = await send('בטל תהילים');
+  S = JSON.parse(kv.get('store'));
+  check('ביטול מסיר את המשלוח היומי', r3.text.includes('ביטלתי') && !S.reminders.some(x => /תהילים/.test(x.text)), r3.text);
+
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
