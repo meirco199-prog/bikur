@@ -1092,7 +1092,7 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       if (!title) return null;
       const matches = findDocs(S, title);
       if (matches.length === 1) return { text: `📄 הנה "${matches[0].name}":`, doc: matches[0], replyTo: matches[0].mid };
-      if (matches.length > 1) return 'מצאתי כמה מסמכים 📄:\n' + matches.map(d => `• ${d.name}`).join('\n') + '\n\nדייק לי: "איפה <שם>"';
+      if (matches.length > 1) return 'מצאתי כמה מסמכים 📄:\n' + matches.map(d => `${S.docs.indexOf(d) + 1}. ${d.name}`).join('\n') + '\n\nשלח את המספר (למשל "2")';
       return `לא מצאתי מסמך בשם "${title}" 🤔 כתוב "מסמכים" לרשימה.`;
     }
     case 'gmail': {
@@ -1218,7 +1218,13 @@ function taskGroupMsg(S, header) {
 }
 
 export async function handleMessage(S, text, now, env, isVoice = false) {
-  const c = parseCommand(text, now);
+  let c = parseCommand(text, now);
+
+  // המשך-הקשר: מספר בודד מיד אחרי שהבוט הציג רשימת מסמכים = "שלח מסמך N"
+  if (c.cmd === 'unknown' && /^\d{1,2}$/.test((c.text || '').trim())) {
+    const lastBot = [...(S.history || [])].reverse().find(h => h.bot);
+    if (lastBot && /מסמכ/.test(lastBot.text)) c = { cmd: 'doc_send', index: parseInt(c.text, 10) };
+  }
 
   // כשהחוקים לא בטוחים (או שזו הודעה קולית מתומללת) — המוח (AI) מקבל את ההגה
   const weak = c.cmd === 'unknown' || c.cmd === 'reminder_missing_time' || c.cmd === 'event_missing_time'
@@ -1489,7 +1495,7 @@ export async function handleMessage(S, text, now, env, isVoice = false) {
         return `מצאתי כמה מסמכים 📄:\n` + matches.map((d) => {
           const idx = S.docs.indexOf(d) + 1;
           return `${idx}. ${d.name}`;
-        }).join('\n') + '\n\nכתוב "שלח מסמך <מספר>"';
+        }).join('\n') + '\n\nשלח את המספר (למשל "2")';
       }
       // אין מסמך כזה — ננסה חיפוש כללי
       return doSearch(S, c.query, now);

@@ -929,5 +929,14 @@ console.log('כמה אירועים בהודעה אחת:');
   globalThis.fetch = prevFetch;
 }
 
+console.log('מספר בודד אחרי רשימת מסמכים:');
+{
+  const r = await send('שלח לי תז שלי');
+  check('שני מסמכים תואמים — רשימה ממוספרת', r.text.includes('מצאתי כמה מסמכים'), r.text);
+  const before = sent.length;
+  await send('2');
+  check('"2" לבד שולח את מסמך 2', sent.slice(before).some(m => m.photo === 'photo123'), JSON.stringify(sent.slice(before)));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
