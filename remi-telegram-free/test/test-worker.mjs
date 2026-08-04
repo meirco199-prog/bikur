@@ -1190,5 +1190,46 @@ console.log('המוח שולח תהילים במקום לתאר אותם:');
   globalThis.fetch = prevFetch;
 }
 
+console.log('מזג אוויר וזמני שבת בהודעת הבוקר:');
+{
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes('api.open-meteo.com')) {
+      return new Response(JSON.stringify({ daily: {
+        temperature_2m_max: [33.4], temperature_2m_min: [23.6],
+        precipitation_probability_max: [10], weather_code: [1],
+      } }), { status: 200 });
+    }
+    if (u.includes('hebcal.com')) {
+      return new Response(JSON.stringify({ items: [
+        { category: 'candles', date: '2026-08-07T19:07:00+03:00' },
+        { category: 'parashat', hebrew: 'פרשת עקב' },
+        { category: 'havdalah', date: '2026-08-08T20:16:00+03:00' },
+      ] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+
+  const r = await send('מזג אוויר');
+  check('"מזג אוויר" — שתי הנקודות עם טווח מעלות', r.text.includes('נתיבות 24°–33°') && r.text.includes('שדה דוד'), r.text);
+  const r2 = await send('זמני שבת');
+  check('"זמני שבת" — כניסה, צאת ופרשה', r2.text.includes('כניסת שבת: 19:07') && r2.text.includes('צאת שבת: 20:16') && r2.text.includes('עקב'), r2.text);
+
+  // תזכורת הבוקר כוללת את מזג האוויר
+  await send('תזכיר לי כל יום ב-7 בוקר טוב וברכת בוקר');
+  let S = JSON.parse(kv.get('store'));
+  const rem = S.reminders.find(x => /בוקר טוב/.test(x.text) && x.recurringDaily);
+  check('נוצרה תזכורת בוקר', !!rem, JSON.stringify(S.reminders.map(x => x.text)));
+  rem.at = ilMs() - 60000;
+  kv.set('store', JSON.stringify(S));
+  const before = sent.length;
+  await worker.scheduled({}, env);
+  const fired = sent.slice(before);
+  check('הודעת הבוקר כוללת את מזג האוויר', fired.some(m => m.text.includes('בוקר טוב') && m.text.includes('מזג אוויר: נתיבות')), JSON.stringify(fired.map(f => f.text.slice(0, 120))));
+
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

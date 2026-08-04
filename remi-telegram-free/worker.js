@@ -83,6 +83,65 @@ const TEHILLIM_DAYS = [
   { a: 120, b: 134 }, { a: 135, b: 139 }, { a: 140, b: 144 }, { a: 145, b: 150 },
 ];
 
+// ===== מזג אוויר (Open-Meteo — חינם, בלי מפתח) וזמני שבת (Hebcal) =====
+const WEATHER_SPOTS = [
+  { name: 'נתיבות', lat: 31.422, lon: 34.589 },
+  { name: 'שדה דוד', lat: 31.545, lon: 34.685 },
+];
+const weatherIcon = (c) => c === 0 ? '☀️' : c <= 3 ? '⛅' : c <= 48 ? '🌫️' : c <= 67 ? '🌧️' : c <= 77 ? '🌨️' : c <= 82 ? '🌧️' : '⛈️';
+
+// נשלף פעם ביום ונשמר בזיכרון האיזולט — הודעת הבוקר לא תלויה בכמה בקשות רשת כל דקה
+const dayCache = new Map();
+async function cachedDaily(key, fn) {
+  const k = key + '|' + new Date().toISOString().slice(0, 10);
+  if (dayCache.has(k)) return dayCache.get(k);
+  const v = await fn();
+  if (v) {
+    for (const old of [...dayCache.keys()]) if (old.startsWith(key + '|')) dayCache.delete(old);
+    dayCache.set(k, v);
+  }
+  return v;
+}
+
+async function weatherLine() {
+  return cachedDaily('wx', async () => {
+    try {
+      const results = await Promise.all(WEATHER_SPOTS.map(async (s) => {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${s.lat}&longitude=${s.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&timezone=Asia%2FJerusalem&forecast_days=1`);
+        if (!res.ok) throw new Error('meteo ' + res.status);
+        const d = (await res.json()).daily;
+        return { name: s.name, min: Math.round(d.temperature_2m_min[0]), max: Math.round(d.temperature_2m_max[0]),
+          rain: d.precipitation_probability_max[0] || 0, code: d.weather_code[0] || 0 };
+      }));
+      const icon = weatherIcon(Math.max(...results.map(r => r.code)));
+      let line = `${icon} מזג אוויר: ` + results.map(r => `${r.name} ${r.min}°–${r.max}°`).join(' | ');
+      const rain = Math.max(...results.map(r => r.rain));
+      if (rain >= 25) line += `\n🌧️ סיכוי לגשם: ${rain}%`;
+      return line;
+    } catch { return null; }
+  });
+}
+
+// זמני שבת לאזור נתיבות — כניסה, צאת ופרשת השבוע
+async function shabbatLine() {
+  return cachedDaily('shb', async () => {
+    try {
+      const res = await fetch('https://www.hebcal.com/shabbat?cfg=json&latitude=31.422&longitude=34.589&tzid=Asia/Jerusalem&M=on&b=18');
+      if (!res.ok) throw new Error('hebcal ' + res.status);
+      const items = (await res.json()).items || [];
+      const timeOf = (cat) => {
+        const it = items.find(x => x.category === cat);
+        const m = it && String(it.date).match(/T(\d{2}:\d{2})/);
+        return m ? m[1] : null;
+      };
+      const candles = timeOf('candles'), havdalah = timeOf('havdalah');
+      if (!candles || !havdalah) return null;
+      const parasha = items.find(x => x.category === 'parashat');
+      return `🕯️ ${parasha?.hebrew ? parasha.hebrew + ' — ' : ''}כניסת שבת: ${candles} | 🌃 צאת שבת: ${havdalah}`;
+    } catch { return null; }
+  });
+}
+
 function hebrewDayOfMonth(date = new Date()) {
   const parts = new Intl.DateTimeFormat('he-u-ca-hebrew', { timeZone: IL_TZ, day: 'numeric' }).formatToParts(date);
   return parseInt(parts.find(p => p.type === 'day')?.value || '1', 10);
@@ -381,6 +440,10 @@ export function parseCommand(raw, now) {
   if (m) return { cmd:'draft', text: cleanup(m[1]) };
   m = text.match(/^(?:תרגם|תרגמי|targem)(?:\s+לי)?(?:\s+ל(אנגלית|עברית|צרפתית|ספרדית|רוסית|ערבית))?[:\s]+(.+)$/s);
   if (m) return { cmd:'translate', lang: m[1] || 'עברית', text: cleanup(m[2]) };
+
+  // מזג אוויר וזמני שבת — לפי דרישה
+  if (/^(?:מה\s+)?(?:ה)?מזג\s*(?:ה)?אוויר(?:\s+היום)?\??$/.test(text)) return { cmd:'weather' };
+  if (/^(?:מתי\s+)?(?:זמני\s+שבת|כניסת\s+שבת|צאת\s+שבת|שעות\s+שבת)\??$/.test(text)) return { cmd:'shabbat' };
 
   // תהילים יומי לפי התאריך העברי
   m = text.match(/^(?:(?:שלח|תשלח|תביא|הבא|תן)(?:\s+לי)?\s+)?(?:את\s+)?ה?(?:תהילים|תהלים)\s+כל\s+(?:בוקר|יום)(?:\s+ב-?(\d{1,2})(?::(\d{2}))?)?$/);
@@ -882,6 +945,12 @@ async function morningBrief(S, now, env) {
   if (!all.length && !rems.length && !tasks.length) return null;
   const n = firstName(S);
   let out = `🌅 בוקר טוב${n ? ' ' + n : ''}! יום ${DAY_NAMES[now.getDay()]}, ${hebrewDate()}:\n`;
+  const wx = await weatherLine();
+  if (wx) out += '\n' + wx + '\n';
+  if (now.getDay() === 5) {
+    const sh = await shabbatLine();
+    if (sh) out += '\n' + sh + '\n';
+  }
   if (all.length) out += '\n' + all.map(e => `📅 ${e.allDay ? 'כל היום' : fmtTime(e.at)} — ${e.text}${e.loc ? ` (📍 ${e.loc})` : ''}`).join('\n');
   if (rems.length) out += '\n' + rems.map(x => `⏰ ${fmtTime(x.occ)} — ${x.r.text}`).join('\n');
   if (tasks.length) out += `\n\n📋 משימות פתוחות:\n` + tasks.map((t,i) => `${i+1}. ${t.text}`).join('\n');
@@ -1334,6 +1403,12 @@ async function smartReminderText(env, S, text, now) {
   const nm = firstName(S);
   if (/בוקר טוב|ברכת בוקר/.test(text)) {
     parts.push(`☀️ בוקר טוב${nm ? ' ' + nm : ''}! שיהיה לך יום נפלא 🙂`);
+    const wx = await weatherLine();
+    if (wx) parts.push(wx);
+    if (now.getDay() === 5) { // שישי — מוסיפים את זמני השבת
+      const sh = await shabbatLine();
+      if (sh) parts.push(sh);
+    }
   }
   if (/תאריך/.test(text) && /עברי/.test(text)) {
     parts.push(`היום יום ${DAY_NAMES[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} — ובעברי: ${hebrewDate()} 🕎`);
@@ -1654,6 +1729,14 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
       const localText = typeof local === 'string' ? local : local.text;
       const out = `בוואטסאפ אני לא יכול לחפש 😕 ההודעות שם מוצפנות ושמורות רק בטלפון שלך — אף שירות חיצוני לא יכול לקרוא אותן.\n\n💡 מה כן עובד: כל מסמך חשוב שמגיע לך בוואטסאפ — שתף/העבר אליי עם כיתוב "שמור: <שם>", ומאותו רגע הוא בארכיון שלי לתמיד ("איפה <שם>").\n\nבינתיים חיפשתי אצלי:\n${localText}`;
       return typeof local === 'object' && local.replyTo ? { text: out, replyTo: local.replyTo } : out;
+    }
+    case 'weather': {
+      const wx = await weatherLine();
+      return wx || 'לא הצלחתי להביא כרגע את מזג האוויר 😕 נסה שוב עוד רגע.';
+    }
+    case 'shabbat': {
+      const sh = await shabbatLine();
+      return sh || 'לא הצלחתי להביא כרגע את זמני השבת 😕 נסה שוב עוד רגע.';
     }
     case 'tehillim_now': {
       const chunks = await tehillimChunks();
