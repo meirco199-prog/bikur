@@ -1213,6 +1213,8 @@ console.log('מזג אוויר וזמני שבת בהודעת הבוקר:');
 
   const r = await send('מזג אוויר');
   check('"מזג אוויר" — שתי הנקודות עם טווח מעלות', r.text.includes('נתיבות 24°–33°') && r.text.includes('שדה דוד'), r.text);
+  const rTypo = await send('מה המזג אויר');
+  check('גם בכתיב חסר "מזג אויר"', rTypo.text.includes('נתיבות'), rTypo.text);
   const r2 = await send('זמני שבת');
   check('"זמני שבת" — כניסה, צאת ופרשה', r2.text.includes('כניסת שבת: 19:07') && r2.text.includes('צאת שבת: 20:16') && r2.text.includes('עקב'), r2.text);
 
@@ -1227,6 +1229,20 @@ console.log('מזג אוויר וזמני שבת בהודעת הבוקר:');
   await worker.scheduled({}, env);
   const fired = sent.slice(before);
   check('הודעת הבוקר כוללת את מזג האוויר', fired.some(m => m.text.includes('בוקר טוב') && m.text.includes('מזג אוויר: נתיבות')), JSON.stringify(fired.map(f => f.text.slice(0, 120))));
+
+  // ניסוח חופשי דרך המוח — פעולת weather במקום "אין לי גישה"
+  const innerFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      return new Response(JSON.stringify({ stop_reason: 'end_turn',
+        content: [{ type: 'text', text: '{"action":"weather","reply":""}' }] }), { status: 200 });
+    }
+    return innerFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const rAi = await send('כמה מעלות יהיה היום בחוץ?');
+  check('שאלה חופשית על מעלות → תחזית אמיתית מהמוח', rAi.text.includes('נתיבות'), rAi.text);
+  delete env.ANTHROPIC_API_KEY;
 
   globalThis.fetch = prevFetch;
 }

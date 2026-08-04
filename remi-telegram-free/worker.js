@@ -441,8 +441,9 @@ export function parseCommand(raw, now) {
   m = text.match(/^(?:תרגם|תרגמי|targem)(?:\s+לי)?(?:\s+ל(אנגלית|עברית|צרפתית|ספרדית|רוסית|ערבית))?[:\s]+(.+)$/s);
   if (m) return { cmd:'translate', lang: m[1] || 'עברית', text: cleanup(m[2]) };
 
-  // מזג אוויר וזמני שבת — לפי דרישה
-  if (/^(?:מה\s+)?(?:ה)?מזג\s*(?:ה)?אוויר(?:\s+היום)?\??$/.test(text)) return { cmd:'weather' };
+  // מזג אוויר וזמני שבת — לפי דרישה (גם בכתיב חסר: "מזג אויר")
+  if (/^(?:מה\s+)?(?:ה)?מזג\s*(?:ה)?אוו?יר(?:\s+היום|\s+מחר)?\??$/.test(text)) return { cmd:'weather' };
+  if (/^(?:מה\s+)?(?:ה)?תחזית(?:\s+היום|\s+מחר)?\??$/.test(text)) return { cmd:'weather' };
   if (/^(?:מתי\s+)?(?:זמני\s+שבת|כניסת\s+שבת|צאת\s+שבת|שעות\s+שבת)\??$/.test(text)) return { cmd:'shabbat' };
 
   // תהילים יומי לפי התאריך העברי
@@ -1132,12 +1133,14 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|tehillim|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"...","details":"..."}],"details":"...","reply":"תשובה חמה בעברית"}
+{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|tehillim|weather|shabbat|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"...","details":"..."}],"details":"...","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
 - בקשת תהילים יומי ("שלח לי כל בוקר תהילים") = reminder יומי (recurring=daily) עם title "תהילים של היום" — בזמן המשלוח הבוט שולח אוטומטית את פרקי היום לפי התאריך העברי.
 - tehillim = מבקש את התהילים של היום עכשיו ("תשלח תהילים של היום") — הבוט ישלח את הטקסט המלא של הפרקים. לעולם אל תסתפק בתיאור הפרקים ב-answer — השתמש ב-tehillim!
+- weather = שואל על מזג האוויר ("מה מזג האוויר?", "כמה מעלות היום?") — לבוט יש תחזית אמיתית ועדכנית לנתיבות ושדה דוד! לעולם אל תגיד שאין לך גישה לנתוני מזג אוויר.
+- shabbat = שואל על זמני שבת ("מתי נכנסת שבת?") — לבוט יש את הזמנים האמיתיים לאזור נתיבות.
 - event = פגישה/טיסה/אירוע ליומן. חובה datetime. אם נתן טווח תאריכים — קח את תאריך ההתחלה וציין את הטווח ב-title.
 - אם יש בהודעה כמה אירועים (תאריכים/שעות שונים) — action=event ומלא את המערך events עם כולם, כל אחד עם title נקי, datetime ו-location משלו. לעולם אל תדחס שני אירועים לאחד!
 - דייק בתאריך! חשב לפי התאריך של היום שכתוב למעלה: "מחר"=יום אחד קדימה, "יום שני הקרוב"=יום השני הבא בלוח השנה, "ל-1/8"=האחד באוגוסט. אל תשים הכול על מחר.
@@ -1373,6 +1376,14 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       const chunks = await tehillimChunks();
       if (!chunks) return '📖 לא הצלחתי להביא כרגע את פרקי התהילים 😕 נסה שוב עוד רגע, או קרא בינתיים ב-sefaria.org.il/Psalms';
       return { text: chunks[0], cards: chunks.slice(1).map(t => ({ text: t })) };
+    }
+    case 'weather': {
+      const wx = await weatherLine();
+      return wx || 'לא הצלחתי להביא כרגע את מזג האוויר 😕 נסה שוב עוד רגע.';
+    }
+    case 'shabbat': {
+      const sh = await shabbatLine();
+      return sh || 'לא הצלחתי להביא כרגע את זמני השבת 😕 נסה שוב עוד רגע.';
     }
     case 'answer':
       return reply || null;
