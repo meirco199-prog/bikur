@@ -1280,5 +1280,13 @@ console.log('שמירה עם "תשמור לי" + תיוג ההודעה המקו�
   globalThis.fetch = prevFetch;
 }
 
+console.log('כתיב חסר בפקודות זיכרון:');
+{
+  const r = await send('זכרונות');
+  check('"זכרונות" בלי י\' מציג את הרשימה (לא נשמר כזיכרון!)', r.text.includes('הזיכרונות שלך') && !r.text.includes('שמרתי'), r.text.slice(0, 100));
+  const S = JSON.parse(kv.get('store'));
+  check('  לא נוצר זיכרון-זבל', !S.notes.some(n => n.text === 'זכרונות'), JSON.stringify(S.notes.slice(-3).map(n => n.text)));
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
