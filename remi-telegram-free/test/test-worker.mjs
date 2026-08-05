@@ -1288,5 +1288,25 @@ console.log('כתיב חסר בפקודות זיכרון:');
   check('  לא נוצר זיכרון-זבל', !S.notes.some(n => n.text === 'זכרונות'), JSON.stringify(S.notes.slice(-3).map(n => n.text)));
 }
 
+console.log('תגובה "מחק" על הודעת מסמך של הבוט מוחקת את המסמך:');
+{
+  const up = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { photo: [{ file_id: 'photoRep' }],
+      caption: 'שמור: דוח שנתי חברה', message_id: 3001, chat: { id: 111 } } }),
+  });
+  await worker.fetch(up, env);
+  // הבוט שלח את המסמך, והמשתמש מגיב "מחק" על הודעת השליחה של הבוט
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'מחק', chat: { id: 111 },
+      reply_to_message: { message_id: 424242, from: { is_bot: true }, caption: '📄 הנה "דוח שנתי חברה":' } } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  const S = JSON.parse(kv.get('store'));
+  check('המסמך עצמו נמחק (לא זיכרון דומה)', r.text.includes('מחקתי את המסמך') && !S.docs.some(d => d.name.includes('דוח שנתי')), r.text);
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

@@ -1058,6 +1058,15 @@ async function deleteQuoted(S, quoted, env) {
     S.docs = S.docs.filter(d => d !== doc);
     return `🗑️ מחקתי את המסמך "${doc.name}" מהארכיון.`;
   }
+  // תגובה על הודעת 'הנה "<מסמך>"' של הבוט — מוחקים את המסמך ששלחנו שם
+  const nm = String(quoted.text || '').match(/הנה "([^"]+)"/);
+  if (nm) {
+    const sentDoc = (S.docs || []).find(d => d.name === nm[1]);
+    if (sentDoc) {
+      S.docs = S.docs.filter(d => d !== sentDoc);
+      return `🗑️ מחקתי את המסמך "${sentDoc.name}" מהארכיון.`;
+    }
+  }
   const cands = [
     ...(S.notes || []).map(x => ({ x, kind: 'note' })),
     ...(S.tasks || []).filter(x => !x.done).map(x => ({ x, kind: 'task' })),
