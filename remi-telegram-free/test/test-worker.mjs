@@ -1247,5 +1247,38 @@ console.log('מזג אוויר וזמני שבת בהודעת הבוקר:');
   globalThis.fetch = prevFetch;
 }
 
+console.log('שמירה עם "תשמור לי" + תיוג ההודעה המקורית בשליפה:');
+{
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'תשמור לי יוזר לכספת בהראל sxv035744 והסיסמא HAREL63663',
+      message_id: 7777, chat: { id: 111 } } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  const S = JSON.parse(kv.get('store'));
+  const note = S.notes.find(n => n.text.includes('sxv035744'));
+  check('"תשמור לי..." נשמר בזיכרון', r.text.includes('שמרתי') && !!note, r.text);
+  check('  הזיכרון זוכר את ההודעה המקורית', note && note.mid === 7777, JSON.stringify(note));
+
+  const r2 = await send('חפש כספת');
+  check('חיפוש מוצא ומתייג את ההודעה המקורית', r2.text.includes('HAREL63663') && r2.reply_to_message_id === 7777, JSON.stringify({ t: r2.text.slice(0, 80), tag: r2.reply_to_message_id }));
+
+  // גם תשובה חופשית מהמוח שנשענת על הזיכרון — מתייגת את ההודעה המקורית
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const text = '{"action":"answer","reply":"מאיר, היוזר לכספת בהראל הוא sxv035744 והסיסמא HAREL63663 🙂"}';
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const r3 = await send('מה היוזר לכספת בהראל?');
+  check('תשובת המוח מהזיכרון מתייגת את ההודעה ששמרה אותו', r3.text.includes('sxv035744') && r3.reply_to_message_id === 7777, JSON.stringify({ t: r3.text.slice(0, 80), tag: r3.reply_to_message_id }));
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

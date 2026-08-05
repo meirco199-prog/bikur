@@ -424,7 +424,7 @@ export function parseCommand(raw, now) {
   if (/^(נקה קניות|מחק קניות)$/.test(text)) return { cmd:'shop_clear' };
 
   // זיכרונות
-  m = text.match(/^(?:זכור|תזכור|שמור|זיכרון|רעיון|הערה)[:\s]+(.+)$/s);
+  m = text.match(/^(?:זכור|תזכור|שמור|תשמור|שמרי|תשמרי|זיכרון|רעיון|הערה)(?:\s+לי)?[:\s]+(.+)$/s);
   if (m) return { cmd:'note_add', text: cleanup(m[1]) };
   if (/^(זיכרונות|רשימת זיכרונות|הערות)\??$/.test(text)) return { cmd:'note_list' };
   m = text.match(/^(?:מחק|מחקי)\s+זיכרון\s+(\d+)$/);
@@ -1020,7 +1020,8 @@ function doSearch(S, q, now) {
     return `• (${d.getDate()}/${d.getMonth()+1}) ${h.text}`;
   }).join('\n');
   // תיוג: עונים על ההודעה המקורית האחרונה שנמצאה (או על הודעת המסמך)
-  const tag = [...hist].reverse().find(h => h.mid)?.mid || [...docs].reverse().find(d => d.mid)?.mid || null;
+  const tag = [...notes].reverse().find(n => n.mid)?.mid
+    || [...hist].reverse().find(h => h.mid)?.mid || [...docs].reverse().find(d => d.mid)?.mid || null;
   // כפתורי מחיקה לזיכרונות שנמצאו — לזיכרונות קצרי-טווח שסיימו את תפקידם
   const noteBtns = notes.slice(0, 4).map(n => ([{
     text: `🗑️ מחק: ${n.text.slice(0, 30)}${n.text.length > 30 ? '…' : ''}`,
@@ -1106,7 +1107,8 @@ async function aiBrain(env, S, text, now, isVoice = false, replyCtx = null) {
   ].filter(Boolean).join(' | ');
   const hist = (S.history || []).slice(-9, -1)
     .map(h => (h.bot ? '- (אתה ענית): ' : '- (הוא כתב): ') + h.text.slice(0, 160)).join('\n');
-  const memCtx = relevantNotes(S, text).map(x => '• ' + x.text.slice(0, 200)).join('\n');
+  const memNotes = relevantNotes(S, text);
+  const memCtx = memNotes.map(x => '• ' + x.text.slice(0, 200)).join('\n');
   const upcoming = S.events.filter(e => e.at >= now.getTime() - 3600000).sort((a,b) => a.at - b.at).slice(0, 10)
     .map(e => {
       const d = new Date(e.at);
@@ -1169,7 +1171,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
     try {
       const m = fromClaude.match(/\{[\s\S]*\}/);
       if (m) {
-        const out = await applyAiAction(S, JSON.parse(m[0]), now, env, gcal);
+        const out = await applyAiAction(S, JSON.parse(m[0]), now, env, gcal, memNotes);
         if (out) return out;
       }
     } catch {}
@@ -1181,7 +1183,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
       const m = (r?.response || '').match(/\{[\s\S]*\}/);
       if (!m) continue;
       const j = JSON.parse(m[0]);
-      const out = await applyAiAction(S, j, now, env, gcal);
+      const out = await applyAiAction(S, j, now, env, gcal, memNotes);
       if (out) return out;
     } catch {}
   }
@@ -1196,7 +1198,7 @@ function findGcalEvent(gcal, title) {
     || (gcal || []).find(e => e.text.includes(t) || t.includes(e.text));
 }
 
-async function applyAiAction(S, j, now, env, gcal = []) {
+async function applyAiAction(S, j, now, env, gcal = [], memNotes = []) {
   const nid = () => S.nextId++;
   const reply = cleanup(String(j.reply || ''));
   const parseDt = (s) => {
@@ -1259,7 +1261,8 @@ async function applyAiAction(S, j, now, env, gcal = []) {
     case 'note': {
       const content = title || reply;
       if (!content || content.length < 4) return null;
-      const noteT = { id: nid(), text: content, created: now.getTime() };
+      const srcMid = [...(S.history || [])].reverse().find(h => !h.bot)?.mid;
+      const noteT = { id: nid(), text: content, created: now.getTime(), mid: srcMid };
       S.notes.push(noteT);
       return { text: `🧠 שמרתי${hey}. תמצא את זה עם "חפש" מתי שתרצה.`,
         buttons: [[{ text: '🗑️ מחק את הזיכרון הזה', callback_data: `n:del:${noteT.id}` }]] };
@@ -1385,8 +1388,12 @@ async function applyAiAction(S, j, now, env, gcal = []) {
       const sh = await shabbatLine();
       return sh || 'לא הצלחתי להביא כרגע את זמני השבת 😕 נסה שוב עוד רגע.';
     }
-    case 'answer':
-      return reply || null;
+    case 'answer': {
+      if (!reply) return null;
+      // כשהתשובה באה מזיכרון שמור — מתייגים (עונים על) את ההודעה המקורית ששמרה אותו
+      const src = memNotes.find(x => x.mid && wordScore(x.text, reply) >= 2);
+      return src ? { text: reply, replyTo: src.mid } : reply;
+    }
     default:
       return null;
   }
@@ -1657,7 +1664,8 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
     }
 
     case 'note_add': {
-      const noteT = { id: nid(), text: c.text, created: now.getTime() };
+      const srcMid = [...(S.history || [])].reverse().find(h => !h.bot)?.mid;
+      const noteT = { id: nid(), text: c.text, created: now.getTime(), mid: srcMid };
       S.notes.push(noteT);
       const delBtn = [[{ text: '🗑️ מחק את הזיכרון הזה', callback_data: `n:del:${noteT.id}` }]];
       if (c.auto) return { text: `🧠 לא זיהיתי פקודה, אז שמרתי את זה בזיכרון שלא ילך לאיבוד.\nלשליפה: "זיכרונות" או "חפש <מילה>"\n(אם התכוונת למשהו אחר — כתוב "עזרה")`, buttons: delBtn };
