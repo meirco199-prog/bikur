@@ -1031,12 +1031,15 @@ function doSearch(S, q, now) {
   return out;
 }
 
-// כמה מהמילים המשמעותיות של a מופיעות ב-b (עם קילוף אותיות שימוש: "בשלמה"→"שלמה")
+// כמה מהמילים המשמעותיות של a מופיעות ב-b (עם קילוף אותיות שימוש: "בשלמה"→"שלמה",
+// ואיחוד קיצורים מנוקדים: "ח.פ"→"חפ", "ת.ז"→"תז" — כדי שגם קיצורים יימצאו)
+const STOP_WORDS = new Set(['של','את','עם','מה','אם','כל','גם','או','על','אל','זה','זו','יש','אין','לא','כן','אז','רק','עוד','כמו','אבל','הוא','היא','אני','לי','לך','לו','לה','שלי','שלו','שלה','שלך','ואת','הם','הן']);
 function wordScore(a, b) {
+  const norm = (t) => String(t || '').replace(/([\u0590-\u05FF])[.״"׳']([\u0590-\u05FF])(?![\u0590-\u05FF])/g, '$1$2');
   const strip = (w) => w.replace(/^(?:וש|וב|ול|וכ|ומ|וה|ש|ב|ל|כ|מ|ה|ו)/, '');
-  const words = [...new Set(String(a || '').split(/[^\u0590-\u05FFa-zA-Z0-9]+/)
-    .flatMap(w => [w, strip(w)]).filter(w => w.length >= 3))];
-  const t = String(b || '');
+  const words = [...new Set(norm(a).split(/[^\u0590-\u05FFa-zA-Z0-9]+/)
+    .flatMap(w => [w, strip(w)]).filter(w => w.length >= 2 && !STOP_WORDS.has(w)))];
+  const t = norm(b);
   return words.filter(w => t.includes(w)).length;
 }
 
@@ -1118,6 +1121,15 @@ async function aiBrain(env, S, text, now, isVoice = false, replyCtx = null) {
     .map(h => (h.bot ? '- (אתה ענית): ' : '- (הוא כתב): ') + h.text.slice(0, 160)).join('\n');
   const memNotes = relevantNotes(S, text);
   const memCtx = memNotes.map(x => '• ' + x.text.slice(0, 200)).join('\n');
+  // גם הודעות ישנות שלו שקשורות לשאלה — מידע שהוזכר פעם אך לא נשמר כזיכרון
+  const histMatches = (S.history || []).slice(0, -1).filter(h => !h.bot)
+    .map(h => ({ h, s: wordScore(text, h.text) })).filter(x => x.s >= 2)
+    .sort((a, b) => b.s - a.s).slice(0, 5).map(x => x.h);
+  const histCtx = histMatches.map(h => {
+    const d = new Date(h.ts);
+    return `• (${d.getDate()}/${d.getMonth() + 1}) ` + h.text.slice(0, 200);
+  }).join('\n');
+  const memSrcs = [...memNotes, ...histMatches];
   const upcoming = S.events.filter(e => e.at >= now.getTime() - 3600000).sort((a,b) => a.at - b.at).slice(0, 10)
     .map(e => {
       const d = new Date(e.at);
@@ -1136,6 +1148,8 @@ async function aiBrain(env, S, text, now, isVoice = false, replyCtx = null) {
 ${hist || '(אין)'}
 זיכרונות שמורים שאולי קשורים להודעה:
 ${memCtx || '(אין)'}
+הודעות ישנות שלו שאולי קשורות:
+${histCtx || '(אין)'}
 ${replyCtx ? `ההודעה החדשה שלו נשלחה כתגובה (reply) על ההודעה הזו${replyCtx.fromBot === false ? ' (שהוא עצמו שלח בעבר)' : ' שאתה שלחת לו'}: "${String(replyCtx.text || '').slice(0, 300)}"
 חשוב: ההודעה שלו מתייחסת להודעה המצוטטת! "תמחק"/"תשנה"/"תעביר" = על מה שכתוב שם. אם המצוטטת היא אישור פגישה — event_move/event_delete עם ה-title משם; אם היא זיכרון או תשובה מזיכרון — note_delete עם המילים המרכזיות משם.` : ''}
 ההודעה החדשה שלו: "${text}"
@@ -1169,7 +1183,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - note_delete = מבקש למחוק זיכרון שמור ("תמחק את הזיכרון של הפוליסה", או "תמחק" כתגובה על הודעה עם תוכן מהזיכרון) — title = המילים המרכזיות של הזיכרון (למשל מספר או שם ייחודי). אתה כן יודע למחוק זיכרונות!
 - gmail = מבקש לחפש משהו במיילים, רק כשהוא מזכיר במפורש מייל/ג'ימייל ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
-- אם השאלה שלו נענית מתוך "זיכרונות שמורים" למעלה (למשל "מה מספר הפוליסה?" והמספר שמור בזיכרון) — action=answer, וכתוב ב-reply את המידע המלא מהזיכרון, כולל המספרים המדויקים. לעולם אל תחפש במייל מידע שכבר נמצא בזיכרונות!
+- אם השאלה שלו נענית מתוך "זיכרונות שמורים" או "הודעות ישנות" למעלה (למשל "מה מספר הפוליסה?" והמספר מופיע שם) — action=answer, וכתוב ב-reply את המידע המלא, כולל המספרים המדויקים. לעולם אל תחפש במייל מידע שכבר נמצא שם, ולעולם אל תגיד "אין לי" כשהמידע מופיע למעלה!
 - הודעה קצרה שהיא המשך שיחה ("כן", "לא", "ח.פ", "ומה עוד") — הבן מההקשר למעלה וענה (answer). לעולם אל תשמור note מהודעה כזו.
 - מילה בודדת שנראית כמו בקשת תפריט ("זכרונות", "משימות", "תזכורות", "מסמכים") = הוא רוצה לראות את הרשימה — לעולם לא note! לזיכרונות ענה (answer) עם רשימת הזיכרונות שלמעלה.
 - אל תציע פעולות המשך שאינך יכול לבצע — תן את המידע המלא מיד בתשובה.
@@ -1181,7 +1195,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
     try {
       const m = fromClaude.match(/\{[\s\S]*\}/);
       if (m) {
-        const out = await applyAiAction(S, JSON.parse(m[0]), now, env, gcal, memNotes);
+        const out = await applyAiAction(S, JSON.parse(m[0]), now, env, gcal, memSrcs);
         if (out) return out;
       }
     } catch {}
@@ -1193,7 +1207,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
       const m = (r?.response || '').match(/\{[\s\S]*\}/);
       if (!m) continue;
       const j = JSON.parse(m[0]);
-      const out = await applyAiAction(S, j, now, env, gcal, memNotes);
+      const out = await applyAiAction(S, j, now, env, gcal, memSrcs);
       if (out) return out;
     } catch {}
   }

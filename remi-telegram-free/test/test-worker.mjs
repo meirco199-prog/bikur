@@ -1308,5 +1308,56 @@ console.log('תגובה "מחק" על הודעת מסמך של הבוט מוחק
   check('המסמך עצמו נמחק (לא זיכרון דומה)', r.text.includes('מחקתי את המסמך') && !S.docs.some(d => d.name.includes('דוח שנתי')), r.text);
 }
 
+console.log('קיצורים ("ח.פ") והודעות ישנות נמצאים בזיכרון:');
+{
+  // שמירת ח.פ עם נקודה — ושליפה בניסוח שונה
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'תשמור לי ח.פ של החברה 515123456',
+      message_id: 8801, chat: { id: 111 } } }),
+  });
+  await worker.fetch(req, env);
+  const S = JSON.parse(kv.get('store'));
+  check('ח.פ נשמר בזיכרון', S.notes.some(n => n.text.includes('515123456')));
+
+  const prevFetch = globalThis.fetch;
+  let seenPrompt = '';
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const reqB = JSON.parse(opts.body);
+      seenPrompt = typeof reqB.messages[0].content === 'string' ? reqB.messages[0].content : '';
+      const text = seenPrompt.includes('515123456')
+        ? '{"action":"answer","reply":"החפ של החברה שלך הוא 515123456 🙂"}'
+        : '{"action":"answer","reply":"אין לי"}';
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const r = await send('מה הח.פ שלי?');
+  check('שאלת "מה הח.פ" מוצאת את הזיכרון למרות הקיצור', r.text.includes('515123456'), r.text);
+  check('  והתשובה מתויגת על הודעת השמירה', r.reply_to_message_id === 8801, String(r.reply_to_message_id));
+
+  // מידע שהוזכר פעם בהודעה רגילה (לא נשמר כזיכרון) — נמצא מההיסטוריה
+  delete env.ANTHROPIC_API_KEY;
+  await send('הספק בפלאפון מספר לקוח 998877');
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const reqB = JSON.parse(opts.body);
+      seenPrompt = typeof reqB.messages[0].content === 'string' ? reqB.messages[0].content : '';
+      const text = seenPrompt.includes('998877') && seenPrompt.includes('הודעות ישנות')
+        ? '{"action":"answer","reply":"מספר הלקוח שלך בפלאפון הוא 998877"}'
+        : '{"action":"answer","reply":"אין לי"}';
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  const r2 = await send('מה מספר הלקוח שלנו בפלאפון?');
+  check('שאלה על מידע מהודעה ישנה נענית מההיסטוריה', r2.text.includes('998877'), r2.text.slice(0, 120));
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);
