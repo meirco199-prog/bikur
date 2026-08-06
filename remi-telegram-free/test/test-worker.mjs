@@ -391,7 +391,10 @@ console.log('העברה ומחיקה של פגישות (דרך המוח):');
       const S = JSON.parse(kv.get('store'));
       const dani = S.events.find(e => e.text.includes('יוסי הבדיקה'));
       let text = 'לא JSON';
-      if (msg.includes('תעביר') && dani) text = JSON.stringify({ action: 'event_move', event_id: dani.id, datetime: '2026-07-30 15:00', reply: '' });
+      // תאריך עתידי דינמי — תאריך קבוע נרקב ברגע שהוא עובר (ניקוי אירועים ישנים מוחק אותו)
+      const fut = new Date(Date.now() + 10 * 86400000);
+      const futStr = `${fut.getFullYear()}-${String(fut.getMonth() + 1).padStart(2, '0')}-${String(fut.getDate()).padStart(2, '0')} 15:00`;
+      if (msg.includes('תעביר') && dani) text = JSON.stringify({ action: 'event_move', event_id: dani.id, datetime: futStr, reply: '' });
       else if (msg.includes('בטל את הפגישה') && dani) text = JSON.stringify({ action: 'event_delete', event_id: dani.id, reply: '' });
       return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
     }

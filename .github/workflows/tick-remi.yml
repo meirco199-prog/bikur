@@ -19,3 +19,8 @@ jobs:
           resp=$(curl -sS --max-time 45 "https://remi.meirco199.workers.dev/tick?secret=remi-meir-2026")
           echo "$resp"
           echo "$resp" | grep -q 'tick ok'
+
+      # תמונת מצב טכנית ליומן הריצה — שעות, מזהים ושגיאות בלבד, בלי שום תוכן אישי
+      - name: Health snapshot
+        run: |
+          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026" || true

@@ -2189,6 +2189,8 @@ async function handleWebhook(env, update) {
 
 // דופק ריצות של השעון — לזיהוי ריצות דלילות (נשמר בזיכרון האיזולט + ב-KV כל 10 דק')
 const cronTicks = [];
+// הקריסה האחרונה של השעון (אם הייתה) — מוצגת ב-/health לאבחון מרחוק
+let lastCronCrash = null;
 
 // שריון בזיכרון מפני שליחה כפולה: אם האחסון החזיר לרגע גרסה ישנה של רישום
 // "מה כבר נשלח", האיזולט זוכר בעצמו מה נשלח לאחרונה ולא שולח שוב
@@ -2510,7 +2512,42 @@ export default {
     if (url.pathname === '/tick') {
       if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });
       try { await runCron(env, { minLateMs: 3 * 60000 }); return new Response('tick ok'); }
-      catch (e) { return new Response('tick error: ' + e.message, { status: 500 }); }
+      catch (e) { lastCronCrash = { ts: Date.now(), msg: e.message }; return new Response('tick error: ' + e.message, { status: 500 }); }
+    }
+
+    // אבחון טכני נקי — בלי שום תוכן אישי (בלי טקסטים של תזכורות/זיכרונות/מסמכים).
+    // שעון הגיבוי מדפיס את זה ליומן הריצה שלו, כך שאפשר לאבחן את הבוט החי מרחוק.
+    if (url.pathname === '/health') {
+      if (url.searchParams.get('secret') !== env.SECRET) return new Response('forbidden', { status: 403 });
+      const out = { ok: true };
+      try {
+        const S = await loadStore(env);
+        const C = await loadCron(env, S);
+        const now = ilNow();
+        const nowMs = now.getTime();
+        const hhmm = (ms) => fmtTime(ms) + ' ' + new Date(ms).toISOString().slice(5, 10);
+        out.il = `${DAY_NAMES[now.getDay()]} ${fmtTime(nowMs)}`;
+        out.beatAgeMin = C.beat ? Math.round((nowMs - C.beat) / 60000) : null;
+        out.kvRuns = (C.runs || []).map(t => hhmm(t));
+        out.isolateTicks = cronTicks.slice(-12).map(t => fmtTime(t));
+        out.lastCrash = lastCronCrash ? { agoMin: Math.round((Date.now() - lastCronCrash.ts) / 60000), msg: lastCronCrash.msg } : null;
+        out.counts = { reminders: S.reminders.length, openTasks: S.tasks.filter(t => !t.done).length,
+          events: S.events.length, docs: S.docs.length, notes: S.notes.length };
+        out.reminders = S.reminders.map(r => {
+          const d = new Date(r.at);
+          const sched = r.recurringDaily ? 'daily'
+            : (r.recurringWeekly !== null && r.recurringWeekly !== undefined) ? 'weekly' + r.recurringWeekly : 'once';
+          const due = dueOccurrence(r, C.fired[r.id], nowMs);
+          return { id: r.id, sched,
+            at: sched === 'once' ? hhmm(r.at) : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+            lastFired: C.fired[r.id] ? hhmm(C.fired[r.id]) : null,
+            dueNow: due !== null ? hhmm(due) : null };
+        });
+        out.recentFires = (C.stats.fired || []).slice(-15).map(t => hhmm(t));
+        out.errors = (C.errors || []).map(e => ({ at: hhmm(e.ts), msg: String(e.msg || '').slice(0, 140) }));
+        out.flags = { briefOff: !!S.briefOff, summaryOff: !!S.summaryOff, pingMin: S.meetingPingMin };
+      } catch (e) { out.ok = false; out.err = e.message; }
+      return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
     }
 
     if (url.pathname === `/webhook/${env.SECRET}` && request.method === 'POST') {
@@ -2525,6 +2562,7 @@ export default {
   },
 
   async scheduled(event, env) {
-    await runCron(env);
+    try { await runCron(env); }
+    catch (e) { lastCronCrash = { ts: Date.now(), msg: e.message }; throw e; }
   },
 };
