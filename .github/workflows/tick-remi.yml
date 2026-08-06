@@ -6,7 +6,9 @@ name: Tick remi (backup clock)
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    # דקות "עקומות" בכוונה — בדקות העגולות התור של GitHub הכי עמוס,
+    # וריצות מתוזמנות נתקעות שם בלי שרת ומתבטלות
+    - cron: '2-57/5 * * * *'
   workflow_dispatch:
 
 jobs:

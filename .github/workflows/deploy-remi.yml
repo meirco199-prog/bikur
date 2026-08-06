@@ -63,3 +63,8 @@ jobs:
           code=$(curl -sS -o /dev/null -w "%{http_code}" https://remi.meirco199.workers.dev/)
           echo "worker HTTP status: $code"
           test "$code" = "200"
+
+      # תמונת מצב טכנית של השעון והתזכורות (שעות ומזהים בלבד, בלי תוכן אישי)
+      - name: Health snapshot
+        run: |
+          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026" || true
