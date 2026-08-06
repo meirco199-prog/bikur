@@ -35,6 +35,26 @@ function doGet() {
   return ContentService.createTextOutput('הגשר של רמי חי 🙂 (' + new Date() + ')');
 }
 
+// ===== שעון גיבוי נוסף לבוט (מומלץ מאוד!) =====
+// השעונים של Cloudflare ושל GitHub מדלגים לפעמים — לגוגל יש טריגרים של זמן
+// אמינים מאוד. הפעלה חד-פעמית: בחר בתפריט הפונקציות את installClock ולחץ ▶.
+// מרגע זה גוגל יעיר את הבוט כל 5 דקות, והתזכורות לא יפספסו גם כששניהם נופלים.
+const REMI_TICK_URL = 'https://remi.meirco199.workers.dev/tick?secret=' + SECRET;
+
+function tickRemi() {
+  try { UrlFetchApp.fetch(REMI_TICK_URL, { muteHttpExceptions: true }); } catch (e) {}
+}
+
+function installClock() {
+  // מסירים טריגרים קודמים של tickRemi כדי שלא יהיו כפולים
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'tickRemi') ScriptApp.deleteTrigger(triggers[i]);
+  }
+  ScriptApp.newTrigger('tickRemi').timeBased().everyMinutes(5).create();
+  Logger.log('השעון הותקן ✅ גוגל יעיר את רמי כל 5 דקות');
+}
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
