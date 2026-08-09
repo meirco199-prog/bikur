@@ -2217,6 +2217,8 @@ async function runCron(env, opts = {}) {
 
   // דופק חיים — כדי שמסך האבחון ידע אם השעון באמת רץ (נכתב לכל היותר פעם ברבע שעה)
   if (nowMs - (C.beat || 0) > 15 * 60000) { C.beat = nowMs; changed = true; }
+  // דופק נפרד לשעון הראשי של Cloudflare — כדי לראות מרחוק אם דווקא הוא מת
+  if (opts.native && nowMs - (C.nativeBeat || 0) > 15 * 60000) { C.nativeBeat = nowMs; changed = true; }
   cronTicks.push(nowMs);
   if (cronTicks.length > 40) cronTicks.shift();
   if (now.getMinutes() % 10 === 0) { C.runs = [...(C.runs || []), nowMs].slice(-12); changed = true; }
@@ -2528,6 +2530,7 @@ export default {
         const hhmm = (ms) => fmtTime(ms) + ' ' + new Date(ms).toISOString().slice(5, 10);
         out.il = `${DAY_NAMES[now.getDay()]} ${fmtTime(nowMs)}`;
         out.beatAgeMin = C.beat ? Math.round((nowMs - C.beat) / 60000) : null;
+        out.nativeBeatAgeMin = C.nativeBeat ? Math.round((nowMs - C.nativeBeat) / 60000) : null;
         out.kvRuns = (C.runs || []).map(t => hhmm(t));
         out.isolateTicks = cronTicks.slice(-12).map(t => fmtTime(t));
         out.lastCrash = lastCronCrash ? { agoMin: Math.round((Date.now() - lastCronCrash.ts) / 60000), msg: lastCronCrash.msg } : null;
@@ -2562,7 +2565,7 @@ export default {
   },
 
   async scheduled(event, env) {
-    try { await runCron(env); }
+    try { await runCron(env, { native: true }); }
     catch (e) { lastCronCrash = { ts: Date.now(), msg: e.message }; throw e; }
   },
 };
