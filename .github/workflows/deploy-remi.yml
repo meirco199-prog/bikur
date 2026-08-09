@@ -65,7 +65,9 @@ jobs:
           echo "worker HTTP status: $code"
           test "$code" = "200"
 
-      # תמונת מצב טכנית של השעון והתזכורות (שעות ומזהים בלבד, בלי תוכן אישי)
+      # תמונת מצב טכנית של השעון והתזכורות (שעות ומזהים בלבד, בלי תוכן אישי).
+      # ההמתנה — כדי שהקוד שהועלה הרגע יספיק להתפשט ברשת של Cloudflare
       - name: Health snapshot
         run: |
+          sleep 10
           curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026" || true
