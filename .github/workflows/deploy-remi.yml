@@ -8,7 +8,7 @@
 #   CF_ACCOUNT_ID — מזהה החשבון (מופיע במסך Workers & Pages בצד)
 
 name: Deploy remi to Cloudflare
-# (עדכון קל כדי לעורר ריצה — GitHub לא יצר ריצות במשך תקלת הערב)
+# (עדכון קל כדי לעורר ריצה מחדש — אירועי הדחיפה של רביעי בערב אבדו בתקלת GitHub)
 
 on:
   push:
