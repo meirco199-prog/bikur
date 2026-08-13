@@ -1,0 +1,59 @@
+# פריסת ה-Worker של אפליקציית האנגלית ל-Cloudflare — אוטומטית בכל דחיפה ל-main.
+# משתמש באותם Secrets כמו deploy-remi (CF_API_TOKEN, ואופציונלית CF_ACCOUNT_ID).
+# בניגוד ל-remi, כאן ההעלאה כוללת metadata עם binding ל-Workers AI, כך שה-Worker
+# נוצר מוכן לעבודה גם בפעם הראשונה — בלי הגדרות ידניות בדשבורד.
+
+name: Deploy english-ai to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'english-ai/worker.js'
+      - '.github/workflows/deploy-english-ai.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload worker.js (with AI binding)
+        run: |
+          if [ -z "${{ secrets.CF_API_TOKEN }}" ]; then
+            echo "::error::חסר הסוד CF_API_TOKEN בהגדרות הריפו (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          ACCOUNT_ID="${{ secrets.CF_ACCOUNT_ID }}"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "::error::לא הצלחתי לגלות את מזהה החשבון מהטוקן — בדוק שהטוקן נוצר מתבנית Edit Cloudflare Workers"
+            exit 1
+          fi
+          echo "account: ${ACCOUNT_ID:0:6}..."
+          resp=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/english-ai" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -F 'metadata={"main_module":"worker.js","compatibility_date":"2025-01-01","bindings":[{"type":"ai","name":"AI"}]};type=application/json' \
+            -F 'worker.js=@english-ai/worker.js;type=application/javascript+module')
+          echo "$resp"
+          echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
+
+      - name: Enable workers.dev subdomain for the script
+        run: |
+          ACCOUNT_ID="${{ secrets.CF_ACCOUNT_ID }}"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/english-ai/subdomain" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"enabled": true, "previews_enabled": false}' || true
