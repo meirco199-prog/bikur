@@ -8,7 +8,7 @@ import { renderSpeak } from "./screens/speak.js";
 import { renderWords } from "./screens/words.js";
 import { renderProfile, applyTheme } from "./screens/profile.js";
 import { renderTeacher } from "./screens/teacher.js";
-import { scheduleDaily, syncReminderState } from "./notify.js";
+import { scheduleDaily, syncReminderState, remindIfDue, refreshPush } from "./notify.js";
 import { stopSpeaking } from "./speech.js";
 
 const main = document.getElementById("main");
@@ -66,12 +66,22 @@ window.addEventListener("hashchange", route);
 route();
 scheduleDaily();
 
-// כשחוזרים לאפליקציה אחרי onboarding — לוודא שהניווט מוצג
-window.addEventListener("focus", () => {
-  if (S.profile.onboarded && S.settings.notifs){ scheduleDaily(); syncReminderState(); }
-});
+// כל חזרה לאפליקציה: מכוונים מחדש את הטיימר, מרעננים את המנוי לשרת,
+// ומשלימים תזכורת שפוספסה בזמן שהמכשיר היה כבוי/האפליקציה סגורה.
+function onResume(){
+  if (!S.profile.onboarded || !S.settings.notifs) return;
+  scheduleDaily();
+  syncReminderState();
+  remindIfDue();
+}
+window.addEventListener("focus", onResume);
+// visibilitychange הוא מה שבאמת נורה בנייד כשחוזרים לאפליקציה — focus לא תמיד
+document.addEventListener("visibilitychange", () => { if (!document.hidden) onResume(); });
+window.addEventListener("pageshow", onResume);
 
-// service worker לעבודה ללא רשת
+// service worker לעבודה ללא רשת + התראות ברקע
 if ("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("sw.js")
+    .then(() => refreshPush())
+    .catch(() => {});
 }

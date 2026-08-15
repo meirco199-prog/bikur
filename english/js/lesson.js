@@ -7,6 +7,7 @@ import { GRAMMAR } from "./data/grammar.js";
 import { review, dueWords, newWords, ensureEntry, toggleSaved } from "./srs.js";
 import { addXP, checkAchievements } from "./gamify.js";
 import { speak, stopSpeaking, sttSupported, listen } from "./speech.js";
+import { syncReminderState } from "./notify.js";
 import { todayStr } from "./util.js";
 
 // ---------- בניית אימון ----------
@@ -360,6 +361,7 @@ export function runLesson(container, items, {title = "אימון יומי", minu
     logDay({minutes: mins, lessons: 1});
     S.lessonDate = todayStr();
     save();
+    syncReminderState();   // מודיע לשרת ולשרת-העבודה שהיום כבר נלמד — שלא תגיע תזכורת מיותרת
     addXP(25, "השלמת אימון");
     checkAchievements();
     confetti();

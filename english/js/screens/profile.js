@@ -3,7 +3,9 @@ import { el, toast, fmtMinutes, todayStr } from "../util.js";
 import { S, save, resetAll, weekSummary } from "../store.js";
 import { levelInfo, ACHIEVEMENTS, LEVELS } from "../gamify.js";
 import { srsCounts } from "../srs.js";
-import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminder, syncReminderState } from "../notify.js";
+import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminder, syncReminderState,
+  reminderBlocker, installedAsApp } from "../notify.js";
+import { pushSupported, pushStatus, testPush } from "../push.js";
 import { cefrDesc } from "./onboarding.js";
 
 const SKILL_HE = {vocab: "אוצר מילים", grammar: "דקדוק", listening: "שמיעה", reading: "קריאה", speaking: "דיבור", writing: "כתיבה"};
@@ -77,9 +79,96 @@ export function renderProfile(main){
         miniStat(counts.learning, "לומד"), miniStat(counts.known, "מכיר"),
         miniStat(counts.mastered, "שולט"), miniStat(counts.saved, "שמורות"))),
 
+    // תזכורת יומית
+    renderReminders(main),
+
     // הגדרות
     renderSettings(main),
   ));
+}
+
+// כרטיס התזכורת היומית — כולל אבחון, כי "מופעל אבל לא מגיע כלום" הוא המצב
+// שהכי קשה להבין ממנו מה תקוע. כאן רואים בדיוק איפה השרשרת נקטעת.
+function renderReminders(main){
+  const on = !!S.settings.notifs;
+  const blocker = reminderBlocker();
+  const card = el("div", {class: "card"},
+    el("h3", {}, "🔔 תזכורת יומית"),
+
+    settingRow("שעת תזכורת", el("input", {class: "input inline", type: "time", dir: "ltr",
+      value: S.profile.reminderTime,
+      onchange: e => {
+        S.profile.reminderTime = e.target.value || "20:00";
+        save(); scheduleDaily(); syncReminderState();
+        toast(`התזכורת נקבעה ל-${S.profile.reminderTime}`);
+      }})),
+
+    settingRow("מצב", el("button", {class: "btn ghost small", onclick: async (ev) => {
+      const btn = ev.currentTarget;
+      if (!notifSupported()) return toast(blocker || "הדפדפן לא תומך בהתראות");
+      if (S.settings.notifs){
+        btn.disabled = true;
+        await disableNotifs();
+        toast("התזכורת כובתה");
+        renderProfile(main);
+        return;
+      }
+      btn.disabled = true; btn.textContent = "מפעיל...";
+      const ok = await enableNotifs();
+      toast(ok ? "התזכורת הופעלה ✓" : "ההרשאה נדחתה בדפדפן — יש לאפשר התראות בהגדרות האתר");
+      renderProfile(main);
+    }}, on ? "פעילה — כבה" : "כבויה — הפעל")),
+
+    blocker ? el("p", {class: "muted small-text"}, "⚠️ " + blocker) : null,
+
+    on ? el("div", {class: "row gap"},
+      el("button", {class: "btn ghost small", onclick: async () => {
+        const ok = await testReminder();
+        toast(ok ? "התראה מקומית נשלחה 🔔" : "לא הצלחתי להציג התראה בדפדפן הזה");
+      }}, "בדיקה מקומית"),
+      el("button", {class: "btn ghost small", onclick: async (ev) => {
+        const btn = ev.currentTarget;
+        btn.disabled = true; btn.textContent = "שולח מהשרת...";
+        const r = await testPush();
+        btn.disabled = false; btn.textContent = "בדיקה מהשרת";
+        toast(r?.ok
+          ? "השרת שלח התראה 🔔 סגור את האפליקציה ותראה אותה מגיעה"
+          : "השרת לא הצליח לשלוח — " + (r?.reason === "no_sub" ? "המכשיר עוד לא רשום לשרת" : `קוד ${r?.status || "?"}`));
+      }}, "בדיקה מהשרת")) : null,
+
+    on ? el("div", {class: "muted small-text push-status"}, "בודק את מצב החיבור לשרת...") : null);
+
+  // אבחון חי: מה הדפדפן והשרת באמת יודעים
+  if (on){
+    const box = card.querySelector(".push-status");
+    const draw = async () => {
+      const lines = [
+        `הרשאת התראות: ${Notification.permission === "granted" ? "מאושרת ✓" : Notification.permission}`,
+        `מותקן כאפליקציה: ${installedAsApp() ? "כן ✓" : "לא"}`,
+      ];
+      let registered = false;
+      if (!pushSupported()){
+        lines.push("Web Push: לא נתמך בדפדפן הזה — תזכורת תגיע רק כשהאפליקציה פתוחה");
+        registered = true;   // אין מה לחכות לו
+      } else {
+        const st = await pushStatus();
+        if (!st.subscribed) lines.push("רישום לשרת: עוד לא נרשם — אם זה נשאר כך, כבה והפעל את התזכורת");
+        else if (st.error || !st.found) lines.push("רישום לשרת: המכשיר רשום בדפדפן אך השרת לא מאשר — בדוק את כתובת שרת התזכורות");
+        else {
+          registered = true;
+          lines.push(`רישום לשרת: פעיל ✓ (שעה ${st.time})`);
+          if (st.lastPush) lines.push(`תזכורת אחרונה מהשרת: ${new Date(st.lastPush).toLocaleString("he-IL")} (קוד ${st.lastStatus})`);
+          else lines.push("השרת עוד לא שלח תזכורת למכשיר הזה");
+        }
+      }
+      if (!box?.isConnected) return;
+      box.replaceChildren(...lines.map(t => el("div", {}, t)));
+      // הרישום לשרת יכול להימשך כמה שניות — בודקים שוב במקום להציג "לא רשום" לנצח
+      if (!registered) setTimeout(draw, 5000);
+    };
+    draw();
+  }
+  return card;
 }
 
 function reportRow(label, val, deltaEl){
@@ -132,22 +221,6 @@ function renderSettings(main){
           S.profile.minutesPerDay = m; save(); renderProfile(main);
         }}, String(m))))),
 
-    settingRow("שעת תזכורת", el("input", {class: "input inline", type: "time", dir: "ltr",
-      value: S.profile.reminderTime, oninput: e => { S.profile.reminderTime = e.target.value; save(); scheduleDaily(); syncReminderState(); }})),
-
-    settingRow("תזכורת יומית", el("button", {class: "btn ghost small", onclick: async () => {
-      if (!notifSupported()) return toast("הדפדפן לא תומך בהתראות (ב-iPhone צריך קודם להוסיף את האפליקציה למסך הבית)");
-      if (S.settings.notifs){ disableNotifs(); toast("התזכורת כובתה"); renderProfile(main); return; }
-      const ok = await enableNotifs();
-      toast(ok ? "התזכורת הופעלה ✓" : "ההרשאה נדחתה בדפדפן — יש לאפשר התראות בהגדרות הדפדפן");
-      renderProfile(main);
-    }}, S.settings.notifs ? "פעילה — כבה" : "כבויה — הפעל")),
-
-    S.settings.notifs ? settingRow("בדיקה", el("button", {class: "btn ghost small", onclick: async () => {
-      const ok = await testReminder();
-      toast(ok ? "שלחתי התראת בדיקה — בדוק את מרכז ההתראות 🔔" : "לא הצלחתי להציג התראה בדפדפן הזה");
-    }}, "שלח לי התראת בדיקה")) : null,
-
     settingRow("מהירות הקראה", el("div", {class: "chips"},
       [[0.8, "איטית"], [1, "רגילה"], [1.15, "מהירה"]].map(([v, name]) =>
         el("button", {class: "chip-btn" + (s.voiceRate === v ? " sel" : ""), onclick: () => {
@@ -160,6 +233,9 @@ function renderSettings(main){
 
     settingRow("כתובת שרת AI", el("input", {class: "input inline", dir: "ltr",
       value: s.aiUrl, onchange: e => { s.aiUrl = e.target.value.trim(); save(); toast("נשמר"); }})),
+
+    settingRow("כתובת שרת תזכורות", el("input", {class: "input inline", dir: "ltr",
+      value: s.pushUrl || "", onchange: e => { s.pushUrl = e.target.value.trim(); save(); toast("נשמר — כבה והפעל את התזכורת כדי להירשם מחדש"); }})),
 
     el("hr", {}),
     el("button", {class: "btn ghost small danger", onclick: () => {

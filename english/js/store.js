@@ -42,7 +42,13 @@ function defaults(){
     challenge: {date: null, idx: 0, done: false},
     lessonDate: null,         // תאריך האימון היומי האחרון שהושלם
     teacherHistory: [],       // צ'אט עם המורה
-    settings: {theme: "system", aiUrl: "https://english-ai.meirco199.workers.dev", notifs: false, voiceRate: 1},
+    settings: {
+      theme: "system",
+      aiUrl: "https://english-ai.meirco199.workers.dev",
+      pushUrl: "https://english-push.meirco199.workers.dev", // שרת התזכורות (Web Push)
+      notifs: false,
+      voiceRate: 1,
+    },
   };
 }
 

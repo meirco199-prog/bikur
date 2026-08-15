@@ -1,10 +1,10 @@
 /* English — service worker: קאשינג לעבודה ללא אינטרנט */
-var CACHE = "english-v2";
+var CACHE = "english-v3";
 var ASSETS = [
   "./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png",
   "css/main.css",
   "js/app.js", "js/util.js", "js/store.js", "js/srs.js", "js/gamify.js", "js/speech.js",
-  "js/ai.js", "js/notify.js", "js/lesson.js",
+  "js/ai.js", "js/notify.js", "js/push.js", "js/lesson.js",
   "js/data/words.js", "js/data/grammar.js", "js/data/scenarios.js", "js/data/reading.js", "js/data/test.js",
   "js/screens/onboarding.js", "js/screens/placement.js", "js/screens/home.js", "js/screens/learn.js",
   "js/screens/speak.js", "js/screens/words.js", "js/screens/teacher.js", "js/screens/profile.js"
@@ -55,41 +55,67 @@ function todayISO() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
+// "כבר למד היום" = השלים את האימון היומי או עמד ביעד הדקות.
+// בכוונה לא לפי כל פעילות קטנה (lastActive) — אחרת פתיחה חטופה של האפליקציה
+// באמצע היום הייתה מבטלת את התזכורת של אותו ערב.
+function studiedOn(st, today) {
+  return !!st && (st.lastLesson === today || st.metGoal === today);
+}
+
+function reminderBody(st) {
+  if (st && st.due > 0) return st.due + " מילים מחכות לחזרה — כמה דקות וסיימת!";
+  if (st && st.streak >= 3) return "אל תשבור את הרצף! נשאר רק האימון של היום 🔥 (" + st.streak + " ימים)";
+  return "כמה דקות אנגלית עכשיו ותסמן את היום ✓";
+}
+
+async function showReminder(st, today) {
+  await self.registration.showNotification("הזמן שלך ללמוד אנגלית", {
+    body: reminderBody(st), icon: "icon-192.png", badge: "icon-192.png", tag: "study-reminder",
+    dir: "rtl", lang: "he", data: { url: "./#/home" }
+  });
+  if (st) { st.notifiedOn = today; await idbPut("state", st); }
+}
+
 // מחליט אם להציג תזכורת עכשיו: מופעל, עבר זמן התזכורת, לא למד היום, לא הותרע כבר היום
 async function maybeRemind() {
   var st = await idbGetState();
   if (!st || !st.enabled) return;
   var today = todayISO();
-  if (st.lastLesson === today || st.lastStudy === today) return; // כבר למד היום
+  if (studiedOn(st, today)) return;
   if (st.notifiedOn === today) return;                            // כבר הותרע היום
   var now = new Date();
   var mins = now.getHours() * 60 + now.getMinutes();
   var parts = (st.time || "20:00").split(":");
   var target = (parseInt(parts[0], 10) || 20) * 60 + (parseInt(parts[1], 10) || 0);
   if (mins < target || mins > 23 * 60 + 30) return;               // רק בין שעת התזכורת ל-23:30
-  var body = "כמה דקות אנגלית עכשיו ותסמן את היום ✓";
-  if (st.due > 0) body = st.due + " מילים מחכות לחזרה — כמה דקות וסיימת!";
-  else if (st.streak >= 3) body = "אל תשבור את הרצף! נשאר רק האימון של היום 🔥 (" + st.streak + " ימים)";
-  await self.registration.showNotification("הזמן שלך ללמוד אנגלית", {
-    body: body, icon: "icon-192.png", badge: "icon-192.png", tag: "study-reminder",
-    dir: "rtl", lang: "he", data: { url: "./#/home" }
-  });
-  st.notifiedOn = today;
-  await idbPut("state", st);
+  await showReminder(st, today);
 }
 
 self.addEventListener("periodicsync", function (e) {
   if (e.tag === "study-reminder") e.waitUntil(maybeRemind());
 });
 
-// גיבוי: אם השרת ישלח Web Push בעתיד — נציג אותו כאן
+// Web Push מהשרת (english-push) — זה מה שמעיר את האפליקציה כשהיא סגורה.
+// הדחיפה מגיעה ריקה: השרת רק אומר "הגיע הזמן", והנוסח נבנה כאן מהמצב המקומי
+// כדי שיהיה מדויק (כמה מילים לחזרה, מה הרצף) גם אם השרת לא התעדכן.
 self.addEventListener("push", function (e) {
-  var data = {};
-  try { data = e.data ? e.data.json() : {}; } catch (err) {}
-  e.waitUntil(self.registration.showNotification(data.title || "אנגלית", {
-    body: data.body || "הגיע הזמן ללמוד אנגלית", icon: "icon-192.png", badge: "icon-192.png",
-    tag: "study-reminder", dir: "rtl", lang: "he", data: { url: data.url || "./#/home" }
-  }));
+  e.waitUntil((async function () {
+    var data = null;
+    try { data = e.data ? e.data.json() : null; } catch (err) {}
+    var st = await idbGetState();
+    var today = todayISO();
+    // אם המכשיר כבר יודע שלמדנו היום — לא מציקים, גם אם השרת חשב אחרת
+    if (studiedOn(st, today)) return;
+    if (data && data.title) {
+      await self.registration.showNotification(data.title, {
+        body: data.body || reminderBody(st), icon: "icon-192.png", badge: "icon-192.png",
+        tag: "study-reminder", dir: "rtl", lang: "he", data: { url: data.url || "./#/home" }
+      });
+      if (st) { st.notifiedOn = today; await idbPut("state", st); }
+      return;
+    }
+    await showReminder(st, today);
+  })());
 });
 
 // לחיצה על ההתראה — פותחת/ממקדת את האפליקציה בדף הבית

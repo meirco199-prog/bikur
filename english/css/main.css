@@ -365,6 +365,9 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 }
 .setting-row:last-of-type { border-bottom: none; }
 .setting-label { font-size: .95rem; }
+/* אבחון התזכורת — שורות מצב קצרות מתחת לכפתורי הבדיקה */
+.push-status { margin-top: 10px; line-height: 1.7; }
+.push-status div { direction: rtl; }
 
 /* ---------- טוסט וקונפטי ---------- */
 .toast {
