@@ -53,10 +53,13 @@ function load(){
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaults();
     const d = defaults(), s = JSON.parse(raw);
-    // מיזוג רדוד עם ברירות מחדל כדי ששדות חדשים לא יחסרו אחרי עדכון
+    // מיזוג רדוד עם ברירות מחדל כדי ששדות חדשים לא יחסרו אחרי עדכון.
+    // ממזגים רק כשגם ברירת המחדל וגם הערך השמור הם אובייקטים אמיתיים —
+    // אחרת ברירת מחדל null (כמו lessonDate) הייתה "מפזרת" מחרוזת לאובייקט תווים.
+    const isPlainObj = v => v && typeof v === "object" && !Array.isArray(v);
     for (const k of Object.keys(d)){
       if (s[k] === undefined) s[k] = d[k];
-      else if (typeof d[k] === "object" && !Array.isArray(d[k])) s[k] = {...d[k], ...s[k]};
+      else if (isPlainObj(d[k]) && isPlainObj(s[k])) s[k] = {...d[k], ...s[k]};
     }
     return s;
   } catch { return defaults(); }

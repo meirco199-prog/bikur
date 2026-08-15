@@ -3,7 +3,7 @@ import { el, toast, fmtMinutes, todayStr } from "../util.js";
 import { S, save, resetAll, weekSummary } from "../store.js";
 import { levelInfo, ACHIEVEMENTS, LEVELS } from "../gamify.js";
 import { srsCounts } from "../srs.js";
-import { enableNotifs, scheduleDaily, notifSupported } from "../notify.js";
+import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminder, syncReminderState } from "../notify.js";
 import { cefrDesc } from "./onboarding.js";
 
 const SKILL_HE = {vocab: "אוצר מילים", grammar: "דקדוק", listening: "שמיעה", reading: "קריאה", speaking: "דיבור", writing: "כתיבה"};
@@ -133,15 +133,20 @@ function renderSettings(main){
         }}, String(m))))),
 
     settingRow("שעת תזכורת", el("input", {class: "input inline", type: "time", dir: "ltr",
-      value: S.profile.reminderTime, oninput: e => { S.profile.reminderTime = e.target.value; save(); scheduleDaily(); }})),
+      value: S.profile.reminderTime, oninput: e => { S.profile.reminderTime = e.target.value; save(); scheduleDaily(); syncReminderState(); }})),
 
-    settingRow("תזכורת יומית", el("button", {class: "btn ghost small", onclick: async (ev) => {
-      if (!notifSupported()) return toast("הדפדפן לא תומך בהתראות");
-      if (S.settings.notifs){ S.settings.notifs = false; save(); ev.currentTarget.textContent = "כבויה — הפעל"; return; }
+    settingRow("תזכורת יומית", el("button", {class: "btn ghost small", onclick: async () => {
+      if (!notifSupported()) return toast("הדפדפן לא תומך בהתראות (ב-iPhone צריך קודם להוסיף את האפליקציה למסך הבית)");
+      if (S.settings.notifs){ disableNotifs(); toast("התזכורת כובתה"); renderProfile(main); return; }
       const ok = await enableNotifs();
-      toast(ok ? "התזכורות הופעלו ✓ (פועלות כשהאפליקציה פתוחה ברקע)" : "ההרשאה נדחתה בדפדפן");
+      toast(ok ? "התזכורת הופעלה ✓" : "ההרשאה נדחתה בדפדפן — יש לאפשר התראות בהגדרות הדפדפן");
       renderProfile(main);
     }}, S.settings.notifs ? "פעילה — כבה" : "כבויה — הפעל")),
+
+    S.settings.notifs ? settingRow("בדיקה", el("button", {class: "btn ghost small", onclick: async () => {
+      const ok = await testReminder();
+      toast(ok ? "שלחתי התראת בדיקה — בדוק את מרכז ההתראות 🔔" : "לא הצלחתי להציג התראה בדפדפן הזה");
+    }}, "שלח לי התראת בדיקה")) : null,
 
     settingRow("מהירות הקראה", el("div", {class: "chips"},
       [[0.8, "איטית"], [1, "רגילה"], [1.15, "מהירה"]].map(([v, name]) =>

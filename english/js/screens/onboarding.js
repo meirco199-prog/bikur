@@ -3,6 +3,7 @@ import { el, toast } from "../util.js";
 import { S, save } from "../store.js";
 import { TOPICS } from "../data/words.js";
 import { renderPlacement } from "./placement.js";
+import { enableNotifs, notifSupported } from "../notify.js";
 
 const GOALS = [
   {id: "daily", icon: "💬", name: "שיחות יומיומיות"},
@@ -143,6 +144,15 @@ export function renderOnboarding(main){
         el("p", {class: "muted"}, cefrDesc(level)),
         el("p", {}, `בנינו לך מסלול אישי: ${S.profile.minutesPerDay} דקות ביום, עם דגש על ${
           [...state.weak].map(w => SKILLS.find(s => s.id === w)?.name).filter(Boolean).join(", ") || "כל המיומנויות"}.`),
+        notifSupported() ? el("button", {class: "btn ghost big reminder-btn", onclick: async (ev) => {
+          const btn = ev.currentTarget;
+          btn.disabled = true; btn.textContent = "מבקש הרשאה...";
+          const ok = await enableNotifs();
+          btn.disabled = false;
+          btn.textContent = ok ? `🔔 תזכורת יומית פעילה ל-${state.time}` : "🔕 ההרשאה נדחתה — אפשר להפעיל בהגדרות";
+          btn.classList.toggle("sel-good", ok);
+          toast(ok ? "מעולה! נזכיר לך כל יום ✓" : "אין בעיה — תמיד אפשר להפעיל אחר כך בפרופיל");
+        }}, `🔔 הפעל תזכורת יומית ב-${state.time}`) : null,
         el("button", {class: "btn primary big", onclick: () => {
           location.hash = "#/home";
           // אם ה-hash לא השתנה — מפעילים ניתוב ידנית

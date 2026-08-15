@@ -8,7 +8,7 @@ import { renderSpeak } from "./screens/speak.js";
 import { renderWords } from "./screens/words.js";
 import { renderProfile, applyTheme } from "./screens/profile.js";
 import { renderTeacher } from "./screens/teacher.js";
-import { scheduleDaily } from "./notify.js";
+import { scheduleDaily, syncReminderState } from "./notify.js";
 import { stopSpeaking } from "./speech.js";
 
 const main = document.getElementById("main");
@@ -55,6 +55,8 @@ function route(){
     b.classList.toggle("active", b.dataset.id === r.nav));
   window.scrollTo(0, 0);
   r.render(main);
+  // עדכון מצב התזכורת ל-service worker אחרי כל מסך (למשל אחרי אימון — כבר למד היום)
+  if (S.settings.notifs) syncReminderState();
 }
 
 // אתחול
@@ -66,7 +68,7 @@ scheduleDaily();
 
 // כשחוזרים לאפליקציה אחרי onboarding — לוודא שהניווט מוצג
 window.addEventListener("focus", () => {
-  if (S.profile.onboarded && S.settings.notifs) scheduleDaily();
+  if (S.profile.onboarded && S.settings.notifs){ scheduleDaily(); syncReminderState(); }
 });
 
 // service worker לעבודה ללא רשת
