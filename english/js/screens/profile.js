@@ -7,6 +7,7 @@ import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminde
   reminderBlocker, installedAsApp } from "../notify.js";
 import { pushSupported, pushStatus, testPush } from "../push.js";
 import { cefrDesc } from "./onboarding.js";
+import { renderPlacement } from "./placement.js";
 
 const SKILL_HE = {vocab: "אוצר מילים", grammar: "דקדוק", listening: "שמיעה", reading: "קריאה", speaking: "דיבור", writing: "כתיבה"};
 
@@ -32,6 +33,13 @@ export function renderProfile(main){
         el("span", {}, `בדרך ל-${lvl.next.name} (${lvl.next.he})`),
         el("span", {class: "muted small-text"}, `${lvl.pct}%`)),
       el("div", {class: "progress"}, el("div", {class: "progress-fill", style: `width:${lvl.pct}%`}))) : null,
+
+    // מבחן רמה מחדש — כי רמה לא מדויקת משבשת את קושי הקריאה והאימונים
+    el("div", {class: "card row spread"},
+      el("div", {},
+        el("div", {}, `רמת אנגלית: ${p.level}`),
+        el("div", {class: "muted small-text"}, "מרגיש קל או קשה מדי? המבחן המדויק ימקם אותך מחדש")),
+      el("button", {class: "btn ghost small", onclick: () => retakeTest(main)}, "מבחן רמה מחדש")),
 
     // דוח שבועי
     el("div", {class: "card"},
@@ -248,6 +256,24 @@ function renderSettings(main){
 function settingRow(label, control){
   return el("div", {class: "setting-row"},
     el("span", {class: "setting-label"}, label), control);
+}
+
+// מבחן רמה מחדש מתוך הפרופיל, ועדכון הרמה בסיום
+function retakeTest(main){
+  renderPlacement(main, level => {
+    const prev = S.profile.level;
+    S.profile.level = level;
+    save();
+    main.replaceChildren(el("div", {class: "screen"},
+      el("div", {class: "card center summary"},
+        el("div", {class: "summary-emoji"}, "🎯"),
+        el("h2", {}, `הרמה שלך: ${level}`),
+        prev && prev !== level
+          ? el("p", {class: "muted"}, `עודכן מ-${prev} ל-${level}. הקריאה, האימונים והתכנים יתאימו לרמה החדשה.`)
+          : el("p", {class: "muted"}, "הרמה נשארה זהה — סימן שהיא מדויקת."),
+        el("p", {class: "muted small-text"}, cefrDesc(level)),
+        el("button", {class: "btn primary big", onclick: () => renderProfile(main)}, "חזרה לפרופיל"))));
+  });
 }
 
 export function applyTheme(){
