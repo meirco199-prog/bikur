@@ -288,7 +288,7 @@ function grammarExercise(){
             recordMistake(`grammar ${g.id}: ${q.q}`, "grammar");
             const gd = S.grammarDone[g.id] = S.grammarDone[g.id] || {ok: 0, fail: 0};
             gd.fail++; save();
-            showFeedback(box, false, q.opts[q.a], done2, q.why + " · " + g.short);
+            showFeedback(box, false, q.opts[q.a], done2, q.why);
           } else {
             const gd = S.grammarDone[g.id] = S.grammarDone[g.id] || {ok: 0, fail: 0};
             gd.ok++; save();

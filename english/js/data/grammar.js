@@ -1,4 +1,5 @@
 // נושאי דקדוק: הסבר קצר בעברית, דוגמאות, ותרגול. ההסבר המורחב מוצג רק אחרי טעות.
+// כל הסבר טעות (why) נכתב פשוט, ספציפי למשפט, ובלי ז'רגון — כמו מורה שמסביר בשקט.
 export const GRAMMAR = [
   {
     id:"present-simple", name:"Present Simple", lvl:"A1",
@@ -10,11 +11,11 @@ export const GRAMMAR = [
       ["They don't watch TV.","הם לא צופים בטלוויזיה."],
     ],
     quiz:[
-      {q:"She ___ English every day.", opts:["study","studies","studying","studied"], a:1, why:"גוף שלישי יחיד (she) מקבל s/es: studies."},
-      {q:"___ he like pizza?", opts:["Do","Is","Does","Are"], a:2, why:"שאלה בגוף שלישי יחיד נבנית עם Does."},
-      {q:"We ___ to work by bus.", opts:["goes","going","go","gone"], a:2, why:"עם we משתמשים בצורת הבסיס: go."},
-      {q:"My brother ___ meat.", opts:["don't eat","doesn't eat","not eat","doesn't eats"], a:1, why:"שלילה בגוף שלישי: doesn't + פועל בסיס."},
-      {q:"The train ___ at 8:00.", opts:["leave","leaves","leaving","is leave"], a:1, why:"לוחות זמנים קבועים = Present Simple עם s."},
+      {q:"She ___ English every day.", opts:["study","studies","studying","studied"], a:1, why:"עם she / he / it מוסיפים s לפועל, לכן studies. (עם I / you / we / they — בלי s.)"},
+      {q:"___ he like pizza?", opts:["Do","Is","Does","Are"], a:2, why:"שאלה על he / she / it מתחילה ב-Does. (עם I / you / we / they זה Do.)"},
+      {q:"We ___ to work by bus.", opts:["goes","going","go","gone"], a:2, why:"עם we הפועל נשאר רגיל, בלי s: go."},
+      {q:"My brother ___ meat.", opts:["don't eat","doesn't eat","not eat","doesn't eats"], a:1, why:"שלילה על 'הוא': doesn't ואז הפועל רגיל — doesn't eat. לא doesn't eats."},
+      {q:"The train ___ at 8:00.", opts:["leave","leaves","leaving","is leave"], a:1, why:"לוח זמנים קבוע. train זה 'it', ולכן leaves עם s."},
     ]
   },
   {
@@ -27,10 +28,10 @@ export const GRAMMAR = [
       ["They are waiting outside.","הם מחכים בחוץ."],
     ],
     quiz:[
-      {q:"Quiet, please! The baby ___.", opts:["sleeps","is sleeping","sleep","slept"], a:1, why:"פעולה שקורית עכשיו: is sleeping."},
-      {q:"Look! It ___.", opts:["rains","rain","is raining","rained"], a:2, why:"Look! מסמן פעולה שקורית ברגע זה."},
-      {q:"We ___ for the bus now.", opts:["wait","are waiting","waits","waited"], a:1, why:"now = פעולה מתמשכת בהווה."},
-      {q:"I ___ this word.", opts:["am knowing","know","knowing","knows"], a:1, why:"know הוא פועל מצב — לא מקבל ing."},
+      {q:"Quiet, please! The baby ___.", opts:["sleeps","is sleeping","sleep","slept"], a:1, why:"זה קורה ממש עכשיו, לכן is + פועל עם ing — is sleeping."},
+      {q:"Look! It ___.", opts:["rains","rain","is raining","rained"], a:2, why:"המילה Look! אומרת שזה קורה עכשיו מול העיניים — is raining."},
+      {q:"We ___ for the bus now.", opts:["wait","are waiting","waits","waited"], a:1, why:"now = קורה כרגע, לכן are waiting."},
+      {q:"I ___ this word.", opts:["am knowing","know","knowing","knows"], a:1, why:"יש פעלים (know, like, want) שלא באים עם ing, גם כשזה עכשיו. פשוט: I know."},
     ]
   },
   {
@@ -43,11 +44,11 @@ export const GRAMMAR = [
       ["We didn't see the movie.","לא ראינו את הסרט."],
     ],
     quiz:[
-      {q:"I ___ to the beach yesterday.", opts:["go","goed","went","gone"], a:2, why:"go הוא פועל חריג: go → went."},
-      {q:"___ you call him last night?", opts:["Did","Do","Was","Have"], a:0, why:"שאלה בעבר נבנית עם Did + פועל בסיס."},
-      {q:"She ___ the answer.", opts:["didn't knew","didn't know","don't know","not knew"], a:1, why:"אחרי didn't הפועל חוזר לצורת הבסיס: know."},
-      {q:"They ___ dinner at eight.", opts:["eated","ate","eaten","eat"], a:1, why:"eat הוא פועל חריג: eat → ate."},
-      {q:"We ___ TV two hours ago.", opts:["watch","watches","watched","watching"], a:2, why:"ago מסמן עבר — פועל רגיל מקבל ed."},
+      {q:"I ___ to the beach yesterday.", opts:["go","goed","went","gone"], a:2, why:"go הוא פועל מיוחד: בעבר הוא הופך ל-went (לא 'goed')."},
+      {q:"___ you call him last night?", opts:["Did","Do","Was","Have"], a:0, why:"שאלה בעבר מתחילה ב-Did, והפועל נשאר רגיל: Did you call?"},
+      {q:"She ___ the answer.", opts:["didn't knew","didn't know","don't know","not knew"], a:1, why:"אחרי didn't הפועל חוזר לצורה הרגילה: didn't know (לא 'didn't knew')."},
+      {q:"They ___ dinner at eight.", opts:["eated","ate","eaten","eat"], a:1, why:"eat הוא פועל מיוחד: בעבר ate (לא 'eated')."},
+      {q:"We ___ TV two hours ago.", opts:["watch","watches","watched","watching"], a:2, why:"ago אומר שזה בעבר. פועל רגיל מקבל ed: watched."},
     ]
   },
   {
@@ -60,10 +61,10 @@ export const GRAMMAR = [
       ["It won't rain tomorrow.","לא ירד גשם מחר."],
     ],
     quiz:[
-      {q:"Wait, I ___ you with those bags.", opts:["am going to help","will help","helping","helped"], a:1, why:"החלטה רגעית = will."},
-      {q:"Look at those clouds! It ___ rain.", opts:["will","is going to","would","won't"], a:1, why:"תחזית על סמך ראיות = going to."},
-      {q:"She ___ study medicine next year.", opts:["is going to","will going","going","go to"], a:0, why:"תוכנית מוחלטת מראש = is going to."},
-      {q:"Don't worry, I ___ forget.", opts:["will","won't","am not","don't will"], a:1, why:"שלילת will = won't."},
+      {q:"Wait, I ___ you with those bags.", opts:["am going to help","will help","helping","helped"], a:1, why:"החלטת עכשיו, ברגע זה, לעזור — לכן will help."},
+      {q:"Look at those clouds! It ___ rain.", opts:["will","is going to","would","won't"], a:1, why:"רואים סימנים (עננים) ומנחשים מה יקרה — לכן going to."},
+      {q:"She ___ study medicine next year.", opts:["is going to","will going","going","go to"], a:0, why:"תוכנית שכבר הוחלטה מראש — is going to."},
+      {q:"Don't worry, I ___ forget.", opts:["will","won't","am not","don't will"], a:1, why:"won't זה הקיצור של will not — כלומר 'לא אשכח'."},
     ]
   },
   {
@@ -76,10 +77,10 @@ export const GRAMMAR = [
       ["We have lived here since 2015.","אנחנו גרים כאן מאז 2015."],
     ],
     quiz:[
-      {q:"I ___ this movie three times.", opts:["saw","have seen","see","am seeing"], a:1, why:"חוויה שחוזרת עד היום — Present Perfect."},
-      {q:"___ you ever ___ to Japan?", opts:["Did / go","Have / been","Do / go","Are / going"], a:1, why:"Have you ever been — שאלת חוויית חיים."},
-      {q:"She ___ her keys, so she can't get in.", opts:["lost","has lost","loses","losing"], a:1, why:"תוצאה בהווה (היא לא יכולה להיכנס) = has lost."},
-      {q:"We have known each other ___ ten years.", opts:["since","for","ago","from"], a:1, why:"for + משך זמן; since + נקודת התחלה."},
+      {q:"I ___ this movie three times.", opts:["saw","have seen","see","am seeing"], a:1, why:"חוויה שקרתה עד היום, בלי לומר מתי בדיוק — have seen."},
+      {q:"___ you ever ___ to Japan?", opts:["Did / go","Have / been","Do / go","Are / going"], a:1, why:"שאלה על חוויה בחיים ('אי פעם') נבנית כך: Have you ever been...?"},
+      {q:"She ___ her keys, so she can't get in.", opts:["lost","has lost","loses","losing"], a:1, why:"קרה בעבר אבל התוצאה עכשיו (אין לה מפתחות) — לכן has lost."},
+      {q:"We have known each other ___ ten years.", opts:["since","for","ago","from"], a:1, why:"for בא עם כמות זמן (ten years). since בא עם נקודת התחלה (since 2010)."},
     ]
   },
   {
@@ -92,10 +93,10 @@ export const GRAMMAR = [
       ["My English is getting better.","האנגלית שלי משתפרת."],
     ],
     quiz:[
-      {q:"Today is ___ than yesterday.", opts:["hot","hotter","more hot","hottest"], a:1, why:"מילה קצרה: hot → hotter (than)."},
-      {q:"This is ___ restaurant in the city.", opts:["better","the best","most good","the goodest"], a:1, why:"good חריג: good → better → the best."},
-      {q:"The test was ___ than I expected.", opts:["more easy","easyer","easier","most easy"], a:2, why:"easy → easier (y הופך ל-ier)."},
-      {q:"This hotel is ___ expensive than ours.", opts:["more","most","much","many"], a:0, why:"מילה ארוכה: more expensive than."},
+      {q:"Today is ___ than yesterday.", opts:["hot","hotter","more hot","hottest"], a:1, why:"מילה קצרה מקבלת er: hot → hotter. (ואז than.)"},
+      {q:"This is ___ restaurant in the city.", opts:["better","the best","most good","the goodest"], a:1, why:"good היא מילה מיוחדת: good → better → the best."},
+      {q:"The test was ___ than I expected.", opts:["more easy","easyer","easier","most easy"], a:2, why:"easy נגמר ב-y, אז ה-y הופך ל-ier: easier."},
+      {q:"This hotel is ___ expensive than ours.", opts:["more","most","much","many"], a:0, why:"מילה ארוכה (expensive) לא מקבלת er — שמים more לפניה: more expensive."},
     ]
   },
   {
@@ -108,10 +109,10 @@ export const GRAMMAR = [
       ["You must wear a seatbelt.","חובה לחגור חגורת בטיחות."],
     ],
     quiz:[
-      {q:"You look tired. You ___ go to sleep.", opts:["can","should","must not","would"], a:1, why:"עצה = should."},
-      {q:"She ___ speak three languages.", opts:["can","should","must","can to"], a:0, why:"יכולת = can + פועל בסיס."},
-      {q:"You ___ smoke here. It's forbidden.", opts:["don't have to","shouldn't","mustn't","couldn't"], a:2, why:"איסור מוחלט = mustn't."},
-      {q:"It's free — you ___ pay.", opts:["mustn't","don't have to","can't","shouldn't"], a:1, why:"אין חובה (אבל מותר) = don't have to."},
+      {q:"You look tired. You ___ go to sleep.", opts:["can","should","must not","would"], a:1, why:"should = כדאי לך. זו עצה ידידותית."},
+      {q:"She ___ speak three languages.", opts:["can","should","must","can to"], a:0, why:"can = מסוגלת, יודעת. אחריו פועל רגיל: can speak."},
+      {q:"You ___ smoke here. It's forbidden.", opts:["don't have to","shouldn't","mustn't","couldn't"], a:2, why:"forbidden = אסור. 'אסור' באנגלית זה mustn't."},
+      {q:"It's free — you ___ pay.", opts:["mustn't","don't have to","can't","shouldn't"], a:1, why:"don't have to = לא חייב (אבל מותר). זה שונה מ-mustn't שפירושו אסור."},
     ]
   },
   {
@@ -124,10 +125,10 @@ export const GRAMMAR = [
       ["We met in 2020.","נפגשנו ב-2020."],
     ],
     quiz:[
-      {q:"I wake up ___ 7 o'clock.", opts:["on","in","at","by"], a:2, why:"שעה מדויקת = at."},
-      {q:"My birthday is ___ March.", opts:["at","on","in","of"], a:2, why:"חודש = in."},
-      {q:"See you ___ Sunday!", opts:["in","on","at","to"], a:1, why:"יום בשבוע = on."},
-      {q:"The picture is ___ the wall.", opts:["in","at","on","over"], a:2, why:"על משטח = on."},
+      {q:"I wake up ___ 7 o'clock.", opts:["on","in","at","by"], a:2, why:"שעה מדויקת באה עם at: at 7 o'clock."},
+      {q:"My birthday is ___ March.", opts:["at","on","in","of"], a:2, why:"חודש בא עם in: in March."},
+      {q:"See you ___ Sunday!", opts:["in","on","at","to"], a:1, why:"יום בשבוע בא עם on: on Sunday."},
+      {q:"The picture is ___ the wall.", opts:["in","at","on","over"], a:2, why:"משהו על משטח (קיר, שולחן) בא עם on: on the wall."},
     ]
   },
   {
@@ -140,26 +141,26 @@ export const GRAMMAR = [
       ["The sun is strong today.","השמש חזקה היום."],
     ],
     quiz:[
-      {q:"He's eating ___ apple.", opts:["a","an","the","—"], a:1, why:"לפני צליל תנועה (a-pple) = an."},
-      {q:"I bought a shirt. ___ shirt is blue.", opts:["A","An","The","This a"], a:2, why:"הוזכר כבר — the."},
-      {q:"Can you give me ___ advice?", opts:["an","a","some","the a"], a:2, why:"advice בלתי ספיר — בלי a; אומרים some advice."},
+      {q:"He's eating ___ apple.", opts:["a","an","the","—"], a:1, why:"apple מתחיל בצליל תנועה (a-פל), ולפני צליל כזה אומרים an ולא a."},
+      {q:"I bought a shirt. ___ shirt is blue.", opts:["A","An","The","This a"], a:2, why:"כבר דיברנו על החולצה הזאת, אז בפעם השנייה אומרים the."},
+      {q:"Can you give me ___ advice?", opts:["an","a","some","the a"], a:2, why:"advice לא נספר (אין 'עצה אחת' באנגלית), אז אומרים some advice."},
       {q:"She plays ___ piano.", opts:["a","an","the","—"], a:2, why:"כלי נגינה מקבלים the: play the piano."},
     ]
   },
   {
     id:"conditionals", name:"משפטי תנאי — First & Second Conditional", lvl:"B2",
-    short:"תנאי ריאלי: If + present, will (If it rains, we'll stay home). תנאי דמיוני: If + past, would (If I had time, I would travel).",
-    more:"הרחבה: בתנאי שני if I were you (לא was) הוא הניסוח המקובל לעצות: If I were you, I would apologize. אין will אחרי if.",
+    short:"תנאי אמיתי: If + הווה, ואז will (If it rains, we'll stay home). תנאי דמיוני: If + עבר, ואז would (If I had time, I would travel).",
+    more:"טיפ קטן וחשוב: אחרי If אף פעם לא כותבים will. ובתנאי דמיוני אומרים If I were (לא was): If I were you, I would apologize.",
     examples:[
       ["If you practice daily, you'll improve fast.","אם תתרגל יומיום, תשתפר מהר."],
       ["If I won the lottery, I would buy a house.","אם הייתי זוכה בלוטו, הייתי קונה בית."],
       ["If I were you, I'd take the job.","אם הייתי במקומך, הייתי לוקח את העבודה."],
     ],
     quiz:[
-      {q:"If it rains, we ___ at home.", opts:["stay","will stay","would stay","stayed"], a:1, why:"תנאי ראשון: If + הווה, will + פועל."},
-      {q:"If I ___ rich, I would travel the world.", opts:["am","will be","were","have been"], a:2, why:"תנאי שני (דמיוני): If + עבר → were."},
-      {q:"If you ___ hard, you'll pass the test.", opts:["will study","study","studied","would study"], a:1, why:"אין will אחרי if — משתמשים בהווה."},
-      {q:"If I were you, I ___ apologize.", opts:["will","would","was","am"], a:1, why:"תנאי שני: would + פועל בסיס."},
+      {q:"If it rains, we ___ at home.", opts:["stay","will stay","would stay","stayed"], a:1, why:"מצב אמיתי שיכול לקרות: אחרי החלק של If (בהווה) בא will — we will stay."},
+      {q:"If I ___ rich, I would travel the world.", opts:["am","will be","were","have been"], a:2, why:"זה חלום דמיוני (אני לא באמת עשיר), ובמקרה כזה אומרים were: If I were rich."},
+      {q:"If you ___ hard, you'll pass the test.", opts:["will study","study","studied","would study"], a:1, why:"אחרי If אף פעם לא כותבים will — משאירים הווה פשוט: If you study."},
+      {q:"If I were you, I ___ apologize.", opts:["will","would","was","am"], a:1, why:"'If I were you' = 'אם הייתי במקומך' — זה דמיוני, ואחרי משפט כזה תמיד בא would, אף פעם will."},
     ]
   },
 ];
