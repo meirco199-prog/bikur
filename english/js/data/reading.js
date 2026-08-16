@@ -68,18 +68,7 @@ export const ARTICLES = [
 export function articlesFor(lvl, interests){
   const order = ["A1","A2","B1","B2","C1","C2"];
   const idx = Math.max(0, order.indexOf(lvl));
-  // חלון: עד שתי רמות מתחת ועד רמה אחת מעל — כך תמיד יש קטעים נוחים,
-  // ולא רק אתגר כבד. קטעים ברמה או מתחתיה מופיעים ראשונים.
-  const ok = ARTICLES.filter(a => {
-    const d = order.indexOf(a.lvl) - idx;
-    return d >= -2 && d <= 1;
-  });
-  const score = a => {
-    const d = order.indexOf(a.lvl) - idx;
-    const comfy = d <= 0 ? 0 : 1;                       // ברמה/מתחתיה קודם
-    const interest = interests?.includes(a.topic) ? 0 : 1; // תחום עניין קודם
-    return comfy * 10 + interest * 4 + order.indexOf(a.lvl); // ואז לפי רמה עולה
-  };
-  ok.sort((a, b) => score(a) - score(b));
+  const ok = ARTICLES.filter(a => Math.abs(order.indexOf(a.lvl) - idx) <= 1);
+  ok.sort((a, b) => (interests?.includes(b.topic) ? 1 : 0) - (interests?.includes(a.topic) ? 1 : 0));
   return ok.length ? ok : ARTICLES;
 }

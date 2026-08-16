@@ -34,12 +34,22 @@ export function renderProfile(main){
         el("span", {class: "muted small-text"}, `${lvl.pct}%`)),
       el("div", {class: "progress"}, el("div", {class: "progress-fill", style: `width:${lvl.pct}%`}))) : null,
 
-    // מבחן רמה מחדש — כי רמה לא מדויקת משבשת את קושי הקריאה והאימונים
-    el("div", {class: "card row spread"},
-      el("div", {},
-        el("div", {}, `רמת אנגלית: ${p.level}`),
-        el("div", {class: "muted small-text"}, "מרגיש קל או קשה מדי? המבחן המדויק ימקם אותך מחדש")),
-      el("button", {class: "btn ghost small", onclick: () => retakeTest(main)}, "מבחן רמה מחדש")),
+    // רמת אנגלית — אתה קובע. אפשר לבחור ידנית (אתה מכיר את עצמך) או לעשות מבחן.
+    el("div", {class: "card"},
+      el("div", {class: "row spread"},
+        el("div", {},
+          el("div", {}, "רמת האנגלית שלך"),
+          el("div", {class: "muted small-text"}, "בחר ידנית, או עשה מבחן קצר")),
+        el("button", {class: "btn ghost small", onclick: () => retakeTest(main)}, "מבחן רמה")),
+      el("div", {class: "chips level-chips"},
+        ["A1","A2","B1","B2","C1","C2"].map(L =>
+          el("button", {class: "chip-btn" + (p.level === L ? " sel" : ""), onclick: () => {
+            if (L === S.profile.level) return;
+            S.profile.level = L; save();
+            toast(`הרמה נקבעה ל-${L} — האימונים והתכנים יתאימו`);
+            renderProfile(main);
+          }}, L))),
+      el("div", {class: "muted small-text"}, cefrDesc(p.level))),
 
     // דוח שבועי
     el("div", {class: "card"},

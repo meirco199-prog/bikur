@@ -391,3 +391,6 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 .big-popup { max-height: 70vh; overflow-y: auto; }
 
 .reminder-btn.sel-good { background: var(--good-soft); color: var(--good); border-color: transparent; }
+
+.level-chips { margin: 10px 0; }
+.level-chips .chip-btn { min-width: 48px; text-align: center; font-weight: 700; }

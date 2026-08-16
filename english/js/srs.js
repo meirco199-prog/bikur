@@ -80,6 +80,9 @@ export function newWords(limit = 5){
   candidates.sort((a, b) => {
     const ai = interests.includes(a.topic) ? 1 : 0, bi = interests.includes(b.topic) ? 1 : 0;
     if (ai !== bi) return bi - ai;
+    // קרוב לרמת המשתמש קודם — משתמש C1 יקבל מילות C1 לפני B2/C2
+    const da = Math.abs(order.indexOf(a.lvl) - li), db = Math.abs(order.indexOf(b.lvl) - li);
+    if (da !== db) return da - db;
     return order.indexOf(a.lvl) - order.indexOf(b.lvl);
   });
   return candidates.slice(0, limit);
