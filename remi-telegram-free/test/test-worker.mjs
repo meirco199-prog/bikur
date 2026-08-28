@@ -1362,5 +1362,40 @@ console.log('קיצורים ("ח.פ") והודעות ישנות נמצאים ב�
   globalThis.fetch = prevFetch;
 }
 
+console.log('ביטול תזכורת בתגובה ובשפה חופשית:');
+{
+  // תזכורת יומית קיימת; המשתמש מגיב "תבטל לי את התזכורת" על הודעת הצלצול שלה
+  await send('תזכיר לי כל יום ב-21:15 חיבוק לילדים');
+  let S = JSON.parse(kv.get('store'));
+  check('התזכורת נוצרה', S.reminders.some(r => r.text.includes('חיבוק')));
+  const req = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'תבטל לי את התזכורת', chat: { id: 111 },
+      reply_to_message: { message_id: 6161, from: { is_bot: true },
+        text: '⏰ מאיר, תזכורת: חיבוק לילדים\n(תזכורת יומית — תחזור מחר)' } } }),
+  });
+  await worker.fetch(req, env);
+  const r = sent[sent.length - 1];
+  S = JSON.parse(kv.get('store'));
+  check('"תבטל לי את התזכורת" כתגובה מבטל אותה', /מחקתי|ביטלתי/.test(r.text) && !S.reminders.some(x => x.text.includes('חיבוק')), r.text);
+
+  // ניסוח חופשי בלי תגובה — דרך פעולת reminder_delete של המוח
+  await send('תזכיר לי כל יום ב-20:45 להשקות עציצים');
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      const text = '{"action":"reminder_delete","title":"להשקות עציצים","reply":""}';
+      return new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text }] }), { status: 200 });
+    }
+    return prevFetch(url, opts);
+  };
+  env.ANTHROPIC_API_KEY = 'sk-test';
+  const r2 = await send('אין צורך יותר בתזכורת של העציצים, תוריד אותה');
+  S = JSON.parse(kv.get('store'));
+  check('ניסוח חופשי מבטל תזכורת דרך המוח', r2.text.includes('ביטלתי') && !S.reminders.some(x => x.text.includes('עציצים')), r2.text);
+  delete env.ANTHROPIC_API_KEY;
+  globalThis.fetch = prevFetch;
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

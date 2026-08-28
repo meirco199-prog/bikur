@@ -1158,7 +1158,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 פגישות מיומן גוגל שלו (בלי id): ${gcalList || '(אין)'}
 
 החזר אך ורק JSON תקין אחד, בלי שום טקסט לפני או אחרי, במבנה:
-{"action":"reminder|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|tehillim|weather|shabbat|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"...","details":"..."}],"details":"...","reply":"תשובה חמה בעברית"}
+{"action":"reminder|reminder_delete|event|event_move|event_delete|task|tasks|shopping|note|note_delete|agenda|gmail|routine|document|document_delete|tehillim|weather|shabbat|answer","title":"...","location":"...","items":["..."],"datetime":"YYYY-MM-DD HH:MM","event_id":0,"recurring":"none|daily|weekly","weekday":0,"range":"today|tomorrow|week","routine":[{"time":"HH:MM","title":"..."}],"events":[{"title":"...","datetime":"YYYY-MM-DD HH:MM","location":"...","details":"..."}],"details":"...","reply":"תשובה חמה בעברית"}
 
 כללים:
 - reminder = לבקש להזכיר משהו. חובה datetime עתידי. אם אמר רק יום בלי שעה — בחר שעה הגיונית.
@@ -1180,6 +1180,7 @@ ${isVoice ? 'שים לב: ההודעה תומללה מהקלטה קולית וי
 - routine = שולח לוז יומי חדש — כמה שורות של שעה+פעולה שיחזרו כל יום ("מעכשיו יהיה לוז חדש: 7:00 ... 21:00 ..."). מלא את routine עם כל השורות; שמור ב-title את מלוא התוכן של השורה (כולל ברכות). אל תשמור את זה כ-note!
 - document = מבקש מסמך/קובץ מהארכיון ("שלח לי את התז") — title = שם המסמך. לעולם אל תטען ב-answer ששלחת או צירפת קובץ — אתה לא מסוגל לצרף; השתמש ב-document.
 - document_delete = מבקש למחוק מסמך/תמונה/קובץ מהארכיון ("תמחק את התמונה של פרטי החברה") — title = שם המסמך. אתה כן יודע למחוק מסמכים — אל תסרב ואל תגיד שאי אפשר!
+- reminder_delete = מבקש לבטל/למחוק תזכורת קיימת ("תבטל את התזכורת של הנשיקה") — title = המילים המרכזיות של התזכורת. אתה כן יודע לבטל תזכורות — אל תסרב!
 - note_delete = מבקש למחוק זיכרון שמור ("תמחק את הזיכרון של הפוליסה", או "תמחק" כתגובה על הודעה עם תוכן מהזיכרון) — title = המילים המרכזיות של הזיכרון (למשל מספר או שם ייחודי). אתה כן יודע למחוק זיכרונות!
 - gmail = מבקש לחפש משהו במיילים, רק כשהוא מזכיר במפורש מייל/ג'ימייל ("חפש במייל את החשבונית של..."). שים ב-title את מילות החיפוש בלבד (בלי "חפש" ובלי "במייל").
 - answer = שאלה כללית או שיחה — ענה בעצמך ב-reply (התאריך העברי והשעה כתובים למעלה — השתמש בהם).
@@ -1337,6 +1338,15 @@ async function applyAiAction(S, j, now, env, gcal = [], memNotes = []) {
       if (matches.length === 1) return { text: `📄 הנה "${matches[0].name}":`, doc: matches[0], replyTo: matches[0].mid };
       if (matches.length > 1) return 'מצאתי כמה מסמכים 📄:\n' + matches.map(d => `${S.docs.indexOf(d) + 1}. ${d.name}`).join('\n') + '\n\nשלח את המספר (למשל "2")';
       return `לא מצאתי מסמך בשם "${title}" 🤔 כתוב "מסמכים" לרשימה.`;
+    }
+    case 'reminder_delete': {
+      if (!title) return null;
+      const bestRem = (S.reminders || [])
+        .map(x => ({ x, s: wordScore(title, x.text) }))
+        .filter(e => e.s >= 1).sort((a, b) => b.s - a.s)[0]?.x;
+      if (!bestRem) return `לא מצאתי תזכורת שמתאימה ל"${title}" 🤔 כתוב "תזכורות" לרשימה.`;
+      S.reminders = S.reminders.filter(x => x !== bestRem);
+      return `🗑️ ביטלתי${hey} את התזכורת: "${bestRem.text}"`;
     }
     case 'note_delete': {
       if (!title) return null;
@@ -1518,7 +1528,7 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
   }
 
   // תגובה (reply) על הודעה עם "תמחק"/"בטל" — מוחקים את מה שההודעה המצוטטת מדברת עליו
-  if (replyCtx && /^(?:תמחק|מחק|בטל|תבטל)(?:\s+(?:את\s+)?(?:זה|אותו|אותה))?[.!]?$/.test(cleanup(text))) {
+  if (replyCtx && /^(?:תמחק|מחק|בטל|תבטל)(?:\s+לי)?(?:\s+את)?(?:\s+(?:זה|אותו|אותה|ה?תזכורת|ה?זיכרון|ה?משימה|ה?פגישה|ה?אירוע|ה?מסמך))?[.!]?$/.test(cleanup(text))) {
     const out = await deleteQuoted(S, replyCtx, env);
     if (out) return out;
   }
