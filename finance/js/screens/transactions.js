@@ -3,7 +3,7 @@
    ============================================================ */
 
 import { el, money, fmtDate, monthLabel, debounce, uid } from '../core/util.js';
-import { selectTx, totals, monthsWithData } from '../domain/finance.js';
+import { selectTx, totals, monthsWithData, settlementsToExclude } from '../domain/finance.js';
 import { PAYMENT_METHODS, EXPENSE_TYPES } from '../core/schema.js';
 import { sectionCard, emptyState, catIcon, spaceChip, toast, select, input, confirmDialog, modal, field, dataTable, promptDialog } from '../ui/components.js';
 import { exportTransactionsCsv } from '../ui/exporters.js';
@@ -70,10 +70,14 @@ export default function renderTransactions(ctx) {
     el('span', { class: 'chip pos', text: `הכנסות ${money(t.income)}` }),
     el('span', { class: 'chip neg', text: `הוצאות ${money(t.expense)}` }),
     el('span', { class: `chip ${t.balance >= 0 ? 'pos' : 'neg'}`, text: `יתרה ${money(t.balance)}` }),
-    rows.some((r) => r.internalTransfer || r.isSettlement)
-      ? el('span', { class: 'chip', title: 'העברות פנימיות אינן נספרות. חיוב אשראי מרוכז נספר כל עוד לא יובא פירוט הכרטיס',
-          text: `${rows.filter((r) => r.internalTransfer).length + rows.filter((r) => r.isSettlement).length} מסומנות` })
-      : null,
+    (() => {
+      const excluded = settlementsToExclude(rows);
+      const n = rows.filter((r) => r.internalTransfer || (r.isSettlement && excluded.has(r.id))).length;
+      return n
+        ? el('span', { class: 'chip', title: 'העברות פנימיות וחיובי אשראי מרוכזים שעסקאותיהם כבר יובאו — אינם נספרים בסיכומים',
+            text: `${n} לא נספרות` })
+        : null;
+    })(),
   ]));
 
   /* ---------- פעולות על בחירה ---------- */
@@ -224,7 +228,7 @@ function removeFilter(ctx, id) {
 /* ============================================================
    הטבלה
    ============================================================ */
-function buildTable(ctx, rows, refreshBulk) {
+function buildTable(ctx, rows, refreshBulk, excludedSettlements = new Set()) {
   const state = ctx.store.state;
   const catOf = (id) => state.categories.find((c) => c.id === id);
   const accOf = (id) => state.accounts.find((a) => a.id === id);
@@ -265,7 +269,13 @@ function buildTable(ctx, rows, refreshBulk) {
     { label: 'סוג', width: '92px', render: (tx) => {
       const chips = [];
       if (tx.internalTransfer) chips.push(el('span', { class: 'chip', title: 'לא נספרת בחישובים', text: '↔ העברה' }));
-      else if (tx.isSettlement) chips.push(el('span', { class: 'chip', title: 'חיוב אשראי מרוכז — נספר כהוצאה כל עוד לא יובא פירוט העסקאות של הכרטיס', text: '🧾 מרוכז' }));
+      else if (tx.isSettlement) chips.push(el('span', {
+        class: `chip ${excludedSettlements.has(tx.id) ? '' : 'warn'}`,
+        title: excludedSettlements.has(tx.id)
+          ? 'חיוב אשראי מרוכז — אינו נספר, כי עסקאות הכרטיס עצמן כבר יובאו'
+          : 'חיוב אשראי מרוכז — נספר כהוצאה, כי פירוט עסקאות הכרטיס טרם יובא',
+        text: '🧾 מרוכז',
+      }));
       else if (tx.isRefund) chips.push(el('span', { class: 'chip pos', text: '↩ זיכוי' }));
       else if (tx.direction === 'expense') chips.push(el('span', { class: 'chip', text: EXPENSE_TYPES[tx.expenseType]?.label || '—' }));
       else chips.push(el('span', { class: 'chip pos', text: 'הכנסה' }));
@@ -279,7 +289,9 @@ function buildTable(ctx, rows, refreshBulk) {
       ]);
     } },
     { label: 'סכום', align: 'end', width: '112px', render: (tx) => {
-      const excluded = tx.internalTransfer || tx.isSettlement;
+      // הקו החוצה מסמן "לא נספר בחישובים" — ולכן חייב לשקף את המצב
+      // בפועל: חיוב מרוכז מוחרג רק כשעסקאות הכרטיס יובאו.
+      const excluded = tx.internalTransfer || (tx.isSettlement && excludedSettlements.has(tx.id));
       const color = excluded ? 'var(--text-3)' : tx.isRefund ? 'var(--pos)' : tx.direction === 'income' ? 'var(--pos)' : 'var(--neg)';
       const sign = tx.isRefund ? '−' : tx.direction === 'income' ? '+' : '−';
       return el('span', { class: 'bold num nowrap', style: { color, textDecoration: excluded ? 'line-through' : null },

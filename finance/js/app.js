@@ -66,14 +66,15 @@ const ctx = {
   get params() { return app.params; },
 
   go(route, params = {}) {
+    // שומרים איפה היינו במסך הנוכחי, כדי שחזרה אחורה תחזיר לאותה נקודה
+    scrollMemory.set(app.route, window.scrollY);
     app.params = params;
     if (SCREENS[route]?.space) app.space = SCREENS[route].space;
     app.route = route;
     app.sidebarOpen = false;
     const hash = `#/${route}`;
     if (location.hash !== hash) { history.pushState(null, '', hash); }
-    render();
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    render({ scrollTo: 0 });
   },
 
   setSpace(space) {
@@ -89,6 +90,7 @@ const ctx = {
     render();
   },
 
+  /** רינדור מחדש בלי לזוז מהמקום — אחרי עריכה, סינון או מחיקה */
   refresh() { render(); },
 
   toggleSidebar() {
@@ -179,9 +181,19 @@ function applyTheme(theme) {
 /* ============================================================
    רינדור
    ============================================================ */
-function render() {
+/** זיכרון מיקום הגלילה לכל מסך */
+const scrollMemory = new Map();
+
+/**
+ * רינדור.
+ * כברירת מחדל נשארים באותו מיקום גלילה — רינדור מחדש אחרי עריכה
+ * או סינון לא אמור לזרוק את המשתמש לראש הדף.
+ * scrollTo מאפשר לקבוע מיקום אחר (0 במעבר למסך חדש).
+ */
+function render(opts = {}) {
   const root = document.getElementById('app');
   const screen = SCREENS[app.route] || SCREENS.gate;
+  const keepY = opts.scrollTo === undefined ? window.scrollY : opts.scrollTo;
   clear(root);
 
   // חישוב תגי התראה בתפריט
@@ -230,6 +242,20 @@ function render() {
       onclick: () => ctx.addTransaction(), text: '+',
     }));
   }
+
+  restoreScroll(keepY);
+}
+
+/**
+ * הדפדפן צריך פריים אחד כדי לחשב את גובה התוכן החדש,
+ * אחרת גלילה לנקודה שמעבר לגובה הנוכחי פשוט לא תתפוס.
+ */
+function restoreScroll(y) {
+  if (!y) { window.scrollTo(0, 0); return; }
+  window.scrollTo(0, y);
+  requestAnimationFrame(() => {
+    if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
+  });
 }
 
 /* ============================================================
@@ -245,8 +271,13 @@ function routeFromHash() {
   }
 }
 
-window.addEventListener('popstate', () => { routeFromHash(); render(); });
-window.addEventListener('hashchange', () => { routeFromHash(); render(); });
+function navigateBack() {
+  scrollMemory.set(app.route, window.scrollY);
+  routeFromHash();
+  render({ scrollTo: scrollMemory.get(app.route) ?? 0 });
+}
+window.addEventListener('popstate', navigateBack);
+window.addEventListener('hashchange', navigateBack);
 
 /* ============================================================
    קיצורי מקלדת

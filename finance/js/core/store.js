@@ -106,12 +106,11 @@ function migrate(state) {
   for (const key of ['categories', 'accounts', 'transactions', 'budgets', 'merchantRules', 'imports', 'audit']) {
     if (!Array.isArray(merged[key])) merged[key] = [];
   }
-  if ((merged.version || 1) < 2) {
-    migrateToV2(merged);
-    // מסמנים שהמצב שונה, כדי ש-init ישמור אותו מיד ולא יריץ
-    // את המיגרציה מחדש בכל טעינה
-    merged.__migrated = true;
-  }
+  const from = merged.version || 1;
+  // מסמנים שהמצב שונה, כדי ש-init ישמור אותו מיד ולא יריץ
+  // את המיגרציה מחדש בכל טעינה
+  if (from < 2) { migrateToV2(merged); merged.__migrated = true; }
+  if (from < 3) { scrubFabricatedDigits(merged); merged.__migrated = true; }
   merged.version = SCHEMA_VERSION;
   return merged;
 }
@@ -136,11 +135,21 @@ function migrateToV2(state) {
     if (tx.direction === 'expense' && savingIds.has(tx.categoryId)) tx.expenseType = 'saving';
   }
 
-  // ניקוי פרטי חשבון מומצאים
-  const used = new Set(state.transactions.map((t) => t.accountId).filter(Boolean));
+}
+
+/**
+ * מחיקת 4 הספרות הבדויות שהגיעו עם חשבונות ברירת המחדל.
+ * הן נשמרו גם על כל תנועה בנפרד (cardLast4) ולכן המשיכו להופיע
+ * במסך התנועות גם אחרי שנוקו מהחשבון עצמו.
+ */
+function scrubFabricatedDigits(state) {
   for (const acc of state.accounts) {
     if (DEMO_LAST4.includes(acc.last4)) acc.last4 = '';
   }
+  for (const tx of state.transactions) {
+    if (DEMO_LAST4.includes(tx.cardLast4)) tx.cardLast4 = null;
+  }
+  const used = new Set(state.transactions.map((t) => t.accountId).filter(Boolean));
   state.accounts = state.accounts.filter((a) => used.has(a.id) || a.last4 || a.institution);
 }
 

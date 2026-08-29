@@ -59,8 +59,10 @@ export default function renderGate(ctx) {
       el('div', { class: 'gc-stats' }, [
         statBit('הכנסות', money(t.income), 'var(--pos)'),
         statBit('הוצאות', money(t.expense), 'var(--neg)'),
+        // חיסכון והשקעות אינם הוצאה — מוצגים בנפרד גם כאן
+        t.saving > 0 ? statBit('חיסכון', money(t.saving), 'var(--brand-500)') : null,
         statBit(s.balanceLabel, money(t.balance), t.balance >= 0 ? 'var(--text)' : 'var(--neg)'),
-      ]),
+      ].filter(Boolean)),
       el('div', { class: 'row', style: { gap: '8px', marginTop: '10px', flexWrap: 'wrap' } }, [
         cmp.vsPrev.expense !== null
           ? el('span', { class: 'row tiny muted-2', style: { gap: '5px' } }, [

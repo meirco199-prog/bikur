@@ -6,7 +6,7 @@
 import { uid, todayISO, currentMonthKey } from './util.js';
 
 /** גרסת הסכימה — משמשת למיגרציות מקומיות */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SPACES = {
   business: { id: 'business', label: 'עסקי', icon: '🏢', color: '#3b62f0' },

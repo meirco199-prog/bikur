@@ -41,11 +41,14 @@ export function toast(message, { type = 'ok', ms = 3600, undo = null } = {}) {
 export function modal({ title, subtitle = '', body, footer = [], size = '', onClose = null, closeOnBackdrop = true }) {
   const backdrop = el('div', { class: 'modal-backdrop' });
   const box = el('div', { class: `modal ${size}` });
+  // מיקום הגלילה לפני פתיחת החלון, כדי לחזור אליו בדיוק בסגירה
+  const scrollBefore = window.scrollY;
 
   const close = () => {
     backdrop.style.opacity = '0';
     setTimeout(() => backdrop.remove(), 160);
     document.removeEventListener('keydown', onKey);
+    if (Math.abs(window.scrollY - scrollBefore) > 2) window.scrollTo(0, scrollBefore);
     onClose?.();
   };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
@@ -69,7 +72,11 @@ export function modal({ title, subtitle = '', body, footer = [], size = '', onCl
   backdrop.addEventListener('click', (e) => { if (closeOnBackdrop && e.target === backdrop) close(); });
   document.body.append(backdrop);
 
-  setTimeout(() => box.querySelector('input, select, textarea, button:not(.modal-close)')?.focus(), 60);
+  // preventScroll: מיקוד בשדה בתוך חלון צף גורם לדפדפן לגלול את הדף
+  // שמאחוריו, ואז חזרה מהחלון נוחתת במקום אחר
+  setTimeout(() => {
+    box.querySelector('input, select, textarea, button:not(.modal-close)')?.focus({ preventScroll: true });
+  }, 60);
   return { close, body: bodyNode, box, backdrop };
 }
 
