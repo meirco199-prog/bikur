@@ -141,12 +141,11 @@ export default function renderDashboard(ctx) {
       actions: [el('button', { class: 'btn xs ghost', text: 'לכל התנועות', onclick: () => ctx.go('transactions') })],
       body: hBarList(catBreak.rows.slice(0, 7).map((r) => {
         const c = catOf(r.categoryId);
-        return { label: c?.name || 'ללא קטגוריה', value: r.amount, color: c?.color, icon: c?.icon, share: r.share };
+        return { id: r.categoryId, label: c?.name || 'ללא קטגוריה', value: r.amount, color: c?.color, icon: c?.icon, share: r.share };
       }), {
-        onClick: (d) => {
-          const c = state.categories.find((x) => x.name === d.label && (space === 'all' || x.space === space));
-          ctx.go('transactions', { categoryId: c?.id, month });
-        },
+        // מעבירים מזהה ולא שם: לקטגוריות "אחר" ו"השקעות" יש גם גרסת
+        // הכנסה וגם גרסת הוצאה, וחיפוש לפי שם היה מגיע לזו של ההכנסות.
+        onClick: (d) => ctx.go('transactions', { categoryId: d.id, month }),
       }),
     }),
   ]));

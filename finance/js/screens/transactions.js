@@ -19,8 +19,25 @@ let selection = new Set();
 export default function renderTransactions(ctx) {
   const state = ctx.store.state;
 
-  // פרמטרים שהגיעו ממסך אחר
-  if (ctx.params?.categoryId) { filters.categoryId = ctx.params.categoryId; ctx.params.categoryId = null; }
+  // פרמטרים שהגיעו ממסך אחר.
+  // בכניסה מקטגוריה מיישרים את שאר הסינונים אליה, כדי שהמסך יראה
+  // בדיוק את מה שנלחץ ולא ישלב סינון קודם שנשאר מהפעם הקודמת.
+  if (ctx.params?.categoryId) {
+    const clicked = state.categories.find((c) => c.id === ctx.params.categoryId);
+    filters.categoryId = ctx.params.categoryId;
+    if (clicked) {
+      filters.space = clicked.space;
+      filters.direction = clicked.kind;
+    }
+    filters.text = '';
+    filters.flag = '';
+    filters.expenseType = '';
+    filters.amountMin = '';
+    filters.amountMax = '';
+    if (ctx.params.month) { filters.month = ctx.params.month; ctx.params.month = null; }
+    ctx.params.categoryId = null;
+    selection.clear();
+  }
   if (ctx.params?.flag) { filters.flag = ctx.params.flag; ctx.params.flag = null; }
   if (ctx.params?.accountId) { filters.accountId = ctx.params.accountId; ctx.params.accountId = null; }
 
