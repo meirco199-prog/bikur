@@ -113,7 +113,7 @@ export function selectTx(transactions, filters = {}) {
 /** סך הכנסות/הוצאות/יתרה עבור אוסף תנועות */
 export function totals(txs) {
   const excluded = settlementsToExclude(txs);
-  let income = 0, expense = 0, fixed = 0, variable = 0, oneoff = 0;
+  let income = 0, expense = 0, fixed = 0, variable = 0, oneoff = 0, saving = 0;
   let count = 0;
   for (const tx of txs) {
     if (!countsInTotals(tx, excluded)) continue;
@@ -124,6 +124,7 @@ export function totals(txs) {
       expense += v;
       if (tx.expenseType === 'fixed') fixed += v;
       else if (tx.expenseType === 'oneoff') oneoff += v;
+      else if (tx.expenseType === 'saving') saving += v;
       else variable += v;
     }
   }
@@ -131,7 +132,9 @@ export function totals(txs) {
   const balance = round2(income - expense);
   return {
     income, expense, balance, count,
-    fixed: round2(fixed), variable: round2(variable), oneoff: round2(oneoff),
+    fixed: round2(fixed), variable: round2(variable), oneoff: round2(oneoff), saving: round2(saving),
+    /** הוצאות צריכה בפועל — בלי חיסכון והשקעות */
+    spending: round2(expense - saving),
     /** אחוז חיסכון / רווח מתוך ההכנסה */
     rate: income > 0 ? round2((balance / income) * 100) : null,
   };

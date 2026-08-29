@@ -48,6 +48,23 @@ export default function renderDashboard(ctx) {
     }),
   ]));
 
+  /* --- פילוח ההוצאה: צריכה מול חיסכון והשקעות --- */
+  if (cur.saving > 0) {
+    node.append(el('div', { class: 'card pad-sm' }, [
+      el('div', { class: 'row wrap', style: { gap: '18px' } }, [
+        el('div', { class: 'grow' }, [
+          el('div', { class: 'bold small', text: 'מתוך ההוצאות החודש' }),
+          el('div', { class: 'tiny muted-2', text: 'חיסכון והשקעות הם כסף שיצא מהחשבון אבל נשאר שלכם' }),
+        ]),
+        breakdownBit('צריכה בפועל', money(cur.spending), 'var(--neg)'),
+        breakdownBit('חיסכון והשקעות', money(cur.saving), 'var(--pos)'),
+        cur.income > 0
+          ? breakdownBit('שיעור החיסכון מההכנסה', `${((cur.saving / cur.income) * 100).toFixed(1).replace(/\.0$/, '')}%`, 'var(--brand-500)')
+          : null,
+      ]),
+    ]));
+  }
+
   if (!cur.count) {
     node.append(sectionCard('', {
       body: emptyState({
@@ -330,6 +347,13 @@ function miniRow(label, value, color, strong = false) {
   return el('div', { class: 'row-between' }, [
     el('span', { class: 'small muted', text: label }),
     el('span', { class: `num ${strong ? 'bold' : ''}`, style: { color, fontSize: strong ? '17px' : '14px' }, text: value }),
+  ]);
+}
+
+function breakdownBit(label, value, color) {
+  return el('div', {}, [
+    el('div', { class: 'tiny muted-2', text: label }),
+    el('div', { class: 'num bold', style: { color, fontSize: '18px' }, text: value }),
   ]);
 }
 

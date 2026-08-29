@@ -111,6 +111,11 @@
         var running = v[0], deployed = v[1];
         // הקוד שרץ בפועל מגיע מהרשת, ולכן הגרסה שעל השרת היא הנכונה להצגה
         window.__APP_VERSION = deployed || running || null;
+        if (window.__APP_VERSION) {
+          document.querySelectorAll('[data-app-version]').forEach(function (node) {
+            node.textContent = ' · גרסה ' + window.__APP_VERSION;
+          });
+        }
         if (!deployed || !running || deployed === running) return false;
 
         // מרעננים פעם אחת בלבד לכל גרסה חדשה — אחרת ניכנס ללולאת רענון

@@ -24,6 +24,9 @@ export const EXPENSE_TYPES = {
   fixed:    { id: 'fixed',    label: 'קבועה',    icon: '🔁' },
   variable: { id: 'variable', label: 'משתנה',   icon: '📊' },
   oneoff:   { id: 'oneoff',   label: 'חד-פעמית', icon: '⚡' },
+  // חיסכון והשקעה הם כסף שיוצא, אבל הוא נשאר שלכם.
+  // הוא נספר בהוצאות ומוצג בנפרד, כדי להבחין בינו לבין צריכה.
+  saving:   { id: 'saving',   label: 'חיסכון',   icon: '🐖' },
 };
 
 export const PAYMENT_METHODS = {
@@ -96,8 +99,8 @@ const P_EXPENSE = [
   ['חדר כושר', '🏋️', '#15803d', 'fixed'],
   ['הלוואות', '🏦', '#8a6d3b', 'fixed'],
   ['כרטיסי אשראי', '💳', '#4338ca', 'variable'],
-  ['השקעות', '📈', '#0f9d76', 'fixed'],
-  ['חסכונות', '🐖', '#3b62f0', 'fixed'],
+  ['השקעות', '📈', '#0f9d76', 'saving'],
+  ['חסכונות', '🐖', '#3b62f0', 'saving'],
   ['קניות שונות', '🛍️', '#7e22ce', 'variable'],
   ['אחר', '📦', '#7b839c', 'variable'],
 ];

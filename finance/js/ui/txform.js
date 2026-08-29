@@ -65,7 +65,7 @@ export function openTxForm(ctx, tx = null, presets = {}) {
             draft.expenseType,
             (v) => {
               draft.expenseType = v;
-              if (v === 'fixed') draft.autoCopy = true;
+              if (v === 'fixed' || v === 'saving') draft.autoCopy = true;
               rebuildAutoCopy();
             },
           ),
@@ -91,7 +91,7 @@ export function openTxForm(ctx, tx = null, presets = {}) {
   const autoCopyWrap = el('div');
   const rebuildAutoCopy = () => {
     autoCopyWrap.replaceChildren(
-      draft.expenseType === 'fixed' || draft.direction === 'income'
+      draft.expenseType === 'fixed' || draft.expenseType === 'saving' || draft.direction === 'income'
         ? switchField('העתק אוטומטית לחודש הבא', draft.autoCopy, (v) => { draft.autoCopy = v; })
         : el('span', { class: 'tiny muted-2', text: 'העתקה אוטומטית זמינה להוצאות קבועות' }),
     );

@@ -96,6 +96,8 @@ export default function renderGate(ctx) {
   const months = monthsWithData(txs);
   wrap.append(el('div', { class: 'tiny muted-2 center' }, [
     `${txs.length.toLocaleString('he-IL')} תנועות · ${months.length} חודשי היסטוריה · הנתונים נשמרים במכשיר בלבד`,
+    // מספר הגרסה מגיע מ-sw.js אחרי טעינת הדף, ולכן מתעדכן לתוך התג הזה
+    el('span', { 'data-app-version': '', text: window.__APP_VERSION ? ` · גרסה ${window.__APP_VERSION}` : '' }),
   ]));
 
   return wrap;

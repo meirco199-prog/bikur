@@ -38,7 +38,7 @@ export function buildMonthCopy(transactions, fromMonth, toMonth, options = {}) {
     if (mode === 'fixed') {
       const keep = tx.direction === 'income'
         ? (tx.recurring || tx.autoCopy)
-        : (tx.expenseType === 'fixed' || tx.recurring || tx.autoCopy);
+        : (tx.expenseType === 'fixed' || tx.expenseType === 'saving' || tx.recurring || tx.autoCopy);
       if (!keep) continue;
     } else if (mode === 'recurring') {
       if (!tx.recurring && !tx.autoCopy) continue;
