@@ -172,11 +172,17 @@ html, body { overflow-x: hidden; max-width: 100%; }
 @media (max-width: 1000px) {
   .side {
     position: fixed; inset-block: 0; inset-inline-start: 0;
-    transform: translateX(100%); transition: transform .28s var(--ease);
+    transition: transform .28s var(--ease);
     box-shadow: var(--shadow-lg); z-index: 120;
+    /* מוסתר מחוץ למסך: ב-RTL הסרגל צמוד לימין ולכן יוצא ימינה */
+    transform: translateX(100%);
   }
-  html[dir="rtl"] .side { transform: translateX(100%); }
-  .side.open { transform: translateX(0); }
+  html[dir="ltr"] .side { transform: translateX(-100%); }
+  /* הסלקטורים חייבים להיות ספציפיים לפחות כמו כללי ההסתרה שמעל,
+     אחרת הסרגל לא ייפתח. */
+  .side.open,
+  html[dir="rtl"] .side.open,
+  html[dir="ltr"] .side.open { transform: translateX(0); }
   .side-scrim { display: block; position: fixed; inset: 0; background: rgba(9,12,22,.45); z-index: 110; animation: fadeIn .2s var(--ease); }
   .menu-btn { display: grid; }
   .topbar { padding: 0 var(--sp-3); gap: var(--sp-2); }

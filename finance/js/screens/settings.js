@@ -165,6 +165,11 @@ export default function renderSettings(ctx) {
   /* ---------- אודות ---------- */
   node.append(sectionCard('אודות', {
     body: el('div', { class: 'col', style: { gap: '8px' } }, [
+      el('div', { class: 'row wrap', style: { gap: '8px' } }, [
+        el('span', { class: 'chip brand', text: `גרסה ${window.__APP_VERSION || '—'}` }),
+        el('button', { class: 'btn xs', text: '↻ בדיקת עדכון', onclick: (e) => checkForUpdate(e.target) }),
+      ]),
+      el('div', { class: 'tiny muted-2', text: 'האפליקציה מתעדכנת לבד כשעולה גרסה חדשה — אין צורך להתקין אותה מחדש.' }),
       el('div', { class: 'small muted', text: 'אפליקציית ניהול הכנסות והוצאות — עסקי ופרטי.' }),
       el('div', { class: 'tiny muted-2', text: 'הנתונים נשמרים בדפדפן (localStorage). שכבת הנתונים בנויה כך שניתן להחליף אותה ל-Supabase/PostgreSQL בשינוי שורה אחת, ללא שינוי בשאר האפליקציה.' }),
       el('div', { class: 'tiny muted-2', text: 'קיצורי מקלדת: N — תנועה חדשה · ← → — מעבר בין חודשים · Ctrl+Z — ביטול פעולה אחרונה.' }),
@@ -242,4 +247,28 @@ async function wipeAll(ctx) {
   ctx.store.bulkInsert('accounts', defaultAccounts(), { audit: false });
   ctx.refresh();
   toast('כל הנתונים נמחקו. נטענו קטגוריות וחשבונות ברירת מחדל.');
+}
+
+/* ============================================================
+   בדיקת עדכון ידנית
+   ============================================================ */
+async function checkForUpdate(btn) {
+  const original = btn.textContent;
+  btn.textContent = 'בודק…';
+  btn.disabled = true;
+  try {
+    if (typeof window.__checkForUpdate !== 'function') {
+      toast('האפליקציה רצה ישירות מהרשת — היא תמיד מעודכנת', { type: 'info' });
+      return;
+    }
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    const updating = await window.__checkForUpdate(reg);
+    if (updating) toast('נמצאה גרסה חדשה — האפליקציה מתרעננת', { type: 'ok', ms: 5000 });
+    else toast('האפליקציה מעודכנת לגרסה האחרונה');
+  } catch (err) {
+    toast('בדיקת העדכון נכשלה: ' + err.message, { type: 'err' });
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
 }

@@ -1,5 +1,14 @@
-/* Service Worker — מטמון האפליקציה בלבד. נתוני המשתמש נשמרים ב-localStorage. */
-const CACHE = 'bikur-finance-v1';
+/* ============================================================
+   Service Worker — מטמון האפליקציה בלבד.
+   נתוני המשתמש נשמרים ב-localStorage ואינם עוברים כאן.
+   ------------------------------------------------------------
+   מנגנון העדכון:
+   שינוי ה-VERSION מייצר מטמון חדש, מוחק את הישן, ומודיע לדף
+   שיש גרסה חדשה — כך שאין צורך להתקין את האפליקציה מחדש.
+   ============================================================ */
+
+const VERSION = '2026.08.29.2';
+const CACHE = `bikur-finance-${VERSION}`;
 
 const ASSETS = [
   './',
@@ -39,10 +48,17 @@ const ASSETS = [
   './js/screens/settings.js',
 ];
 
+/* ---------- התקנה: הגרסה החדשה נכנסת לתוקף מיד ---------- */
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      // קובץ בודד שנכשל לא יפיל את כל ההתקנה
+      .then((c) => Promise.allSettled(ASSETS.map((a) => c.add(a))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
+/* ---------- הפעלה: ניקוי מטמונים ישנים ותפיסת הלשוניות ---------- */
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
@@ -51,19 +67,48 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+/* ---------- שליפה: קודם רשת, מטמון כגיבוי ---------- */
 self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
-  // ספריות חיצוניות (Excel/PDF) — מהרשת, בלי מטמון
+  const url = new URL(e.request.url);
+  // ספריות חיצוניות (Excel/PDF, גופנים) — ישירות מהרשת
   if (url.origin !== location.origin) return;
 
   e.respondWith(
-    fetch(e.request)
+    // no-cache מאלץ אימות מול השרת בכל בקשה, ולכן קוד חדש שנפרס
+    // מגיע מיד ולא ממטמון ה-HTTP של הדפדפן. אם הדפדפן לא מאפשר
+    // לשנות את מצב המטמון לבקשה מסוימת — נופלים לבקשה רגילה.
+    fromNetwork(e.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html'))),
+      .catch(() => caches.match(e.request).then((cached) => {
+        if (cached) return cached;
+        // רק לניווט מחזירים את שלד האפליקציה; בקשת JS שתקבל HTML תישבר
+        if (e.request.mode === 'navigate') return caches.match('./index.html');
+        return Response.error();
+      })),
   );
+});
+
+function fromNetwork(request) {
+  try {
+    return fetch(request, { cache: 'no-cache' });
+  } catch (err) {
+    return fetch(request);
+  }
+}
+
+/* ---------- תקשורת עם הדף ---------- */
+self.addEventListener('message', (e) => {
+  if (e.data === 'GET_VERSION' || e.data?.type === 'GET_VERSION') {
+    e.ports?.[0]?.postMessage(VERSION);
+  }
+  if (e.data === 'SKIP_WAITING' || e.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

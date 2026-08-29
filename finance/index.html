@@ -56,11 +56,104 @@
 
 <script type="module" src="js/app.js"></script>
 <script>
-  if ('serviceWorker' in navigator) {
+  /* ============================================================
+     עדכון אוטומטי של האפליקציה המותקנת
+     ------------------------------------------------------------
+     מקור אמת יחיד לגרסה: הקבוע VERSION בקובץ sw.js.
+     בכל חזרה לאפליקציה משווים בין הגרסה שעל השרת לגרסה שרצה כרגע,
+     ואם עלתה גרסה חדשה מרעננים פעם אחת. הרענון מספיק, כי ה-Service
+     Worker מביא קבצים מהרשת קודם ומהמטמון רק כגיבוי.
+     כך אין צורך להסיר ולהתקין את האפליקציה מחדש.
+     ============================================================ */
+  (function () {
+    if (!('serviceWorker' in navigator)) return;
+
+    var SEEN_KEY = 'bikur.finance.seenVersion';
+    var reloading = false;
+
+    function reloadWhenSafe() {
+      if (reloading) return;
+      reloading = true;
+      (function attempt() {
+        // לא קוטעים משתמש באמצע מילוי טופס
+        if (document.querySelector('.modal-backdrop')) { setTimeout(attempt, 1500); return; }
+        location.reload();
+      })();
+    }
+
+    /** הגרסה שה-Service Worker ששולט כרגע מריץ */
+    function runningVersion() {
+      return new Promise(function (resolve) {
+        var sw = navigator.serviceWorker.controller;
+        if (!sw || !('MessageChannel' in window)) return resolve(null);
+        var ch = new MessageChannel();
+        var done = false;
+        ch.port1.onmessage = function (e) { done = true; resolve(e.data); };
+        try { sw.postMessage({ type: 'GET_VERSION' }, [ch.port2]); }
+        catch (err) { return resolve(null); }
+        setTimeout(function () { if (!done) resolve(null); }, 2500);
+      });
+    }
+
+    /** הגרסה שנמצאת כרגע על השרת */
+    function deployedVersion() {
+      return fetch('sw.js?v=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.text() : ''; })
+        .then(function (t) {
+          var m = t.match(/const VERSION = '([^']+)'/);
+          return m ? m[1] : null;
+        })
+        .catch(function () { return null; });
+    }
+
+    function checkForUpdate(reg) {
+      return Promise.all([runningVersion(), deployedVersion()]).then(function (v) {
+        var running = v[0], deployed = v[1];
+        // הקוד שרץ בפועל מגיע מהרשת, ולכן הגרסה שעל השרת היא הנכונה להצגה
+        window.__APP_VERSION = deployed || running || null;
+        if (!deployed || !running || deployed === running) return false;
+
+        // מרעננים פעם אחת בלבד לכל גרסה חדשה — אחרת ניכנס ללולאת רענון
+        // אם ה-Service Worker הישן עדיין לא הוחלף.
+        var seen = null;
+        try { seen = localStorage.getItem(SEEN_KEY); } catch (e) { /* חסום */ }
+        if (seen === deployed) return false;
+        try { localStorage.setItem(SEEN_KEY, deployed); } catch (e) { /* חסום */ }
+
+        if (reg) { try { reg.update(); } catch (e) { /* לא קריטי */ } }
+        reloadWhenSafe();
+        return true;
+      });
+    }
+    window.__checkForUpdate = checkForUpdate;
+
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () { /* עובד גם בלי */ });
+      // updateViaCache: 'none' — קובץ ה-Service Worker עצמו לעולם לא מגיע ממטמון HTTP
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+        // דחיפת גרסה שהותקנה וממתינה, כשהדפדפן תומך בכך
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        reg.addEventListener('updatefound', function () {
+          var fresh = reg.installing;
+          if (!fresh) return;
+          fresh.addEventListener('statechange', function () {
+            if (fresh.state === 'installed' && navigator.serviceWorker.controller) {
+              fresh.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+
+        checkForUpdate(reg);
+
+        // בכל חזרה לאפליקציה — קריטי ל-PWA מותקנת שנשארת בזיכרון
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') checkForUpdate(reg);
+        });
+        setInterval(function () { checkForUpdate(reg); }, 30 * 60 * 1000);
+      }).catch(function () { /* האפליקציה עובדת גם בלי Service Worker */ });
     });
-  }
+  })();
 </script>
 </body>
 </html>
