@@ -1,0 +1,171 @@
+/* ============================================================
+   בסיס: טוקנים, טיפוגרפיה, ריסט, ערכות נושא
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* --- צבעי מותג --- */
+  --brand-50:  #eef4ff;
+  --brand-100: #dbe6ff;
+  --brand-200: #bcd0ff;
+  --brand-300: #8fb0ff;
+  --brand-400: #5d86fb;
+  --brand-500: #3b62f0;
+  --brand-600: #2a49d4;
+  --brand-700: #2239a8;
+  --brand-800: #1f3184;
+  --brand-900: #1e2d68;
+
+  /* --- סמנטיקה פיננסית --- */
+  --pos:        #0f9d76;
+  --pos-soft:   rgba(15, 157, 118, 0.12);
+  --neg:        #d9455f;
+  --neg-soft:   rgba(217, 69, 95, 0.12);
+  --warn:       #d98218;
+  --warn-soft:  rgba(217, 130, 24, 0.14);
+  --info:       #2a72d4;
+  --info-soft:  rgba(42, 114, 212, 0.12);
+
+  /* --- משטחים --- */
+  --bg:          #f5f6fa;
+  --bg-elev:     #ffffff;
+  --bg-sunken:   #eceef5;
+  --surface:     #ffffff;
+  --surface-2:   #f8f9fc;
+  --surface-3:   #f1f3f9;
+  --line:        rgba(18, 24, 46, 0.09);
+  --line-strong: rgba(18, 24, 46, 0.16);
+
+  /* --- טקסט --- */
+  --text:        #12182e;
+  --text-2:      #4b5470;
+  --text-3:      #7b839c;
+  --text-inv:    #ffffff;
+
+  /* --- אפקטים --- */
+  --shadow-sm: 0 1px 2px rgba(18,24,46,.06), 0 1px 3px rgba(18,24,46,.04);
+  --shadow:    0 2px 6px rgba(18,24,46,.05), 0 8px 24px rgba(18,24,46,.07);
+  --shadow-lg: 0 8px 20px rgba(18,24,46,.08), 0 24px 60px rgba(18,24,46,.12);
+  --ring:      0 0 0 3px rgba(59, 98, 240, 0.18);
+
+  /* --- מידות --- */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-full: 999px;
+
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px; --sp-9: 56px;
+
+  --side-w: 250px;
+  --top-h: 66px;
+
+  --font: 'Heebo', 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --ease: cubic-bezier(.22,.61,.36,1);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg:          #0b0e18;
+  --bg-elev:     #121728;
+  --bg-sunken:   #080b13;
+  --surface:     #141a2c;
+  --surface-2:   #1a2136;
+  --surface-3:   #212940;
+  --line:        rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text:        #eef1f8;
+  --text-2:      #a8b0c6;
+  --text-3:      #737d99;
+
+  --brand-50:  #17203c;
+  --brand-100: #1c2951;
+  --brand-500: #6b8dff;
+  --brand-600: #5d86fb;
+
+  --pos:      #34d3a4;
+  --pos-soft: rgba(52, 211, 164, 0.14);
+  --neg:      #ff6b83;
+  --neg-soft: rgba(255, 107, 131, 0.14);
+  --warn:     #f0ad4e;
+  --warn-soft:rgba(240, 173, 78, 0.16);
+  --info:     #6fa8ff;
+  --info-soft:rgba(111, 168, 255, 0.14);
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow:    0 4px 16px rgba(0,0,0,.45);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,.6);
+  --ring:      0 0 0 3px rgba(107, 141, 255, 0.25);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-wrap: break-word;
+  transition: background-color .28s var(--ease), color .28s var(--ease);
+}
+
+h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
+h1 { font-size: 26px; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+p  { margin: 0; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+a { color: var(--brand-500); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+ul { margin: 0; padding: 0; list-style: none; }
+
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-xs); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: var(--r-full); border: 3px solid transparent; background-clip: content-box; }
+
+/* --- עזרי טיפוגרפיה --- */
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; letter-spacing: -0.01em; }
+.muted   { color: var(--text-2); }
+.muted-2 { color: var(--text-3); }
+.tiny  { font-size: 12px; }
+.small { font-size: 13px; }
+.bold  { font-weight: 700; }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+.warn { color: var(--warn); }
+.center { text-align: center; }
+.nowrap { white-space: nowrap; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hidden { display: none !important; }
+
+.row { display: flex; align-items: center; gap: var(--sp-3); }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.col { display: flex; flex-direction: column; gap: var(--sp-2); }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.spacer { flex: 1 1 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

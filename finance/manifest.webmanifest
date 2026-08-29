@@ -1,0 +1,21 @@
+{
+  "name": "ניהול הכנסות והוצאות",
+  "short_name": "פיננסי",
+  "description": "ניהול הכנסות והוצאות חודשיות — עסקי ופרטי",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f6fa",
+  "theme_color": "#3b62f0",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%233b62f0'/%3E%3Ctext x='256' y='360' font-size='300' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'%3E%E2%82%AA%3C/text%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
