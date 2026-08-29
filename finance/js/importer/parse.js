@@ -105,7 +105,8 @@ export async function readFileToMatrix(file) {
   }
 
   if (ext === 'pdf') {
-    return { matrix: await readPdfToMatrix(file), kind: 'pdf', sheets: null };
+    const { matrix, rawHead } = await readPdfToMatrix(file);
+    return { matrix, kind: 'pdf', sheets: null, rawHead };
   }
 
   throw new Error(`סוג הקובץ .${ext} אינו נתמך. ניתן להעלות CSV, Excel או PDF.`);
@@ -129,12 +130,16 @@ async function readPdfToMatrix(file) {
 
   const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
   const out = [];
+  // השורות הגולמיות של העמוד הראשון, לפני שיוך לעמודות —
+  // כותרת החשבון יושבת מחוץ לעמודות הטבלה ומתעוותת בשיוך.
+  let rawHead = [];
   let headerEmitted = false;
 
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
     const lines = groupIntoLines(content.items);
+    if (p === 1) rawHead = lines.slice(0, 30).map((l) => l.map((i) => i.str));
     const header = findHeaderLine(lines);
 
     if (!header) {
@@ -155,7 +160,7 @@ async function readPdfToMatrix(file) {
       if (cells.some((c) => c !== '')) out.push(cells);
     }
   }
-  return out;
+  return { matrix: out, rawHead };
 }
 
 /** קיבוץ פריטי טקסט לשורות לפי קו Y, עם הקצה הימני של כל פריט */
@@ -490,11 +495,74 @@ function normalizeCurrency(raw) {
   return s.slice(0, 3).toUpperCase();
 }
 
+/**
+ * חילוץ פרטי החשבון מכותרת הדוח.
+ * ------------------------------------------------------------
+ * דוחות בנק פותחים בשורת כותרות ("בנק / סניף / חשבון / שם חשבון")
+ * ומתחתיה השורה עם הערכים. נשמרות 4 הספרות האחרונות בלבד —
+ * מספר החשבון המלא לא נשמר ולא עוזב את המכשיר.
+ */
+export function extractAccountInfo(matrix) {
+  const LABELS = {
+    bank: /^בנק$/,
+    branch: /^סניף$/,
+    account: /^(מספר\s*)?חשבון$/,
+    owner: /^שם\s*חשבון$/,
+  };
+  for (let r = 0; r < Math.min(matrix.length, 30); r++) {
+    const row = (matrix[r] || []).map((c) => String(c ?? '').trim());
+    const map = {};
+    row.forEach((cell, i) => {
+      for (const [key, re] of Object.entries(LABELS)) {
+        if (map[key] === undefined && re.test(cell)) map[key] = i;
+      }
+    });
+    if (map.account === undefined || map.branch === undefined) continue;
+
+    const values = (matrix[r + 1] || []).map((c) => String(c ?? '').trim());
+    if (!values.length) continue;
+    const digits = (i) => (i === undefined ? '' : String(values[i] || '').replace(/\D/g, ''));
+    const account = digits(map.account);
+    if (!account) continue;
+
+    const institution = detectInstitution(matrix);
+    return {
+      institution,
+      bank: digits(map.bank) || null,
+      branch: digits(map.branch) || null,
+      last4: account.slice(-4),
+      owner: map.owner !== undefined ? String(values[map.owner] || '').trim() : '',
+    };
+  }
+  return null;
+}
+
+/** שם הבנק מתוך כתובת האתר או הטקסט שבראש הדוח */
+function detectInstitution(matrix) {
+  const head = matrix.slice(0, 12).map((r) => (r || []).join(' ')).join(' ').toLowerCase();
+  const known = [
+    [/bankhapoalim|הפועלים/, 'בנק הפועלים'],
+    [/leumi|לאומי/, 'בנק לאומי'],
+    [/mizrahi|tefahot|מזרחי|טפחות/, 'מזרחי טפחות'],
+    [/discount|דיסקונט/, 'בנק דיסקונט'],
+    [/fibi|בינלאומי/, 'הבנק הבינלאומי'],
+    [/otsar|אוצר\s*החייל/, 'אוצר החייל'],
+    [/massad|מסד/, 'בנק מסד'],
+    [/yahav|יהב/, 'בנק יהב'],
+    [/pagi|פאג"?י/, 'פאג״י'],
+    [/one\s*zero|וואן\s*זירו/, 'ONE ZERO'],
+  ];
+  for (const [re, name] of known) if (re.test(head)) return name;
+  return '';
+}
+
 /** נקודת הכניסה הראשית: קובץ → שורות גולמיות */
 export async function parseFile(file) {
-  const { matrix, kind, sheets } = await readFileToMatrix(file);
+  const { matrix, kind, sheets, rawHead } = await readFileToMatrix(file);
   const { rows, mapping, headerIndex, warnings } = matrixToRows(matrix, {});
+  const accountInfo = extractAccountInfo(rawHead && rawHead.length ? rawHead : matrix);
   return {
+    accountInfo,
     fileName: file.name,
     fileType: kind,
     fileSize: file.size,

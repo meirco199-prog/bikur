@@ -109,9 +109,11 @@ async function handleFiles(ctx, files, opts) {
   try {
     let allRows = [];
     let batch = null;
+    let accountInfo = null;
     const warnings = [];
     for (const file of files) {
       const res = await processFile(file, ctx.store.state, opts);
+      if (!accountInfo && res.parsed?.accountInfo) accountInfo = res.parsed.accountInfo;
       if (!batch) batch = res.batch;
       else {
         batch.fileName += `, ${res.batch.fileName}`;
@@ -133,6 +135,8 @@ async function handleFiles(ctx, files, opts) {
       summary: summarizeBatch(allRows),
       sourceKind: opts.sourceKind,
       monthsOff: new Set(),
+      accountInfo,
+      accountApplied: false,
     };
     reviewFilter = 'all';
     ctx.refresh();
@@ -187,6 +191,10 @@ function buildReviewScreen(ctx) {
     ]),
   ]));
 
+  /* --- פרטי חשבון שזוהו בקובץ --- */
+  const accCard = buildAccountInfoCard(ctx);
+  if (accCard) wrap.append(accCard);
+
   /* --- בחירת חודשים לייבוא --- */
   wrap.append(buildMonthPicker(ctx));
 
@@ -234,6 +242,47 @@ function buildReviewScreen(ctx) {
   ]));
 
   return wrap;
+}
+
+/**
+ * פרטי החשבון שהופיעו בכותרת הדוח.
+ * הם נקראים מהקובץ שלכם ונשמרים במכשיר בלבד — 4 ספרות אחרונות
+ * בלבד, בלי מספר חשבון מלא ובלי שם בעל החשבון.
+ */
+function buildAccountInfoCard(ctx) {
+  const info = staging.accountInfo;
+  if (!info || !info.last4) return null;
+  const acc = ctx.store.state.accounts.find((a) => a.id === staging.batch.accountId);
+  if (!acc) return null;
+  const already = acc.last4 === info.last4 && (!info.institution || acc.institution === info.institution);
+  if (already || staging.accountApplied) {
+    return el('div', { class: 'card pad-sm', style: { borderInlineStart: '3px solid var(--pos)' } }, [
+      el('div', { class: 'row', style: { gap: '10px' } }, [
+        el('span', { style: { fontSize: '18px' }, text: '🏦' }),
+        el('span', { class: 'small', text: `החשבון "${acc.name}" מעודכן לפי הדוח: ${[info.institution, info.branch ? 'סניף ' + info.branch : '', '•••• ' + info.last4].filter(Boolean).join(' · ')}` }),
+      ]),
+    ]);
+  }
+
+  const parts = [info.institution, info.branch ? `סניף ${info.branch}` : '', `•••• ${info.last4}`].filter(Boolean).join(' · ');
+  return el('div', { class: 'card pad-sm', style: { borderInlineStart: '3px solid var(--info)' } }, [
+    el('div', { class: 'row wrap', style: { gap: '10px' } }, [
+      el('span', { style: { fontSize: '18px' }, text: '🏦' }),
+      el('div', { class: 'grow' }, [
+        el('div', { class: 'bold small', text: `זוהו פרטי חשבון בקובץ: ${parts}` }),
+        el('div', { class: 'tiny muted-2', text: `לעדכן איתם את "${acc.name}"? נשמרות 4 הספרות האחרונות בלבד, במכשיר שלכם.` }),
+      ]),
+      el('button', { class: 'btn sm primary', text: 'עדכן את החשבון', onclick: () => {
+        ctx.store.update('accounts', acc.id, {
+          last4: info.last4,
+          institution: info.institution || acc.institution,
+        });
+        staging.accountApplied = true;
+        toast('פרטי החשבון עודכנו מהדוח');
+        ctx.refresh();
+      } }),
+    ]),
+  ]);
 }
 
 /**

@@ -42,7 +42,7 @@ const PERSONAL_INCOME = [
 ];
 
 const PERSONAL_EXPENSE = [
-  { cat: 'משכנתא', name: 'משכנתא — בנק', amount: 7420, day: 4, vary: 0.01, type: 'fixed', method: 'standing', recurring: true },
+  { cat: 'דיור', name: 'משכנתא — בנק', amount: 7420, day: 4, vary: 0.01, type: 'fixed', method: 'standing', recurring: true },
   { cat: 'ארנונה', name: 'ארנונה עירייה', amount: 690, day: 6, vary: 0, type: 'fixed', method: 'standing', recurring: true },
   { cat: 'ועד בית', name: 'ועד בית', amount: 250, day: 3, vary: 0, type: 'fixed', method: 'standing', recurring: true },
   { cat: 'חשמל', name: 'חברת החשמל', amount: 640, day: 12, vary: 0.28, type: 'variable', method: 'standing', recurring: true, seasonal: true },
@@ -57,7 +57,8 @@ const PERSONAL_EXPENSE = [
   { cat: 'חדר כושר', name: 'הולמס פלייס', amount: 289, day: 2, vary: 0, type: 'fixed', method: 'credit', recurring: true },
   { cat: 'בתי ספר וגנים', name: 'צהרון + גן', amount: 2340, day: 3, vary: 0, type: 'fixed', method: 'standing', recurring: true },
   { cat: 'חוגים', name: 'חוג התעמלות', amount: 320, day: 4, vary: 0, type: 'fixed', method: 'credit', recurring: true },
-  { cat: 'חסכונות', name: 'הפקדה לקרן השתלמות', amount: 2000, day: 1, vary: 0, type: 'fixed', method: 'standing', recurring: true },
+  { cat: 'חיסכון', name: 'הפקדה לקרן השתלמות', amount: 2000, day: 1, vary: 0, type: 'saving', method: 'standing', recurring: true },
+  { cat: 'חיסכון', name: 'הפקדה לקופת גמל להשקעה', amount: 1500, day: 1, vary: 0, type: 'saving', method: 'standing', recurring: true },
 
   { cat: 'קניות בסופר', name: 'שופרסל דיל', amount: 780, day: 5, freq: 2, vary: 0.3, type: 'variable', method: 'credit' },
   { cat: 'קניות בסופר', name: 'רמי לוי', amount: 520, day: 17, freq: 2, vary: 0.35, type: 'variable', method: 'credit' },
@@ -132,11 +133,11 @@ export function buildDemoState() {
   };
   const acc = (name) => state.accounts.find((a) => a.name === name);
 
-  const persBank = acc('עו״ש פרטי');
-  const bizBank = acc('עו״ש עסקי');
-  const persCard = acc('Visa פרטי');
-  const bizCard = acc('Mastercard עסקי');
-  const wallet = acc('ארנק דיגיטלי');
+  const persBank = acc('עובר ושב פרטי');
+  const bizBank = acc('עובר ושב עסקי');
+  const persCard = acc('כרטיס אשראי פרטי');
+  const bizCard = acc('כרטיס אשראי עסקי');
+  const wallet = persCard;
 
   const thisMonth = currentMonthKey();
   const months = [];

@@ -106,8 +106,68 @@ function migrate(state) {
   for (const key of ['categories', 'accounts', 'transactions', 'budgets', 'merchantRules', 'imports', 'audit']) {
     if (!Array.isArray(merged[key])) merged[key] = [];
   }
+  if ((merged.version || 1) < 2) {
+    migrateToV2(merged);
+    // מסמנים שהמצב שונה, כדי ש-init ישמור אותו מיד ולא יריץ
+    // את המיגרציה מחדש בכל טעינה
+    merged.__migrated = true;
+  }
   merged.version = SCHEMA_VERSION;
   return merged;
+}
+
+/* ============================================================
+   מיגרציה לגרסה 2
+   ------------------------------------------------------------
+   - משכנתא ושכירות מתאחדות ל"דיור"
+   - השקעות וחסכונות מתאחדות ל"חיסכון", עם סוג תנועה "חיסכון"
+   - 4 הספרות המומצאות שהגיעו עם נתוני ההדגמה נמחקות,
+     וחשבונות הדגמה שלא נעשה בהם שימוש מוסרים
+   ============================================================ */
+const DEMO_LAST4 = ['4821', '7390', '2244', '9017', '5566'];
+
+function migrateToV2(state) {
+  mergeCategories(state, ['משכנתא', 'שכירות'], { name: 'דיור', icon: '🏠', color: '#3b62f0', defaultExpenseType: 'fixed' });
+  mergeCategories(state, ['השקעות', 'חסכונות'], { name: 'חיסכון', icon: '🐖', color: '#0f9d76', defaultExpenseType: 'saving' });
+
+  // כל תנועה בקטגוריית החיסכון מסומנת כסוג "חיסכון"
+  const savingIds = new Set(state.categories.filter((c) => c.kind === 'expense' && c.name === 'חיסכון').map((c) => c.id));
+  for (const tx of state.transactions) {
+    if (tx.direction === 'expense' && savingIds.has(tx.categoryId)) tx.expenseType = 'saving';
+  }
+
+  // ניקוי פרטי חשבון מומצאים
+  const used = new Set(state.transactions.map((t) => t.accountId).filter(Boolean));
+  for (const acc of state.accounts) {
+    if (DEMO_LAST4.includes(acc.last4)) acc.last4 = '';
+  }
+  state.accounts = state.accounts.filter((a) => used.has(a.id) || a.last4 || a.institution);
+}
+
+/** מאחדת קטגוריות הוצאה בעלות אותם שמות לקטגוריה אחת, כולל התנועות */
+function mergeCategories(state, names, target) {
+  for (const space of ['personal', 'business']) {
+    const group = state.categories.filter((c) => c.space === space && c.kind === 'expense' && names.includes(c.name));
+    if (!group.length) continue;
+    const keep = group[0];
+    const order = Math.min(...group.map((c) => c.order));
+    Object.assign(keep, target, { order });
+    const drop = new Set(group.slice(1).map((c) => c.id));
+    if (drop.size) {
+      for (const tx of state.transactions) if (drop.has(tx.categoryId)) tx.categoryId = keep.id;
+      for (const b of state.budgets) if (drop.has(b.categoryId)) b.categoryId = keep.id;
+      for (const r of state.merchantRules) if (drop.has(r.categoryId)) r.categoryId = keep.id;
+      state.categories = state.categories.filter((c) => !drop.has(c.id));
+      // תקציב אחד בלבד לקטגוריה שאוחדה
+      const seen = new Set();
+      state.budgets = state.budgets.filter((b) => {
+        const k = `${b.categoryId}|${b.month || ''}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    }
+  }
 }
 
 /* ============================================================
@@ -146,7 +206,14 @@ class Store {
   /* ---------- מחזור חיים ---------- */
   async init() {
     const loaded = await this.adapter.load();
-    if (loaded) this.state = loaded;
+    if (loaded) {
+      this.state = loaded;
+      if (this.state.__migrated) {
+        delete this.state.__migrated;
+        this.log('migrate', 'system', null, `מבנה הנתונים עודכן לגרסה ${SCHEMA_VERSION}`);
+        await this.save(true);
+      }
+    }
     this.ready = true;
     this.emit('ready', this.state);
     return this.state;

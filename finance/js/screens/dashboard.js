@@ -27,43 +27,35 @@ export default function renderDashboard(ctx) {
   const balanceLabel = isBiz ? 'רווח החודש' : isAll ? 'יתרה כוללת' : 'יתרה החודש';
   const rateLabel = isBiz ? 'שיעור רווחיות' : 'שיעור חיסכון';
 
-  node.append(el('div', { class: 'grid g-4' }, [
+  const cards = [
     statCard({
       label: 'סך הכנסות החודש', value: money(cur.income), icon: '↗', tone: 'pos',
       delta: cmp.vsPrev.income, deltaLabel: 'מול חודש קודם',
     }),
     statCard({
-      label: 'סך הוצאות החודש', value: money(cur.expense), icon: '↙', tone: 'neg',
+      label: 'הוצאות החודש', value: money(cur.expense), icon: '↙', tone: 'neg',
       delta: cmp.vsPrev.expense === null ? null : cmp.vsPrev.expense, deltaLabel: 'מול חודש קודם',
+      sub: cur.saving > 0 ? 'ללא חיסכון והשקעות' : '',
     }),
-    statCard({
-      label: balanceLabel, value: money(cur.balance), icon: '≡',
-      tone: cur.balance >= 0 ? 'pos' : 'neg',
-      delta: cmp.vsPrev.balance, deltaLabel: 'מול חודש קודם',
-    }),
-    statCard({
-      label: rateLabel, value: cur.rate === null ? '—' : `${cur.rate.toFixed(1).replace(/\.0$/, '')}%`,
-      icon: '%', tone: cur.rate === null ? '' : cur.rate >= 0 ? 'pos' : 'neg',
-      sub: cur.count ? `${cur.count} תנועות בחודש` : 'אין תנועות',
-    }),
-  ]));
-
-  /* --- פילוח ההוצאה: צריכה מול חיסכון והשקעות --- */
+  ];
+  // חיסכון והשקעות אינם הוצאה — הם מוצגים בנפרד
   if (cur.saving > 0) {
-    node.append(el('div', { class: 'card pad-sm' }, [
-      el('div', { class: 'row wrap', style: { gap: '18px' } }, [
-        el('div', { class: 'grow' }, [
-          el('div', { class: 'bold small', text: 'מתוך ההוצאות החודש' }),
-          el('div', { class: 'tiny muted-2', text: 'חיסכון והשקעות הם כסף שיצא מהחשבון אבל נשאר שלכם' }),
-        ]),
-        breakdownBit('צריכה בפועל', money(cur.spending), 'var(--neg)'),
-        breakdownBit('חיסכון והשקעות', money(cur.saving), 'var(--pos)'),
-        cur.income > 0
-          ? breakdownBit('שיעור החיסכון מההכנסה', `${((cur.saving / cur.income) * 100).toFixed(1).replace(/\.0$/, '')}%`, 'var(--brand-500)')
-          : null,
-      ]),
-    ]));
+    cards.push(statCard({
+      label: 'חיסכון והשקעות', value: money(cur.saving), icon: '🐖', tone: 'pos',
+      sub: cur.income > 0 ? `${((cur.saving / cur.income) * 100).toFixed(1).replace(/\.0$/, '')}% מההכנסה` : '',
+    }));
   }
+  cards.push(statCard({
+    label: balanceLabel, value: money(cur.balance), icon: '≡',
+    tone: cur.balance >= 0 ? 'pos' : 'neg',
+    delta: cmp.vsPrev.balance, deltaLabel: 'מול חודש קודם',
+  }));
+  cards.push(statCard({
+    label: rateLabel, value: cur.rate === null ? '—' : `${cur.rate.toFixed(1).replace(/\.0$/, '')}%`,
+    icon: '%', tone: cur.rate === null ? '' : cur.rate >= 0 ? 'pos' : 'neg',
+    sub: cur.count ? `${cur.count} תנועות בחודש` : 'אין תנועות',
+  }));
+  node.append(el('div', { class: cards.length === 5 ? 'grid g-5' : 'grid g-4' }, cards));
 
   if (!cur.count) {
     node.append(sectionCard('', {
@@ -149,6 +141,20 @@ export default function renderDashboard(ctx) {
       }),
     }),
   ]));
+
+  /* ============================================================
+     חיסכון והשקעות
+     ============================================================ */
+  const savingBreak = byCategory(monthTx, 'expense', { onlySaving: true });
+  if (savingBreak.rows.length) {
+    node.append(sectionCard('חיסכון והשקעות', {
+      sub: `${monthLabel(month)} · ${money(savingBreak.total)} — לא נספר בהוצאות`,
+      body: hBarList(savingBreak.rows.map((r) => {
+        const c = catOf(r.categoryId);
+        return { id: r.categoryId, label: c?.name || 'ללא קטגוריה', value: r.amount, color: c?.color || 'var(--pos)', icon: c?.icon, share: r.share };
+      }), { onClick: (d) => ctx.go('transactions', { categoryId: d.id, month }) }),
+    }));
+  }
 
   /* ============================================================
      חריגות + מגמה
@@ -346,13 +352,6 @@ function miniRow(label, value, color, strong = false) {
   return el('div', { class: 'row-between' }, [
     el('span', { class: 'small muted', text: label }),
     el('span', { class: `num ${strong ? 'bold' : ''}`, style: { color, fontSize: strong ? '17px' : '14px' }, text: value }),
-  ]);
-}
-
-function breakdownBit(label, value, color) {
-  return el('div', {}, [
-    el('div', { class: 'tiny muted-2', text: label }),
-    el('div', { class: 'num bold', style: { color, fontSize: '18px' }, text: value }),
   ]);
 }
 

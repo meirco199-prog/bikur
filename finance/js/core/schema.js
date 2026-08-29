@@ -6,7 +6,7 @@
 import { uid, todayISO, currentMonthKey } from './util.js';
 
 /** גרסת הסכימה — משמשת למיגרציות מקומיות */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SPACES = {
   business: { id: 'business', label: 'עסקי', icon: '🏢', color: '#3b62f0' },
@@ -69,8 +69,7 @@ export const CATEGORY_ICONS = [
    ============================================================ */
 
 const P_EXPENSE = [
-  ['משכנתא', '🏠', '#3b62f0', 'fixed'],
-  ['שכירות', '🔑', '#4338ca', 'fixed'],
+  ['דיור', '🏠', '#3b62f0', 'fixed'],
   ['מזונות', '👨‍👩‍👧', '#7c4dff', 'fixed'],
   ['חשמל', '⚡', '#d98218', 'variable'],
   ['מים', '💧', '#0891b2', 'variable'],
@@ -99,8 +98,7 @@ const P_EXPENSE = [
   ['חדר כושר', '🏋️', '#15803d', 'fixed'],
   ['הלוואות', '🏦', '#8a6d3b', 'fixed'],
   ['כרטיסי אשראי', '💳', '#4338ca', 'variable'],
-  ['השקעות', '📈', '#0f9d76', 'saving'],
-  ['חסכונות', '🐖', '#3b62f0', 'saving'],
+  ['חיסכון', '🐖', '#0f9d76', 'saving'],
   ['קניות שונות', '🛍️', '#7e22ce', 'variable'],
   ['אחר', '📦', '#7b839c', 'variable'],
 ];
@@ -174,12 +172,13 @@ export function defaultCategories() {
 }
 
 export function defaultAccounts() {
+  // בלי 4 ספרות מומצאות. ספרות אמיתיות מגיעות מהמסמכים שהמשתמש מייבא,
+  // או מהזנה ידנית — ונשמרות אצלו במכשיר בלבד.
   return [
-    { id: uid('acc'), name: 'עו״ש פרטי',    type: 'checking', space: 'personal', institution: 'בנק', last4: '4821', color: '#0f9d76', currency: 'ILS', archived: false, openingBalance: 0 },
-    { id: uid('acc'), name: 'עו״ש עסקי',    type: 'checking', space: 'business', institution: 'בנק', last4: '7390', color: '#3b62f0', currency: 'ILS', archived: false, openingBalance: 0 },
-    { id: uid('acc'), name: 'Visa פרטי',    type: 'credit',   space: 'personal', institution: 'כרטיס אשראי', last4: '2244', color: '#7c4dff', currency: 'ILS', archived: false, billingDay: 10 },
-    { id: uid('acc'), name: 'Mastercard עסקי', type: 'credit', space: 'business', institution: 'כרטיס אשראי', last4: '9017', color: '#d98218', currency: 'ILS', archived: false, billingDay: 2 },
-    { id: uid('acc'), name: 'ארנק דיגיטלי',  type: 'wallet',   space: 'personal', institution: 'Wallet', last4: '5566', color: '#2aa5b8', currency: 'ILS', archived: false },
+    { id: uid('acc'), name: 'עובר ושב פרטי', type: 'checking', space: 'personal', institution: '', last4: '', color: '#0f9d76', currency: 'ILS', archived: false, openingBalance: 0 },
+    { id: uid('acc'), name: 'עובר ושב עסקי', type: 'checking', space: 'business', institution: '', last4: '', color: '#3b62f0', currency: 'ILS', archived: false, openingBalance: 0 },
+    { id: uid('acc'), name: 'כרטיס אשראי פרטי', type: 'credit', space: 'personal', institution: '', last4: '', color: '#7c4dff', currency: 'ILS', archived: false, billingDay: 10 },
+    { id: uid('acc'), name: 'כרטיס אשראי עסקי', type: 'credit', space: 'business', institution: '', last4: '', color: '#d98218', currency: 'ILS', archived: false, billingDay: 2 },
   ];
 }
 

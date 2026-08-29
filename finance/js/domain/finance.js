@@ -119,24 +119,30 @@ export function totals(txs) {
     if (!countsInTotals(tx, excluded)) continue;
     const v = signedAmount(tx);
     count++;
-    if (tx.direction === 'income') income += v;
-    else {
-      expense += v;
-      if (tx.expenseType === 'fixed') fixed += v;
-      else if (tx.expenseType === 'oneoff') oneoff += v;
-      else if (tx.expenseType === 'saving') saving += v;
-      else variable += v;
-    }
+    if (tx.direction === 'income') { income += v; continue; }
+    // חיסכון והשקעה אינם הוצאה: הכסף יצא מהחשבון אבל נשאר של המשתמש.
+    // הוא נספר ביציאות ובחישוב היתרה, אך לא בסעיף ההוצאות.
+    if (tx.expenseType === 'saving') { saving += v; continue; }
+    expense += v;
+    if (tx.expenseType === 'fixed') fixed += v;
+    else if (tx.expenseType === 'oneoff') oneoff += v;
+    else variable += v;
   }
-  income = round2(income); expense = round2(expense);
-  const balance = round2(income - expense);
+  income = round2(income); expense = round2(expense); saving = round2(saving);
+  const outflow = round2(expense + saving);
+  const balance = round2(income - outflow);
   return {
-    income, expense, balance, count,
-    fixed: round2(fixed), variable: round2(variable), oneoff: round2(oneoff), saving: round2(saving),
-    /** הוצאות צריכה בפועל — בלי חיסכון והשקעות */
-    spending: round2(expense - saving),
-    /** אחוז חיסכון / רווח מתוך ההכנסה */
-    rate: income > 0 ? round2((balance / income) * 100) : null,
+    income,
+    /** הוצאות צריכה — בלי חיסכון והשקעות */
+    expense,
+    /** חיסכון והשקעות — כסף שיצא מהחשבון ונשאר שלכם */
+    saving,
+    /** סך היציאות מהחשבון: הוצאות + חיסכון */
+    outflow,
+    balance, count,
+    fixed: round2(fixed), variable: round2(variable), oneoff: round2(oneoff),
+    /** שיעור החיסכון: החלק מההכנסה שלא נצרך (חיסכון + יתרה) */
+    rate: income > 0 ? round2(((income - expense) / income) * 100) : null,
   };
 }
 
@@ -235,13 +241,23 @@ export function comparisons(transactions, month, space) {
    ============================================================ */
 
 /** חלוקה לפי קטגוריה, ממוינת מהגבוה לנמוך */
-export function byCategory(txs, direction = 'expense') {
+/**
+ * פילוח לפי קטגוריה.
+ * בפילוח הוצאות חיסכון והשקעות אינם נכללים כברירת מחדל —
+ * onlySaving מחזיר דווקא אותם.
+ */
+export function byCategory(txs, direction = 'expense', { includeSaving = false, onlySaving = false } = {}) {
   const excluded = settlementsToExclude(txs);
   const map = new Map();
   let total = 0;
   for (const tx of txs) {
     if (!countsInTotals(tx, excluded)) continue;
     if (tx.direction !== direction) continue;
+    if (direction === 'expense') {
+      const isSaving = tx.expenseType === 'saving';
+      if (onlySaving && !isSaving) continue;
+      if (!onlySaving && !includeSaving && isSaving) continue;
+    }
     const v = signedAmount(tx);
     const key = tx.categoryId || '__none__';
     const cur = map.get(key) || { categoryId: key, amount: 0, count: 0 };
@@ -261,7 +277,8 @@ export function byCategory(txs, direction = 'expense') {
 export function topExpenses(txs, n = 5) {
   const excluded = settlementsToExclude(txs);
   return txs
-    .filter((tx) => countsInTotals(tx, excluded) && tx.direction === 'expense' && !tx.isRefund)
+    .filter((tx) => countsInTotals(tx, excluded) && tx.direction === 'expense'
+      && tx.expenseType !== 'saving' && !tx.isRefund)
     .slice()
     .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
     .slice(0, n);
