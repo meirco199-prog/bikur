@@ -31,7 +31,7 @@ export default function renderImport(ctx) {
   }
 
   node.append(buildUploader(ctx));
-  node.append(buildWalletSection(ctx));
+  node.append(buildSyncSection(ctx));
   node.append(buildRulesSection(ctx));
   node.append(buildHistorySection(ctx));
 
@@ -472,66 +472,59 @@ async function cancelStaging(ctx) {
 }
 
 /* ============================================================
-   5. חיבור ארנק / מקור נתונים
+   5. סנכרון אוטומטי — מה אפשר בפועל
+   ------------------------------------------------------------
+   אין כאן סנכרון אוטומטי, ואין טעם להעמיד פנים שיש.
+   המסך מסביר למה, ומראה את הדרך שכן עובדת.
    ============================================================ */
-function buildWalletSection(ctx) {
-  return sectionCard('חיבור מקור נתונים (Wallet / בנק)', {
-    sub: 'סנכרון אוטומטי דרך ממשק רשמי ומאובטח בלבד',
-    body: el('div', { class: 'col', style: { gap: '12px' } }, [
-      el('p', { class: 'small muted', style: { lineHeight: '1.65' } },
-        ['כדי לסנכרן תנועות אוטומטית נדרש ממשק (API) רשמי של הספק, עם הרשאה מפורשת שלכם. ',
-         'האפליקציה לא מבצעת גרידת מסכים, לא שומרת סיסמאות בנק ולא מתחברת דרך ערוצים לא רשמיים — ',
-         'זו החלטה מכוונת שנועדה להגן על החשבונות שלכם.']),
+function buildSyncSection(ctx) {
+  return sectionCard('סנכרון אוטומטי — המצב לאשורו', {
+    sub: 'מה אפשר היום, ומה לא',
+    body: el('div', { class: 'col', style: { gap: '14px' } }, [
+      el('div', { class: 'card pad-sm', style: { borderInlineStart: '3px solid var(--warn)' } }, [
+        el('div', { class: 'bold small', style: { marginBottom: '6px' }, text: 'האפליקציה אינה מושכת תנועות אוטומטית' }),
+        el('div', { class: 'small muted', style: { lineHeight: '1.7' } }, [
+          'משיכה אוטומטית דורשת ממשק (API) רשמי של הבנק, חברת האשראי או הארנק, עם הרשאה שאתם מאשרים. ',
+          'נכון להיום אין ממשק כזה שפתוח למשתמש פרטי בישראל. ',
+          'שתי הדרכים לעקוף את זה — גרידת מסכים או מסירת סיסמת הבנק לשירות חיצוני — ',
+          'לא מיושמות כאן, וזו החלטה מכוונת: הן מסכנות את החשבונות שלכם ומפרות את תנאי השימוש של הספקים.',
+        ]),
+      ]),
+
+      el('div', { class: 'bold small', text: 'הדרך שעובדת: ייצוא קובץ פעם בחודש' }),
       el('div', { class: 'grid g-2' }, [
-        walletCard('🏦', 'בנקים ישראליים', 'טרם קיים ממשק פתוח וזמין לחיבור ישיר מהדפדפן. עד שיהיה — ייצוא CSV מהאזור האישי הוא הדרך המהירה והמדויקת.', 'ייבוא קובץ', () => document.querySelector('.dropzone')?.click()),
-        walletCard('💳', 'חברות אשראי', 'פירוט העסקאות החודשי ניתן לייצוא כ-Excel או CSV ומזוהה במלואו, כולל תשלומים וזיכויים.', 'ייבוא קובץ', () => document.querySelector('.dropzone')?.click()),
-        walletCard('📱', 'ארנק דיגיטלי', 'אם לספק הארנק שלכם יש API רשמי עם הרשאת קריאה, אפשר להגדיר אותו כאן. אחרת — ייצוא קובץ.', 'הגדרת חיבור', () => openWalletConfig(ctx)),
-        walletCard('🔐', 'הרשאות ופרטיות', 'המידע נשמר במכשיר שלכם. הקובץ המקורי נמחק אחרי העיבוד, ומספרי חשבון מלאים לא נשמרים כלל.', 'הגדרות פרטיות', () => ctx.go('settings')),
+        sourceCard('🏦', 'עובר ושב', 'באזור האישי של הבנק: תנועות בחשבון ← ייצוא / הורדה ← Excel או CSV. זהו הפורמט המדויק ביותר, כולל אסמכתאות.'),
+        sourceCard('💳', 'כרטיס אשראי', 'באתר חברת האשראי: פירוט עסקאות ← ייצוא. הקובץ כולל תשלומים, זיכויים ו-4 ספרות הכרטיס — כולם מזוהים אוטומטית.'),
+        sourceCard('📱', 'ארנק דיגיטלי', 'אם לארנק יש ייצוא היסטוריה — העלו אותו. אם אין, אין צורך: התשלומים מהארנק מחויבים בכרטיס או בעו״ש שמאחוריו, ולכן ממילא מופיעים באותם דוחות.'),
+        sourceCard('🔐', 'פרטיות', 'הקבצים מעובדים בדפדפן שלכם ולא נשלחים לשום שרת. נשמרות 4 ספרות אחרונות בלבד, והקובץ המקורי נמחק אחרי העיבוד.'),
+      ]),
+
+      el('div', { class: 'card pad-sm', style: { background: 'var(--surface-2)' } }, [
+        el('div', { class: 'bold small', style: { marginBottom: '6px' }, text: 'מה כן קורה אוטומטית' }),
+        el('div', { class: 'small muted', style: { lineHeight: '1.7' } }, [
+          'אחרי ההעלאה הכול אוטומטי: זיהוי העמודות, סיווג לקטגוריות, למידה מההחלטות שלכם, ',
+          'זיהוי כפילויות, סינון חיובי אשראי מרוכזים והעברות פנימיות, וזיהוי תשלומים וזיכויים. ',
+          'העבודה הידנית מסתכמת בהעלאת הקובץ ובמעבר על החריגים בלבד.',
+        ]),
+      ]),
+
+      el('div', { class: 'row wrap', style: { gap: '8px' } }, [
+        el('button', { class: 'btn sm primary', text: '⬆ העלאת דוח עכשיו',
+          onclick: () => document.querySelector('.dropzone')?.click() }),
+        el('button', { class: 'btn sm', text: '🔐 הגדרות פרטיות', onclick: () => ctx.go('settings') }),
       ]),
     ]),
   });
 }
 
-function walletCard(icon, title, text, btnLabel, onClick) {
+function sourceCard(icon, title, text) {
   return el('div', { class: 'card pad-sm' }, [
     el('div', { class: 'row', style: { gap: '10px', marginBottom: '7px' } }, [
       el('span', { style: { fontSize: '20px' }, text: icon }),
       el('span', { class: 'bold small', text: title }),
     ]),
-    el('div', { class: 'tiny muted', style: { lineHeight: '1.6', marginBottom: '10px' }, text }),
-    el('button', { class: 'btn xs', text: btnLabel, onclick: onClick }),
+    el('div', { class: 'tiny muted', style: { lineHeight: '1.65' }, text }),
   ]);
-}
-
-function openWalletConfig(ctx) {
-  const state = ctx.store.state;
-  const urlInput = input({ value: state.settings.walletApiUrl || '', placeholder: 'https://api.provider.com/v1/transactions' });
-  const tokenInput = input({ type: 'password', value: '', placeholder: 'הדביקו כאן אסימון קריאה בלבד (read-only)' });
-  const m = modal({
-    title: 'הגדרת חיבור לארנק',
-    subtitle: 'רק ממשק רשמי של הספק, עם אסימון קריאה בלבד',
-    body: el('div', { class: 'col', style: { gap: '14px' } }, [
-      el('div', { class: 'card pad-sm', style: { background: 'var(--warn-soft)' } }, [
-        el('div', { class: 'small', style: { lineHeight: '1.6' },
-          text: 'אין להזין כאן סיסמת בנק או פרטי כניסה אישיים. השתמשו אך ורק באסימון API רשמי עם הרשאת קריאה, שניתן לבטל בכל רגע מצד הספק.' }),
-      ]),
-      field('כתובת ה-API הרשמית', urlInput),
-      field('אסימון קריאה', tokenInput, { hint: 'האסימון נשמר מוצפן-בסיס במכשיר בלבד ולא נשלח לשום שרת אחר' }),
-    ]),
-    footer: [
-      el('button', { class: 'btn ghost', text: 'ביטול', onclick: () => m.close() }),
-      el('button', { class: 'btn primary', text: 'שמירה', onclick: () => {
-        if (urlInput.value && !/^https:\/\//i.test(urlInput.value)) {
-          toast('כתובת ה-API חייבת להיות מאובטחת (https)', { type: 'err' });
-          return;
-        }
-        ctx.store.setSetting('walletApiUrl', urlInput.value.trim());
-        if (tokenInput.value) ctx.store.setSetting('walletTokenSet', true);
-        m.close();
-        toast('פרטי החיבור נשמרו. הסנכרון יופעל כשהספק יאשר את ההרשאה.');
-      } }),
-    ],
-  });
 }
 
 /* ============================================================
