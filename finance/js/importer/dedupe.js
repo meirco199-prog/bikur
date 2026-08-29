@@ -106,7 +106,8 @@ const SETTLEMENT_HINTS = [/חיוב\s*כרטיס/, /ריכוז\s*חיובים/, 
 
 /**
  * זיהוי חיוב אשראי מרוכז בדף עו"ש.
- * חיוב כזה לא נספר כהוצאה נוספת — העסקאות עצמן כבר נספרו.
+ * חיוב כזה אינו נספר כהוצאה נוספת כאשר עסקאות אותו כרטיס יובאו בפועל
+ * (ראו settlementsToExclude ב-domain/finance.js).
  */
 export function detectSettlement(row, ctx = {}) {
   const { accounts = [], minAmount = 400 } = ctx;
@@ -131,8 +132,8 @@ export function detectSettlement(row, ctx = {}) {
     settlementFor: card?.id || null,
     issuer: issuer || 'חברת אשראי',
     reason: card
-      ? `חיוב מרוכז של ${card.name} — לא נספר כהוצאה נפרדת`
-      : 'חיוב כרטיס אשראי מרוכז — לא נספר כהוצאה נפרדת',
+      ? `חיוב מרוכז של ${card.name} — ייספר כהוצאה עד שיובא פירוט העסקאות של הכרטיס`
+      : 'חיוב כרטיס אשראי מרוכז — ייספר כהוצאה עד שיובא פירוט העסקאות של הכרטיס',
   };
 }
 
@@ -247,6 +248,12 @@ export function detectRefund(row, ctx = {}) {
     if (sim > bestScore) { bestScore = sim; original = t; }
   }
   if (original && bestScore < 0.55) original = null;
+
+  // "זיכוי מלאומי" בדף עו״ש הוא העברה נכנסת מבנק אחר, לא החזר על קנייה.
+  // בלי התנאי הזה הכנסות הופכות להוצאות שליליות והמספרים מתעוותים.
+  // זיכוי אמיתי מזוהה רק כשנמצאה העסקה המקורית, או כשהשורה הגיעה
+  // מפירוט כרטיס אשראי — שם זיכוי הוא תמיד ביטול עסקה.
+  if (!original && row.sourceKind !== 'credit') return null;
 
   return {
     isRefund: true,

@@ -5,7 +5,7 @@
    שום תנועה לא נכנסת לנתונים בלי אישור מפורש.
    ============================================================ */
 
-import { el, money, fmtDate, normalizeMerchant } from '../core/util.js';
+import { el, money, fmtDate, monthLabel, normalizeMerchant } from '../core/util.js';
 import { processFile, commitRows } from '../importer/pipeline.js';
 import { summarizeBatch } from '../importer/dedupe.js';
 import { derivePattern } from '../importer/classify.js';
@@ -132,6 +132,7 @@ async function handleFiles(ctx, files, opts) {
       fileName: files.map((f) => f.name).join(', '),
       summary: summarizeBatch(allRows),
       sourceKind: opts.sourceKind,
+      monthsOff: new Set(),
     };
     reviewFilter = 'all';
     ctx.refresh();
@@ -186,6 +187,9 @@ function buildReviewScreen(ctx) {
     ]),
   ]));
 
+  /* --- בחירת חודשים לייבוא --- */
+  wrap.append(buildMonthPicker(ctx));
+
   /* --- סינון תצוגה --- */
   const counts = {
     all: staging.rows.length,
@@ -230,6 +234,79 @@ function buildReviewScreen(ctx) {
   ]));
 
   return wrap;
+}
+
+/**
+ * בורר חודשים — דוח בנק מכסה לא פעם חצי שנה, ולא תמיד רוצים לייבא הכול.
+ * ביטול סימון של חודש מוריד את כל תנועותיו מהייבוא.
+ */
+function buildMonthPicker(ctx) {
+  const counts = new Map();
+  for (const r of staging.rows) {
+    if (!counts.has(r.month)) counts.set(r.month, { total: 0, income: 0, expense: 0, duplicates: 0 });
+    const c = counts.get(r.month);
+    c.total++;
+    if (r.duplicate) { c.duplicates++; continue; }
+    if (r.internalTransfer || r.isSettlement) continue;
+    if (r.direction === 'income') c.income += Math.abs(r.amount);
+    else c.expense += Math.abs(r.amount);
+  }
+  const months = [...counts.keys()].sort();
+  if (months.length < 2) return el('div');
+
+  const setMonth = (m, on) => {
+    if (on) staging.monthsOff.delete(m); else staging.monthsOff.add(m);
+    for (const r of staging.rows) {
+      if (r.month !== m) continue;
+      r.selected = on && !r.duplicate;
+    }
+    ctx.refresh();
+  };
+
+  return el('div', { class: 'card pad-sm' }, [
+    el('div', { class: 'row wrap', style: { gap: '10px', marginBottom: '10px' } }, [
+      el('div', { class: 'grow' }, [
+        el('div', { class: 'bold small', text: `הדוח מכסה ${months.length} חודשים` }),
+        el('div', { class: 'tiny muted-2', text: 'בחרו אילו חודשים לייבא. כל תנועה נשמרת לחודש שלה בנפרד.' }),
+      ]),
+      el('button', { class: 'btn xs', text: 'סמן הכול',
+        onclick: () => { months.forEach((m) => staging.monthsOff.delete(m)); staging.rows.forEach((r) => { r.selected = !r.duplicate; }); ctx.refresh(); } }),
+      el('button', { class: 'btn xs', text: 'רק החודשיים האחרונים',
+        onclick: () => {
+          const keep = new Set(months.slice(-2));
+          months.forEach((m) => (keep.has(m) ? staging.monthsOff.delete(m) : staging.monthsOff.add(m)));
+          staging.rows.forEach((r) => { r.selected = keep.has(r.month) && !r.duplicate; });
+          ctx.refresh();
+        } }),
+    ]),
+    el('div', { class: 'grid', style: { gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '8px' } },
+      months.map((m) => {
+        const c = counts.get(m);
+        const on = !staging.monthsOff.has(m);
+        const cb = el('input', { type: 'checkbox', onchange: (e) => setMonth(m, e.target.checked) });
+        cb.checked = on;
+        return el('label', {
+          class: 'card pad-sm',
+          style: {
+            cursor: 'pointer', margin: 0,
+            borderColor: on ? 'var(--brand-500)' : 'var(--line)',
+            opacity: on ? 1 : 0.55,
+          },
+        }, [
+          el('div', { class: 'row', style: { gap: '8px' } }, [
+            cb,
+            el('div', { class: 'grow', style: { minWidth: 0 } }, [
+              el('div', { class: 'small bold', text: monthLabel(m) }),
+              el('div', { class: 'tiny muted-2', text: c.duplicates ? `${c.total} תנועות · ${c.duplicates} כפילויות` : `${c.total} תנועות` }),
+            ]),
+          ]),
+          el('div', { class: 'row', style: { gap: '6px', marginTop: '7px' } }, [
+            el('span', { class: 'tiny pos num', text: `+${money(c.income)}` }),
+            el('span', { class: 'tiny neg num', text: `−${money(c.expense)}` }),
+          ]),
+        ]);
+      })),
+  ]);
 }
 
 function filterChip(id, label, ctx, tone = '') {
@@ -283,7 +360,7 @@ function buildReviewTable(ctx, rows) {
       });
       return el('div', { class: 'col', style: { gap: '3px' } }, [
         seg,
-        r.isSettlement ? el('span', { class: 'chip', title: 'לא ייספר כהוצאה', text: '🧾 מרוכז' })
+        r.isSettlement ? el('span', { class: 'chip', title: 'חיוב אשראי מרוכז — ייספר כהוצאה כל עוד לא יובא פירוט העסקאות של הכרטיס, וייעלם מעצמו כשיובא', text: '🧾 מרוכז' })
           : r.internalTransfer ? el('span', { class: 'chip', title: 'לא ייספר בחישובים', text: '↔ העברה' })
           : r.isRefund ? el('span', { class: 'chip pos', text: '↩ זיכוי' }) : null,
       ]);

@@ -112,8 +112,14 @@ export async function readFileToMatrix(file) {
 }
 
 /**
- * PDF: מחלצים טקסט עם מיקומים ומקבצים לשורות לפי קו Y.
- * דוחות אשראי רבים בעברית מגיעים כטבלה — הקיבוץ הזה משחזר אותה סבירות.
+ * PDF: מחלצים טקסט עם מיקומים ובונים ממנו טבלה אמיתית.
+ * ------------------------------------------------------------
+ * בדוח בנק בעברית כל העמודות מיושרות לימין — גם הטקסט וגם המספרים.
+ * לכן הקצה הימני של כל תא (x + רוחב) הוא המדד היציב לזיהוי העמודה
+ * שאליה הוא שייך, ולא נקודת ההתחלה או המרכז.
+ *
+ * בלי השיוך הזה סכום שמופיע בעמודת "זכות" נראה בדיוק כמו סכום
+ * בעמודת "חובה", וכל ההכנסות נרשמות כהוצאות.
  */
 async function readPdfToMatrix(file) {
   await loadScript(CDN.pdfjs);
@@ -122,27 +128,112 @@ async function readPdfToMatrix(file) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = CDN.pdfWorker;
 
   const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-  const rows = [];
+  const out = [];
+  let headerEmitted = false;
+
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
-    const lines = new Map();
-    for (const item of content.items) {
-      const str = String(item.str || '').trim();
-      if (!str) continue;
-      const y = Math.round(item.transform[5] / 3) * 3; // סבלנות של 3 יחידות
-      const x = item.transform[4];
-      if (!lines.has(y)) lines.set(y, []);
-      lines.get(y).push({ x, str });
+    const lines = groupIntoLines(content.items);
+    const header = findHeaderLine(lines);
+
+    if (!header) {
+      // אין כותרת בעמוד הזה — מוסרים את הטקסט כפי שהוא לזיהוי החופשי
+      for (const line of lines) out.push(line.map((i) => i.str));
+      continue;
     }
-    const ordered = [...lines.entries()].sort((a, b) => b[0] - a[0]);
-    for (const [, items] of ordered) {
-      // מימין לשמאל — מסמכים בעברית
-      items.sort((a, b) => b.x - a.x);
-      rows.push(items.map((i) => i.str));
+
+    const columns = buildColumns(header);
+    if (!headerEmitted) {
+      out.push(columns.map((c) => c.label));
+      headerEmitted = true;
+    }
+
+    for (const line of lines) {
+      if (line === header) continue;
+      const cells = assignToColumns(line, columns);
+      if (cells.some((c) => c !== '')) out.push(cells);
     }
   }
-  return rows;
+  return out;
+}
+
+/** קיבוץ פריטי טקסט לשורות לפי קו Y, עם הקצה הימני של כל פריט */
+function groupIntoLines(items, tolerance = 3) {
+  const buckets = new Map();
+  for (const item of items) {
+    const str = String(item.str || '').trim();
+    if (!str) continue;
+    const y = Math.round(item.transform[5] / tolerance) * tolerance;
+    const x = item.transform[4];
+    const width = Number(item.width) || estimateWidth(str);
+    if (!buckets.has(y)) buckets.set(y, []);
+    buckets.get(y).push({ x, width, right: x + width, str });
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => b[0] - a[0])                    // מלמעלה למטה
+    .map(([, line]) => line.sort((a, b) => b.right - a.right)); // מימין לשמאל
+}
+
+function estimateWidth(str) {
+  return String(str).length * 4.5;
+}
+
+/** השורה עם הכי הרבה כותרות מזוהות, ובלבד שיש בה תאריך וסכום */
+function findHeaderLine(lines) {
+  let best = null;
+  let bestScore = 0;
+  for (const line of lines) {
+    const found = new Set();
+    for (const item of line) {
+      const field = matchHeader(item.str);
+      if (field) found.add(field);
+    }
+    const hasDate = found.has('date') || found.has('billingDate');
+    const hasAmount = found.has('amount') || found.has('debit') || found.has('credit');
+    if (hasDate && hasAmount && found.size > bestScore) {
+      bestScore = found.size;
+      best = line;
+    }
+  }
+  return best;
+}
+
+/** עמודות לפי הקצה הימני של תאי הכותרת, מימין לשמאל */
+function buildColumns(headerLine) {
+  return headerLine
+    .map((item) => ({ label: item.str, right: item.right }))
+    .sort((a, b) => b.right - a.right);
+}
+
+/**
+ * שיוך כל תא לעמודה הקרובה ביותר לפי הקצה הימני.
+ * תא שרחוק מכל העמודות (מספור עמודים, סימני עיצוב בשוליים) נזרק.
+ */
+function assignToColumns(line, columns) {
+  const cells = columns.map(() => '');
+  for (const item of line) {
+    const idx = nearestColumn(item.right, columns);
+    if (idx === -1) continue;
+    cells[idx] = cells[idx] ? `${cells[idx]} ${item.str}` : item.str;
+  }
+  return cells;
+}
+
+function nearestColumn(right, columns) {
+  let best = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < columns.length; i++) {
+    const d = Math.abs(columns[i].right - right);
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  if (best === -1) return -1;
+  // הסבלנות היא חצי מהמרווח לעמודה השכנה הקרובה ביותר
+  const gaps = [];
+  if (columns[best - 1]) gaps.push(Math.abs(columns[best - 1].right - columns[best].right));
+  if (columns[best + 1]) gaps.push(Math.abs(columns[best + 1].right - columns[best].right));
+  const tolerance = gaps.length ? Math.max(18, Math.min(...gaps) / 2) : 90;
+  return bestDist <= tolerance ? best : -1;
 }
 
 /* ============================================================
@@ -153,11 +244,11 @@ const HEADER_PATTERNS = {
   date: [/תאריך\s*עסקה/, /תאריך\s*ה?עסקה/, /^תאריך$/, /תאריך\s*רכישה/, /תאריך\s*הפעולה/, /^date$/i, /transaction\s*date/i, /יום\s*עסקה/],
   billingDate: [/תאריך\s*חיוב/, /מועד\s*חיוב/, /תאריך\s*ערך/, /billing\s*date/i, /value\s*date/i],
   merchant: [/שם\s*בית\s*ה?עסק/, /בית\s*עסק/, /^ספק$/, /שם\s*ספק/, /מוטב/, /שם\s*המוטב/, /merchant/i, /payee/i, /vendor/i],
-  description: [/תיאור\s*ה?פעולה/, /^תיאור$/, /^פרטים$/, /פירוט/, /תנועה/, /^description$/i, /details/i, /narrative/i],
+  description: [/תיאור\s*ה?פעולה/, /^תיאור$/, /^פעולה$/, /^פרטים$/, /פירוט/, /תנועה/, /^description$/i, /details/i, /narrative/i],
   amount: [/סכום\s*חיוב/, /סכום\s*ה?עסקה/, /^סכום$/, /סכום\s*בש"?ח/, /סכום\s*₪/, /^amount$/i, /^sum$/i, /charge/i],
   debit: [/^חובה$/, /חיוב/, /^debit$/i, /משיכות/, /^בחובה$/],
   credit: [/^זכות$/, /^זיכוי$/, /^credit$/i, /הפקדות/, /^בזכות$/],
-  balance: [/^יתרה$/, /יתרה\s*בחשבון/, /^balance$/i],
+  balance: [/^יתרה/, /יתרה\s*בחשבון/, /^balance$/i, /^יתרה\s*בש"?ח$/],
   currency: [/^מטבע$/, /סוג\s*מטבע/, /^currency$/i],
   originalAmount: [/סכום\s*מקורי/, /סכום\s*במטבע/, /original\s*amount/i],
   card: [/4\s*ספרות/, /ספרות\s*אחרונות/, /מספר\s*כרטיס/, /^כרטיס$/, /card\s*number/i, /last\s*4/i],
@@ -417,3 +508,6 @@ export async function parseFile(file) {
 }
 
 export { normalizeMerchant };
+
+/* עזרי חילוץ הטבלה — מיוצאים כדי שניתן יהיה לבדוק אותם ישירות */
+export { groupIntoLines, findHeaderLine, buildColumns, assignToColumns };

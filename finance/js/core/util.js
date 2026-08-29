@@ -245,8 +245,13 @@ export function parseDate(raw, hintYear) {
   m = s.match(/^(\d{1,2})[-/.](\d{1,2})$/);
   if (m && hintYear) return isoParts(String(hintYear), m[2], m[1]);
 
-  const d = new Date(s);
-  if (!isNaN(d)) return todayISO(d);
+  // גיבוי אחרון — רק למחרוזות שנראות כמו תאריך.
+  // בלי הסינון הזה JS מפרש "1" כשנת 2001, ומספור עמודים בתחתית
+  // דוח בנק הופך לתנועות מזויפות.
+  if (/\d{1,4}[-/.\s]\d{1,2}/.test(s) || /[a-z]{3}/i.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d)) return todayISO(d);
+  }
   return null;
 }
 

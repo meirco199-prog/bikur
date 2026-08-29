@@ -54,8 +54,8 @@ export default function renderTransactions(ctx) {
     el('span', { class: 'chip neg', text: `הוצאות ${money(t.expense)}` }),
     el('span', { class: `chip ${t.balance >= 0 ? 'pos' : 'neg'}`, text: `יתרה ${money(t.balance)}` }),
     rows.some((r) => r.internalTransfer || r.isSettlement)
-      ? el('span', { class: 'chip', title: 'העברות פנימיות וחיובי אשראי מרוכזים אינם נספרים בסיכומים',
-          text: `${rows.filter((r) => r.internalTransfer || r.isSettlement).length} לא נספרות` })
+      ? el('span', { class: 'chip', title: 'העברות פנימיות אינן נספרות. חיוב אשראי מרוכז נספר כל עוד לא יובא פירוט הכרטיס',
+          text: `${rows.filter((r) => r.internalTransfer).length + rows.filter((r) => r.isSettlement).length} מסומנות` })
       : null,
   ]));
 
@@ -248,7 +248,7 @@ function buildTable(ctx, rows, refreshBulk) {
     { label: 'סוג', width: '92px', render: (tx) => {
       const chips = [];
       if (tx.internalTransfer) chips.push(el('span', { class: 'chip', title: 'לא נספרת בחישובים', text: '↔ העברה' }));
-      else if (tx.isSettlement) chips.push(el('span', { class: 'chip', title: 'חיוב אשראי מרוכז — לא נספר', text: '🧾 מרוכז' }));
+      else if (tx.isSettlement) chips.push(el('span', { class: 'chip', title: 'חיוב אשראי מרוכז — נספר כהוצאה כל עוד לא יובא פירוט העסקאות של הכרטיס', text: '🧾 מרוכז' }));
       else if (tx.isRefund) chips.push(el('span', { class: 'chip pos', text: '↩ זיכוי' }));
       else if (tx.direction === 'expense') chips.push(el('span', { class: 'chip', text: EXPENSE_TYPES[tx.expenseType]?.label || '—' }));
       else chips.push(el('span', { class: 'chip pos', text: 'הכנסה' }));

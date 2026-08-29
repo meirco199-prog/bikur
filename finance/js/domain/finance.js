@@ -14,11 +14,41 @@ import { round2, monthKeyOf, addMonths, previousMonths, currentMonthKey, daysInM
 /**
  * תנועה נספרת בחישובי הכנסות/הוצאות רק אם היא לא:
  *  - העברה פנימית (בין חשבונות שלי)
- *  - חיוב אשראי מרוכז (הסכום כבר נספר בעסקאות עצמן)
  *  - ממתינה לאישור ייבוא
+ *  - חיוב אשראי מרוכז שהעסקאות שמאחוריו כבר נספרו
+ *
+ * excluded הוא אוסף המזהים של חיובים מרוכזים שיש להתעלם מהם.
+ * בלעדיו חיוב מרוכז נספר כרגיל — ראו settlementsToExclude.
  */
-export function countsInTotals(tx) {
-  return !tx.internalTransfer && !tx.isSettlement && tx.status !== 'pending';
+export function countsInTotals(tx, excluded = null) {
+  if (tx.internalTransfer || tx.status === 'pending') return false;
+  if (tx.isSettlement) return !(excluded && excluded.has(tx.id));
+  return true;
+}
+
+/**
+ * אילו חיובי אשראי מרוכזים יש להוציא מהחישוב.
+ *
+ * חיוב מרוכז ("ישראכרט 47,305 ₪" בדף העו״ש) מייצג עשרות עסקאות.
+ * אם פירוט העסקאות של אותו כרטיס יובא — החיוב המרוכז הוא כפילות
+ * ויש להתעלם ממנו. אם הפירוט לא יובא — הוא ההוצאה היחידה שמייצגת
+ * אותן, והתעלמות ממנו תקטין את ההוצאות בעשרות אלפי שקלים.
+ *
+ * הבדיקה דינמית: ברגע שיובא פירוט הכרטיס, החיוב המרוכז מפסיק
+ * להיספר מעצמו — בלי צורך לייבא מחדש.
+ */
+export function settlementsToExclude(txs) {
+  const covered = new Set();
+  for (const tx of txs) {
+    if (tx.isSettlement || !tx.accountId || tx.status === 'pending') continue;
+    covered.add(`${tx.accountId}|${tx.month}`);
+  }
+  const excluded = new Set();
+  for (const tx of txs) {
+    if (!tx.isSettlement) continue;
+    if (tx.settlementFor && covered.has(`${tx.settlementFor}|${tx.month}`)) excluded.add(tx.id);
+  }
+  return excluded;
 }
 
 /** סכום חתום של תנועה: זיכוי מקטין את הצד שלו */
@@ -82,10 +112,11 @@ export function selectTx(transactions, filters = {}) {
 
 /** סך הכנסות/הוצאות/יתרה עבור אוסף תנועות */
 export function totals(txs) {
+  const excluded = settlementsToExclude(txs);
   let income = 0, expense = 0, fixed = 0, variable = 0, oneoff = 0;
   let count = 0;
   for (const tx of txs) {
-    if (!countsInTotals(tx)) continue;
+    if (!countsInTotals(tx, excluded)) continue;
     const v = signedAmount(tx);
     count++;
     if (tx.direction === 'income') income += v;
@@ -202,10 +233,11 @@ export function comparisons(transactions, month, space) {
 
 /** חלוקה לפי קטגוריה, ממוינת מהגבוה לנמוך */
 export function byCategory(txs, direction = 'expense') {
+  const excluded = settlementsToExclude(txs);
   const map = new Map();
   let total = 0;
   for (const tx of txs) {
-    if (!countsInTotals(tx)) continue;
+    if (!countsInTotals(tx, excluded)) continue;
     if (tx.direction !== direction) continue;
     const v = signedAmount(tx);
     const key = tx.categoryId || '__none__';
@@ -224,8 +256,9 @@ export function byCategory(txs, direction = 'expense') {
 
 /** N ההוצאות הגדולות */
 export function topExpenses(txs, n = 5) {
+  const excluded = settlementsToExclude(txs);
   return txs
-    .filter((tx) => countsInTotals(tx) && tx.direction === 'expense' && !tx.isRefund)
+    .filter((tx) => countsInTotals(tx, excluded) && tx.direction === 'expense' && !tx.isRefund)
     .slice()
     .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
     .slice(0, n);
@@ -435,9 +468,10 @@ export function budgetFor(budgets, categoryId, month) {
 /** מצב כל התקציבים בחודש */
 export function budgetStatus(transactions, budgets, month, space) {
   const txs = selectTx(transactions, { month, space });
+  const excluded = settlementsToExclude(txs);
   const spent = new Map();
   for (const tx of txs) {
-    if (!countsInTotals(tx) || tx.direction !== 'expense') continue;
+    if (!countsInTotals(tx, excluded) || tx.direction !== 'expense') continue;
     spent.set(tx.categoryId, round2((spent.get(tx.categoryId) || 0) + signedAmount(tx)));
   }
   const relevant = budgets.filter((b) => (space === 'all' || b.space === space) && (b.month === month || !b.month));
