@@ -757,9 +757,18 @@ console.log('תזכורת חוזרת שפוספסה מזמן לא נשלחת ב�
   kv.set('store', JSON.stringify(S));
   const before = sent.length;
   await worker.scheduled({}, env);
-  check('לא נשלחה באיחור של 6 שעות', !sent.slice(before).some(m => m.text.includes('תזכורת בוקר ישנה')), JSON.stringify(sent.slice(before).map(x => x.text)));
+  const late = sent.slice(before);
+  check('לא נשלחה באיחור של 6 שעות (רק הודעת שקיפות)', !late.some(m => m.text.startsWith('⏰') && m.text.includes('תזכורת בוקר ישנה')), JSON.stringify(late.map(x => x.text)));
+  check('  אבל המשתמש כן שומע שפוספס משהו', late.some(m => m.text.includes('פספסתי') && m.text.includes('תזכורת בוקר ישנה')), JSON.stringify(late.map(x => x.text.slice(0, 60))));
   const C = JSON.parse(kv.get('cron'));
   check('  סומנה כ"טופלה" כדי לחכות למחר', !!C.fired[9950]);
+  // הודעת הפספוס מוגבלת לפעם ביום — ריצה נוספת עם פספוס נוסף לא שולחת שוב
+  let S2 = JSON.parse(kv.get('store'));
+  S2.reminders.push({ id: 9951, text: 'עוד תזכורת ישנה', at: ilMs() - 5 * 3600000, recurringDaily: true, recurringWeekly: null });
+  kv.set('store', JSON.stringify(S2));
+  const before2 = sent.length;
+  await worker.scheduled({}, env);
+  check('  הודעת הפספוס לא חוזרת באותו יום', !sent.slice(before2).some(m => m.text.includes('פספסתי')), JSON.stringify(sent.slice(before2).map(x => x.text.slice(0, 60))));
 }
 
 console.log('שעון הגיבוי לא מכפיל תזכורות:');
@@ -839,8 +848,8 @@ console.log('המוח רואה גם את התשובות של עצמו (המשכ�
 {
   // התשובות של הבוט נרשמות בהיסטוריה
   await send('משימות');
-  let S = JSON.parse(kv.get('store'));
-  check('תשובת הבוט נשמרת בהיסטוריה', S.history.length >= 2 && S.history[S.history.length - 1].bot === true, JSON.stringify(S.history.slice(-2)));
+  const hist = JSON.parse(kv.get('hist') || JSON.parse(kv.get('store')).history || '[]');
+  check('תשובת הבוט נשמרת בהיסטוריה', hist.length >= 2 && hist[hist.length - 1].bot === true, JSON.stringify(hist.slice(-2)));
 
   // וההקשר הזה מגיע למוח: "כן" אחרי הצעה — עונים, לא שומרים פתק
   const prevFetch = globalThis.fetch;
@@ -1395,6 +1404,15 @@ console.log('ביטול תזכורת בתגובה ובשפה חופשית:');
   check('ניסוח חופשי מבטל תזכורת דרך המוח', r2.text.includes('ביטלתי') && !S.reminders.some(x => x.text.includes('עציצים')), r2.text);
   delete env.ANTHROPIC_API_KEY;
   globalThis.fetch = prevFetch;
+}
+
+console.log('ההיסטוריה במפתח אחסון נפרד (דיאטת CPU לשעון):');
+{
+  const S = JSON.parse(kv.get('store'));
+  check('ה-store הרזה בלי היסטוריה', !('history' in S) || !S.history || S.history.length === 0, `history in store: ${S.history?.length}`);
+  check('ההיסטוריה חיה במפתח hist', JSON.parse(kv.get('hist') || '[]').length > 10, `hist len: ${JSON.parse(kv.get('hist') || '[]').length}`);
+  const r = await send('חפש כספת');
+  check('חיפוש עדיין מוצא בהיסטוריה שפוצלה', r.text.includes('HAREL63663'), r.text.slice(0, 80));
 }
 
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
