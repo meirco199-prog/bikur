@@ -233,6 +233,33 @@ export function buildHistoryIndex(transactions) {
  * סיווג שורה גולמית אחת.
  * מחזיר { categoryId, space, expenseType, confidence, reason, source, needsReview, needsSpaceReview }
  */
+/* ענפי חברות האשראי שניתן למפות בבטחה לקטגוריה. ענף מעורפל
+   ("שונות", "שיווק ישיר") נשאר בלי מיפוי — עדיף "דורש בדיקה" על סיווג שגוי. */
+const BRANCH_CATEGORIES = {
+  "תש' רשויות": 'ארנונה',
+  'רשויות': 'ארנונה',
+  'קמעונאות דלק': 'דלק',
+  'דלק': 'דלק',
+  'מסעדות/קפה': 'מסעדות',
+  'מסעדות': 'מסעדות',
+  'מזון': 'קניות בסופר',
+  'סופרמרקטים': 'קניות בסופר',
+  'מכולת': 'קניות בסופר',
+  'ביטוח': 'ביטוחים',
+  'פנאי/ספורט': 'בילויים',
+  'תרבות': 'בילויים',
+  'טוטו/פיס': 'בילויים',
+  'ביגוד/הנעלה': 'ביגוד',
+  'הלבשה': 'ביגוד',
+  'תרופות': 'תרופות',
+  'רפואה': 'בריאות',
+  'בריאות': 'בריאות',
+  'תיירות': 'חופשות',
+  'תעופה': 'חופשות',
+  'מלונות': 'חופשות',
+  'חנויות פארם': 'בריאות',
+};
+
 export function classifyRow(row, ctx) {
   const { categories, rules = [], historyIndex = new Map(), account = null, defaultSpace = 'personal' } = ctx;
 
@@ -316,6 +343,28 @@ export function classifyRow(row, ctx) {
         reason: `דומה ל"${bestHit.sample?.merchant || bestHit.key}"`,
         source: 'similar',
       };
+    }
+  }
+
+  /* --- 4.5 ענף העסקה מדוח האשראי --- */
+  // חברות האשראי מציינות ענף לכל עסקה. הוא פחות אמין מזיהוי בית עסק,
+  // אך טוב בהרבה מ"לא זוהה", ולכן משמש רק כשאין התאמה טובה יותר.
+  if (!best && row.sourceCategory) {
+    const branch = normalizeMerchant(row.sourceCategory);
+    const name = Object.keys(BRANCH_CATEGORIES).find((k) => branch === normalizeMerchant(k));
+    if (name) {
+      const space = guessSpace(norm, account, defaultSpace).space;
+      const cat = findCategory(categories, BRANCH_CATEGORIES[name], space, direction);
+      if (cat) {
+        best = {
+          categoryId: cat.id,
+          space: null,
+          expenseType: cat.defaultExpenseType || null,
+          confidence: 74,
+          reason: `ענף בדוח האשראי: ${row.sourceCategory}`,
+          source: 'branch',
+        };
+      }
     }
   }
 

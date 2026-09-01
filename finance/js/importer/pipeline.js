@@ -18,7 +18,7 @@ import { uid, round2, monthKeyOf, normalizeMerchant } from '../core/util.js';
  * מחזיר { batch, rows, warnings, summary }
  */
 export async function processFile(file, state, options = {}) {
-  const parsed = await parseFile(file);
+  const parsed = await parseFile(file, { sourceKind: options.sourceKind });
   const staged = stageRows(parsed.rows, state, {
     ...options,
     fileName: parsed.fileName,
@@ -76,7 +76,7 @@ export function stageRows(rawRows, state, options = {}) {
     /* --- 5. כפילות --- */
     const dup = checkDuplicate(row, { existing, batchSeen, accountId });
     const bkey = `${row.date}|${Math.abs(round2(row.amount)).toFixed(2)}|${normalizeMerchant(row.merchant || '')}`;
-    if (!batchSeen.has(bkey)) batchSeen.set(bkey, i);
+    if (!batchSeen.has(bkey)) batchSeen.set(bkey, { index: i, externalId: row.externalId || null });
 
     /* --- 6. חודש שיוך: לפי תאריך החיוב אם קיים --- */
     const month = monthKeyOf(row.billingDate || row.date);
@@ -129,11 +129,16 @@ export function stageRows(rawRows, state, options = {}) {
       isRefund: !!refund,
       refundOfId: refund?.refundOfId || null,
 
-      /* כפילות */
-      duplicate: dup || null,
+      /* כפילות. רק התאמה ודאית (אותו תאריך, סכום, בית עסק וחודש, או
+         אותו מזהה חיצוני) מבטלת סימון — היא מה שקורה בייבוא חוזר של
+         אותו קובץ. חשד חלש יותר מסומן לתשומת לב בלבד: שתי קניות באותו
+         סכום באותו חודש הן לרוב שתי קניות אמיתיות, וביטול סימון שלהן
+         היה מחסיר כסף אמיתי מהסיכומים. */
+      duplicate: dup && dup.level === 'exact' ? dup : null,
+      repeated: dup && dup.level !== 'exact' ? dup : null,
 
       /* מצב במסך האישור */
-      selected: !dup,
+      selected: !(dup && dup.level === 'exact'),
       decided: false,
 
       accountId,

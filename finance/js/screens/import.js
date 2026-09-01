@@ -169,6 +169,8 @@ function buildReviewScreen(ctx) {
         el('span', { class: 'chip pos', text: `${s.ready} מוכנות` }),
         s.review ? el('span', { class: 'chip warn', text: `${s.review} דורשות בדיקה` }) : null,
         s.duplicates ? el('span', { class: 'chip neg', text: `${s.duplicates} כפילויות` }) : null,
+        staging.rows.filter((r) => r.repeated).length
+          ? el('span', { class: 'chip warn', text: `${staging.rows.filter((r) => r.repeated).length} חוזרות — לבדיקה` }) : null,
         s.settlements ? el('span', { class: 'chip', text: `${s.settlements} חיובים מרוכזים` }) : null,
         s.transfers ? el('span', { class: 'chip', text: `${s.transfers} העברות פנימיות` }) : null,
         s.refunds ? el('span', { class: 'chip', text: `${s.refunds} זיכויים` }) : null,
@@ -203,6 +205,7 @@ function buildReviewScreen(ctx) {
     all: staging.rows.length,
     review: staging.rows.filter((r) => (r.needsReview || r.needsSpaceReview) && !r.duplicate).length,
     duplicates: staging.rows.filter((r) => r.duplicate).length,
+    repeats: staging.rows.filter((r) => r.repeated).length,
     special: staging.rows.filter((r) => r.isSettlement || r.internalTransfer || r.isRefund || r.installment).length,
     ready: staging.rows.filter((r) => !r.duplicate && !r.needsReview && !r.needsSpaceReview).length,
   };
@@ -210,6 +213,7 @@ function buildReviewScreen(ctx) {
     filterChip('all', `הכול (${counts.all})`, ctx),
     counts.review ? filterChip('review', `דורשות בדיקה (${counts.review})`, ctx, 'warn') : null,
     counts.duplicates ? filterChip('duplicates', `כפילויות (${counts.duplicates})`, ctx, 'neg') : null,
+    counts.repeats ? filterChip('repeats', `חוזרות (${counts.repeats})`, ctx, 'warn') : null,
     counts.special ? filterChip('special', `מיוחדות (${counts.special})`, ctx, 'info') : null,
     counts.ready ? filterChip('ready', `מוכנות (${counts.ready})`, ctx, 'pos') : null,
   ]));
@@ -218,6 +222,7 @@ function buildReviewScreen(ctx) {
   let rows = staging.rows.slice();
   if (reviewFilter === 'review') rows = rows.filter((r) => (r.needsReview || r.needsSpaceReview) && !r.duplicate);
   else if (reviewFilter === 'duplicates') rows = rows.filter((r) => r.duplicate);
+  else if (reviewFilter === 'repeats') rows = rows.filter((r) => r.repeated);
   else if (reviewFilter === 'special') rows = rows.filter((r) => r.isSettlement || r.internalTransfer || r.isRefund || r.installment);
   else if (reviewFilter === 'ready') rows = rows.filter((r) => !r.duplicate && !r.needsReview && !r.needsSpaceReview);
 
@@ -393,6 +398,7 @@ function buildReviewTable(ctx, rows) {
         r.cardLast4 ? el('span', { class: 'chip', style: { marginInlineStart: '5px' }, text: `••${r.cardLast4}` }) : null,
       ]),
       r.duplicate ? el('div', { class: 'chip neg', style: { marginTop: '4px', whiteSpace: 'normal' }, text: `⚠ ${r.duplicate.label}: ${r.duplicate.reason}` }) : null,
+      r.repeated ? el('div', { class: 'chip warn', style: { marginTop: '4px', whiteSpace: 'normal' }, text: `לתשומת לבך: ${r.repeated.reason}. נכלל בייבוא — הסר סימון אם זו כפילות.` }) : null,
     ]) },
     { label: 'סכום', align: 'end', width: '104px', render: (r) => el('span', {
       class: 'bold num nowrap',

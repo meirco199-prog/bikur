@@ -14,6 +14,7 @@ const DUP_LEVELS = {
   exact:    { level: 'exact',    label: 'כפילות ודאית',  score: 99 },
   likely:   { level: 'likely',   label: 'כפילות סבירה',  score: 85 },
   possible: { level: 'possible', label: 'ייתכן שכבר קיים', score: 62 },
+  repeat:   { level: 'repeat',   label: 'מופיע פעמיים בקובץ', score: 40 },
 };
 
 /** הפרש ימים בין שני תאריכי ISO */
@@ -50,16 +51,36 @@ export function checkDuplicate(row, ctx) {
     if (hit) return { ...DUP_LEVELS.exact, txId: hit.id, reason: `מזהה חיצוני זהה (${row.externalId})` };
   }
 
-  /* --- 2. כפילות בתוך אותו קובץ --- */
+  /* --- 2. שורה זהה פעמיים באותו קובץ --- */
+  // דוח אחד מפרט את מה שקרה בפועל: שתי קניות זהות באותו יום הן שתי
+  // עסקאות אמיתיות, לא כפילות. מסמנים לתשומת לב בלבד ולא מבטלים סימון —
+  // ייבוא חוזר של אותו קובץ נתפס ממילא מול התנועות הקיימות.
   const bkey = `${row.date}|${amount.toFixed(2)}|${rowMerchant}`;
-  if (batchSeen.has(bkey)) {
-    return { ...DUP_LEVELS.exact, txId: null, batchIndex: batchSeen.get(bkey), reason: 'שורה זהה מופיעה פעמיים באותו קובץ' };
+  const prev = batchSeen.get(bkey);
+  if (prev !== undefined) {
+    const prevIndex = typeof prev === 'object' ? prev.index : prev;
+    const prevRef = typeof prev === 'object' ? prev.externalId : null;
+    // אסמכתא זהה = בוודאות אותה תנועה שנרשמה פעמיים.
+    // בלי אסמכתא אין ראיה לכפילות, ולרוב אלה שתי עסקאות אמיתיות.
+    const sameRef = row.externalId && prevRef && String(row.externalId) === String(prevRef);
+    return {
+      ...(sameRef ? DUP_LEVELS.exact : DUP_LEVELS.repeat),
+      txId: null,
+      batchIndex: prevIndex,
+      reason: sameRef
+        ? `אותה אסמכתא (${row.externalId}) מופיעה פעמיים בקובץ`
+        : 'שורה זהה מופיעה פעמיים באותו קובץ',
+    };
   }
 
   /* --- 3. תאריך + סכום + בית עסק + חשבון --- */
+  // בעסקת תשלומים כל החיובים החודשיים נושאים את תאריך הרכישה המקורי
+  // ואת אותו סכום; מה שמבדיל ביניהם הוא חודש החיוב.
+  const rowMonth = monthKeyOf(row.billingDate || row.date);
   for (const t of existing) {
     if (Math.abs(round2(t.amount)) !== amount) continue;
     if (t.date !== row.date) continue;
+    if (t.month && rowMonth && t.month !== rowMonth) continue;
     if (accountId && t.accountId && t.accountId !== accountId) continue;
     const sim = similarity(t.merchant || t.name, row.merchant);
     if (sim >= 0.92) {
@@ -82,9 +103,8 @@ export function checkDuplicate(row, ctx) {
   }
 
   /* --- 5. אותו חודש, אותו סכום ובית עסק זהה --- */
-  const month = monthKeyOf(row.billingDate || row.date);
   for (const t of existing) {
-    if (t.month !== month) continue;
+    if (t.month !== rowMonth) continue;
     if (Math.abs(round2(t.amount)) !== amount) continue;
     if (normalizeMerchant(t.merchant || t.name) !== rowMerchant || !rowMerchant) continue;
     return { ...DUP_LEVELS.possible, txId: t.id, reason: 'אותו סכום ובית עסק באותו חודש' };
