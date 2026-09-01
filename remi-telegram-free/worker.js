@@ -830,17 +830,29 @@ const EMPTY = {
   nextId: 1, lastBriefDate: null, lastSummaryDate: null, ownerChatId: null,
 };
 
-async function loadStore(env) {
+// ההיסטוריה (עד 500 הודעות) יושבת במפתח נפרד 'hist': השעון לא זקוק לה,
+// וכך כל טיק שלו מפענח JSON קטן בהרבה — פחות CPU, פחות סיכוי ש-Cloudflare
+// תדלג על ריצות (opts.history=false מדלג על הטעינה שלה לגמרי)
+async function loadStore(env, opts = {}) {
   const raw = await env.DATA.get('store');
   const s = raw ? JSON.parse(raw) : {};
   const merged = Object.assign(structuredClone(EMPTY), s);
   merged.profile = Object.assign({ name: null, age: null, facts: [] }, s.profile || {});
   merged.health = Object.assign({ weight: [] }, s.health || {});
   merged.stats = Object.assign({ fired: [] }, s.stats || {});
+  if (opts.history === false) {
+    merged.history = [];
+  } else {
+    const h = await env.DATA.get('hist');
+    if (h) merged.history = JSON.parse(h);
+    // אין מפתח hist? נשארים עם מה שבתוך store (הגירה חד-פעמית מהמבנה הישן)
+  }
   return merged;
 }
 async function saveStore(env, s) {
-  await env.DATA.put('store', JSON.stringify(s));
+  const { history, ...rest } = s;
+  await env.DATA.put('store', JSON.stringify(rest));
+  await env.DATA.put('hist', JSON.stringify(history || []));
 }
 
 // מצב הקרון נשמר במפתח נפרד ('cron') שרק הקרון כותב אליו — כך שליחת תזכורת
@@ -2216,7 +2228,7 @@ async function runCron(env, opts = {}) {
   // opts.minLateMs: שעון הגיבוי מטפל רק במה שאיחר לפחות כך — כדי לא להתנגש
   // בשעון הראשי לפני שרישום "כבר נשלח" הספיק להסתנכרן בין השרתים.
   const minLate = opts.minLateMs || 0;
-  const S = await loadStore(env);
+  const S = await loadStore(env, { history: false });
   if (S.ownerChatId === null) return;
   const C = await loadCron(env, S);
   S.stats = C.stats; // לתצוגה בסיכומים
@@ -2233,6 +2245,7 @@ async function runCron(env, opts = {}) {
   if (cronTicks.length > 40) cronTicks.shift();
   if (now.getMinutes() % 10 === 0) { C.runs = [...(C.runs || []), nowMs].slice(-12); changed = true; }
 
+  const absorbed = []; // תזכורות חוזרות שדולגו כי השעון איחר מעל 3 שעות
   for (const r of S.reminders) {
    try {
     const due = dueOccurrence(r, C.fired[r.id], nowMs);
@@ -2243,6 +2256,7 @@ async function runCron(env, opts = {}) {
     const isRecurring = r.recurringDaily || (r.recurringWeekly !== null && r.recurringWeekly !== undefined);
     if (isRecurring && nowMs - due > 3 * 3600000) {
       C.fired[r.id] = due;
+      absorbed.push(`${fmtTime(due)} — ${r.text}`);
       changed = true;
       continue;
     }
@@ -2307,6 +2321,21 @@ async function runCron(env, opts = {}) {
     C.errors = [...(C.errors || []), { ts: nowMs, what: `תזכורת "${(r.text || '').slice(0, 25)}"`, msg: e.message }].slice(-8);
     changed = true;
    }
+  }
+
+  // שקיפות במקום שתיקה: אם תזכורות חוזרות דולגו כי השעון איחר מעל 3 שעות —
+  // אומרים את זה למשתמש (לכל היותר פעם ביום), במקום שהוא יגלה לבד שכלום לא הגיע
+  if (absorbed.length) {
+    const dayStr = now.toDateString();
+    if (C.absorbNote !== dayStr && !guardHas('absorb|' + dayStr)) {
+      sentGuard.set('absorb|' + dayStr, Date.now());
+      C.absorbNote = dayStr;
+      changed = true;
+      await tgSend(env, S.ownerChatId,
+        `😕 השעון החיצוני השתהה היום ופספסתי תזכורות (מעל 3 שעות איחור, אז לא שלחתי באיחור מביך):\n` +
+        absorbed.map(t => `• ${t}`).join('\n') +
+        '\n\nהן יחזרו כרגיל במופע הבא שלהן. אפשר תמיד לבקש את התוכן ידנית ("תהילים", "הפגישות של היום", "משימות").');
+    }
   }
 
   // 🔔 התראה אוטומטית לפני כל פגישה (ברירת מחדל: 10 דקות; "תזכורת פגישות 15 דקות" לשינוי)
