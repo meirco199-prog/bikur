@@ -11,6 +11,7 @@ on:
     branches: [main]
     paths:
       - 'invest-api/**'
+      - 'invest-api/config.json'
       - '.github/workflows/deploy-invest-api.yml'
   workflow_dispatch:
 
@@ -70,16 +71,19 @@ jobs:
           echo "kv: ${NS_ID:0:6}..."
 
           # שומרים על ה-Secrets הקיימים של ה-Worker (keep_bindings) — כך מפתחות הספקים לא נמחקים בפריסה
+          # הגדרות לא-סודיות מ-invest-api/config.json נכנסות כ-plain_text bindings (סודות אמיתיים נשמרים בזכות keep_bindings)
           META=$(python3 - "$NS_ID" <<'PY'
           import json,sys
+          cfg = json.load(open("invest-api/config.json"))
+          plain = [{"type": "plain_text", "name": k, "text": str(v)} for k, v in cfg.items() if not k.startswith("_")]
           print(json.dumps({
             "main_module": "worker.js",
             "compatibility_date": "2025-01-01",
             "bindings": [
               {"type": "kv_namespace", "name": "INVEST", "namespace_id": sys.argv[1]},
               {"type": "ai", "name": "AI"}
-            ],
-            "keep_bindings": ["secret_text", "plain_text"]
+            ] + plain,
+            "keep_bindings": ["secret_text"]
           }))
           PY
           )

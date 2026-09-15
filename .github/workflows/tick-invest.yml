@@ -1,0 +1,39 @@
+# מנוע העיבוד היומי של פלטפורמת ההשקעות מ-GitHub — עובד גם בתוכנית Workers החינמית:
+# כל קריאה ל-/cron/run היא הפעלה נפרדת של ה-Worker (מגבלת CPU לכל הפעלה), והלולאה ממשיכה עד "finalized".
+# רץ אחרי סגירת וול סטריט, וגם בכל דחיפה של פקודה לקובץ .github/invest-ops/command (health / cron-run).
+name: Tick invest (daily processing)
+
+on:
+  schedule:
+    - cron: '17 22 * * 1-5'
+  push:
+    branches: [main]
+    paths:
+      - '.github/invest-ops/command'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run
+        run: |
+          W=https://invest-api.meirco199.workers.dev
+          SECRET=$(python3 -c 'import json; print(json.load(open("invest-api/config.json"))["CRON_SECRET"])')
+          BATCH=$(python3 -c 'import json; print(json.load(open("invest-api/config.json")).get("CRON_BATCH","2"))')
+          CMD=$(cat .github/invest-ops/command 2>/dev/null | head -1 || echo cron-run)
+          [ "${{ github.event_name }}" = "push" ] || CMD=cron-run
+          echo "command: $CMD"
+          echo "=== health"; curl -sS --max-time 30 "$W/health" | python3 -m json.tool | head -120
+          if [ "$CMD" = "cron-run" ]; then
+            echo "=== cron-run (batch $BATCH)"
+            for i in $(seq 1 150); do
+              r=$(curl -sS --max-time 90 -X POST "$W/cron/run?batch=$BATCH&secret=$SECRET" || echo '{"error":"curl failed"}')
+              echo "$i: $(echo "$r" | head -c 400)"
+              echo "$r" | grep -q '"finalized":true' && break
+              echo "$r" | grep -q 'error' && sleep 3
+            done
+          fi
+          echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo
+          echo "=== rank"; curl -sS --max-time 30 "$W/rank" | head -c 500; echo

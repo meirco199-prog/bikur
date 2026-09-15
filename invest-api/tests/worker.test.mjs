@@ -156,3 +156,18 @@ test('quote שסוטה >25% מהסגירה האחרונה לא נכנס לחיש
   assert.equal(j.priceSource.kind, 'close'); assert.ok(/סוטה/.test(j.priceSource.note));
   assert.ok(j.price > 50);
 });
+test('אימות לפי sha256 (APP_TOKEN_SHA256) בלי APP_TOKEN; מפתחות ספקים דרך /keys; cron עם CRON_SECRET', async () => {
+  const { sha256Hex } = await import('../lib/keys.js');
+  const env3 = { ...env, APP_TOKEN: undefined, APP_TOKEN_SHA256: await sha256Hex('mytok'), CRON_SECRET: 'tick1', FINNHUB_KEY: undefined };
+  const call = (path, opts = {}) => worker.fetch(new Request('https://api.test' + path, { method: opts.body ? 'POST' : 'GET', headers: { 'CF-Connecting-IP': '3.3.3.3', ...(opts.tok ? { Authorization: 'Bearer ' + opts.tok } : {}), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined }), env3, { waitUntil(){} }).then(async (r) => ({ status: r.status, j: await r.json() }));
+  assert.equal((await call('/keys')).status, 401);
+  assert.equal((await call('/keys', { tok: 'wrong' })).status, 401);
+  const ok = await call('/keys', { tok: 'mytok' }); assert.equal(ok.status, 200); assert.ok(ok.j.find((k) => k.name === 'FINNHUB_KEY' && !k.set));
+  const set = await call('/keys', { tok: 'mytok', body: { name: 'FINNHUB_KEY', value: 'abcdef123456' } }); assert.equal(set.status, 200);
+  const k = set.j.keys.find((x) => x.name === 'FINNHUB_KEY'); assert.ok(k.set && k.source === 'app' && k.masked === 'abc…456' && !JSON.stringify(set.j).includes('abcdef123456'));
+  const h = await call('/health'); assert.equal(h.j.auth, 'token'); assert.ok(h.j.providers.find((p) => p.id === 'finnhub').available, 'מפתח מ-KV מפעיל ספק');
+  assert.equal((await call('/keys', { tok: 'mytok', body: { name: 'HACK', value: 'x' } })).status, 400);
+  assert.equal((await call('/cron/run?batch=1&secret=wrong', { body: {} })).status, 401);
+  const c = await call('/cron/run?batch=1&secret=tick1', { body: {} }); assert.equal(c.status, 200); assert.ok('processed' in c.j);
+  await call('/keys', { tok: 'mytok', body: { name: 'FINNHUB_KEY', value: '' } });
+});

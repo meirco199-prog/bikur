@@ -1,6 +1,7 @@
 // invest-api — ה-API, ה-cron ושכבת ה-AI של פלטפורמת המחקר (/invest/). Cloudflare Worker + KV.
 // מסמכים: invest/docs/ARCHITECTURE.md. כל המפתחות ב-Secrets בלבד. אין scraping.
 import { DB } from './lib/db.js';
+import { resolveEnv, keysStatus, setKey, isAuthed } from './lib/keys.js';
 import { Budget } from './lib/budget.js';
 import { providerStatus } from './providers/registry.js';
 import { PaperBroker } from './lib/broker.js';
@@ -30,16 +31,12 @@ function rateLimited(ip, path){
   if (RL.size > 5000) RL.clear();
   return n > ({ ai: 10, data: 600, all: 240 })[bucket];
 }
-function authed(req, env){
-  if (!env.APP_TOKEN) return true; // לא מוגדר טוקן → מצב פתוח (מוצג כאזהרה ב-/health)
-  const h = req.headers.get('Authorization') || '';
-  return h === `Bearer ${env.APP_TOKEN}`;
-}
 const validSym = (s) => typeof s === 'string' && SYM_RE.test(s.toUpperCase());
 const validDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d));
 
-function makeCtx(env, waitUntil){
-  const db = new DB(env.INVEST);
+async function makeCtx(env0, waitUntil){
+  const db = new DB(env0.INVEST);
+  const env = await resolveEnv(env0, db); // Secrets + מפתחות שהוזנו באפליקציה
   const budget = new Budget(db);
   return { env, db, budget, waitUntil: waitUntil || (() => {}) };
 }
@@ -104,13 +101,15 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
 }
 
 // ---------- routes ----------
-async function handle(req, env, ctx){
+async function handle(req, env0, ctx){
+  const env = ctx.env;
   const url = new URL(req.url);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const q = Object.fromEntries(url.searchParams);
   const db = ctx.db;
   const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
-  const needAuth = () => { if (!authed(req, env)) throw Object.assign(new Error('unauthorized'), { status: 401 }); };
+  const authedNow = await isAuthed(req, env);
+  const needAuth = () => { if (!authedNow) throw Object.assign(new Error('unauthorized'), { status: 401 }); };
   const sym = (s) => { const u = String(s || '').toUpperCase(); if (!validSym(u)) throw Object.assign(new Error('סימבול לא תקין'), { status: 400 }); return u; };
   const m = path.match(/^\/([a-z-]+)(?:\/([^/]+))?(?:\/([^/]+))?$/);
   const [, r0, p1, p2] = m || [];
@@ -119,7 +118,12 @@ async function handle(req, env, ctx){
     const budget = await ctx.budget.status();
     const cron = await db.get('cron:last');
     const errors = (await db.get('log:err')) || [];
-    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : 'OPEN (הגדר APP_TOKEN!)', ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', alerts: { telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors.slice(-10) });
+    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : env.APP_TOKEN_SHA256 ? 'token' : 'OPEN (הגדר APP_TOKEN!)', keys: await keysStatus(env0, db), ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', alerts: { telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors.slice(-10) });
+  }
+  if (r0 === 'keys'){
+    needAuth();
+    if (req.method === 'GET') return json(await keysStatus(env0, db));
+    if (req.method === 'POST'){ try { await setKey(db, body.name, body.value); } catch (e) { return err(e.message); } return json({ ok: true, keys: await keysStatus(env0, db) }); }
   }
   if (r0 === 'universe'){
     const u = await getUniverse(db);
@@ -291,7 +295,7 @@ async function handle(req, env, ctx){
   }
   if (r0 === 'cron'){
     if (p1 === 'status') return json({ last: await db.get('cron:last'), state: (({ queue, ...rest }) => ({ ...rest, queueLeft: queue?.length }))((await db.get('cron:state')) || {}) });
-    if (p1 === 'run' && req.method === 'POST'){ needAuth(); const r = await cronStep(ctx, { batch: Math.min(+q.batch || 3, 60), force: q.force === '1' }); return json(r); }
+    if (p1 === 'run' && req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); const r = await cronStep(ctx, { batch: Math.min(+q.batch || 3, 60), force: q.force === '1' }); return json(r); }
   }
   return err('not found', 404);
 }
@@ -302,12 +306,12 @@ export default {
     const ip = req.headers.get('CF-Connecting-IP') || 'local';
     const path = new URL(req.url).pathname;
     if (rateLimited(ip, path)) return err('rate limited', 429);
-    const ctx = makeCtx(env, ec?.waitUntil?.bind(ec));
-    try { return await handle(req, env, ctx); }
-    catch (e) { if (e.status) return err(e.message, e.status); await ctx.db.logError(path, e.message); return err('internal: ' + e.message, 500); }
+    let ctx;
+    try { ctx = await makeCtx(env, ec?.waitUntil?.bind(ec)); return await handle(req, env, ctx); }
+    catch (e) { if (e.status) return err(e.message, e.status); await ctx?.db?.logError(path, e.message); return err('internal: ' + e.message, 500); }
   },
   async scheduled(event, env, ec){
-    const ctx = makeCtx(env, ec.waitUntil.bind(ec));
+    const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     try { await cronStep(ctx); } catch (e) { await ctx.db.logError('scheduled', e.message); }
   },
 };
