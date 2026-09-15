@@ -68,14 +68,26 @@
 - `lib/budget.js` סופר קריאות לכל ספק ליום (KV) ומסרב לחרוג מהמכסה החינמית — כך המערכת לא "נשברת" באמצע היום.
 - Stale data מוחזר **רק** עם דגל `stale: true` ו-`asOf` ישן, והממשק מציג זאת בכתום.
 
+### מצבי חישוב (החלטה בעקבות מדידה)
+
+מדידה ב-Node: ניתוח נכס = ~20ms CPU עם מטמון, ~90ms עם fetch+parse ראשוני. **Workers Free = 10ms CPU
+לקריאה**, ולכן ה-cron בשרת אמין רק ב-Workers Paid ($5/חודש, 30s CPU). כדי שהמערכת תעבוד בשני המקרים:
+
+- **[החלטה] `engine/pipeline.js` הוא פונקציה טהורה** `analyzeBundle(bundle, ctx) → analysis` שרצה זהה
+  ב-Worker (`lib/analysis.js` רק אוסף נתונים ומזין אותה) ובדפדפן (`invest/js/engine-worker.js`).
+- ה-Worker חושף `GET /bundle/:sym` (מחירים+דוחות+פרופיל, ממטמון) ו-`POST /snapshots` (append-only):
+  הדפדפן יכול לחשב את כל ה-universe ולשמור snapshots/דירוג/תיקים/משטר ב-DB — אותן רשומות בדיוק,
+  מסומנות `computedBy:'browser'`.
+- דף הנכס: `GET /asset/:sym` (שרת) ואם נכשל → חישוב מקומי מ-`/bundle` (מסומן "חושב בדפדפן").
+- Backtest, Walk-Forward ו-As-Of רצים תמיד בדפדפן (Web Worker) — כבדים מדי ל-Worker.
+
 ## 3. זרימות עיקריות
 
-**Cron יומי (23:30 UTC, אחרי סגירת ארה"ב):**
-1. רענון מאקרו (FRED, BOI) → `regime` נשמר ל-`regime:{date}`.
-2. לכל נכס ב-universe הפעיל (watchlist + מועמדי screener + מדדים): מחירים, פונדמנטלס (אם פג), חדשות.
-3. חישוב ציון+סיגנל ב-engine → `snap:{date}:{sym}` (כתיבה רק אם לא קיים).
-4. דירוג → `rank:{date}`; תיקים מומלצים → `reco:{date}`.
-5. הרצת כללי התראה → שליחה + `alerts:log:{date}`.
+**Cron (כל 2 דקות, עיבוד באצ'ים של `CRON_BATCH` נכסים — `lib/worker.js:cronStep`):**
+1. ביום חדש: רענון מאקרו (FRED, BOI) ומדדים → `regime:{date}` (putIfAbsent); תור = universe ∪ watchlist.
+2. כל הפעלה: `CRON_BATCH` נכסים מהתור → bundle (מטמון KV, רענון לפי TTL) → pipeline → `snap:{date}:{sym}` (putIfAbsent) → כללי התראה מול snapshot אתמול → שליחה + `alerts:log:{date}`.
+3. כשהתור ריק: `rank:{date}`, `reco:{date}`, `idx:snapdays`, עקומת הון של Paper, הרחבת universe שבועית (FMP screener).
+4. `/cron/status` ו-`/health` מציגים התקדמות; `POST /cron/run` מפעיל באצ' ידנית.
 
 **בקשת דף נכס:** הפרונט קורא `/asset/:sym` (מאוחד: מחירים+פונדמנטלס+חדשות+אנליסטים+snapshot אחרון); כל בלוק עם `source/asOf/quality` משלו.
 

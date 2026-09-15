@@ -1,0 +1,41 @@
+// שלד האפליקציה: ניתוב hash, ניווט, חיפוש, ערכת נושא, בדיקת חיבור, polling התראות.
+import { api, health } from './core/api.js';
+import { settings } from './core/store.js';
+import { $, esc, debounce } from './core/util.js';
+import { pollAlerts } from './screens/alerts.js';
+
+const ROUTES = {
+  '': () => import('./screens/dashboard.js'), dashboard: () => import('./screens/dashboard.js'), search: () => import('./screens/search.js'), asset: () => import('./screens/asset.js'), watchlist: () => import('./screens/watchlist.js'),
+  opportunities: () => import('./screens/opportunities.js'), portfolio: () => import('./screens/portfolio.js'), signals: () => import('./screens/signals.js'), regime: () => import('./screens/regime.js'), backtest: () => import('./screens/backtest.js'),
+  asof: () => import('./screens/asof.js'), paper: () => import('./screens/paper.js'), alerts: () => import('./screens/alerts.js'), assistant: () => import('./screens/assistant.js'), settings: () => import('./screens/settings.js'),
+};
+const NAV = [['', '🏠 תמונת מצב'], ['opportunities', '🎯 הזדמנויות'], ['signals', '🚦 סיגנלים'], ['search', '🔍 סריקה וסינון'], ['watchlist', '⭐ רשימת מעקב'], ['sep', 'ניתוח'], ['portfolio', '💼 תיק 200,000 ₪'], ['regime', '🌡️ משטר שוק'], ['backtest', '🧪 Backtest'], ['asof', '⏳ As-Of'], ['paper', '🧾 Paper Trading'], ['sep', 'כלים'], ['alerts', '🔔 התראות'], ['assistant', '🤖 עוזר מחקר'], ['settings', '⚙️ הגדרות']];
+
+function parse(){ const h = location.hash.replace(/^#\/?/, ''); const [path, qs] = h.split('?'); const parts = path.split('/'); const params = Object.fromEntries(new URLSearchParams(qs || '')); if (parts[0] === 'asset' && parts[1]) params.symbol = decodeURIComponent(parts[1]); return { route: parts[0] || '', params }; }
+async function navigate(){
+  const { route, params } = parse();
+  $('#sidenav').classList.remove('open');
+  document.querySelectorAll('.sidenav a').forEach((a) => a.classList.toggle('active', a.dataset.r === route));
+  const main = $('#main');
+  const loader = ROUTES[route];
+  if (!loader){ main.innerHTML = '<div class="empty">הדף לא נמצא</div>'; return; }
+  try { const mod = await loader(); await mod.render(main, params); window.scrollTo(0, 0); }
+  catch (e) { main.innerHTML = `<div class="empty" style="border-color:var(--neg)">שגיאה בטעינת הדף: ${esc(e.message)}</div>`; console.error(e); }
+}
+function buildNav(){ $('#sidenav').innerHTML = NAV.map(([r, l]) => (r === 'sep' ? `<div class="sep">${esc(l)}</div>` : `<a href="#/${r}" data-r="${r}">${esc(l)}</a>`)).join(''); }
+function theme(){ const t = settings.get().theme || 'dark'; document.documentElement.dataset.theme = t; $('#themeBtn').onclick = () => { settings.set({ theme: t === 'dark' ? 'light' : 'dark' }); theme(); }; }
+function search(){
+  const input = $('#searchInput'), res = $('#searchResults');
+  const go = debounce(async () => { const q = input.value.trim(); if (!q){ res.classList.add('hidden'); return; } try { const r = await api('/search?q=' + encodeURIComponent(q), { ttl: 60000 }); const items = r.items.slice(0, 12); res.innerHTML = (items.length ? items.map((a) => `<div data-s="${esc(a.symbol)}"><span><b>${esc(a.symbol)}</b> <span class="muted">${esc(a.name || '')}</span></span><span class="muted">${esc(a.type || '')} ${esc(a.country || '')}</span></div>`).join('') : '') + (/^[A-Z0-9.^\-]{1,12}$/i.test(q) ? `<div data-s="${esc(q.toUpperCase())}"><span>פתח <b>${esc(q.toUpperCase())}</b> ישירות</span></div>` : ''); res.classList.remove('hidden'); } catch { res.classList.add('hidden'); } }, 200);
+  input.addEventListener('input', go); input.addEventListener('focus', go);
+  res.addEventListener('click', (e) => { const d = e.target.closest('[data-s]'); if (!d) return; location.hash = '#/asset/' + d.dataset.s; res.classList.add('hidden'); input.value = ''; });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#search')) res.classList.add('hidden'); });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && input.value.trim()){ location.hash = '#/asset/' + input.value.trim().toUpperCase(); res.classList.add('hidden'); input.value = ''; } });
+}
+async function apiStatus(){ const h = await health(); const dot = $('#apiStatus .status-dot'); dot.className = 'status-dot ' + (h.ok ? (h.auth === 'token' ? 'ok' : 'warn') : 'bad'); $('#apiStatus').title = h.ok ? `API v${h.version} · ${h.auth}` : h.error || 'אין חיבור'; }
+buildNav(); theme(); search();
+$('#menuBtn').onclick = () => $('#sidenav').classList.toggle('open');
+window.addEventListener('hashchange', navigate);
+navigate(); apiStatus(); setInterval(apiStatus, 60000);
+pollAlerts(); setInterval(pollAlerts, 5 * 60000);
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

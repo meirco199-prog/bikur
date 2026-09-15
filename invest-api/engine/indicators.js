@@ -79,9 +79,13 @@ export function macd(values, fast = 12, slow = 26, signal = 9){
 export function bollinger(values, n = 20, k = 2){
   const mid = sma(values, n);
   const upper = new Array(values.length).fill(null), lower = upper.slice(), pctB = upper.slice(), width = upper.slice();
-  for (let i = n - 1; i < values.length; i++){
-    const win = values.slice(i - n + 1, i + 1);
-    const sd = std(win, false);
+  let sum = 0, sumSq = 0;
+  for (let i = 0; i < values.length; i++){
+    const v = values[i];
+    if (isNum(v)){ sum += v; sumSq += v * v; }
+    if (i >= n){ const o = values[i - n]; if (isNum(o)){ sum -= o; sumSq -= o * o; } }
+    if (i < n - 1) continue;
+    const m = sum / n, sd = Math.sqrt(Math.max(0, sumSq / n - m * m));
     if (!isNum(mid[i]) || !isNum(sd)) continue;
     upper[i] = mid[i] + k * sd; lower[i] = mid[i] - k * sd;
     width[i] = mid[i] ? (upper[i] - lower[i]) / mid[i] : null;
@@ -111,12 +115,19 @@ export function atr(rows, n = 14){
   return out;
 }
 
-export function rollingMax(values, n){
-  return values.map((_, i) => (i >= n - 1 ? Math.max(...values.slice(i - n + 1, i + 1)) : null));
+// חלון מקסימום/מינימום ב-O(n) (monotonic deque)
+function rolling(values, n, cmp){
+  const out = new Array(values.length).fill(null), dq = [];
+  for (let i = 0; i < values.length; i++){
+    while (dq.length && dq[0] <= i - n) dq.shift();
+    while (dq.length && cmp(values[i], values[dq[dq.length - 1]])) dq.pop();
+    dq.push(i);
+    if (i >= n - 1) out[i] = values[dq[0]];
+  }
+  return out;
 }
-export function rollingMin(values, n){
-  return values.map((_, i) => (i >= n - 1 ? Math.min(...values.slice(i - n + 1, i + 1)) : null));
-}
+export function rollingMax(values, n){ return rolling(values, n, (a, b) => a >= b); }
+export function rollingMin(values, n){ return rolling(values, n, (a, b) => a <= b); }
 
 // תשואות יומיות לוגריתמיות/פשוטות
 export function returns(values, log = false){

@@ -23,7 +23,7 @@ export function installMockFetch({ fail = [] } = {}){
     if (u.includes('stooq.com')){ const s = new URL(u).searchParams.get('s'); if (s.includes('nodata')) return ok('No data'); return ok(priceCSV(s), 'text/csv'); }
     if (u.includes('finnhub.io')){
       const p = new URL(u); const sym = p.searchParams.get('symbol');
-      if (u.includes('/quote')) return ok({ c: 101.5, d: 1.5, dp: 1.5, h: 102, l: 99, o: 100, pc: 100, t: Math.floor(Date.now() / 1000) });
+      if (u.includes('/quote')){ const last = +priceCSV(sym.toLowerCase().replace('.', '-') + '.us').trim().split('\n').pop().split(',')[4]; const c = +(last * 1.015).toFixed(2); return ok({ c, d: +(c - last).toFixed(2), dp: 1.5, h: c * 1.01, l: last * 0.99, o: last, pc: last, t: Math.floor(Date.now() / 1000) }); }
       if (u.includes('/profile2')) return ok({ name: sym + ' Corp', country: 'US', currency: 'USD', exchange: 'NASDAQ', finnhubIndustry: 'Technology', marketCapitalization: 150000, shareOutstanding: 1500 });
       if (u.includes('/metric')) return ok({ metric: { peTTM: 25, psTTM: 5, roeTTM: 30, netProfitMarginTTM: 20, beta: 1.2, '52WeekHigh': 120 } });
       if (u.includes('/recommendation')) return ok([{ buy: 10, hold: 5, sell: 1, strongBuy: 8, strongSell: 0, period: '2026-09-01', symbol: sym }, { buy: 9, hold: 6, sell: 1, strongBuy: 7, strongSell: 0, period: '2026-08-01' }]);

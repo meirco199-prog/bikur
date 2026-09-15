@@ -14,7 +14,16 @@
 | Engine: portfolio, risk, news dedup | `engine/portfolio.js`, `engine/risk.js`, `engine/news.js` | `tests/portfolio.test.mjs`, `tests/news.test.mjs` |
 | Worker: providers, cache, budget, routes, cron, alerts, AI | `invest-api/worker.js`, `providers/*`, `lib/*` | `tests/worker.test.mjs` (KV מדומה + fetch מדומה) |
 | Deploy | `.github/workflows/deploy-invest-api.yml` | יוצר KV `invest`, cron, subdomain |
-| Frontend: 14 מסכים | `invest/js/screens/*` | Playwright: טעינה ללא שגיאות קונסול, ניווט לכל מסך עם API מדומה |
+| Frontend: 14 מסכים | `invest/js/screens/*` | `tests/e2e/e2e.mjs` (Playwright/Chromium מול `mock-server.mjs`): 16 תרחישים — כל מסך, לשוניות דף הנכס, backtest+walk-forward, As-Of, paper order, כלל התראה, שאלה ל-AI, עיבוד בדפדפן ושמירה. 0 שגיאות קונסול |
+| מצב חישוב בדפדפן | `engine/pipeline.js`, `POST /snapshots`, `engine-worker.js` | worker.test + e2e (settings) |
+
+### מה אומת ומה לא (בכנות)
+- **אומת:** כל הלוגיקה (67 בדיקות יחידה), ה-Worker מקצה לקצה עם ספקים מדומים, והממשק בדפדפן אמיתי.
+- **לא אומת (אין רשת בסביבת הפיתוח):** פורמטי התשובה האמיתיים של הספקים. המתאמים נכתבו לפי התיעוד הרשמי
+  ומטפלים בשגיאות/שדות חסרים כ-Missing Data, אך ייתכנו סטיות (במיוחד ב-FMP "stable" וב-Alpha Vantage). `/health`
+  מציג `recentErrors` — זה המקום הראשון לבדוק אחרי הזנת המפתחות.
+- **לא אומת:** העלאת Worker רב-מודולי דרך ה-API של Cloudflare (ה-workflow משתמש בחלקי multipart בשמות הנתיבים,
+  כפי ש-wrangler עושה). אם הפריסה נכשלת, הלוג ב-Actions יראה את תשובת Cloudflare.
 
 מסכים ב-MVP: Dashboard, Search, Asset (פונדמנטלס/טכני/חדשות/אנליסטים/ציון/WHY), Watchlist, Opportunities, Portfolio 200k, Signals, Regime, Backtest, As-Of, Paper Trading, Alerts, Assistant, Settings.
 

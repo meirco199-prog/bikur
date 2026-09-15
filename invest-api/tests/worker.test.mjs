@@ -104,10 +104,10 @@ test('/asof/AAPL — נתונים עד תאריך בלבד + תשואות קדי
 });
 test('paper trading: קנייה במחיר quote, מכירה, ביצועים', async () => {
   const b = await get('/paper/order', { body: { symbol: 'AAPL', side: 'buy', qty: 10, reason: 'בדיקה' }, auth: true });
-  assert.equal(b.status, 200, JSON.stringify(b.j)); assert.equal(b.j.price, 101.5); assert.equal(b.j.result.signalAtEntry !== undefined, true);
-  const p = await get('/paper'); assert.equal(p.j.open.length, 1); assert.equal(p.j.open[0].current, 101.5);
-  const s = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 4, price: 110 }, auth: true });
-  assert.equal(s.status, 200); assert.equal(s.j.result[0].pnl, 34);
+  assert.equal(b.status, 200, JSON.stringify(b.j)); assert.ok(b.j.price > 0 && b.j.priceSource.source === 'finnhub'); assert.equal(b.j.result.signalAtEntry !== undefined, true);
+  const p = await get('/paper'); assert.equal(p.j.open.length, 1); assert.equal(p.j.open[0].current, b.j.price);
+  const s = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 4, price: b.j.price + 10 }, auth: true });
+  assert.equal(s.status, 200); assert.ok(Math.abs(s.j.result[0].pnl - 40) < 0.01);
   const p2 = await get('/paper'); assert.equal(p2.j.closedCount, 1); assert.equal(p2.j.open[0].qty, 6);
   const bad = await get('/paper/order', { body: { symbol: 'MSFT', side: 'sell', qty: 1, price: 5 }, auth: true }); assert.equal(bad.status, 400);
 });
@@ -119,9 +119,9 @@ test('/ai/ask — ללא מפתח מחזיר הקשר גולמי; עם מפתח 
   const j = await r.json();
   assert.equal(j.provider, 'anthropic'); assert.ok(calls.some((u) => u.includes('api.anthropic.com')));
 });
-test('rate limit: מעל 120 בקשות בדקה → 429', async () => {
+test('rate limit: מעל 240 בקשות בדקה → 429', async () => {
   let last;
-  for (let i = 0; i < 125; i++) last = await worker.fetch(new Request('https://api.test/days', { headers: { 'CF-Connecting-IP': '9.9.9.9' } }), env, { waitUntil(){} });
+  for (let i = 0; i < 245; i++) last = await worker.fetch(new Request('https://api.test/days', { headers: { 'CF-Connecting-IP': '9.9.9.9' } }), env, { waitUntil(){} });
   assert.equal(last.status, 429);
 });
 test('/prices ו-/bundle ו-/search', async () => {
@@ -136,4 +136,23 @@ test('ספק שנופל → fallback או missing מסומן, לא קריסה', 
   assert.ok(!j.missing); assert.equal(j.priceSource.kind, 'close');
   const h = await get('/health'); assert.ok(h.j.recentErrors.some((e) => /quote/.test(e.where)));
   installMockFetch();
+});
+test('POST /snapshots — מצב חישוב בדפדפן: append-only, מפעיל התראות, לא דורס', async () => {
+  const day = '2026-01-05';
+  const snaps = [{ symbol: 'AAPL', score: 80, signal: 'BUY', price: 100, rsi: 25, events: [], relVol: 3 }, { symbol: 'MSFT', score: 40, signal: 'HOLD', price: 50 }];
+  const r = await get('/snapshots', { body: { date: day, snapshots: snaps, rank: { table: [], categories: {} }, regime: { rules: [], risk: 'Neutral', trend: 'Correction' } }, auth: true });
+  assert.equal(r.status, 200, JSON.stringify(r.j)); assert.equal(r.j.written, 2);
+  const again = await get('/snapshots', { body: { date: day, snapshots: [{ symbol: 'AAPL', score: 1, signal: 'SELL', price: 1 }] }, auth: true });
+  assert.equal(again.j.written, 0, 'לא נדרס');
+  const s = await get(`/snapshot/${day}/AAPL`); assert.equal(s.j.score, 80); assert.equal(s.j.computedBy, 'browser');
+  const days = await get('/days'); assert.ok(days.j.includes(day));
+  const bad = await get('/snapshots', { body: { date: '2099-01-01', snapshots: [] }, auth: true }); assert.equal(bad.status, 400);
+  const noauth = await get('/snapshots', { body: { snapshots: [] } }); assert.equal(noauth.status, 401);
+});
+
+test('quote שסוטה >25% מהסגירה האחרונה לא נכנס לחישוב (מסומן)', async () => {
+  store.set('quote:GOOGL', JSON.stringify({ price: 5, change: 0, changePct: 0, asOf: new Date().toISOString(), source: 'finnhub', quality: 0.9, fetchedAt: new Date().toISOString() }));
+  const { j } = await get('/asset/GOOGL');
+  assert.equal(j.priceSource.kind, 'close'); assert.ok(/סוטה/.test(j.priceSource.note));
+  assert.ok(j.price > 50);
 });

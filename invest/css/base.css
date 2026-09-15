@@ -1,0 +1,32 @@
+/* טוקנים, טיפוגרפיה, ערכות נושא (כהה ברירת מחדל — מסך מסחר), RTL */
+:root{
+  --bg:#0f1318; --bg2:#151b23; --bg3:#1b232e; --line:#26303d; --line2:#33404f;
+  --fg:#e6ebf2; --fg2:#a9b4c2; --fg3:#7c8796; --accent:#4f8cff; --accent2:#7aa7ff;
+  --pos:#2fbf71; --neg:#e5484d; --warn:#f5a524; --info:#38bdf8; --purple:#a78bfa;
+  --sb:#1f9d55; --b:#2fbf71; --w:#38bdf8; --h:#94a3b8; --r:#f5a524; --s:#e5484d; --ns:#64748b;
+  --radius:10px; --shadow:0 4px 18px rgba(0,0,0,.35);
+  --font:"Segoe UI","Heebo","Assistant",-apple-system,system-ui,Arial,sans-serif; --mono:"JetBrains Mono","Consolas","Courier New",monospace;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f5f7fa; --bg2:#ffffff; --bg3:#eef2f7; --line:#dfe5ee; --line2:#c9d2df;
+  --fg:#111827; --fg2:#374151; --fg3:#6b7280; --accent:#2563eb; --accent2:#3b82f6; --shadow:0 4px 16px rgba(16,24,40,.08);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{font-size:15px}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);direction:rtl;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3,h4{margin:0 0 .5rem;font-weight:700;letter-spacing:-.01em}
+h1{font-size:1.5rem}h2{font-size:1.2rem}h3{font-size:1.02rem}h4{font-size:.92rem;color:var(--fg2)}
+p{margin:.3rem 0}
+small,.muted{color:var(--fg3);font-size:.85em}
+.num,.mono,td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.warn{color:var(--warn)}.info{color:var(--info)}
+.hidden{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:.45rem .6rem;outline:none;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+::selection{background:var(--accent);color:#fff}
+::-webkit-scrollbar{height:8px;width:8px}::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px}

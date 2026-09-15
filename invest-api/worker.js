@@ -22,11 +22,13 @@ const err = (msg, status = 400, extra = {}) => json({ error: msg, ...extra }, st
 const RL = new Map();
 function rateLimited(ip, path){
   const minute = Math.floor(Date.now() / 60000);
-  const key = `${ip}:${minute}:${path.startsWith('/ai') ? 'ai' : 'all'}`;
+  // דליים: AI (יקר) 10/דקה; נתונים לחישוב בדפדפן (bundle/prices/snapshot) 600/דקה; שאר הבקשות 240/דקה
+  const bucket = path.startsWith('/ai') ? 'ai' : /^\/(bundle|prices|snapshot)\//.test(path) ? 'data' : 'all';
+  const key = `${ip}:${minute}:${bucket}`;
   const n = (RL.get(key) || 0) + 1;
   RL.set(key, n);
   if (RL.size > 5000) RL.clear();
-  return n > (path.startsWith('/ai') ? 10 : 120);
+  return n > ({ ai: 10, data: 600, all: 240 })[bucket];
 }
 function authed(req, env){
   if (!env.APP_TOKEN) return true; // לא מוגדר טוקן → מצב פתוח (מוצג כאזהרה ב-/health)
@@ -177,7 +179,8 @@ async function handle(req, env, ctx){
     const regime = await computeRegime(ctx, { date: q.date });
     const b = await loadBundle(s, ctx);
     const spy = await db.get('px:SPY');
-    const a = await analyzeBundle(b, ctx, { asOfDate: q.date, regime, benchRows: spy?.rows });
+    const dgs = await db.get('macro:DGS10');
+    const a = analyzeBundle(b, { asOfDate: q.date, regime, benchRows: spy?.rows, dgs10Rows: dgs?.rows });
     const fwd = b.prices?.rows ? forwardReturns(b.prices.rows, q.date) : null;
     const stored = await db.get(`snap:${q.date}:${s}`);
     return json({ ...a, bundle: undefined, forward: fwd, storedSnapshot: stored ? { score: stored.score, signal: stored.signal, price: stored.price, weightsVersion: stored.weightsVersion } : null, regimeAtDate: { summary: regime.summary, risk: regime.risk, trend: regime.trend }, note: 'חושב רק מנתונים שהיו ידועים בתאריך (מחירים ≤ תאריך, דוחות לפי תאריך הגשה, חדשות לפי פרסום). קונצנזוס/תחזיות אנליסטים לא זמינים נקודתית.' });
@@ -193,6 +196,24 @@ async function handle(req, env, ctx){
   if (r0 === 'reco'){ const day = validDate(q.date) ? q.date : await latestRankDay(db); const r = day ? await db.get(`reco:${day}`) : null; return json(r || { missing: true, reason: 'אין תיקים מומלצים עדיין', day }); }
   if (r0 === 'days') return json((await db.get('idx:snapdays')) || []);
   if (r0 === 'snapshots' && p1){ const s = sym(p1); const days = (await db.get('idx:snapdays')) || []; const out = []; for (const d of days.slice(-(+q.limit || 120))){ const sn = await db.get(`snap:${d}:${s}`); if (sn) out.push(sn); } return json(out); }
+  if (r0 === 'snapshots' && !p1 && req.method === 'POST'){
+    needAuth();
+    const day = validDate(body.date) ? body.date : today();
+    if (day > today()) return err('תאריך עתידי');
+    const snaps = Array.isArray(body.snapshots) ? body.snapshots.filter((s) => s && validSym(s.symbol || '')).slice(0, 400) : [];
+    const days = (await db.get('idx:snapdays')) || [];
+    const prevDay = days.filter((d) => d < day).slice(-1)[0] || null;
+    let written = 0, alerts = 0;
+    for (const s of snaps){
+      const snap = { ...s, symbol: s.symbol.toUpperCase(), date: day, computedBy: 'browser' };
+      if (await db.putIfAbsent(`snap:${day}:${snap.symbol}`, snap)){ written++; if (!snap.missing){ const prev = prevDay ? await db.get(`snap:${prevDay}:${snap.symbol}`) : null; alerts += (await evaluateAlerts(ctx, snap, prev, null)).length; } }
+    }
+    if (body.rank && Array.isArray(body.rank.table)) await db.putIfAbsent(`rank:${day}`, { ...body.rank, date: day, computedBy: 'browser' });
+    if (body.reco && body.reco.profiles) await db.putIfAbsent(`reco:${day}`, { ...body.reco, date: day, computedBy: 'browser' });
+    if (body.regime && body.regime.rules) await db.putIfAbsent(`regime:${day}`, { ...body.regime, date: day, computedBy: 'browser' });
+    if (!days.includes(day)){ days.push(day); await db.put('idx:snapdays', days.sort().slice(-3000)); }
+    return json({ ok: true, day, received: snaps.length, written, alerts, note: written < snaps.length ? 'חלק מה-snapshots כבר היו קיימים ולא נדרסו' : undefined });
+  }
   if (r0 === 'snapshot' && p1 && p2){ const s = sym(p2); if (!validDate(p1)) return err('תאריך לא תקין'); return json((await db.get(`snap:${p1}:${s}`)) || { missing: true }); }
 
   if (r0 === 'watchlist'){
