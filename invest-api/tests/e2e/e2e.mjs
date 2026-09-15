@@ -1,5 +1,6 @@
 // E2E: טוען כל מסך בדפדפן אמיתי (Chromium), אוסף שגיאות קונסול/עמוד, מפעיל פעולות מרכזיות.
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+// Playwright: מהפרויקט (npm i -D playwright) או מהתקנה גלובלית
+const { chromium } = await import('playwright').catch(() => import('/opt/node22/lib/node_modules/playwright/index.mjs'));
 const BASE = process.env.BASE || 'http://localhost:8000/invest/';
 const API = process.env.API || 'http://localhost:8787';
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
