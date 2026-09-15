@@ -15,6 +15,7 @@ on:
 jobs:
   tick:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Run
@@ -63,8 +64,8 @@ jobs:
           fi
           if [ "$CMD" = "cron-run" ]; then
             echo "=== cron-run (batch $BATCH)"
-            for i in $(seq 1 150); do
-              r=$(curl -sS --max-time 90 -X POST "$W/cron/run?batch=$BATCH&secret=$SECRET" || echo '{"error":"curl failed"}')
+            for i in $(seq 1 90); do
+              r=$(curl -sS --max-time 60 -X POST "$W/cron/run?batch=$BATCH&secret=$SECRET" || echo '{"error":"curl failed"}')
               echo "$i: $(echo "$r" | head -c 400)"
               echo "$r" | grep -q '"finalized":true' && break
               echo "$r" | grep -q 'error' && sleep 3
