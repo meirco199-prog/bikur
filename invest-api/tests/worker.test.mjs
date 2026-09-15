@@ -181,3 +181,27 @@ test('cron עמיד למקביליות: שני מריצים במקביל מסי�
   const rank = await get('/rank'); assert.ok(rank.j.table.length >= 100, 'analyzed ' + rank.j.table.length);
   const keys = [...store.keys()].filter((k) => k.startsWith('rank:')); assert.equal(keys.length, 1);
 });
+test('POST /ingest/prices — הזרמת CSV מ-GitHub Actions, מיזוג ולא דריסה', async () => {
+  const env4 = { ...env, CRON_SECRET: 'tick1' };
+  const call = (path, body) => worker.fetch(new Request('https://api.test' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '4.4.4.4' }, body: JSON.stringify(body) }), env4, { waitUntil(){} }).then(async (r) => ({ status: r.status, j: await r.json() }));
+  assert.equal((await call('/ingest/prices?secret=bad', { symbol: 'ZZZ', csv: 'Date,Open,High,Low,Close,Volume\n2026-01-02,1,2,0.5,1.5,100' })).status, 401);
+  const r = await call('/ingest/prices?secret=tick1', { items: [{ symbol: 'ZZZ', csv: 'Date,Open,High,Low,Close,Volume\n2026-01-02,1,2,0.5,1.5,100\n2026-01-05,1.5,2,1,1.8,200' }] });
+  assert.equal(r.status, 200); assert.equal(r.j.items[0].rows, 2);
+  const r2 = await call('/ingest/prices?secret=tick1', { symbol: 'ZZZ', rows: [['2026-01-06', 1.8, 2, 1.7, 1.9, 50]] });
+  assert.equal(r2.j.items[0].rows, 3);
+  const p = await get('/prices/ZZZ'); assert.equal(p.j.rows.length, 3); assert.equal(p.j.source, 'stooq-via-github');
+});
+test('snapshot חסר (תקלת נתונים) מתמלא מחדש; ציון אמיתי לא נדרס; דירוג ריק מוחלף', async () => {
+  const { DB } = await import('../lib/db.js'); const { Budget } = await import('../lib/budget.js');
+  const mk = () => { const db = new DB(env.INVEST); return { env, db, budget: new Budget(db) }; };
+  const day = new Date().toISOString().slice(0, 10);
+  for (const k of [...store.keys()]) if (/^(snap|rank|reco|cron):/.test(k)) store.delete(k);
+  store.set(`snap:${day}:AAPL`, JSON.stringify({ symbol: 'AAPL', date: day, missing: true, reason: 'אין מחירים' }));
+  store.set(`snap:${day}:MSFT`, JSON.stringify({ symbol: 'MSFT', date: day, score: 12, signal: 'SELL', price: 1 }));
+  store.set(`rank:${day}`, JSON.stringify({ date: day, analyzed: 0, table: [], categories: {} }));
+  let fin = false; for (let i = 0; i < 80 && !fin; i++) fin = (await cronStep(mk(), { batch: 6 })).finalized;
+  assert.ok(fin);
+  const a = JSON.parse(store.get(`snap:${day}:AAPL`)); assert.ok(!a.missing && a.score > 0, 'חסר מולא מחדש');
+  const m = JSON.parse(store.get(`snap:${day}:MSFT`)); assert.equal(m.score, 12, 'ציון אמיתי נשמר');
+  const r = JSON.parse(store.get(`rank:${day}`)); assert.ok(r.analyzed > 100, 'דירוג ריק הוחלף');
+});

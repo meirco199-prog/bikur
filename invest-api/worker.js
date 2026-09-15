@@ -57,8 +57,10 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
     await db.putIfAbsent(`regime:${day}`, regime);
     log.push(`regime ${regime.summary}`);
   }
+  // snapshot "חסר" (תקלת נתונים, לא תוצר מודל) נחשב לא-גמור וניתן למילוי מחדש; ציון אמיתי לעולם לא נדרס
   const doneKeys = await db.list(`snap:${day}:`);
-  const done = new Set(doneKeys.map((k) => k.slice(`snap:${day}:`.length)));
+  const done = new Set();
+  for (const k of doneKeys){ const sym = k.slice(`snap:${day}:`.length); const ex = await db.get(k); if (ex && !ex.missing) done.add(sym); }
   const queue = syms.filter((s) => !done.has(s));
   // פיזור: מריצים מקבילים מתחילים מנקודות שונות בתור
   const offset = queue.length ? Math.floor(Math.random() * queue.length) : 0;
@@ -70,21 +72,25 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
     try {
       const a = await analyzeSymbol(sym, ctx, { regime });
       const snap = toSnapshot(a);
-      const fresh = await db.putIfAbsent(`snap:${day}:${sym}`, snap);
+      const ex = await db.get(`snap:${day}:${sym}`);
+      let fresh = false;
+      if (!ex || (ex.missing && !snap.missing)){ await db.put(`snap:${day}:${sym}`, snap); fresh = true; }
       const prev = prevDay ? await db.get(`snap:${prevDay}:${sym}`) : null;
       if (fresh && !snap.missing){ const alerts = await evaluateAlerts(ctx, snap, prev, a); if (alerts.length) log.push(`${sym}: ${alerts.length} alerts`); }
       if (snap.missing) log.push(`${sym}: missing — ${snap.reason}`);
       done.add(sym);
     } catch (e) { errors.push({ sym, msg: e.message.slice(0, 160) }); await db.logError(`cron ${sym}`, e.message); }
   }
-  for (const k of await db.list(`snap:${day}:`)) done.add(k.slice(`snap:${day}:`.length)); // מה שמריצים אחרים סיימו בינתיים
+  for (const k of await db.list(`snap:${day}:`)){ const sym = k.slice(`snap:${day}:`.length); if (!done.has(sym)){ const ex = await db.get(k); if (ex && (!ex.missing || pick.includes(sym))) done.add(sym); } }
   const left = syms.filter((s) => !done.has(s)).length;
-  let finalized = !!(await db.get(`rank:${day}`));
+  const exRank = await db.get(`rank:${day}`);
+  let finalized = !!(exRank && exRank.analyzed > 0); // דירוג ריק (כשל נתונים) ניתן להחלפה
   if (!left && !finalized){
     const snaps = [];
     for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); if (s) snaps.push(s); }
     const rank = rankSnapshots(snaps);
-    finalized = await db.putIfAbsent(`rank:${day}`, rank);
+    if (exRank && !exRank.analyzed && rank.analyzed){ await db.put(`rank:${day}`, rank); await db.delete(`reco:${day}`); finalized = true; }
+    else finalized = await db.putIfAbsent(`rank:${day}`, rank);
     if (finalized){
       try { const reco = await buildRecommendations(ctx, rank); await db.putIfAbsent(`reco:${day}`, reco); } catch (e) { await db.logError('reco', e.message); }
       if (!days.includes(day)){ days.push(day); await db.put('idx:snapdays', days.sort().slice(-3000)); }
@@ -168,6 +174,24 @@ async function handle(req, env0, ctx){
     for (const d of days.slice(-90)){ const sn = await db.get(`snap:${d}:${s}`); if (sn && !sn.missing) hist.push({ date: d, score: sn.score, signal: sn.signal, price: sn.price }); }
     const watch = (await db.get('user:watchlist')) || [];
     return json({ ...a, history: hist, watched: watch.some((w) => w.symbol === s), series: a.bundle ? undefined : undefined });
+  }
+  if (r0 === 'ingest' && p1 === 'prices' && req.method === 'POST'){
+    if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth();
+    const items = Array.isArray(body.items) ? body.items : [body];
+    const out = [];
+    for (const it of items.slice(0, 200)){
+      if (!validSym(it.symbol || '')) { out.push({ symbol: it.symbol, error: 'סימבול' }); continue; }
+      const s = String(it.symbol).toUpperCase();
+      let rows = Array.isArray(it.rows) ? it.rows : null;
+      if (!rows && typeof it.csv === 'string'){ const { parseCSV, num } = await import('./lib/http.js'); rows = parseCSV(it.csv).map((r) => [r.Date, num(r.Open), num(r.High), num(r.Low), num(r.Close), num(r.Volume) ?? 0]).filter((r) => r[0] && r[4] !== null); }
+      if (!rows || !rows.length){ out.push({ symbol: s, error: 'אין שורות' }); continue; }
+      rows = rows.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r[0]) && isNum(r[4])).sort((a, b) => a[0].localeCompare(b[0]));
+      const ex = await db.get(`px:${s}`);
+      const merged = DB.mergeRows(ex?.rows || [], rows);
+      await db.put(`px:${s}`, { symbol: s, rows: merged, currency: it.currency || ex?.currency || 'USD', source: it.source || 'stooq-via-github', asOf: merged[merged.length - 1][0], fetchedAt: new Date().toISOString(), quality: 0.6 });
+      out.push({ symbol: s, rows: merged.length, asOf: merged[merged.length - 1][0] });
+    }
+    return json({ ok: true, items: out });
   }
   if (r0 === 'prices' && p1){
     const s = sym(p1);

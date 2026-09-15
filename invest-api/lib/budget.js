@@ -1,5 +1,5 @@
 // תקציב קריאות יומי לכל ספק — כדי לא לחרוג ממכסה חינמית ולהישבר באמצע היום.
-export const DAILY_LIMITS = { alphavantage: 24, fmp: 230, finnhub: 5000, stooq: 2000, edgar: 3000, fred: 2000, boi: 200, eodhd: 18 };
+export const DAILY_LIMITS = { alphavantage: 24, fmp: 230, finnhub: 5000, stooq: 2000, edgar: 3000, fred: 2000, boi: 200, eodhd: 18, twelvedata: 700, tiingo: 900 };
 
 export class Budget {
   constructor(db, limits = DAILY_LIMITS){ this.db = db; this.limits = limits; this.local = {}; }
