@@ -43,61 +43,70 @@ async function makeCtx(env0, waitUntil){
 
 // ---------- cron: עיבוד באצ'ים (תוכנית חינם: ~10ms CPU לקריאה → CRON_BATCH קטן, cron תכוף) ----------
 export async function cronStep(ctx, { batch = null, force = false } = {}){
+  // עמיד למקביליות (cron של Cloudflare + tick מ-GitHub): מצב ה"תור" נגזר מהמפתחות snap:{day}:* בפועל,
+  // ולא ממונה משותף; putIfAbsent מונע כפילות גם אם שני מריצים בחרו אותו נכס.
   const db = ctx.db, day = today();
   const B = batch || parseInt(ctx.env.CRON_BATCH || '3', 10);
-  let state = (await db.get('cron:state')) || {};
   const log = [];
-  if (state.day !== day || force){
-    const universe = await getUniverse(db);
-    const watch = (await db.get('user:watchlist')) || [];
-    const syms = [...new Set([...universe.map((a) => a.symbol), ...watch.map((w) => w.symbol)])];
-    const regime = await computeRegime(ctx, { breadth: (await db.get(`rank:${(await latestRankDay(db)) || ''}`))?.breadth ?? null });
+  const universe = await getUniverse(db);
+  const watch = (await db.get('user:watchlist')) || [];
+  const syms = [...new Set([...universe.map((a) => a.symbol), ...watch.map((w) => w.symbol)])];
+  let regime = await db.get(`regime:${day}`);
+  if (!regime || force){
+    regime = await computeRegime(ctx, { breadth: (await db.get(`rank:${(await latestRankDay(db)) || ''}`))?.breadth ?? null });
     await db.putIfAbsent(`regime:${day}`, regime);
-    state = { day, queue: syms, done: [], errors: [], startedAt: new Date().toISOString(), finalized: false };
-    log.push(`init: ${syms.length} symbols, regime ${regime.summary}`);
+    log.push(`regime ${regime.summary}`);
   }
-  const regime = await db.get(`regime:${day}`);
+  const doneKeys = await db.list(`snap:${day}:`);
+  const done = new Set(doneKeys.map((k) => k.slice(`snap:${day}:`.length)));
+  const queue = syms.filter((s) => !done.has(s));
+  // פיזור: מריצים מקבילים מתחילים מנקודות שונות בתור
+  const offset = queue.length ? Math.floor(Math.random() * queue.length) : 0;
+  const pick = [...queue.slice(offset), ...queue.slice(0, offset)].slice(0, B);
   const days = (await db.get('idx:snapdays')) || [];
   const prevDay = days.filter((d) => d < day).slice(-1)[0] || null;
-  const n = Math.min(B, state.queue.length);
-  for (let i = 0; i < n; i++){
-    const sym = state.queue.shift();
+  const errors = [];
+  for (const sym of pick){
     try {
       const a = await analyzeSymbol(sym, ctx, { regime });
       const snap = toSnapshot(a);
-      await db.putIfAbsent(`snap:${day}:${sym}`, snap);
+      const fresh = await db.putIfAbsent(`snap:${day}:${sym}`, snap);
       const prev = prevDay ? await db.get(`snap:${prevDay}:${sym}`) : null;
-      if (!snap.missing){ const alerts = await evaluateAlerts(ctx, snap, prev, a); if (alerts.length) log.push(`${sym}: ${alerts.length} alerts`); }
-      state.done.push(sym);
-    } catch (e) { state.errors.push({ sym, msg: e.message.slice(0, 120) }); await db.logError(`cron ${sym}`, e.message); }
+      if (fresh && !snap.missing){ const alerts = await evaluateAlerts(ctx, snap, prev, a); if (alerts.length) log.push(`${sym}: ${alerts.length} alerts`); }
+      if (snap.missing) log.push(`${sym}: missing — ${snap.reason}`);
+      done.add(sym);
+    } catch (e) { errors.push({ sym, msg: e.message.slice(0, 160) }); await db.logError(`cron ${sym}`, e.message); }
   }
-  if (!state.queue.length && !state.finalized){
-    // סיום יומי: דירוג, תיקים, אינדקס ימים, שווי תיק וירטואלי
-    const keys = await db.list(`snap:${day}:`);
+  for (const k of await db.list(`snap:${day}:`)) done.add(k.slice(`snap:${day}:`.length)); // מה שמריצים אחרים סיימו בינתיים
+  const left = syms.filter((s) => !done.has(s)).length;
+  let finalized = !!(await db.get(`rank:${day}`));
+  if (!left && !finalized){
     const snaps = [];
-    for (const k of keys){ const s = await db.get(k); if (s) snaps.push(s); }
+    for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); if (s) snaps.push(s); }
     const rank = rankSnapshots(snaps);
-    await db.putIfAbsent(`rank:${day}`, rank);
-    try { const reco = await buildRecommendations(ctx, rank); await db.putIfAbsent(`reco:${day}`, reco); } catch (e) { await db.logError('reco', e.message); }
-    if (!days.includes(day)){ days.push(day); await db.put('idx:snapdays', days.slice(-3000)); }
-    try {
-      const broker = new PaperBroker(db);
-      const priceOf = (s) => snaps.find((x) => x.symbol === s)?.price ?? null;
-      const perf = await broker.performance(priceOf);
-      const spy = snaps.find((x) => x.symbol === 'SPY')?.price ?? null;
-      const eq = perf.equity || [];
-      if (!eq.some((e) => e[0] === day)){ eq.push([day, round(perf.marketValue + perf.realized, 2), spy]); await db.put('paper:equity', eq.slice(-2000)); }
-    } catch (e) { await db.logError('paper equity', e.message); }
-    // הרחבת universe שבועית דרך screener (אם יש FMP)
-    if (ctx.env.FMP_KEY && new Date().getUTCDay() === 1){
-      try { const r = await fetchWithFallback('screener', '', { minMarketCap: 2e9, minVolume: 500000, limit: 60, country: 'US' }, ctx); if (r.items) log.push(`screener: +${await addToUniverse(db, r.items.map((x) => ({ symbol: x.symbol, name: x.name, type: x.type, assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'screener', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })))}`); } catch (e) { await db.logError('screener', e.message); }
+    finalized = await db.putIfAbsent(`rank:${day}`, rank);
+    if (finalized){
+      try { const reco = await buildRecommendations(ctx, rank); await db.putIfAbsent(`reco:${day}`, reco); } catch (e) { await db.logError('reco', e.message); }
+      if (!days.includes(day)){ days.push(day); await db.put('idx:snapdays', days.sort().slice(-3000)); }
+      try {
+        const broker = new PaperBroker(db);
+        const priceOf = (s) => snaps.find((x) => x.symbol === s)?.price ?? null;
+        const perf = await broker.performance(priceOf);
+        const spy = snaps.find((x) => x.symbol === 'SPY')?.price ?? null;
+        const eq = perf.equity || [];
+        if (!eq.some((e) => e[0] === day)){ eq.push([day, round(perf.marketValue + perf.realized, 2), spy]); await db.put('paper:equity', eq.slice(-2000)); }
+      } catch (e) { await db.logError('paper equity', e.message); }
+      if (ctx.env.FMP_KEY && new Date().getUTCDay() === 1){
+        try { const r = await fetchWithFallback('screener', '', { minMarketCap: 2e9, minVolume: 500000, limit: 60, country: 'US' }, ctx); if (r.items) log.push(`screener: +${await addToUniverse(db, r.items.map((x) => ({ symbol: x.symbol, name: x.name, type: x.type, assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'screener', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })))}`); } catch (e) { await db.logError('screener', e.message); }
+      }
+      log.push(`finalized: ${snaps.length} snapshots (${rank.analyzed} analyzed), ${rank.categories.buySignals.length} buy signals`);
     }
-    state.finalized = true; state.finishedAt = new Date().toISOString();
-    log.push(`finalized: ${snaps.length} snapshots, ${rank.categories.buySignals.length} buy signals`);
+    finalized = true;
   }
+  const state = { day, done: done.size, queueLeft: left, finalized, errors: errors.slice(-5), at: new Date().toISOString() };
   await db.put('cron:state', state);
-  await db.put('cron:last', { at: new Date().toISOString(), log, queueLeft: state.queue.length, done: state.done.length, errors: state.errors.length });
-  return { day, processed: n, queueLeft: state.queue.length, done: state.done.length, finalized: state.finalized, errors: state.errors.slice(-5), log };
+  await db.put('cron:last', { at: state.at, log, queueLeft: left, done: done.size, errors: errors.length });
+  return { day, processed: pick.length, queueLeft: left, done: done.size, finalized, errors: errors.slice(-5), log };
 }
 
 // ---------- routes ----------
@@ -294,7 +303,7 @@ async function handle(req, env0, ctx){
     try { return json(await ask(env, db, question)); } catch (e) { return err('AI: ' + e.message, 502); }
   }
   if (r0 === 'cron'){
-    if (p1 === 'status') return json({ last: await db.get('cron:last'), state: (({ queue, ...rest }) => ({ ...rest, queueLeft: queue?.length }))((await db.get('cron:state')) || {}) });
+    if (p1 === 'status') return json({ last: await db.get('cron:last'), state: (await db.get('cron:state')) || {} });
     if (p1 === 'run' && req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); const r = await cronStep(ctx, { batch: Math.min(+q.batch || 3, 60), force: q.force === '1' }); return json(r); }
   }
   return err('not found', 404);

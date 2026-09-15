@@ -171,3 +171,13 @@ test('אימות לפי sha256 (APP_TOKEN_SHA256) בלי APP_TOKEN; מפתחות
   const c = await call('/cron/run?batch=1&secret=tick1', { body: {} }); assert.equal(c.status, 200); assert.ok('processed' in c.j);
   await call('/keys', { tok: 'mytok', body: { name: 'FINNHUB_KEY', value: '' } });
 });
+test('cron עמיד למקביליות: שני מריצים במקביל מסיימים בלי דריסה', async () => {
+  const { DB } = await import('../lib/db.js'); const { Budget } = await import('../lib/budget.js');
+  const mk = () => { const db = new DB(env.INVEST); return { env, db, budget: new Budget(db) }; };
+  for (const k of [...store.keys()]) if (/^(snap|rank|reco|regime|cron):/.test(k)) store.delete(k);
+  let fin = false;
+  for (let i = 0; i < 60 && !fin; i++){ const res = await Promise.all([cronStep(mk(), { batch: 3 }), cronStep(mk(), { batch: 3 })]); fin = res.some((r) => r.finalized); }
+  assert.ok(fin);
+  const rank = await get('/rank'); assert.ok(rank.j.table.length >= 100, 'analyzed ' + rank.j.table.length);
+  const keys = [...store.keys()].filter((k) => k.startsWith('rank:')); assert.equal(keys.length, 1);
+});

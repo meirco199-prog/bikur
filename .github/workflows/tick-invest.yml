@@ -25,7 +25,10 @@ jobs:
           CMD=$(cat .github/invest-ops/command 2>/dev/null | head -1 || echo cron-run)
           [ "${{ github.event_name }}" = "push" ] || CMD=cron-run
           echo "command: $CMD"
-          echo "=== health"; curl -sS --max-time 30 "$W/health" | python3 -m json.tool | head -120
+          echo "=== health"; curl -sS --max-time 30 "$W/health" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("auth:", d.get("auth"), "kv:", d.get("kv"), "ai:", d.get("ai")); print("keys:", [k["name"] for k in d.get("keys",[]) if k.get("set")]); print("budget:", d.get("budget")); print("cron:", d.get("cron")); print("recentErrors:"); [print("  ", e.get("ts","")[5:16], e.get("where"), "|", e.get("msg")) for e in d.get("recentErrors",[])]'
+          TODAY=$(date -u +%F)
+          echo "=== snapshot AAPL"; curl -sS --max-time 30 "$W/snapshot/$TODAY/AAPL" | head -c 700; echo
+          echo "=== prices SPY"; curl -sS --max-time 60 "$W/prices/SPY?from=2026-09-01" | head -c 600; echo
           if [ "$CMD" = "cron-run" ]; then
             echo "=== cron-run (batch $BATCH)"
             for i in $(seq 1 150); do
