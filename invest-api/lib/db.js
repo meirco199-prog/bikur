@@ -1,5 +1,6 @@
 // שכבת נתונים מעל Cloudflare KV. סכימת המפתחות ב-invest/docs/DATABASE_SCHEMA.md.
 // חוזה: snapshots (snap:/rank:/regime:/reco:) נכתבים רק דרך putIfAbsent — לעולם לא נדרסים.
+export let kvWriteLimitHit = null; // חותמת זמן אם KV דחה כתיבה (מכסה יומית)
 export class DB {
   constructor(kv){ this.kv = kv; this.mem = new Map(); }
   async get(key, def = null){
@@ -10,7 +11,8 @@ export class DB {
   async put(key, value, { ttl } = {}){
     if (!this.kv){ this.mem.set(key, value); return; }
     const opts = ttl ? { expirationTtl: Math.max(60, ttl) } : undefined;
-    await this.kv.put(key, JSON.stringify(value), opts);
+    try { await this.kv.put(key, JSON.stringify(value), opts); }
+    catch (e) { if (/limit exceeded/i.test(e.message)) kvWriteLimitHit = new Date().toISOString(); throw e; }
   }
   async delete(key){ if (!this.kv){ this.mem.delete(key); return; } await this.kv.delete(key); }
   async putIfAbsent(key, value){

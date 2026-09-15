@@ -1,11 +1,11 @@
 # מנוע העיבוד היומי של פלטפורמת ההשקעות מ-GitHub — עובד גם בתוכנית Workers החינמית:
 # כל קריאה ל-/cron/run היא הפעלה נפרדת של ה-Worker (מגבלת CPU לכל הפעלה), והלולאה ממשיכה עד "finalized".
-# רץ אחרי סגירת וול סטריט, וגם בכל דחיפה של פקודה לקובץ .github/invest-ops/command (health / cron-run).
+# רץ אחרי סגירת וול סטריט ואחרי איפוס מכסת הכתיבות של KV (00:00 UTC), וגם בכל דחיפה של פקודה לקובץ .github/invest-ops/command.
 name: Tick invest (daily processing)
 
 on:
   schedule:
-    - cron: '17 22 * * 1-5'
+    - cron: '17 1 * * 2-6'
   push:
     branches: [main]
     paths:
@@ -27,7 +27,7 @@ jobs:
           [ "${{ github.event_name }}" = "push" ] && { echo "ממתין לפריסת ה-Worker…"; sleep 75; }
           [ "${{ github.event_name }}" = "push" ] || CMD=cron-run
           echo "command: $CMD"
-          echo "=== health"; curl -sS --max-time 30 "$W/health" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("auth:", d.get("auth"), "kv:", d.get("kv"), "ai:", d.get("ai")); print("keys:", [k["name"] for k in d.get("keys",[]) if k.get("set")]); print("budget:", d.get("budget")); print("cron:", d.get("cron")); print("recentErrors:"); [print("  ", e.get("ts","")[5:16], e.get("where"), "|", e.get("msg")) for e in d.get("recentErrors",[])]'
+          echo "=== health"; curl -sS --max-time 30 "$W/health" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("auth:", d.get("auth"), "kv:", d.get("kv"), "kvWriteLimitHit:", d.get("kvWriteLimitHit"), "ai:", d.get("ai")); print("keys:", [k["name"] for k in d.get("keys",[]) if k.get("set")]); print("budget:", d.get("budget")); print("cron:", d.get("cron")); print("recentErrors:"); [print("  ", e.get("ts","")[5:16], e.get("where"), "|", e.get("msg")) for e in d.get("recentErrors",[])]'
           TODAY=$(date -u +%F)
           echo "=== snapshot AAPL"; curl -sS --max-time 30 "$W/snapshot/$TODAY/AAPL" | head -c 700; echo
           echo "=== prices SPY"; curl -sS --max-time 60 "$W/prices/SPY?from=2026-09-01" | head -c 600; echo

@@ -1,6 +1,6 @@
 // invest-api — ה-API, ה-cron ושכבת ה-AI של פלטפורמת המחקר (/invest/). Cloudflare Worker + KV.
 // מסמכים: invest/docs/ARCHITECTURE.md. כל המפתחות ב-Secrets בלבד. אין scraping.
-import { DB } from './lib/db.js';
+import { DB, kvWriteLimitHit } from './lib/db.js';
 import { resolveEnv, keysStatus, setKey, isAuthed } from './lib/keys.js';
 import { Budget } from './lib/budget.js';
 import { providerStatus } from './providers/registry.js';
@@ -50,6 +50,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   const log = [];
   const prevState = await db.get('cron:state');
   if (prevState?.day === day && prevState.finalized && !force) return { day, processed: 0, queueLeft: 0, done: prevState.done, finalized: true, errors: [], log: ['היום כבר הסתיים; force=1 להרצה מחדש (למשל אחרי הוספת מפתח)'] };
+  const watch0 = new Set(((await db.get('user:watchlist')) || []).map((w) => w.symbol));
   const universe = await getUniverse(db);
   const watch = (await db.get('user:watchlist')) || [];
   const syms = [...new Set([...universe.map((a) => a.symbol), ...watch.map((w) => w.symbol)])];
@@ -72,7 +73,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   const errors = [];
   for (const sym of pick){
     try {
-      const a = await analyzeSymbol(sym, ctx, { regime });
+      const a = await analyzeSymbol(sym, ctx, { regime, cron: true, watched: watch0.has(sym) });
       const snap = toSnapshot(a);
       const ex = await db.get(`snap:${day}:${sym}`);
       let fresh = false;
@@ -111,9 +112,8 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
     }
     finalized = true;
   }
-  const state = { day, done: done.size, queueLeft: left, finalized, errors: errors.slice(-5), at: new Date().toISOString() };
-  await db.put('cron:state', state);
-  await db.put('cron:last', { at: state.at, log, queueLeft: left, done: done.size, errors: errors.length });
+  const state = { day, done: done.size, queueLeft: left, finalized, errors: errors.slice(-5), at: new Date().toISOString(), log: log.slice(-8) };
+  if (pick.length || finalized !== !!prevState?.finalized || prevState?.day !== day) await db.put('cron:state', state); // כתיבה רק כשיש שינוי (מכסת KV)
   return { day, processed: pick.length, queueLeft: left, done: done.size, finalized, errors: errors.slice(-5), log };
 }
 
@@ -133,9 +133,9 @@ async function handle(req, env0, ctx){
 
   if (path === '/' || path === '/health'){
     const budget = await ctx.budget.status();
-    const cron = await db.get('cron:last');
+    const cron = await db.get('cron:state');
     const errors = (await db.get('log:err')) || [];
-    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : env.APP_TOKEN_SHA256 ? 'token' : 'OPEN (הגדר APP_TOKEN!)', keys: await keysStatus(env0, db), ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', alerts: { telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors.slice(-10) });
+    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : env.APP_TOKEN_SHA256 ? 'token' : 'OPEN (הגדר APP_TOKEN!)', keys: await keysStatus(env0, db), ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', kvWriteLimitHit, alerts: { telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors.slice(-10) });
   }
   if (r0 === 'keys'){
     needAuth();
@@ -329,7 +329,7 @@ async function handle(req, env0, ctx){
     try { return json(await ask(env, db, question)); } catch (e) { return err('AI: ' + e.message, 502); }
   }
   if (r0 === 'cron'){
-    if (p1 === 'status') return json({ last: await db.get('cron:last'), state: (await db.get('cron:state')) || {} });
+    if (p1 === 'status'){ const st = (await db.get('cron:state')) || {}; return json({ last: { at: st.at, log: st.log, queueLeft: st.queueLeft, done: st.done, errors: st.errors?.length || 0 }, state: st }); }
     if (p1 === 'run' && req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); const r = await cronStep(ctx, { batch: Math.min(+q.batch || 3, 60), force: q.force === '1' }); return json(r); }
   }
   return err('not found', 404);
@@ -344,9 +344,11 @@ export default {
     let ctx;
     try { ctx = await makeCtx(env, ec?.waitUntil?.bind(ec)); return await handle(req, env, ctx); }
     catch (e) { if (e.status) return err(e.message, e.status); await ctx?.db?.logError(path, e.message); return err('internal: ' + e.message, 500); }
+    finally { if (ctx?.budget?.dirty){ const f = ctx.budget.flush().catch(() => {}); if (ec?.waitUntil) ec.waitUntil(f); else await f; } }
   },
   async scheduled(event, env, ec){
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     try { await cronStep(ctx); } catch (e) { await ctx.db.logError('scheduled', e.message); }
+    finally { await ctx.budget.flush().catch(() => {}); }
   },
 };

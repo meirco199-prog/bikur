@@ -120,7 +120,8 @@ export async function loadIndices(ctx){
   const out = {};
   for (const ix of INDICES){
     if (ix.eodhd && !ctx.env.EODHD_KEY) continue;
-    const r = await getPrices(ix.symbol, { ...ctx, asset: ix });
+    let r = await getPrices(ix.symbol, { ...ctx, asset: ix });
+    if ((!r || r.missing) && ix.proxy){ const p = await ctx.db.get(`px:${ix.proxy}`); if (p?.rows?.length) r = { ...p, proxyOf: ix.symbol, note: `מדד לא זמין אצל הספק — משתמש ב-ETF ${ix.proxy} כמייצג` }; }
     if (r && !r.missing) out[ix.id] = r;
   }
   return out;
@@ -136,19 +137,21 @@ export async function computeRegime(ctx, { date = null, breadth = null } = {}){
 }
 
 // ---------- ניתוח נכס ----------
-export async function loadBundle(symbol, ctx, { light = false } = {}){
+// cron=true: בלי quote (סגירה מספיקה) ובלי חדשות אלא לרשימת המעקב — חוסך כ-230 כתיבות KV ביום
+export async function loadBundle(symbol, ctx, { light = false, cron = false, watched = false } = {}){
   const asset = await assetMeta(ctx.db, symbol);
   const c = { ...ctx, asset };
   const isEtf = asset.type === 'etf' || asset.type === 'index' || asset.type === 'fund';
   const prices = await getPrices(symbol, c);
   if (light) return { asset, prices };
+  const skip = Promise.resolve({ missing: true, reason: 'לא נמשך בעיבוד היומי' });
   const [quote, profile, facts, ratios, est, analyst, news, insider, etf, earn] = await Promise.all([
-    getQuote(symbol, c), getProfile(symbol, c),
+    cron ? skip : getQuote(symbol, c), getProfile(symbol, c),
     isEtf ? Promise.resolve({ missing: true, reason: 'ETF' }) : getFacts(symbol, c),
     isEtf ? Promise.resolve({ missing: true, reason: 'ETF' }) : getRatios(symbol, c),
     isEtf ? Promise.resolve({ missing: true, reason: 'ETF' }) : getEstimates(symbol, c),
     isEtf ? Promise.resolve({ missing: true, reason: 'ETF' }) : getAnalyst(symbol, c),
-    getNews(symbol, c),
+    cron && !watched ? ctx.db.get(`news:${symbol}`).then((n) => n || { missing: true, reason: 'חדשות נמשכות לרשימת המעקב ובצפייה בנכס' }) : getNews(symbol, c),
     isEtf ? Promise.resolve({ missing: true, reason: 'ETF' }) : getInsider(symbol, c),
     isEtf ? getEtf(symbol, c) : Promise.resolve({ missing: true, reason: 'לא ETF' }),
     isEtf ? Promise.resolve({ missing: true, reason: 'ETF' }) : getEarnings(symbol, c),
@@ -165,7 +168,7 @@ export async function peersFor(ctx, asset, date){
 export async function latestRankDay(db){ const days = (await db.get('idx:snapdays')) || []; return days[days.length - 1] || null; }
 
 export async function analyzeSymbol(symbol, ctx, opts = {}){
-  const b = await loadBundle(symbol, ctx);
+  const b = await loadBundle(symbol, ctx, { cron: !!opts.cron, watched: !!opts.watched });
   const regime = opts.regime || (await ctx.db.get(`regime:${today()}`)) || (await computeRegime(ctx));
   const bench = await getPrices(BENCHMARK_FOR(b.asset) === 'AGG' ? 'AGG' : 'SPY', { ...ctx, asset: findAsset('SPY') });
   const qqq = b.asset.sector === 'Technology' ? await ctx.db.get('px:QQQ') : null;
