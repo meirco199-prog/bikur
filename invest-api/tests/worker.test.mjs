@@ -4,7 +4,7 @@ import { installMockFetch, calls } from './mock-providers.mjs';
 import worker, { cronStep } from '../worker.js';
 
 installMockFetch();
-const env = { INVEST: null, FINNHUB_KEY: 'x', FRED_KEY: 'x', APP_TOKEN: 'secret', CRON_BATCH: '200' };
+const env = { INVEST: null, FINNHUB_KEY: 'x', FRED_KEY: 'x', APP_TOKEN: 'secret', CRON_BATCH: '200', STOOQ_ENABLED: '1' };
 // KV מדומה בזיכרון משותף לכל הבקשות
 const store = new Map();
 env.INVEST = { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }) };

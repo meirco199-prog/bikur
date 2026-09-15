@@ -7,7 +7,7 @@ import { Budget } from '../../lib/budget.js';
 installMockFetch();
 const store = new Map();
 const kv = { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => store.delete(k), list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }) };
-const env = { INVEST: kv, FINNHUB_KEY: 'x', FRED_KEY: 'x', APP_TOKEN: 'secret', CRON_BATCH: '300', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: 'c' };
+const env = { INVEST: kv, FINNHUB_KEY: 'x', FRED_KEY: 'x', APP_TOKEN: 'secret', CRON_BATCH: '300', STOOQ_ENABLED: '1', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: 'c' };
 const realFetch = globalThis.fetch;
 if (process.env.SEED !== '0'){
   const db = new DB(kv); const ctx = { env, db, budget: new Budget(db) };

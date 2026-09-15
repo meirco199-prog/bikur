@@ -31,37 +31,7 @@ jobs:
           TODAY=$(date -u +%F)
           echo "=== snapshot AAPL"; curl -sS --max-time 30 "$W/snapshot/$TODAY/AAPL" | head -c 700; echo
           echo "=== prices SPY"; curl -sS --max-time 60 "$W/prices/SPY?from=2026-09-01" | head -c 600; echo
-          echo "=== stooq from GitHub runner?"
-          probe=$(curl -sS --max-time 20 -A "Mozilla/5.0 (bikur-invest)" "https://stooq.com/q/d/l/?s=spy.us&i=d" | head -c 200 | tr '\n' ' ')
-          echo "$probe"
           echo "=== facts AAPL (EDGAR)"; curl -sS --max-time 60 "$W/bundle/AAPL?light=0" | python3 -c 'import json,sys; d=json.load(sys.stdin); f=d.get("facts",{}); print("facts:", f.get("source"), f.get("asOf"), "series:", {k: len(v) for k,v in (f.get("series") or {}).items()} if not f.get("missing") else f.get("reason")); print("prices:", d.get("prices",{}).get("source"), d.get("prices",{}).get("asOf"), d.get("prices",{}).get("reason"))'
-          if echo "$probe" | grep -q "^Date,Open"; then
-            echo "=== ingest-stooq: Stooq עונה מ-GitHub — מושך CSV לכל ה-universe ומזרים ל-Worker"
-            python3 - "$W" "$SECRET" <<'PY'
-          import json, sys, time, urllib.request, urllib.parse
-          W, SECRET = sys.argv[1], sys.argv[2]
-          u = json.load(urllib.request.urlopen(W + "/universe", timeout=60))
-          syms = [(a["symbol"], a.get("stooq") or (a["symbol"].lower().replace(".", "-") + ".us"), a.get("currency", "USD")) for a in u["items"]]
-          syms += [(ix["symbol"], ix["stooq"], ix.get("currency", "USD")) for ix in u.get("indices", []) if ix.get("stooq")]
-          batch, ok, bad = [], 0, []
-          def flush():
-              global batch, ok
-              if not batch: return
-              req = urllib.request.Request(W + "/ingest/prices?secret=" + urllib.parse.quote(SECRET), data=json.dumps({"items": batch}).encode(), headers={"Content-Type": "application/json"}, method="POST")
-              r = json.load(urllib.request.urlopen(req, timeout=120)); ok += sum(1 for x in r["items"] if "rows" in x); batch = []
-          for sym, st, cur in syms:
-              try:
-                  req = urllib.request.Request("https://stooq.com/q/d/l/?s=" + st + "&i=d", headers={"User-Agent": "Mozilla/5.0 (bikur-invest)"})
-                  csv = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "ignore")
-                  if csv.startswith("Date,Open"): batch.append({"symbol": sym, "csv": csv, "currency": cur, "source": "stooq-via-github"})
-                  else: bad.append(sym + ":" + csv[:40].replace("\n", " "))
-              except Exception as e: bad.append(sym + ":" + str(e)[:40])
-              if len(batch) >= 10: flush()
-              time.sleep(0.7)
-          flush()
-          print("ingested:", ok, "of", len(syms), "bad:", bad[:8])
-          PY
-          fi
           if [ "$CMD" = "cron-run" ]; then
             echo "=== cron-run (batch $BATCH)"
             for i in $(seq 1 90); do
@@ -69,6 +39,7 @@ jobs:
               echo "$i: $(echo "$r" | head -c 400)"
               echo "$r" | grep -q '"finalized":true' && break
               echo "$r" | grep -q 'error' && sleep 3
+              sleep 6
             done
           fi
           echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo

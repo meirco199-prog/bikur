@@ -1,9 +1,11 @@
 // Stooq — מחירים יומיים חינמיים (CSV), ללא מפתח. ארה"ב/אירופה/מדדים. אין ת"א.
+// נמצא בפועל (15.9.2026): Stooq מחזיר דף אימות JavaScript לכתובות datacenter (Cloudflare, GitHub) → לא שמיש אוטומטית.
+// נשאר כמתאם, כבוי כברירת מחדל; הפעלה עם STOOQ_ENABLED=1.
 import { getText, parseCSV, num } from '../lib/http.js';
 
 export const stooq = {
   id: 'stooq', priority: 1, supports: ['prices'],
-  available: () => true,
+  available: (env) => env.STOOQ_ENABLED === '1',
   async prices(symbol, { from } = {}, ctx){
     const s = ctx?.asset?.stooq || (symbol.startsWith('^') ? symbol.toLowerCase() : symbol.toLowerCase().replace('.', '-') + '.us');
     await ctx.budget.spend('stooq');

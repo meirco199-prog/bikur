@@ -23,7 +23,7 @@
 1. **הפריסה אוטומטית** בדחיפה ל-`main` (`.github/workflows/deploy-invest-api.yml` יוצר KV `invest`, binding ל-Workers AI, cron).
 2. ב-Cloudflare → Workers & Pages → `invest-api` → Settings → Variables and Secrets, הוסף:
    - `APP_TOKEN` — סיסמה שלך לכתיבה (רשימת מעקב, paper, התראות, הגדרות, עיבוד).
-   - `FINNHUB_KEY`, `FRED_KEY` (חינם), `FMP_KEY`, `ALPHAVANTAGE_KEY` (חינם, מוגבל) — ראו DATA_SOURCES.md.
+   - `TWELVEDATA_KEY` (**חובה למחירים** — חינם, twelvedata.com), `FINNHUB_KEY`, `FRED_KEY` (חינם), `FMP_KEY`, `ALPHAVANTAGE_KEY` — ראו DATA_SOURCES.md. אפשר גם להדביק את המפתחות במסך ההגדרות של האפליקציה במקום בדשבורד.
    - אופציונלי: `EODHD_KEY` (ת"א), `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`, `RESEND_KEY` + `ALERT_EMAIL`, `ANTHROPIC_API_KEY` (אחרת Workers AI), `EDGAR_UA` (User-Agent עם אימייל ל-SEC), `CRON_BATCH`.
 3. פתח `/invest/#/settings`, הזן את כתובת ה-API ואת `APP_TOKEN`, ולחץ **"עיבוד יומי בדפדפן ושמירה"** (או המתן ל-cron).
 

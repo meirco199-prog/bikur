@@ -7,7 +7,9 @@
 
 | ספק | מה מספק | מפתח | מכסה חינמית | מחיר בתשלום | יתרונות | חסרונות | סטטוס במערכת |
 |---|---|---|---|---|---|---|---|
-| **Stooq** (stooq.com/q/d/l) | מחירים יומיים OHLCV, היסטוריה של עשרות שנים: מניות ארה"ב, ETF, מדדים (^spx, ^ndq, ^dji), אירופה, יפן, מט"ח, סחורות | אין | ללא הגבלה רשמית; חסימה זמנית בשימוש כבד | — | חינם, ארוך, בלי הרשמה, CSV פשוט | אין ת"א; אין intraday; ללא SLA; ללא מטא-דאטה | **ראשי למחירים** |
+| **Stooq** (stooq.com/q/d/l) | מחירים יומיים OHLCV, היסטוריה של עשרות שנים | אין | — | — | חינם, ארוך | **נמצא בפועל (15.9.2026): מחזיר דף אימות JavaScript לכתובות datacenter (Cloudflare וגם GitHub) — לא שמיש אוטומטית** | מתאם קיים, כבוי (`STOOQ_ENABLED=1` להפעלה) |
+| **Twelve Data** | מחירים יומיים (עד 5000 ברים), quote, מדדים עיקריים | `TWELVEDATA_KEY` | 800 קרדיטים/יום, 8/דקה | $29+/חודש | API רשמי יציב, כיסוי ארה"ב מלא, JSON נקי | מכסת דקה נמוכה (המערכת מגבילה ל-7/דקה) | **ראשי למחירים** |
+| **Tiingo** | מחירים יומיים מותאמים (adjusted) למניות/ETF בארה"ב | `TIINGO_KEY` | ~1000/יום, 50/שעה | $10+/חודש | איכות נתונים גבוהה, adjusted | אין מדדים | גיבוי למחירים |
 | **Alpha Vantage** | TIME_SERIES_DAILY (מלא), OVERVIEW (P/E, PEG, EV/EBITDA, ROE, יעד אנליסטים + ספירת דירוגים), EARNINGS, NEWS_SENTIMENT (ציון סנטימנט לכל ידיעה), INSIDER_TRANSACTIONS, ETF_PROFILE (החזקות), TOP_GAINERS_LOSERS | `ALPHAVANTAGE_KEY` | **25 קריאות/יום** | $50/חודש (75/דקה) | רחב מאוד, כולל סנטימנט וחדשות ממקורות מזוהים | מכסה זעירה; חייב תקציב יומי | גיבוי מחירים; ראשי ל-ETF holdings, insider, סנטימנט חדשות |
 | **Finnhub** | quote (כמעט real-time), profile2, metric (basic financials), recommendation trends (Strong Buy…Sell לפי חודש), company-news, insider-transactions, earnings calendar, peers, symbol lists | `FINNHUB_KEY` | 60 קריאות/דקה | $50+/חודש | מהיר, קונצנזוס אנליסטים חינם, חדשות חברה | candles ו-price targets בתשלום; חינם = ארה"ב בלבד | ראשי ל-quote, קונצנזוס, חדשות, insider, earnings |
 | **Financial Modeling Prep** | screener (סינון universe!), profile, ratios, key-metrics, income/balance/cashflow, analyst-estimates, price-target-consensus, ETF holdings, historical EOD | `FMP_KEY` | 250 קריאות/יום, ארה"ב, 5 שנות היסטוריה | $22–$99/חודש | ה-screener היחיד החינמי הסביר; יחסים מחושבים | חלק מהנקודות עברו לתשלום ללא הודעה — המתאם מטפל ב-402/403 כ-missing | ראשי ל-**Market Screening**, תחזיות EPS/Revenue |
@@ -25,7 +27,7 @@
 
 | נתון | 1 | 2 | 3 | הערות |
 |---|---|---|---|---|
-| מחירים יומיים | Stooq | Alpha Vantage | FMP | ת"א: EODHD בלבד |
+| מחירים יומיים | Twelve Data | Tiingo | FMP / Alpha Vantage | ת"א: EODHD בלבד; Stooq חסום |
 | מחיר אחרון / שינוי יומי | Finnhub quote | סגירה אחרונה מ-Stooq (מסומן "סגירה") | | |
 | פרופיל חברה (ענף, מדינה, שווי שוק) | FMP | Finnhub | Alpha Vantage OVERVIEW | |
 | דוחות (Revenue, NI, EPS, FCF, חוב, מזומן) היסטוריים | **EDGAR** | FMP statements | | EDGAR = point-in-time |

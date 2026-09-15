@@ -60,7 +60,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   // snapshot "חסר" (תקלת נתונים, לא תוצר מודל) נחשב לא-גמור וניתן למילוי מחדש; ציון אמיתי לעולם לא נדרס
   const doneKeys = await db.list(`snap:${day}:`);
   const done = new Set();
-  for (const k of doneKeys){ const sym = k.slice(`snap:${day}:`.length); const ex = await db.get(k); if (ex && !ex.missing) done.add(sym); }
+  for (const k of doneKeys){ const sym = k.slice(`snap:${day}:`.length); const ex = await db.get(k); if (!ex) continue; if (!ex.missing) done.add(sym); else { const px = await db.get(`px:${sym}`); if (!px?.rows?.length) done.add(sym); } }
   const queue = syms.filter((s) => !done.has(s));
   // פיזור: מריצים מקבילים מתחילים מנקודות שונות בתור
   const offset = queue.length ? Math.floor(Math.random() * queue.length) : 0;
@@ -81,7 +81,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
       done.add(sym);
     } catch (e) { errors.push({ sym, msg: e.message.slice(0, 160) }); await db.logError(`cron ${sym}`, e.message); }
   }
-  for (const k of await db.list(`snap:${day}:`)){ const sym = k.slice(`snap:${day}:`.length); if (!done.has(sym)){ const ex = await db.get(k); if (ex && (!ex.missing || pick.includes(sym))) done.add(sym); } }
+  for (const k of await db.list(`snap:${day}:`)){ const sym = k.slice(`snap:${day}:`.length); if (!done.has(sym)){ const ex = await db.get(k); if (ex && (!ex.missing || pick.includes(sym) || !(await db.get(`px:${sym}`))?.rows?.length)) done.add(sym); } }
   const left = syms.filter((s) => !done.has(s)).length;
   const exRank = await db.get(`rank:${day}`);
   let finalized = !!(exRank && exRank.analyzed > 0); // דירוג ריק (כשל נתונים) ניתן להחלפה
