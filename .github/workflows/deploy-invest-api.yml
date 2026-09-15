@@ -1,0 +1,120 @@
+# פריסת ה-API של פלטפורמת המחקר (invest-api) ל-Cloudflare — אוטומטית בכל דחיפה ל-main.
+# משתמש באותם Secrets כמו שאר ה-Workers (CF_API_TOKEN, ואופציונלית CF_ACCOUNT_ID).
+# ה-workflow מקים לבד: מרחב KV בשם invest, binding ל-Workers AI, cron (כל 2 דקות — עיבוד באצ'ים
+# בגלל מגבלת ה-CPU של התוכנית החינמית), ו-subdomain. מפתחות הספקים (FINNHUB_KEY וכו') מוזנים
+# פעם אחת בדשבורד של ה-Worker (Settings → Variables → Secrets) — הם לא נדרסים בפריסה.
+
+name: Deploy invest-api to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'invest-api/**'
+      - '.github/workflows/deploy-invest-api.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Engine + worker tests
+        run: node --test invest-api/tests/*.test.mjs
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy worker (modules) with KV + AI bindings and cron
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          set -e
+          if [ -z "$CF_API_TOKEN" ]; then
+            echo "::error::חסר הסוד CF_API_TOKEN בהגדרות הריפו (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          ACCOUNT_ID="$CF_ACCOUNT_ID"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer $CF_API_TOKEN" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "::error::לא הצלחתי לגלות את מזהה החשבון מהטוקן — בדוק שהטוקן נוצר מתבנית Edit Cloudflare Workers"
+            exit 1
+          fi
+          echo "account: ${ACCOUNT_ID:0:6}..."
+
+          # מרחב KV בשם invest — מאתרים לפי שם, ואם אין יוצרים
+          NS_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/storage/kv/namespaces?per_page=100" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((n["id"] for n in (d.get("result") or []) if n.get("title")=="invest"), ""))')
+          if [ -z "$NS_ID" ]; then
+            NS_ID=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/storage/kv/namespaces" \
+              -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+              --data '{"title":"invest"}' \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("result") or {}).get("id",""))')
+          fi
+          if [ -z "$NS_ID" ]; then
+            echo "::error::לא הצלחתי ליצור/למצוא את מרחב ה-KV בשם invest — לטוקן צריכה להיות הרשאת Workers KV Storage:Edit"
+            exit 1
+          fi
+          echo "kv: ${NS_ID:0:6}..."
+
+          # שומרים על ה-Secrets הקיימים של ה-Worker (keep_bindings) — כך מפתחות הספקים לא נמחקים בפריסה
+          META=$(python3 - "$NS_ID" <<'PY'
+          import json,sys
+          print(json.dumps({
+            "main_module": "worker.js",
+            "compatibility_date": "2025-01-01",
+            "bindings": [
+              {"type": "kv_namespace", "name": "INVEST", "namespace_id": sys.argv[1]},
+              {"type": "ai", "name": "AI"}
+            ],
+            "keep_bindings": ["secret_text", "plain_text"]
+          }))
+          PY
+          )
+          # כל קבצי המודולים (engine/providers/lib) מועלים כחלקי multipart בשמות הנתיבים שלהם
+          ARGS=()
+          cd invest-api
+          for f in worker.js engine/*.js providers/*.js lib/*.js; do
+            ARGS+=(-F "$f=@$f;type=application/javascript+module;filename=$f")
+          done
+          resp=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/invest-api" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -F "metadata=$META;type=application/json" \
+            "${ARGS[@]}")
+          echo "$resp" | head -c 600; echo
+          echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
+          cd ..
+
+          # cron כל 2 דקות: כל הפעלה מעבדת CRON_BATCH נכסים (ברירת מחדל 3) — מתאים למגבלת CPU חינמית
+          sched=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/invest-api/schedules" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+            -d '[{"cron":"*/2 * * * *"}]')
+          echo "$sched"
+          echo "$sched" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
+
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/invest-api/subdomain" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+            --data '{"enabled": true, "previews_enabled": false}' || true
+
+      - name: Verify worker answers
+        run: |
+          sleep 8
+          code=$(curl -sS -o /dev/null -w "%{http_code}" https://invest-api.meirco199.workers.dev/health)
+          echo "worker HTTP status: $code"
+          test "$code" = "200"
+          curl -sS https://invest-api.meirco199.workers.dev/health | head -c 800 || true
