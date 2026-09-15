@@ -1,0 +1,71 @@
+# כלי תפעול ל-invest-api, מופעל ידנית (workflow_dispatch) — כי ל-Worker אין גישה מבחוץ לסודות שלו:
+#   health     — מצב ה-Worker (ספקים, cron, שגיאות)
+#   set-secret — הגדרת סוד ב-Worker (למשל APP_TOKEN) בלי לפתוח את הדשבורד
+#   cron-run   — הרצת עיבוד יומי באצ'ים עד סיום (מתאים גם לתוכנית החינמית: כל קריאה = הפעלה נפרדת)
+name: Invest ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'health | set-secret | cron-run'
+        required: true
+        default: 'health'
+      name:
+        description: 'set-secret: שם הסוד'
+        required: false
+      value:
+        description: 'set-secret: ערך הסוד (לא מודפס ללוג)'
+        required: false
+      batch:
+        description: 'cron-run: נכסים לכל קריאה'
+        required: false
+        default: '2'
+      app_token:
+        description: 'cron-run: APP_TOKEN (אם לא נשמר כ-secret בריפו)'
+        required: false
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          ACTION: ${{ inputs.action }}
+          SNAME: ${{ inputs.name }}
+          SVALUE: ${{ inputs.value }}
+          BATCH: ${{ inputs.batch }}
+          APP_TOKEN: ${{ inputs.app_token || secrets.INVEST_APP_TOKEN }}
+        run: |
+          set -e
+          W=https://invest-api.meirco199.workers.dev
+          case "$ACTION" in
+            health)
+              curl -sS --max-time 30 "$W/health" | python3 -m json.tool
+              echo "--- cron status"; curl -sS --max-time 30 "$W/cron/status" | python3 -m json.tool | head -60
+              echo "--- rank"; curl -sS --max-time 30 "$W/rank" | head -c 600; echo ;;
+            set-secret)
+              ACCOUNT_ID="$CF_ACCOUNT_ID"
+              if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+                ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" -H "Authorization: Bearer $CF_API_TOKEN" | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+              fi
+              [ -n "$SNAME" ] && [ -n "$SVALUE" ] || { echo "::error::חסר name/value"; exit 1; }
+              python3 - "$SNAME" "$SVALUE" > /tmp/body.json <<'PY'
+          import json,sys; print(json.dumps({"name": sys.argv[1], "text": sys.argv[2], "type": "secret_text"}))
+          PY
+              resp=$(curl -sS -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/invest-api/secrets" \
+                -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" --data @/tmp/body.json)
+              echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("success:", d.get("success"), d.get("errors")); sys.exit(0 if d.get("success") else 1)' ;;
+            cron-run)
+              [ -n "$APP_TOKEN" ] || { echo "::error::חסר APP_TOKEN"; exit 1; }
+              for i in $(seq 1 200); do
+                r=$(curl -sS --max-time 60 -X POST -H "Authorization: Bearer $APP_TOKEN" "$W/cron/run?batch=${BATCH:-2}" || echo '{"error":"curl failed"}')
+                echo "$i: $(echo "$r" | head -c 300)"
+                echo "$r" | grep -q '"finalized":true' && break
+                echo "$r" | grep -q '"error"' && sleep 5
+              done
+              curl -sS "$W/cron/status" | head -c 800; echo ;;
+            *) echo "::error::action לא מוכר"; exit 1 ;;
+          esac
