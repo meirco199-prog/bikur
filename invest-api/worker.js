@@ -48,6 +48,8 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   const db = ctx.db, day = today();
   const B = batch || parseInt(ctx.env.CRON_BATCH || '3', 10);
   const log = [];
+  const prevState = await db.get('cron:state');
+  if (prevState?.day === day && prevState.finalized && !force) return { day, processed: 0, queueLeft: 0, done: prevState.done, finalized: true, errors: [], log: ['היום כבר הסתיים; force=1 להרצה מחדש (למשל אחרי הוספת מפתח)'] };
   const universe = await getUniverse(db);
   const watch = (await db.get('user:watchlist')) || [];
   const syms = [...new Set([...universe.map((a) => a.symbol), ...watch.map((w) => w.symbol)])];
@@ -60,7 +62,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   // snapshot "חסר" (תקלת נתונים, לא תוצר מודל) נחשב לא-גמור וניתן למילוי מחדש; ציון אמיתי לעולם לא נדרס
   const doneKeys = await db.list(`snap:${day}:`);
   const done = new Set();
-  for (const k of doneKeys){ const sym = k.slice(`snap:${day}:`.length); const ex = await db.get(k); if (!ex) continue; if (!ex.missing) done.add(sym); else { const px = await db.get(`px:${sym}`); if (!px?.rows?.length) done.add(sym); } }
+  for (const k of doneKeys){ const sym = k.slice(`snap:${day}:`.length); const ex = await db.get(k); if (!ex) continue; if (!ex.missing) done.add(sym); else if (!force){ const px = await db.get(`px:${sym}`); if (!px?.rows?.length) done.add(sym); } }
   const queue = syms.filter((s) => !done.has(s));
   // פיזור: מריצים מקבילים מתחילים מנקודות שונות בתור
   const offset = queue.length ? Math.floor(Math.random() * queue.length) : 0;
@@ -84,12 +86,12 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   for (const k of await db.list(`snap:${day}:`)){ const sym = k.slice(`snap:${day}:`.length); if (!done.has(sym)){ const ex = await db.get(k); if (ex && (!ex.missing || pick.includes(sym) || !(await db.get(`px:${sym}`))?.rows?.length)) done.add(sym); } }
   const left = syms.filter((s) => !done.has(s)).length;
   const exRank = await db.get(`rank:${day}`);
-  let finalized = !!(exRank && exRank.analyzed > 0); // דירוג ריק (כשל נתונים) ניתן להחלפה
+  let finalized = !!(exRank && (exRank.analyzed > 0 || !force)); // דירוג ריק (כשל נתונים) ניתן להחלפה ב-force
   if (!left && !finalized){
     const snaps = [];
     for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); if (s) snaps.push(s); }
     const rank = rankSnapshots(snaps);
-    if (exRank && !exRank.analyzed && rank.analyzed){ await db.put(`rank:${day}`, rank); await db.delete(`reco:${day}`); finalized = true; }
+    if (exRank && !exRank.analyzed){ await db.put(`rank:${day}`, rank); await db.delete(`reco:${day}`); finalized = true; }
     else finalized = await db.putIfAbsent(`rank:${day}`, rank);
     if (finalized){
       try { const reco = await buildRecommendations(ctx, rank); await db.putIfAbsent(`reco:${day}`, reco); } catch (e) { await db.logError('reco', e.message); }

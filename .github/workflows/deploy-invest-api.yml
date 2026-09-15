@@ -102,11 +102,11 @@ jobs:
           echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
           cd ..
 
-          # cron כל 2 דקות: כל הפעלה מעבדת CRON_BATCH נכסים (ברירת מחדל 3) — מתאים למגבלת CPU חינמית
+          # cron כל 10 דקות: כל הפעלה מעבדת CRON_BATCH נכסים; אחרי סיום היום יוצאת מיד (חוסך קריאות KV)
           sched=$(curl -sS -X PUT \
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/invest-api/schedules" \
             -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-            -d '[{"cron":"*/2 * * * *"}]')
+            -d '[{"cron":"*/10 * * * *"}]')
           echo "$sched"
           echo "$sched" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
 

@@ -199,7 +199,7 @@ test('snapshot חסר (תקלת נתונים) מתמלא מחדש; ציון אמ
   store.set(`snap:${day}:AAPL`, JSON.stringify({ symbol: 'AAPL', date: day, missing: true, reason: 'אין מחירים' }));
   store.set(`snap:${day}:MSFT`, JSON.stringify({ symbol: 'MSFT', date: day, score: 12, signal: 'SELL', price: 1 }));
   store.set(`rank:${day}`, JSON.stringify({ date: day, analyzed: 0, table: [], categories: {} }));
-  let fin = false; for (let i = 0; i < 80 && !fin; i++) fin = (await cronStep(mk(), { batch: 6 })).finalized;
+  let fin = false; for (let i = 0; i < 80 && !fin; i++) fin = (await cronStep(mk(), { batch: 6, force: true })).finalized;
   assert.ok(fin);
   const a = JSON.parse(store.get(`snap:${day}:AAPL`)); assert.ok(!a.missing && a.score > 0, 'חסר מולא מחדש');
   const m = JSON.parse(store.get(`snap:${day}:MSFT`)); assert.equal(m.score, 12, 'ציון אמיתי נשמר');
