@@ -36,7 +36,26 @@ export const SEED_UNIVERSE = [
   US('TEVA', 'Teva (ADR)', 'Healthcare', { country: 'IL' }), US('CHKP', 'Check Point', 'Technology', { country: 'IL' }), US('NICE', 'NICE (ADR)', 'Technology', { country: 'IL' }), US('WIX', 'Wix.com', 'Technology', { country: 'IL' }),
   US('MNDY', 'monday.com', 'Technology', { country: 'IL' }), US('CYBR', 'CyberArk', 'Technology', { country: 'IL' }), US('ESLT', 'Elbit Systems', 'Industrials', { country: 'IL' }), US('TSEM', 'Tower Semiconductor', 'Technology', { country: 'IL' }),
   US('NVMI', 'Nova', 'Technology', { country: 'IL' }), US('CAMT', 'Camtek', 'Technology', { country: 'IL' }), US('GLBE', 'Global-E', 'Technology', { country: 'IL' }), US('ZIM', 'ZIM Shipping', 'Industrials', { country: 'IL' }),
+  US('ICL', 'ICL Group', 'Basic Materials', { country: 'IL' }), US('ORA', 'Ormat Technologies', 'Utilities', { country: 'IL' }), US('SEDG', 'SolarEdge', 'Technology', { country: 'IL' }), US('INMD', 'InMode', 'Healthcare', { country: 'IL' }),
+  US('FVRR', 'Fiverr', 'Technology', { country: 'IL' }), US('PLTK', 'Playtika', 'Communication Services', { country: 'IL' }), US('KRNT', 'Kornit Digital', 'Technology', { country: 'IL' }), US('SPNS', 'Sapiens', 'Technology', { country: 'IL' }),
+  US('RDWR', 'Radware', 'Technology', { country: 'IL' }), US('ITRN', 'Ituran', 'Technology', { country: 'IL' }), US('CGNT', 'Cognyte', 'Technology', { country: 'IL' }), US('NNDM', 'Nano Dimension', 'Technology', { country: 'IL' }),
+  US('OPRX', 'OptimizeRx', 'Healthcare'), US('GILT', 'Gilat Satellite', 'Technology', { country: 'IL' }), US('MGIC', 'Magic Software', 'Technology', { country: 'IL' }), US('URGN', 'UroGen Pharma', 'Healthcare', { country: 'IL' }),
 ];
+
+// בורסת תל אביב — מחירים דרך ספק שתומך ב-XTAE (EODHD בתשלום, או Marketstack חינמי-מוגבל). ללא מפתח מתאים הנכסים מסומנים "אין מחירים".
+const TA = (symbol, name, nameHe, sector, extra = {}) => ({ symbol: symbol + '.TA', name, nameHe, type: 'stock', assetClass: 'equity', role: 'satellite', sector, country: 'IL', currency: 'ILS', exchange: 'TASE', eodhd: symbol + '.TA', marketstack: symbol + '.XTAE', ...extra });
+export const TASE_UNIVERSE = [
+  TA('LUMI', 'Bank Leumi', 'בנק לאומי', 'Financial Services'), TA('POLI', 'Bank Hapoalim', 'בנק הפועלים', 'Financial Services'), TA('DSCT', 'Israel Discount Bank', 'בנק דיסקונט', 'Financial Services'), TA('MZTF', 'Mizrahi Tefahot', 'מזרחי טפחות', 'Financial Services'),
+  TA('FIBI', 'First International Bank', 'הבינלאומי', 'Financial Services'), TA('TEVA', 'Teva', 'טבע', 'Healthcare'), TA('ICL', 'ICL', 'איי.סי.אל', 'Basic Materials'), TA('ESLT', 'Elbit Systems', 'אלביט מערכות', 'Industrials'),
+  TA('NICE', 'NICE', 'נייס', 'Technology'), TA('TSEM', 'Tower Semiconductor', 'טאואר', 'Technology'), TA('NVMI', 'Nova', 'נובה', 'Technology'), TA('CAMT', 'Camtek', 'קמטק', 'Technology'),
+  TA('BEZQ', 'Bezeq', 'בזק', 'Communication Services'), TA('AZRG', 'Azrieli Group', 'עזריאלי', 'Real Estate'), TA('MLSR', 'Melisron', 'מליסרון', 'Real Estate'), TA('DLEKG', 'Delek Group', 'קבוצת דלק', 'Energy'),
+  TA('NWMD', 'NewMed Energy', 'ניומד אנרג\'י', 'Energy'), TA('PHOE', 'Phoenix', 'הפניקס', 'Financial Services'), TA('HARL', 'Harel', 'הראל', 'Financial Services'), TA('MMHD', 'Menora Mivtachim', 'מנורה מבטחים', 'Financial Services'),
+  TA('STRS', 'Strauss', 'שטראוס', 'Consumer Defensive'), TA('SAE', 'Shufersal', 'שופרסל', 'Consumer Defensive'), TA('ELAL', 'El Al', 'אל על', 'Industrials'), TA('ORL', 'Bazan', 'בז\'ן', 'Energy'),
+  TA('ENLT', 'Enlight Renewable', 'אנלייט', 'Utilities'), TA('SPEN', 'Shapir', 'שפיר', 'Industrials'), TA('AMOT', 'Amot Investments', 'אמות', 'Real Estate'), TA('ISCD', 'Isracard', 'ישראכרט', 'Financial Services'),
+];
+export const NAME_HE = { AAPL: 'אפל', MSFT: 'מיקרוסופט', NVDA: 'אנבידיה', AMZN: 'אמזון', GOOGL: 'גוגל (אלפבית)', META: 'מטא (פייסבוק)', TSLA: 'טסלה', 'BRK.B': 'ברקשייר האת\'וויי', AVGO: 'ברודקום', AMD: 'AMD', JPM: 'ג\'יי.פי מורגן', V: 'ויזה', MA: 'מאסטרקארד', UNH: 'יונייטד הלת\'', JNJ: 'ג\'ונסון אנד ג\'ונסון', LLY: 'אלי לילי', ABBV: 'אבווי', MRK: 'מרק', PFE: 'פייזר', XOM: 'אקסון מוביל', CVX: 'שברון', PG: 'פרוקטר אנד גמבל', KO: 'קוקה קולה', PEP: 'פפסיקו', COST: 'קוסטקו', WMT: 'וולמארט', HD: 'הום דיפו', MCD: 'מקדונלדס', NKE: 'נייקי', DIS: 'דיסני', NFLX: 'נטפליקס', ORCL: 'אורקל', CRM: 'סיילספורס', ADBE: 'אדובי', CSCO: 'סיסקו', INTC: 'אינטל', QCOM: 'קוואלקום', TXN: 'טקסס אינסטרומנטס', IBM: 'IBM', NOW: 'סרוויס-נאו', PLTR: 'פלנטיר', UBER: 'אובר', CAT: 'קטרפילר', DE: 'ג\'ון דיר', HON: 'האניוול', GE: 'GE תעופה', LMT: 'לוקהיד מרטין', RTX: 'RTX', BA: 'בואינג', UPS: 'UPS', LIN: 'לינדה', NEE: 'נקסט-ארה אנרג\'י', SO: 'סאות\'רן', GS: 'גולדמן זאקס', BAC: 'בנק אוף אמריקה', WFC: 'וולס פארגו', AXP: 'אמריקן אקספרס', BLK: 'בלאקרוק', T: 'AT&T', VZ: 'ורייזון', TMO: 'ת\'רמו פישר', ABT: 'אבוט', AMGN: 'אמג\'ן', ISRG: 'אינטואיטיב סרג\'יקל', SBUX: 'סטארבקס', LOW: 'לואוס', BKNG: 'בוקינג', SHOP: 'שופיפיי', ASML: 'ASML', TSM: 'TSMC', MU: 'מיקרון', ARM: 'ARM', SNOW: 'סנופלייק', CRWD: 'קראודסטרייק', PANW: 'פאלו אלטו', TEVA: 'טבע', CHKP: 'צ\'ק פוינט', NICE: 'נייס', WIX: 'וויקס', MNDY: 'מאנדיי', CYBR: 'סייברארק', ESLT: 'אלביט מערכות', TSEM: 'טאואר', NVMI: 'נובה', CAMT: 'קמטק', GLBE: 'גלובל-אי', ZIM: 'צים', ICL: 'איי.סי.אל', ORA: 'אורמת', SEDG: 'סולאראדג\'', INMD: 'אינמוד', FVRR: 'פייבר', PLTK: 'פלייטיקה', KRNT: 'קורנית', SPNS: 'ספיינס', RDWR: 'רדוור', ITRN: 'איתוראן', CGNT: 'קוגנייט', NNDM: 'ננו דיימנשן', GILT: 'גילת', MGIC: 'מג\'יק', URGN: 'יורוג\'ן',
+  SPY: 'S&P 500 (SPY)', VOO: 'S&P 500 (VOO)', QQQ: 'נאסד"ק 100 (QQQ)', VTI: 'כל שוק ארה"ב', IWM: 'מניות קטנות ארה"ב', VEA: 'שווקים מפותחים', VWO: 'שווקים מתפתחים', EIS: 'ישראל (EIS)', SCHD: 'דיבידנד ארה"ב', VIG: 'צמיחת דיבידנד', RSP: 'S&P משקל שווה', XLK: 'טכנולוגיה', XLV: 'בריאות', XLF: 'פיננסים', XLE: 'אנרגיה', XLU: 'תשתיות', XLP: 'צריכה בסיסית', XLI: 'תעשייה', SMH: 'שבבים', XLY: 'צריכה מחזורית', AGG: 'אג"ח ארה"ב כללי', BND: 'אג"ח ארה"ב כללי (BND)', IEF: 'אג"ח ממשלתי 7-10', TLT: 'אג"ח ממשלתי ארוך', SHY: 'אג"ח ממשלתי קצר', TIP: 'אג"ח צמוד', LQD: 'אג"ח חברות', HYG: 'אג"ח תשואה גבוהה', GLD: 'זהב', IAU: 'זהב (IAU)' };
+for (const a of SEED_UNIVERSE) if (NAME_HE[a.symbol]) a.nameHe = NAME_HE[a.symbol];
 
 // מדדים ומאקרו (Stooq / FRED / EODHD)
 export const INDICES = [
@@ -60,7 +79,7 @@ export const BENCHMARK_FOR = (asset) => (asset?.assetClass === 'bond' ? 'AGG' : 
 
 export function findAsset(symbol){
   const s = String(symbol || '').toUpperCase();
-  return SEED_UNIVERSE.find((a) => a.symbol === s) || INDICES.find((a) => a.symbol === s || a.id === s) || null;
+  return SEED_UNIVERSE.find((a) => a.symbol === s) || TASE_UNIVERSE.find((a) => a.symbol === s) || INDICES.find((a) => a.symbol === s || a.id === s) || null;
 }
 
 // סינון universe לפי פילטרים (משמש גם ל-screener מקומי)

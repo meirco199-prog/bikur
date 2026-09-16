@@ -27,6 +27,7 @@ main{padding:1rem 1.2rem 3rem;min-width:0;max-width:100%}
 .stack{display:flex;flex-direction:column;gap:.5rem}
 .toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem}
 .menu-btn{display:none}
+.bottombar{display:none}
 @media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.g-2-1,.g-1-2{grid-template-columns:1fr}}
 @media (max-width:820px){
   .app{grid-template-columns:minmax(0,1fr)}
@@ -38,6 +39,10 @@ main{padding:1rem 1.2rem 3rem;min-width:0;max-width:100%}
   .menu-btn{display:inline-flex}
   .g2,.g3,.g4{grid-template-columns:1fr}
   .span2{grid-column:auto}
-  main{padding:.8rem}
+  main{padding:.8rem 0.8rem 5rem}
   html{font-size:14px}
+  .bottombar{display:flex;position:fixed;bottom:0;inset-inline:0;background:var(--bg2);border-top:1px solid var(--line);z-index:20;padding-bottom:env(safe-area-inset-bottom,0)}
+  .bottombar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:.45rem 0;font-size:.72rem;color:var(--fg3)}
+  .bottombar a span{font-size:1.2rem}
+  .bottombar a.active{color:var(--accent)}
 }

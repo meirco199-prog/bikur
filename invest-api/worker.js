@@ -51,7 +51,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   const prevState = await db.get('cron:state');
   if (prevState?.day === day && prevState.finalized && !force) return { day, processed: 0, queueLeft: 0, done: prevState.done, finalized: true, errors: [], log: ['היום כבר הסתיים; force=1 להרצה מחדש (למשל אחרי הוספת מפתח)'] };
   const watch0 = new Set(((await db.get('user:watchlist')) || []).map((w) => w.symbol));
-  const universe = await getUniverse(db);
+  const universe = await getUniverse(db, ctx.env);
   const watch = (await db.get('user:watchlist')) || [];
   const syms = [...new Set([...universe.map((a) => a.symbol), ...watch.map((w) => w.symbol)])];
   let regime = await db.get(`regime:${day}`);
@@ -145,7 +145,7 @@ async function handle(req, env0, ctx){
     if (req.method === 'POST'){ try { await setKey(db, body.name, body.value); } catch (e) { return err(e.message); } return json({ ok: true, keys: await keysStatus(env0, db) }); }
   }
   if (r0 === 'universe'){
-    const u = await getUniverse(db);
+    const u = await getUniverse(db, env);
     const day = q.date || (await latestRankDay(db));
     const rank = day ? await db.get(`rank:${day}`) : null;
     const byS = new Map((rank?.table || []).map((r) => [r.symbol, r]));
@@ -163,7 +163,7 @@ async function handle(req, env0, ctx){
     const qq = (q.q || '').trim().toUpperCase();
     if (!qq) return json({ items: [] });
     const u = await getUniverse(db);
-    const local = u.filter((a) => a.symbol.includes(qq) || (a.name || '').toUpperCase().includes(qq)).slice(0, 15);
+    const local = u.filter((a) => a.symbol.includes(qq) || (a.name || '').toUpperCase().includes(qq) || (a.nameHe || '').includes(q.q.trim())).slice(0, 15);
     const tickers = await db.get('edgar:tickers');
     const ext = tickers?.map ? Object.entries(tickers.map).filter(([t, v]) => t.startsWith(qq) || v.name.toUpperCase().includes(qq)).slice(0, 10).map(([t, v]) => ({ symbol: t, name: v.name, type: 'stock', country: 'US', currency: 'USD', origin: 'edgar' })) : [];
     return json({ items: [...local, ...ext.filter((e) => !local.some((l) => l.symbol === e.symbol))].slice(0, 20), note: validSym(qq) && !local.length ? `אפשר לפתוח כל סימבול ישירות: /asset/${qq}` : undefined });

@@ -31,7 +31,7 @@ export async function render(main){
       let items = r.items.filter((a) => (!sig || a.signal === sig) && (!minScore || (a.score ?? -1) >= minScore));
       out.innerHTML = `<div class="muted" style="margin-bottom:.4rem">${items.length} נכסים · נתוני דירוג מ-${esc(r.date || '—')}</div>`;
       out.appendChild(table([
-        { key: 'symbol', label: 'נכס', render: (a) => symLink(a.symbol, a.name) }, { key: 'type', label: 'סוג' }, { key: 'sector', label: 'ענף' }, { key: 'country', label: 'מדינה' },
+        { key: 'symbol', label: 'נכס', render: (a) => symLink(a.symbol, a.name, a.nameHe) }, { key: 'type', label: 'סוג' }, { key: 'sector', label: 'ענף' }, { key: 'country', label: 'מדינה' },
         { key: 'price', label: 'מחיר', num: true, render: (a) => fmt.num(a.price) }, { key: 'dailyChange', label: 'יומי', num: true, render: (a) => pctCell(a.dailyChange) },
         { key: 'score', label: 'ציון', num: true, render: (a) => scoreBar(a.score) }, { key: 'signal', label: 'סיגנל', render: (a) => sigBadge(a.signal) },
         { key: 'momentum12m', label: '12 חודשים', num: true, render: (a) => pctCell(a.momentum12m, 0) }, { key: 'vol1y', label: 'תנודתיות', num: true, render: (a) => fmt.pct(a.vol1y, 0) }, { key: 'pe', label: 'P/E', num: true, render: (a) => fmt.num(a.pe, 1) }, { key: 'analystUpside', label: 'Upside אנליסטים', num: true, render: (a) => pctCell(a.analystUpside, 0) },
@@ -46,7 +46,7 @@ export async function render(main){
       const r = await api('/screen?' + new URLSearchParams({ ...f, add: '1' }), { auth: true });
       if (r.missing){ out.innerHTML = `<div class="empty">${esc(r.reason)}<br><span class="muted">${esc(r.note || '')}</span></div>`; return; }
       toast(`נוספו ${r.added || 0} נכסים ל-universe; ינותחו בעיבוד הבא`);
-      out.innerHTML = ''; out.appendChild(table([{ key: 'symbol', label: 'נכס', render: (a) => symLink(a.symbol, a.name) }, { key: 'sector', label: 'ענף' }, { key: 'marketCap', label: 'שווי שוק', num: true, render: (a) => fmt.big(a.marketCap) }, { key: 'price', label: 'מחיר', num: true }, { key: 'beta', label: 'בטא', num: true }, { key: 'dividend', label: 'דיבידנד', num: true }], r.items, { onRow: (a) => { location.hash = '#/asset/' + a.symbol; } }));
+      out.innerHTML = ''; out.appendChild(table([{ key: 'symbol', label: 'נכס', render: (a) => symLink(a.symbol, a.name, a.nameHe) }, { key: 'sector', label: 'ענף' }, { key: 'marketCap', label: 'שווי שוק', num: true, render: (a) => fmt.big(a.marketCap) }, { key: 'price', label: 'מחיר', num: true }, { key: 'beta', label: 'בטא', num: true }, { key: 'dividend', label: 'דיבידנד', num: true }], r.items, { onRow: (a) => { location.hash = '#/asset/' + a.symbol; } }));
     } catch (e) { out.innerHTML = errorBox(e); }
   };
   run();

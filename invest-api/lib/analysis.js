@@ -5,7 +5,7 @@ import { DB } from './db.js';
 import { fetchWithFallback } from '../providers/registry.js';
 import { edgar } from '../providers/edgar.js';
 import { alphavantage } from '../providers/alphavantage.js';
-import { SEED_UNIVERSE, INDICES, MACRO_SERIES, findAsset, BENCHMARK_FOR } from '../engine/universe.js';
+import { SEED_UNIVERSE, TASE_UNIVERSE, INDICES, MACRO_SERIES, findAsset, BENCHMARK_FOR } from '../engine/universe.js';
 import { classifyRegime } from '../engine/regime.js';
 import { clusterNews } from '../engine/news.js';
 import { buildPortfolios } from '../engine/portfolio.js';
@@ -18,9 +18,10 @@ export const today = () => isoDate();
 const ANALYSIS_BARS = 1500; // ~6 שנים — מספיק ל-SMA200, מומנטום, P/E היסטורי 5 שנים; חוסך CPU
 
 // ---------- universe ----------
-export async function getUniverse(db){
+export async function getUniverse(db, env = null){
   const extra = (await db.get('meta:universe')) || [];
   const map = new Map(SEED_UNIVERSE.map((a) => [a.symbol, { ...a, origin: 'seed' }]));
+  if (!env || env.MARKETSTACK_KEY || env.EODHD_KEY) for (const a of TASE_UNIVERSE) map.set(a.symbol, { ...a, origin: 'seed' });
   for (const a of extra) if (a?.symbol && !map.has(a.symbol)) map.set(a.symbol, a);
   return [...map.values()];
 }

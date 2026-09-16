@@ -5,24 +5,26 @@ import { $, esc, debounce } from './core/util.js';
 import { pollAlerts } from './screens/alerts.js';
 
 const ROUTES = {
-  '': () => import('./screens/dashboard.js'), dashboard: () => import('./screens/dashboard.js'), search: () => import('./screens/search.js'), asset: () => import('./screens/asset.js'), watchlist: () => import('./screens/watchlist.js'),
+  '': () => import('./screens/simple.js'), today: () => import('./screens/simple.js'), dashboard: () => import('./screens/dashboard.js'), search: () => import('./screens/search.js'), asset: () => import('./screens/asset.js'), watchlist: () => import('./screens/watchlist.js'),
   opportunities: () => import('./screens/opportunities.js'), portfolio: () => import('./screens/portfolio.js'), signals: () => import('./screens/signals.js'), regime: () => import('./screens/regime.js'), backtest: () => import('./screens/backtest.js'),
   asof: () => import('./screens/asof.js'), paper: () => import('./screens/paper.js'), alerts: () => import('./screens/alerts.js'), assistant: () => import('./screens/assistant.js'), settings: () => import('./screens/settings.js'),
 };
-const NAV = [['', '🏠 תמונת מצב'], ['opportunities', '🎯 הזדמנויות'], ['signals', '🚦 סיגנלים'], ['search', '🔍 סריקה וסינון'], ['watchlist', '⭐ רשימת מעקב'], ['sep', 'ניתוח'], ['portfolio', '💼 תיק 200,000 ₪'], ['regime', '🌡️ משטר שוק'], ['backtest', '🧪 Backtest'], ['asof', '⏳ As-Of'], ['paper', '🧾 Paper Trading'], ['sep', 'כלים'], ['alerts', '🔔 התראות'], ['assistant', '🤖 עוזר מחקר'], ['settings', '⚙️ הגדרות']];
+const NAV = [['', '🏠 היום'], ['opportunities', '🎯 הזדמנויות'], ['portfolio', '💼 התיק שלי'], ['watchlist', '⭐ מעקב'], ['search', '🔍 חיפוש'], ['assistant', '🤖 שאל את המערכת'], ['settings', '⚙️ הגדרות'], ['sep', 'מתקדם'], ['dashboard', '📊 תמונת מצב מלאה'], ['signals', '🚦 כל הסיגנלים'], ['regime', '🌡️ מצב השוק בפירוט'], ['backtest', '🧪 בדיקה היסטורית'], ['asof', '⏳ מסע בזמן'], ['paper', '🧾 תיק וירטואלי'], ['alerts', '🔔 התראות']];
+const BOTTOM = [['', '🏠', 'היום'], ['opportunities', '🎯', 'לקנות'], ['portfolio', '💼', 'התיק'], ['search', '🔍', 'חיפוש'], ['settings', '⚙️', 'הגדרות']];
 
 function parse(){ const h = location.hash.replace(/^#\/?/, ''); const [path, qs] = h.split('?'); const parts = path.split('/'); const params = Object.fromEntries(new URLSearchParams(qs || '')); if (parts[0] === 'asset' && parts[1]) params.symbol = decodeURIComponent(parts[1]); return { route: parts[0] || '', params }; }
 async function navigate(){
   const { route, params } = parse();
+  document.getElementById('overlay').innerHTML = ''; // מודל פתוח לא נשאר בין מסכים
   $('#sidenav').classList.remove('open');
-  document.querySelectorAll('.sidenav a').forEach((a) => a.classList.toggle('active', a.dataset.r === route));
+  document.querySelectorAll('.sidenav a, .bottombar a').forEach((a) => a.classList.toggle('active', a.dataset.r === (route === 'today' ? '' : route)));
   const main = $('#main');
   const loader = ROUTES[route];
   if (!loader){ main.innerHTML = '<div class="empty">הדף לא נמצא</div>'; return; }
   try { const mod = await loader(); await mod.render(main, params); window.scrollTo(0, 0); }
   catch (e) { main.innerHTML = `<div class="empty" style="border-color:var(--neg)">שגיאה בטעינת הדף: ${esc(e.message)}</div>`; console.error(e); }
 }
-function buildNav(){ $('#sidenav').innerHTML = NAV.map(([r, l]) => (r === 'sep' ? `<div class="sep">${esc(l)}</div>` : `<a href="#/${r}" data-r="${r}">${esc(l)}</a>`)).join(''); }
+function buildNav(){ $('#sidenav').innerHTML = NAV.map(([r, l]) => (r === 'sep' ? `<div class="sep">${esc(l)}</div>` : `<a href="#/${r}" data-r="${r}">${esc(l)}</a>`)).join(''); const bb = document.createElement('nav'); bb.className = 'bottombar'; bb.innerHTML = BOTTOM.map(([r, i, l]) => `<a href="#/${r}" data-r="${r}"><span>${i}</span>${esc(l)}</a>`).join(''); document.body.appendChild(bb); }
 function theme(){ const t = settings.get().theme || 'dark'; document.documentElement.dataset.theme = t; $('#themeBtn').onclick = () => { settings.set({ theme: t === 'dark' ? 'light' : 'dark' }); theme(); }; }
 function search(){
   const input = $('#searchInput'), res = $('#searchResults');

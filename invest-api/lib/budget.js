@@ -1,6 +1,6 @@
 // תקציב קריאות לספקים. KV חינמי = 1,000 כתיבות/יום — לכן כל המונים במפתח אחד ליום, נצברים בזיכרון ונכתבים פעם אחת (flush).
 export const MINUTE_LIMITS = { twelvedata: 7, alphavantage: 4 };
-export const DAILY_LIMITS = { alphavantage: 24, fmp: 230, finnhub: 5000, stooq: 2000, edgar: 3000, fred: 2000, boi: 200, eodhd: 18, twelvedata: 700, tiingo: 900 };
+export const DAILY_LIMITS = { alphavantage: 24, fmp: 230, finnhub: 5000, stooq: 2000, edgar: 3000, fred: 2000, boi: 200, eodhd: 18, twelvedata: 700, tiingo: 900, marketstack: 3 };
 const MINUTE = new Map(); // per-isolate (מספיק: ה-tick ממתין 6 שניות בין קריאות, ה-cron רץ כל 10 דקות)
 
 export class Budget {

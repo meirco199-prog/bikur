@@ -10,8 +10,9 @@ import { boi } from './boi.js';
 import { eodhd } from './eodhd.js';
 import { twelvedata } from './twelvedata.js';
 import { tiingo } from './tiingo.js';
+import { marketstack } from './marketstack.js';
 
-export const PROVIDERS = [eodhd, stooq, twelvedata, tiingo, finnhub, fmp, alphavantage, fred, edgar, boi];
+export const PROVIDERS = [eodhd, marketstack, stooq, twelvedata, tiingo, finnhub, fmp, alphavantage, fred, edgar, boi];
 
 export function providersFor(cap, env, symbol, asset){
   return PROVIDERS.filter((p) => p.supports.includes(cap) && p.available(env) && (!p.appliesTo || p.appliesTo(symbol, asset))).sort((a, b) => a.priority - b.priority);

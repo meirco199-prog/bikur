@@ -21,6 +21,9 @@ export const fmt = {
 };
 export const cls = (x) => (!isNum(x) ? '' : x > 0 ? 'pos' : x < 0 ? 'neg' : '');
 export const sigClass = (label) => 'sig sig-' + String(label || 'NO SIGNAL').replace(' ', '_');
+export const KIND_HE = { FACT: 'עובדה', MODEL: 'מודל', 'MODEL SIGNAL': 'סיגנל מודל', 'ANALYST OPINION': 'דעת אנליסטים', ESTIMATE: 'תחזית' };
+export const REGIME_HE = { 'Risk On': 'תיאבון לסיכון', Neutral: 'ניטרלי', 'Risk Off': 'בריחה מסיכון', 'Bull Trend': 'מגמת עלייה', Correction: 'תיקון', 'Bear Trend': 'מגמת ירידה', 'לא ידוע': 'לא ידוע' };
+export const nameOf = (a) => (a?.nameHe ? `${a.nameHe}` : a?.name || a?.symbol || '');
 export const SIGNAL_HE = { 'STRONG BUY': 'קנייה חזקה', BUY: 'קנייה', WATCH: 'מעקב', HOLD: 'החזקה', REDUCE: 'הקטנה', SELL: 'מכירה', 'NO SIGNAL': 'אין סיגנל' };
 export const COMP_HE = { fundamental: 'פונדמנטלי', valuation: 'הערכת שווי', growth: 'צמיחה', quality: 'איכות', technical: 'טכני', momentum: 'מומנטום', analyst: 'אנליסטים', sentiment: 'סנטימנט', macro: 'מאקרו', risk: 'סיכון' };
 export const today = () => new Date().toISOString().slice(0, 10);

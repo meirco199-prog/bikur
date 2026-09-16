@@ -11,7 +11,7 @@ const symFor = (symbol, asset) => asset?.twelvedata || symbol; // Twelve Data מ
 export const twelvedata = {
   id: 'twelvedata', priority: 2, supports: ['prices', 'quote'],
   available: (env) => !!env.TWELVEDATA_KEY,
-  appliesTo: (symbol, asset) => !symbol.startsWith('^') || !!asset?.twelvedata, // מדדים לא מכוסים בתוכנית החינמית — ETF מייצג במקומם
+  appliesTo: (symbol, asset) => (!symbol.startsWith('^') && !/\.TA$/.test(symbol)) || !!asset?.twelvedata, // מדדים לא מכוסים בתוכנית החינמית — ETF מייצג במקומם
   async prices(symbol, { from } = {}, ctx){
     const r = await call(ctx, 'time_series', { symbol: symFor(symbol, ctx.asset), interval: '1day', outputsize: from && from > '2020' ? '400' : '5000', order: 'ASC', ...(from ? { start_date: from } : {}) });
     const vals = r.values || [];

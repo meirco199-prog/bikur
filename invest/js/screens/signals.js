@@ -11,7 +11,7 @@ export async function render(main){
   const order = { 'STRONG BUY': 0, BUY: 1, WATCH: 2, HOLD: 3, REDUCE: 4, SELL: 5, 'NO SIGNAL': 6 };
   const rows = rank.table.slice().sort((a, b) => order[a.signal] - order[b.signal] || b.score - a.score);
   const cols = [
-    { key: 'symbol', label: 'נכס', render: (s) => symLink(s.symbol, s.name) }, { key: 'signal', label: 'סיגנל', render: (s) => sigBadge(s.signal), sortVal: (s) => -order[s.signal] }, { key: 'score', label: 'ציון', num: true, render: (s) => scoreBar(s.score) },
+    { key: 'symbol', label: 'נכס', render: (s) => symLink(s.symbol, s.name, s.nameHe) }, { key: 'signal', label: 'סיגנל', render: (s) => sigBadge(s.signal), sortVal: (s) => -order[s.signal] }, { key: 'score', label: 'ציון', num: true, render: (s) => scoreBar(s.score) },
     { key: 'confidence', label: 'ביטחון', num: true, render: (s) => fmt.num(s.confidence, 2) }, { key: 'price', label: 'מחיר', num: true, render: (s) => fmt.num(s.price) }, { key: 'trend', label: 'מגמה' }, { key: 'rsi', label: 'RSI', num: true },
     { key: 'mos', label: 'MoS', num: true, render: (s) => pctCell(s.mos, 0) }, { key: 'analystUpside', label: 'אנליסטים', num: true, render: (s) => pctCell(s.analystUpside, 0) }, { key: 'nextEarnings', label: 'דוח הבא', render: (s) => fmt.date(s.nextEarnings) },
   ];

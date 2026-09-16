@@ -28,7 +28,7 @@ export async function render(main, { symbol }){
   const sig = a.signal, sc = a.score, t = a.technical, m = a.metrics, fv = a.fair, r = a.risk, an = a.analyst, d = a.dataAsOf, lv = sig.levels;
   const isEtf = ['etf', 'index', 'fund'].includes(a.asset.type);
   main.innerHTML = `
-  <div class="page-head"><div><h1>${esc(a.asset.symbol)} <span class="muted" style="font-weight:400">${esc(a.asset.name || '')}</span></h1>
+  <div class="page-head"><div><h1>${esc(a.asset.nameHe || a.asset.name || a.asset.symbol)} <span class="muted" style="font-weight:400">${esc(a.asset.symbol)}${a.asset.nameHe ? ' · ' + esc(a.asset.name || '') : ''}</span></h1>
     <div class="row muted"><span>${esc(a.asset.type)}</span>·<span>${esc(a.asset.sector || '')}</span>·<span>${esc(a.asset.country || '')}</span>·<span>${esc(a.asset.currency || '')}</span>${a.asset.marketCap ? `·<span>שווי שוק ${fmt.big(a.asset.marketCap)}</span>` : ''}${mode === 'browser' ? '·<span class="tag stale">חושב בדפדפן</span>' : ''}</div></div>
     <div class="row"><button class="btn" id="watchBtn">${a.watched ? '★ במעקב' : '☆ הוסף למעקב'}</button><button class="btn" id="paperBtn">🧾 Paper Buy</button><button class="btn" id="alertBtn">🔔 התראה</button><button class="btn ghost sm" id="refreshBtn" title="רענון מהספקים (דורש טוקן)">⟳</button></div></div>
   <div class="grid g4" style="margin-bottom:1rem">

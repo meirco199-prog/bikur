@@ -1,9 +1,9 @@
 // רכיבי ממשק לשימוש חוזר: תגי סיגנל/ציון/סוג-נתון, חותמות עדכון, כרטיסי KPI, WHY.
-import { el, esc, fmt, isNum, sigClass, SIGNAL_HE, COMP_HE, cls } from '../core/util.js';
+import { el, esc, fmt, isNum, sigClass, SIGNAL_HE, COMP_HE, KIND_HE, cls } from '../core/util.js';
 
-export const sigBadge = (label) => `<span class="${sigClass(label)}" title="${esc(SIGNAL_HE[label] || '')}">${esc(label || 'NO SIGNAL')}</span>`;
+export const sigBadge = (label) => `<span class="${sigClass(label)}" title="${esc(label || '')}" style="direction:rtl">${esc(SIGNAL_HE[label] || label || 'אין סיגנל')}</span>`;
 export const scoreBar = (v) => (isNum(v) ? `<span class="score"><span class="bar"><i style="width:${v}%"></i></span><span class="num">${v}</span></span>` : '<span class="tag missing">אין ציון</span>');
-export const kind = (k) => ({ FACT: '<span class="tag fact">FACT</span>', MODEL: '<span class="tag model">MODEL</span>', 'MODEL SIGNAL': '<span class="tag model">MODEL SIGNAL</span>', 'ANALYST OPINION': '<span class="tag opinion">ANALYST OPINION</span>', ESTIMATE: '<span class="tag estimate">ESTIMATE</span>' }[k] || `<span class="tag">${esc(k)}</span>`);
+export const kind = (k) => { const cls = { FACT: 'fact', MODEL: 'model', 'MODEL SIGNAL': 'model', 'ANALYST OPINION': 'opinion', ESTIMATE: 'estimate' }[k] || ''; return `<span class="tag ${cls}" title="${esc(k)}">${esc(KIND_HE[k] || k)}</span>`; };
 export const missing = (reason = 'Missing Data') => `<span class="tag missing" title="${esc(reason)}">חסר</span>`;
 export function asOf(d, { source, stale, quality } = {}){
   if (!d && !source) return '<span class="asof">—</span>';
@@ -35,4 +35,4 @@ export function componentsTable(score){
 export const disclaimer = (t = 'סיגנלים וציונים הם תוצרי מודל (MODEL SIGNAL), לא ייעוץ השקעות ולא תחזית. Backtest אינו תחזית.') => `<div class="disclaimer">${esc(t)}</div>`;
 export const loading = (t = 'טוען…') => `<div class="empty"><span class="spin"></span> ${esc(t)}</div>`;
 export const errorBox = (e) => `<div class="empty" style="border-color:var(--neg)">שגיאה: ${esc(e?.message || e)}</div>`;
-export const symLink = (s, name) => `<a href="#/asset/${esc(s)}"><b>${esc(s)}</b></a>${name ? ` <span class="muted">${esc(name)}</span>` : ''}`;
+export const symLink = (s, name, nameHe) => `<a href="#/asset/${esc(s)}"><b>${esc(nameHe || s)}</b></a> <span class="muted">${esc(nameHe ? s : name || '')}</span>`;

@@ -22,8 +22,9 @@ const check = async (name, hash, mustHave, action) => {
   results.push({ name, ok: !missing.length && !errs.length, missing, errs });
   await page.screenshot({ path: `/tmp/claude-0/-home-user-bikur/4339afcd-f01b-5f35-b439-92a20b519276/scratchpad/shot-${name}.png`, fullPage: false });
 };
-await check('dashboard', '#/', ['MARKET STATUS', 'TOP OPPORTUNITIES', 'WATCHLIST', 'BUY SIGNALS', 'SELL', 'MARKET RISK', 'ALERTS']);
-await check('opportunities', '#/opportunities', ['Best Overall', 'Best Value', 'Best ETF', 'AVOID']);
+await check('today', '#/', ['מצב השוק', 'מה לקנות עכשיו', 'מה למכור', 'התיק שלי'], async () => { const b = await page.$('[data-buy]'); if (b){ await b.click(); await page.waitForTimeout(400); const modals = await page.$$eval('.modal', (a) => a.length); if (modals !== 1) errors.push('[today] modals opened: ' + modals); await page.locator('.modal #ok').last().click(); await page.waitForTimeout(1000); const t = await page.textContent('#main'); if (!t.includes('קניתי ב-')) errors.push('[today] paper buy not shown'); } });
+await check('dashboard', '#/dashboard', ['מצב השוק', 'הזדמנויות מובילות', 'רשימת מעקב', 'סיגנלי קנייה', 'סיכוני שוק', 'התראות']);
+await check('opportunities', '#/opportunities', ['הטובות ביותר', 'זולות ביחס לשווי', 'קרנות סל', 'להתרחק']);
 await check('signals', '#/signals', ['סיגנלים']);
 await check('search', '#/search', ['סריקת נכסים', 'AAPL']);
 await check('watchlist', '#/watchlist', ['NVDA', 'Opportunity']);
@@ -38,7 +39,7 @@ await check('asset', '#/asset/AAPL', ['AAPL', 'Investment Score', 'Risk/Reward',
 });
 await check('asset-etf', '#/asset/SPY', ['SPY', 'Investment Score']);
 await check('portfolio', '#/portfolio', ['תיק', 'הקצאה', 'Scenario', 'שוק −10%'], async () => { await page.waitForFunction(() => document.querySelector('#scen table'), null, { timeout: 15000 }).catch(() => errors.push('[portfolio] scenarios not rendered')); await page.click('#tabs button[data-p="aggressive"]'); await page.waitForTimeout(500); });
-await check('regime', '#/regime', ['Market Regime', 'הכללים', 'Fear & Greed']);
+await check('regime', '#/regime', ['מצב השוק בפירוט', 'הכללים', 'Fear & Greed']);
 await check('backtest', '#/backtest', ['Backtest'], async () => { await page.fill('#sym', 'AAPL'); await page.selectOption('#strat', 'signal'); await page.click('#go'); await page.waitForFunction(() => !document.querySelector('#out .spin'), null, { timeout: 120000 }); const t = await page.textContent('#out'); for (const k of ['CAGR', 'Sharpe', 'Max Drawdown', 'Walk-Forward', 'תקופות שוק']) if (!t.includes(k)) errors.push('[backtest] missing ' + k); });
 await check('asof', '#/asof', ['As-Of'], async () => { await page.fill('#date', '2024-01-02'); await page.selectOption('#scope', 'watch'); await page.click('#go'); await page.waitForFunction(() => !document.querySelector('#out .spin'), null, { timeout: 180000 }); const t = await page.textContent('#out'); for (const k of ['תיקים מומלצים', 'SPY', 'דירוג מלא']) if (!t.includes(k)) errors.push('[asof] missing ' + k); });
 await check('asof-single', '#/asof?symbol=AAPL&date=2023-06-01', ['מה קרה בפועל', '12 חודשים']);
