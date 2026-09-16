@@ -28,9 +28,9 @@ export const SIGNAL_HE = { 'STRONG BUY': 'קנייה חזקה', BUY: 'קנייה
 export const COMP_HE = { fundamental: 'פונדמנטלי', valuation: 'הערכת שווי', growth: 'צמיחה', quality: 'איכות', technical: 'טכני', momentum: 'מומנטום', analyst: 'אנליסטים', sentiment: 'סנטימנט', macro: 'מאקרו', risk: 'סיכון' };
 export const today = () => new Date().toISOString().slice(0, 10);
 export const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
-export function toast(msg, kind = ''){
+export function toast(msg, kind = '', ms = null){
   const t = el(`<div class="toast ${kind}">${esc(msg)}</div>`);
-  document.body.appendChild(t); setTimeout(() => t.remove(), kind === 'err' ? 6000 : 3500);
+  document.body.appendChild(t); setTimeout(() => t.remove(), ms || (kind === 'err' ? 6000 : 3500));
 }
 export function modal(html, { onClose } = {}){
   const bg = el(`<div class="modal-bg"><div class="modal">${html}</div></div>`);
