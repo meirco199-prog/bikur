@@ -84,7 +84,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
       done.add(sym);
     } catch (e) { errors.push({ sym, msg: e.message.slice(0, 160) }); await db.logError(`cron ${sym}`, e.message); }
   }
-  for (const k of await db.list(`snap:${day}:`)){ const sym = k.slice(`snap:${day}:`.length); if (!done.has(sym)){ const ex = await db.get(k); if (ex && (!ex.missing || pick.includes(sym) || !(await db.get(`px:${sym}`))?.rows?.length)) done.add(sym); } }
+  for (const k of await db.list(`snap:${day}:`)){ const sym = k.slice(`snap:${day}:`.length); if (!done.has(sym)){ const ex = await db.get(k); if (ex && (!ex.missing || pick.includes(sym) || (!force && !(await db.get(`px:${sym}`))?.rows?.length))) done.add(sym); } }
   const left = syms.filter((s) => !done.has(s)).length;
   const exRank = await db.get(`rank:${day}`);
   let finalized = !!(exRank && (exRank.analyzed > 0 || !force)); // דירוג ריק (כשל נתונים) ניתן להחלפה ב-force
