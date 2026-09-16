@@ -24,7 +24,7 @@ jobs:
           W=https://invest-api.meirco199.workers.dev
           SECRET=$(python3 -c 'import json; print(json.load(open("invest-api/config.json"))["CRON_SECRET"])')
           BATCH=$(python3 -c 'import json; print(json.load(open("invest-api/config.json")).get("CRON_BATCH","2"))')
-          CMD=$(cat .github/invest-ops/command 2>/dev/null | head -1 || echo cron-run)
+          CMD=$(cat .github/invest-ops/command 2>/dev/null | head -1 | cut -d" " -f1 || echo cron-run)
           [ "${{ github.event_name }}" = "push" ] && { echo "ממתין לפריסת ה-Worker…"; sleep 75; }
           [ "${{ github.event_name }}" = "push" ] || CMD=cron-run
           echo "command: $CMD"
