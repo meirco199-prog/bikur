@@ -102,10 +102,11 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
       try {
         const broker = new PaperBroker(db);
         const priceOf = (s) => snaps.find((x) => x.symbol === s)?.price ?? null;
-        const perf = await broker.performance(priceOf);
+        const fxDoc = await db.get('fx:USDILS');
+        const perf = await broker.performance(priceOf, fxDoc?.rate || null);
         const spy = snaps.find((x) => x.symbol === 'SPY')?.price ?? null;
         const eq = perf.equity || [];
-        if (!eq.some((e) => e[0] === day)){ eq.push([day, round(perf.marketValue + perf.realized, 2), spy]); await db.put('paper:equity', eq.slice(-2000)); }
+        if (!eq.some((e) => e[0] === day)){ eq.push([day, perf.totalIls, spy]); await db.put('paper:equity', eq.slice(-2000)); }
       } catch (e) { await db.logError('paper equity', e.message); }
       if (ctx.env.FMP_KEY && new Date().getUTCDay() === 1){
         try { const r = await fetchWithFallback('screener', '', { minMarketCap: 2e9, minVolume: 500000, limit: 60, country: 'US' }, ctx); if (r.items) log.push(`screener: +${await addToUniverse(db, r.items.map((x) => ({ symbol: x.symbol, name: x.name, type: x.type, assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'screener', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })))}`); } catch (e) { await db.logError('screener', e.message); }
@@ -308,25 +309,30 @@ async function handle(req, env0, ctx){
   if (r0 === 'paper'){
     const broker = new PaperBroker(db);
     const day = await latestRankDay(db);
-    if (req.method === 'GET'){
-      const perf = await broker.performance(() => null);
-      // מחירים נוכחיים: snapshot אחרון או quote מהמטמון
-      for (const o of perf.open){ const sn = day ? await db.get(`snap:${day}:${o.symbol}`) : null; const qt = await db.get(`quote:${o.symbol}`); const p = qt?.price ?? sn?.price ?? null; o.current = p; o.currentSource = qt?.price ? { source: qt.source, asOf: qt.asOf } : sn ? { source: 'snapshot', asOf: sn.date } : null; o.pnl = isNum(p) ? round((p - o.price) * o.qty, 2) : null; o.pnlPct = isNum(p) ? round(p / o.price - 1, 4) : null; }
-      perf.unrealized = round(perf.open.reduce((s, o) => s + (o.pnl || 0), 0), 2); perf.marketValue = round(perf.open.reduce((s, o) => s + ((o.current || o.price) * o.qty), 0), 2);
-      return json(perf);
-    }
+    const fxDoc = await db.get('fx:USDILS'); const fx = fxDoc?.rate || 3.7;
+    const priceCache = {};
+    const priceOf = (s) => priceCache[s];
+    const view = async () => {
+      const t = await broker.trades();
+      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){ const qt = await db.get(`quote:${s}`); const sn = day ? await db.get(`snap:${day}:${s}`) : null; priceCache[s] = qt?.price ?? sn?.price ?? null; }
+      const perf = await broker.performance(priceOf, fx);
+      const u = await getUniverse(db, env);
+      perf.positions = perf.positions.map((p) => ({ ...p, name: u.find((a) => a.symbol === p.symbol)?.name || p.symbol, nameHe: u.find((a) => a.symbol === p.symbol)?.nameHe || null, signal: null }));
+      for (const p of perf.positions){ const sn = day ? await db.get(`snap:${day}:${p.symbol}`) : null; p.signal = sn?.signal || null; }
+      perf.fxSource = fxDoc ? { rate: fx, source: fxDoc.source, asOf: fxDoc.asOf } : null;
+      return perf;
+    };
+    if (req.method === 'GET') return json(await view());
     needAuth();
-    if (p1 === 'trade' && req.method === 'DELETE'){ // ביטול רישום של פוזיציה פתוחה (טעות/כפילות) — עסקאות סגורות לא נמחקות
-      const id = q.id || body.id; const t = await broker.trades(); const x = t.find((y) => y.id === id);
-      if (!x) return err('לא נמצא'); if (x.exitDate) return err('עסקה סגורה לא ניתנת לביטול');
-      await broker.save(t.filter((y) => y.id !== id)); return json({ ok: true });
-    }
+    if (p1 === 'reset' && req.method === 'POST'){ const st = (await db.get('user:settings')) || {}; const acc = await broker.reset(isNum(body.initialIls) && body.initialIls > 0 ? body.initialIls : (st.portfolioSize || 200000)); return json({ ok: true, account: acc }); }
+    if (p1 === 'trade' && req.method === 'DELETE'){ try { const acc = await broker.cancel(q.id || body.id); return json({ ok: true, account: acc }); } catch (e) { return err(e.message); } }
     if (p1 === 'order'){
       const s = sym(body.symbol);
+      const asset = await assetMeta(db, s);
       let price = isNum(body.price) ? body.price : null, priceSource = price ? { source: 'user' } : null;
-      if (!price){ const asset = await assetMeta(db, s); const qt = await getQuote(s, { ...ctx, asset }); if (qt && !qt.missing){ price = qt.price; priceSource = { source: qt.source, asOf: qt.asOf, stale: !!qt.stale }; } else { const px = await getPrices(s, { ...ctx, asset }); if (px?.rows?.length){ price = px.rows[px.rows.length - 1][4]; priceSource = { source: px.source + ' (close)', asOf: px.asOf }; } } }
+      if (!price){ const qt = await getQuote(s, { ...ctx, asset }); if (qt && !qt.missing){ price = qt.price; priceSource = { source: qt.source, asOf: qt.asOf, stale: !!qt.stale }; } else { const px = await getPrices(s, { ...ctx, asset }); if (px?.rows?.length){ price = px.rows[px.rows.length - 1][4]; priceSource = { source: px.source + ' (close)', asOf: px.asOf }; } } }
       const sn = day ? await db.get(`snap:${day}:${s}`) : null;
-      try { const r = await broker.placeOrder({ symbol: s, side: body.side === 'sell' ? 'sell' : 'buy', qty: +body.qty, price, reason: String(body.reason || '').slice(0, 300), signal: sn?.signal || null, snapDate: sn?.date || null, priceSource }); return json({ ok: true, result: r, price, priceSource }); }
+      try { const r = await broker.placeOrder({ symbol: s, side: body.side === 'sell' ? 'sell' : 'buy', qty: +body.qty, price, currency: asset.currency || 'USD', fx, reason: String(body.reason || '').slice(0, 300), signal: sn?.signal || null, snapDate: sn?.date || null, priceSource }); return json({ ok: true, result: r, price, priceSource, fx }); }
       catch (e) { return err(e.message); }
     }
   }

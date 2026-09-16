@@ -102,14 +102,21 @@ test('/asof/AAPL — נתונים עד תאריך בלבד + תשואות קדי
   assert.ok(j.metrics.asOf < '2023-12-31', 'facts asOf ' + j.metrics.asOf);
   const bad = await get('/asof/AAPL?date=nope'); assert.equal(bad.status, 400);
 });
-test('paper trading: קנייה במחיר quote, מכירה, ביצועים', async () => {
+test('paper trading כחשבון אמיתי: מזומן, עמלה, חסימת קנייה מעבר ליתרה, איחוד פוזיציות, מכירה, איפוס', async () => {
+  const r0 = await get('/paper/reset', { body: { initialIls: 200000 }, auth: true }); assert.equal(r0.status, 200); assert.equal(r0.j.account.cashIls, 200000);
   const b = await get('/paper/order', { body: { symbol: 'AAPL', side: 'buy', qty: 10, reason: 'בדיקה' }, auth: true });
-  assert.equal(b.status, 200, JSON.stringify(b.j)); assert.ok(b.j.price > 0 && b.j.priceSource.source === 'finnhub'); assert.equal(b.j.result.signalAtEntry !== undefined, true);
-  const p = await get('/paper'); assert.equal(p.j.open.length, 1); assert.equal(p.j.open[0].current, b.j.price);
+  assert.equal(b.status, 200, JSON.stringify(b.j)); assert.ok(b.j.price > 0 && b.j.priceSource.source === 'finnhub');
+  const cost = b.j.result.trade.costIls; assert.ok(cost > 10 * b.j.price * 3 && b.j.result.trade.feeIls >= 3.7, 'עלות כוללת עמלה');
+  const b2 = await get('/paper/order', { body: { symbol: 'AAPL', side: 'buy', qty: 5 }, auth: true }); assert.equal(b2.status, 200);
+  const p = await get('/paper');
+  assert.equal(p.j.positions.length, 1); assert.equal(p.j.positions[0].qty, 15); assert.ok(Math.abs(p.j.cashIls - (200000 - cost - b2.j.result.trade.costIls)) < 0.01);
+  assert.ok(Math.abs(p.j.totalIls - (p.j.cashIls + p.j.valueIls)) < 0.01);
+  const big = await get('/paper/order', { body: { symbol: 'MSFT', side: 'buy', qty: 100000 }, auth: true }); assert.equal(big.status, 400); assert.ok(/אין מספיק מזומן/.test(big.j.error));
+  const tooMany = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 50, price: 100 }, auth: true }); assert.equal(tooMany.status, 400);
   const s = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 4, price: b.j.price + 10 }, auth: true });
-  assert.equal(s.status, 200); assert.ok(Math.abs(s.j.result[0].pnl - 40) < 0.01);
-  const p2 = await get('/paper'); assert.equal(p2.j.closedCount, 1); assert.equal(p2.j.open[0].qty, 6);
-  const bad = await get('/paper/order', { body: { symbol: 'MSFT', side: 'sell', qty: 1, price: 5 }, auth: true }); assert.equal(bad.status, 400);
+  assert.equal(s.status, 200); assert.ok(s.j.result.proceedsIls > 0);
+  const p2 = await get('/paper'); assert.equal(p2.j.positions[0].qty, 11); assert.equal(p2.j.closedCount, 1); assert.ok(p2.j.realizedIls > 0);
+  const frac = await get('/paper/order', { body: { symbol: 'AAPL', side: 'buy', qty: 1.5 }, auth: true }); assert.equal(frac.status, 400);
 });
 test('/ai/ask — ללא מפתח מחזיר הקשר גולמי; עם מפתח קורא ל-Anthropic', async () => {
   const a = await get('/ai/ask', { body: { question: 'מה קרה ל-AAPL היום?' } });
@@ -205,10 +212,11 @@ test('snapshot חסר (תקלת נתונים) מתמלא מחדש; ציון אמ
   const m = JSON.parse(store.get(`snap:${day}:MSFT`)); assert.equal(m.score, 12, 'ציון אמיתי נשמר');
   const r = JSON.parse(store.get(`rank:${day}`)); assert.ok(r.analyzed > 100, 'דירוג ריק הוחלף');
 });
-test('DELETE /paper/trade מוחק רישום פתוח בלבד', async () => {
-  const b = await get('/paper/order', { body: { symbol: 'GOOGL', side: 'buy', qty: 2, price: 100 }, auth: true }); const id = b.j.result.id;
+test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מזומן', async () => {
+  const before = (await get('/paper')).j.cashIls;
+  const b = await get('/paper/order', { body: { symbol: 'GOOGL', side: 'buy', qty: 2, price: 100 }, auth: true }); const id = b.j.result.trade.id;
   assert.equal((await get('/paper/trade?id=' + id, { method: 'DELETE' })).status, 401);
   const d = await get('/paper/trade?id=' + id, { method: 'DELETE', auth: true }); assert.equal(d.status, 200);
-  const p = await get('/paper'); assert.ok(!p.j.open.some((t) => t.id === id));
+  const p = await get('/paper'); assert.ok(!p.j.open.some((t) => t.id === id)); assert.ok(Math.abs(p.j.cashIls - before) < 0.01, 'המזומן הוחזר');
   assert.equal((await get('/paper/trade?id=nope', { method: 'DELETE', auth: true })).status, 400);
 });
