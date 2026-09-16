@@ -88,12 +88,14 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   const left = syms.filter((s) => !done.has(s)).length;
   const exRank = await db.get(`rank:${day}`);
   let finalized = !!(exRank && (exRank.analyzed > 0 || !force)); // דירוג ריק (כשל נתונים) ניתן להחלפה ב-force
-  if (!left && !finalized){
+  // דירוג ותיקים הם אגרגט של ה-snapshots (שלעולם לא נדרסים): מחושבים מחדש כשנוספו snapshots חדשים היום
+  if (!left && (!finalized || pick.length)){
     const snaps = [];
     for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); if (s) snaps.push(s); }
     const rank = rankSnapshots(snaps);
-    if (exRank && !exRank.analyzed){ await db.put(`rank:${day}`, rank); await db.delete(`reco:${day}`); finalized = true; }
-    else finalized = await db.putIfAbsent(`rank:${day}`, rank);
+    if (exRank && (rank.analyzed > (exRank.analyzed || 0))){ await db.put(`rank:${day}`, rank); await db.delete(`reco:${day}`); finalized = true; }
+    else if (!exRank) finalized = await db.putIfAbsent(`rank:${day}`, rank);
+    else finalized = false;
     if (finalized){
       try { const reco = await buildRecommendations(ctx, rank); await db.putIfAbsent(`reco:${day}`, reco); } catch (e) { await db.logError('reco', e.message); }
       if (!days.includes(day)){ days.push(day); await db.put('idx:snapdays', days.sort().slice(-3000)); }

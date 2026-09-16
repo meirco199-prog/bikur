@@ -33,14 +33,15 @@ jobs:
           echo "=== snapshot AAPL"; curl -sS --max-time 30 "$W/snapshot/$TODAY/AAPL" | head -c 700; echo
           echo "=== prices SPY"; curl -sS --max-time 60 "$W/prices/SPY?from=2026-09-01" | head -c 600; echo
           echo "=== facts AAPL (EDGAR)"; curl -sS --max-time 60 "$W/bundle/AAPL?light=0" | python3 -c 'import json,sys; d=json.load(sys.stdin); f=d.get("facts",{}); print("facts:", f.get("source"), f.get("asOf"), "series:", {k: len(v) for k,v in (f.get("series") or {}).items()} if not f.get("missing") else f.get("reason")); print("prices:", d.get("prices",{}).get("source"), d.get("prices",{}).get("asOf"), d.get("prices",{}).get("reason"))'
+          FORCE=""; [ "$CMD" = "cron-run-force" ] && { CMD=cron-run; FORCE="&force=1"; }
           if [ "$CMD" = "cron-run" ]; then
             echo "=== cron-run (batch $BATCH)"
-            for i in $(seq 1 90); do
-              r=$(curl -sS --max-time 60 -X POST "$W/cron/run?batch=$BATCH&secret=$SECRET" || echo '{"error":"curl failed"}')
+            for i in $(seq 1 120); do
+              r=$(curl -sS --max-time 60 -X POST "$W/cron/run?batch=$BATCH&secret=$SECRET$FORCE" || echo '{"error":"curl failed"}')
               echo "$i: $(echo "$r" | head -c 400)"
               echo "$r" | grep -q '"finalized":true' && break
               echo "$r" | grep -q 'error' && sleep 3
-              sleep 6
+              sleep 16
             done
           fi
           echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo
