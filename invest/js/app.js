@@ -5,14 +5,14 @@ import { $, esc, debounce } from './core/util.js';
 import { pollAlerts } from './screens/alerts.js';
 
 const ROUTES = {
-  '': () => import('./screens/simple.js'), today: () => import('./screens/simple.js'), dashboard: () => import('./screens/dashboard.js'), search: () => import('./screens/search.js'), asset: () => import('./screens/asset.js'), watchlist: () => import('./screens/watchlist.js'),
+  '': () => import('./screens/simple.js'), today: () => import('./screens/simple.js'), buy: () => import('./screens/simple.js'), sell: () => import('./screens/simple.js'), mine: () => import('./screens/simple.js'), more: () => import('./screens/more.js'), explain: () => import('./screens/explain.js'), dashboard: () => import('./screens/dashboard.js'), search: () => import('./screens/search.js'), asset: () => import('./screens/asset.js'), watchlist: () => import('./screens/watchlist.js'),
   opportunities: () => import('./screens/opportunities.js'), portfolio: () => import('./screens/portfolio.js'), signals: () => import('./screens/signals.js'), regime: () => import('./screens/regime.js'), backtest: () => import('./screens/backtest.js'),
   asof: () => import('./screens/asof.js'), paper: () => import('./screens/paper.js'), alerts: () => import('./screens/alerts.js'), assistant: () => import('./screens/assistant.js'), settings: () => import('./screens/settings.js'),
 };
-const NAV = [['', '🏠 היום'], ['opportunities', '🎯 הזדמנויות'], ['portfolio', '💼 התיק שלי'], ['watchlist', '⭐ מעקב'], ['search', '🔍 חיפוש'], ['assistant', '🤖 שאל את המערכת'], ['settings', '⚙️ הגדרות'], ['sep', 'מתקדם'], ['dashboard', '📊 תמונת מצב מלאה'], ['signals', '🚦 כל הסיגנלים'], ['regime', '🌡️ מצב השוק בפירוט'], ['backtest', '🧪 בדיקה היסטורית'], ['asof', '⏳ מסע בזמן'], ['paper', '🧾 תיק וירטואלי'], ['alerts', '🔔 התראות']];
-const BOTTOM = [['', '🏠', 'היום'], ['opportunities', '🎯', 'לקנות'], ['portfolio', '💼', 'התיק'], ['search', '🔍', 'חיפוש'], ['settings', '⚙️', 'הגדרות']];
+const NAV = [['', '🏠 היום'], ['buy', '🟢 לקנות'], ['sell', '🔴 למכור'], ['mine', '💼 התיק שלי'], ['more', '⋯ עוד'], ['sep', 'עוד'], ['search', '🔍 חיפוש'], ['watchlist', '⭐ מעקב'], ['explain', '📖 איך זה עובד'], ['assistant', '🤖 שאל את המערכת'], ['settings', '⚙️ הגדרות'], ['sep', 'מקצועי'], ['dashboard', '📊 תמונת מצב מלאה'], ['opportunities', '🎯 הזדמנויות'], ['signals', '🚦 סיגנלים'], ['portfolio', '📐 בניית תיק'], ['regime', '🌡️ מצב השוק'], ['backtest', '🧪 בדיקה היסטורית'], ['asof', '⏳ מסע בזמן'], ['paper', '🧾 תיק וירטואלי'], ['alerts', '🔔 התראות']];
+const BOTTOM = [['', '🏠', 'היום'], ['buy', '🟢', 'לקנות'], ['sell', '🔴', 'למכור'], ['mine', '💼', 'התיק שלי'], ['more', '⋯', 'עוד']];
 
-function parse(){ const h = location.hash.replace(/^#\/?/, ''); const [path, qs] = h.split('?'); const parts = path.split('/'); const params = Object.fromEntries(new URLSearchParams(qs || '')); if (parts[0] === 'asset' && parts[1]) params.symbol = decodeURIComponent(parts[1]); return { route: parts[0] || '', params }; }
+function parse(){ const h = location.hash.replace(/^#\/?/, ''); const [path, qs] = h.split('?'); const parts = path.split('/'); const params = Object.fromEntries(new URLSearchParams(qs || '')); if (parts[0] === 'asset' && parts[1]) params.symbol = decodeURIComponent(parts[1]); if (['buy', 'sell', 'mine', 'today'].includes(parts[0])) params.view = parts[0]; return { route: parts[0] || '', params }; }
 async function navigate(){
   const { route, params } = parse();
   document.getElementById('overlay').innerHTML = ''; // מודל פתוח לא נשאר בין מסכים

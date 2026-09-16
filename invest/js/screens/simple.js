@@ -1,61 +1,109 @@
-// המסך הפשוט (ברירת מחדל): מצב · מה לקנות · מה למכור · התיק שלי. עברית בלבד, בלי מונחים.
+// המסכים הפשוטים: היום · לקנות · למכור · התיק שלי. עברית בלבד, בלי מונחים. כל היתר ב"עוד".
 import { api, invalidate } from '../core/api.js';
 import { settings } from '../core/store.js';
 import { esc, fmt, isNum, cls, toast, modal, SIGNAL_HE, REGIME_HE, nameOf } from '../core/util.js';
-import { loading, errorBox, scoreBar } from '../ui/components.js';
+import { loading, errorBox } from '../ui/components.js';
 
-const plain = (s) => {
-  // משפט אחד בעברית פשוטה מתוך רכיבי הציון
-  const c = s.components || {}; const good = [], bad = [];
-  const say = (k, g, b) => { const v = c[k]; if (!isNum(v)) return; if (v >= 70) good.push(g); else if (v <= 40) bad.push(b); };
-  say('fundamental', 'חברה רווחית ויציבה', 'רווחיות חלשה'); say('valuation', 'המחיר סביר ביחס לשווי', 'המחיר יקר ביחס לשווי'); say('growth', 'צומחת', 'לא צומחת'); say('technical', 'המגמה עולה', 'המגמה יורדת'); say('momentum', 'תנופה חיובית', 'תנופה שלילית'); say('risk', 'סיכון נמוך יחסית', 'תנודתית ומסוכנת');
-  return (good.length ? 'בעד: ' + good.slice(0, 3).join(', ') + '. ' : '') + (bad.length ? 'נגד: ' + bad.slice(0, 2).join(', ') + '.' : '');
-};
-const money = (x, cur) => (cur === 'ILS' ? `${fmt.num(x)} ₪` : `$${fmt.num(x)}`);
-
-export async function render(main){
-  main.innerHTML = loading('טוען את התמונה של היום…');
-  let regime, rank, watch, paper, reco;
-  try { [regime, rank, watch, paper, reco] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 })]); }
-  catch (e) { main.innerHTML = errorBox(e) + '<p class="muted"><a href="#/settings">בדוק את החיבור בהגדרות</a></p>'; return; }
+let D = null; // נתונים משותפים לכל המסכים הפשוטים (מטמון קצר)
+async function load(){
+  const [regime, rank, watch, paper, reco] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 })]);
   const table = rank?.table || [];
   const by = new Map(table.map((r) => [r.symbol, r]));
-  const buys = table.filter((r) => ['STRONG BUY', 'BUY'].includes(r.signal)).sort((a, b) => b.score - a.score).slice(0, 8);
-  const held = new Set([...(paper?.open || []).map((p) => p.symbol), ...(watch?.items || []).map((w) => w.symbol)]);
-  const sells = table.filter((r) => held.has(r.symbol) && ['SELL', 'REDUCE'].includes(r.signal));
-  const weak = table.filter((r) => !held.has(r.symbol) && r.signal === 'SELL').slice(0, 5);
-  const mood = regime?.risk ? `${REGIME_HE[regime.trend] || regime.trend} · ${REGIME_HE[regime.risk] || regime.risk}` : 'אין נתונים';
-  const moodText = !regime?.risk ? '' : regime.trend === 'Bull Trend' && regime.risk === 'Risk On' ? 'השוק בעלייה והמשקיעים מוכנים לקחת סיכון. זמן סביר להיכנס בהדרגה, לא בבת אחת.' : regime.trend === 'Bear Trend' ? 'השוק בירידה. עדיף להמתין עם קניות חדשות ולהחזיק יותר מזומן.' : regime.risk === 'Risk Off' ? 'המשקיעים בורחים מסיכון. להיזהר, להקטין פוזיציות תנודתיות.' : 'שוק מעורב. לקנות רק מה שמקבל סיגנל ברור, ובסכומים קטנים.';
-  const size = settings.get().portfolioSize || 200000;
-  const bal = reco?.profiles?.balanced;
-  const card = (title, body, sub = '') => `<section class="card"><h3>${esc(title)} ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}</h3>${body}</section>`;
-  const buyRow = (r) => `<div class="card tight" style="margin-bottom:.5rem"><div class="row spread"><div><a href="#/asset/${esc(r.symbol)}"><b style="font-size:1.05rem">${esc(nameOf(r))}</b></a> <span class="muted">${esc(r.symbol)} · ${esc(r.sector || '')}</span></div><div class="row"><span class="num">${money(r.price, r.currency)}</span>${scoreBar(r.score)}</div></div>
-    <div style="margin:.3rem 0">${esc(plain(r))}</div>
-    <div class="row muted" style="font-size:.85rem">${r.mos != null ? (r.mos >= 0 ? `<span class="pos">מרווח ביטחון ${fmt.pct(r.mos, 0)} מתחת לשווי המוערך</span>` : `<span class="warn">המחיר ${fmt.pct(-r.mos, 0)} מעל השווי המוערך</span>`) : ''}<span>סיכון: ${esc(r.riskLevel || '—')}</span>${r.nextEarnings ? `<span>דוח הבא ${fmt.date(r.nextEarnings)}</span>` : ''}</div>
-    <div class="row" style="margin-top:.4rem"><button class="btn sm primary" data-buy="${esc(r.symbol)}" data-price="${r.price}">קנייה (וירטואלית)</button><button class="btn sm" data-watch="${esc(r.symbol)}">${held.has(r.symbol) ? 'במעקב ✓' : 'הוסף למעקב'}</button><a class="btn sm ghost" href="#/asset/${esc(r.symbol)}">למה? פרטים</a></div></div>`;
-  const sellRow = (r) => `<div class="card tight" style="margin-bottom:.5rem;border-color:var(--neg)"><div class="row spread"><div><a href="#/asset/${esc(r.symbol)}"><b>${esc(nameOf(r))}</b></a> <span class="muted">${esc(r.symbol)}</span></div><span class="sig sig-${esc(r.signal.replace(' ', '_'))}">${esc(SIGNAL_HE[r.signal])}</span></div><div>${esc(plain(r))}</div>${(paper?.open || []).some((p) => p.symbol === r.symbol) ? `<button class="btn sm danger" data-sell="${esc(r.symbol)}" style="margin-top:.4rem">מכירה (וירטואלית)</button>` : ''}</div>`;
-  const pos = paper?.open || [];
-  main.innerHTML = `
-  <div class="page-head"><div><h1>היום</h1><span class="muted">נכון ל-${esc(rank?.date || '—')} · ${table.length ? `${table.length} נכסים נבדקו` : 'אין עדיין ניתוח להיום'}</span></div><a class="btn ghost sm" href="#/dashboard">מצב מתקדם →</a></div>
-  ${card('מצב השוק', regime?.risk ? `<div class="row"><span class="tag ${regime.risk === 'Risk On' ? 'fact' : regime.risk === 'Risk Off' ? 'missing' : ''}" style="font-size:1rem">${esc(mood)}</span></div><p>${esc(moodText)}</p><p class="muted">S&P 500: ${regime.inputs?.spx ? (regime.inputs.spx.aboveSma200 ? 'מעל הממוצע השנתי (חיובי)' : 'מתחת לממוצע השנתי (שלילי)') : '—'}${isNum(regime.inputs?.vix) ? ` · מדד הפחד VIX: ${fmt.num(regime.inputs.vix, 0)} (${regime.inputs.vix < 20 ? 'רגוע' : regime.inputs.vix < 30 ? 'מתוח' : 'פאניקה'})` : ''}${isNum(regime.inputs?.usdils) ? ` · דולר: ${fmt.num(regime.inputs.usdils, 2)} ₪` : ''}</p>` : '<div class="empty">אין נתוני שוק עדיין</div>')}
-  ${card('מה לקנות עכשיו', buys.length ? buys.map(buyRow).join('') + '<p class="muted">רק נכסים שקיבלו סיגנל קנייה. כניסה בהדרגה, לא יותר מ-10% מהתיק לנכס אחד.</p>' : `<div class="empty">אין כרגע סיגנלי קנייה ברורים. ${table.length ? 'זה בסדר, לפעמים הכי נכון לחכות.' : 'הניתוח היומי עוד לא רץ.'}</div>`, buys.length ? `${buys.length} סיגנלים` : '')}
-  ${card('מה למכור או להקטין', sells.length ? sells.map(sellRow).join('') : `<div class="empty">אין נכס ברשימת המעקב או בתיק הווירטואלי שקיבל סיגנל מכירה.</div>${weak.length ? `<p class="muted">נכסים בשוק שכדאי להתרחק מהם כרגע: ${weak.map((r) => esc(nameOf(r))).join(', ')}</p>` : ''}`)}
-  ${card('התיק שלי (וירטואלי)', pos.length ? `<table><thead><tr><th>נכס</th><th class="num">כמות</th><th class="num">קניתי ב-</th><th class="num">עכשיו</th><th class="num">רווח/הפסד</th><th></th></tr></thead><tbody>${pos.map((p) => `<tr><td><a href="#/asset/${esc(p.symbol)}">${esc(nameOf(by.get(p.symbol) || { symbol: p.symbol }))}</a></td><td class="num">${p.qty}</td><td class="num">${fmt.num(p.price)}</td><td class="num">${fmt.num(p.current)}</td><td class="num ${cls(p.pnl)}">${fmt.usd(p.pnl)} (${fmt.pct(p.pnlPct, 1, true)})</td><td class="row"><button class="btn sm" data-sell="${esc(p.symbol)}">מכור</button><button class="btn sm ghost" data-cancel="${esc(p.id)}" title="מחיקת רישום (טעות או כפילות)">בטל רישום</button></td></tr>`).join('')}</tbody></table><p class="muted">${pos.length} רישומים · הקנייה האחרונה: ${fmt.dt(pos[pos.length - 1]?.date)}</p><p class="muted">שווי ${fmt.usd(paper.marketValue)} · רווח לא ממומש <span class="${cls(paper.unrealized)}">${fmt.usd(paper.unrealized)}</span> · ממומש <span class="${cls(paper.realized)}">${fmt.usd(paper.realized)}</span></p>` : '<div class="empty">התיק הווירטואלי ריק. לחץ "קנייה (וירטואלית)" על נכס כדי לעקוב אחרי ביצועי המערכת בלי כסף אמיתי.</div>')}
-  ${card(`איך הייתי מחלק ${fmt.ils(size)} היום`, bal ? `<table><thead><tr><th>נכס</th><th class="num">אחוז</th><th class="num">סכום</th></tr></thead><tbody>${bal.positions.map((x) => `<tr><td>${x.symbol === 'CASH' ? '<b>מזומן / פיקדון</b>' : `<a href="#/asset/${esc(x.symbol)}">${esc(nameOf(by.get(x.symbol) || x))}</a> <span class="muted">${esc(x.symbol)}</span>`}</td><td class="num">${fmt.pct(x.weight, 0)}</td><td class="num">${fmt.ils(x.ils)}</td></tr>`).join('')}</tbody></table><p class="muted">תיק "מאוזן": תנודתיות צפויה ${fmt.pct(bal.risk?.volatility, 0)} בשנה, ירידה זמנית אפשרית של ${fmt.pct(bal.risk?.maxDrawdown, 0)}. <a href="#/portfolio">פרופילים אחרים (שמרני / צמיחה / אגרסיבי) →</a></p>` : '<div class="empty">התיק המומלץ ייבנה אחרי הניתוח היומי.</div>', 'הצעה, לא ייעוץ')}
-  <p class="disclaimer">כל הסיגנלים הם תוצאה של מודל מחשב שמנתח נתונים, לא ייעוץ השקעות. הכסף שלך, ההחלטה שלך.</p>`;
+  const usdils = regime?.inputs?.usdils || reco?.usdils || 3.7;
+  return { regime, rank, watch, paper, reco, table, by, usdils, size: settings.get().portfolioSize || 200000 };
+}
+const ils = (usd) => fmt.ils(usd * (D?.usdils || 3.7));
+const riskWord = (r) => ({ 'נמוך': 'סיכון נמוך', 'בינוני': 'סיכון בינוני', 'גבוה': 'סיכון גבוה' }[r?.riskLevel] || 'סיכון לא ידוע');
+const why = (r) => { // משפט אחד בעברית פשוטה
+  const c = r.components || {}; const good = [], bad = [];
+  const say = (k, g, b) => { const v = c[k]; if (!isNum(v)) return; if (v >= 70) good.push(g); else if (v <= 40) bad.push(b); };
+  say('fundamental', 'החברה רווחית ויציבה', 'החברה לא רווחית מספיק'); say('valuation', 'המחיר סביר', 'המחיר יקר'); say('growth', 'צומחת', 'לא צומחת'); say('technical', 'המגמה עולה', 'המגמה יורדת'); say('momentum', 'בתנופה', 'מאבדת תנופה'); say('risk', 'יציבה', 'תנודתית');
+  return (good.length ? good.slice(0, 3).join(', ') : '') + (bad.length ? (good.length ? '. אבל: ' : 'חסרונות: ') + bad.slice(0, 2).join(', ') : '') + '.';
+};
+const held = () => new Set([...(D.paper?.open || []).map((p) => p.symbol), ...(D.watch?.items || []).map((w) => w.symbol)]);
+const sec = (title, body, sub = '') => `<section class="card"><h3>${esc(title)} ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}</h3>${body}</section>`;
+const positions = () => {
+  const pos = D.paper?.open || [];
+  const rows = pos.map((p) => { const cur = isNum(p.current) ? p.current : p.price; return { ...p, cur, costIls: p.qty * p.price * D.usdils, valIls: p.qty * cur * D.usdils, pnlIls: p.qty * (cur - p.price) * D.usdils }; });
+  return { rows, cost: rows.reduce((s, r) => s + r.costIls, 0), val: rows.reduce((s, r) => s + r.valIls, 0) };
+};
+const buyCard = (r, compact = false) => `<div class="card tight" style="margin-bottom:.5rem"><div class="row spread"><a href="#/asset/${esc(r.symbol)}" style="font-size:1.1rem;font-weight:700">${esc(nameOf(r))}</a><span class="tag ${r.signal === 'STRONG BUY' ? 'fact' : ''}">${esc(SIGNAL_HE[r.signal] || '')}</span></div>
+  <div style="margin:.25rem 0">${esc(why(r))}</div>
+  <div class="muted" style="font-size:.85rem">מחיר ${r.currency === 'ILS' ? fmt.num(r.price) + ' ₪' : '$' + fmt.num(r.price) + ' (' + ils(r.price) + ')'} · ${esc(riskWord(r))}${r.nextEarnings ? ' · דוח בקרוב: ' + fmt.date(r.nextEarnings) : ''}</div>
+  ${compact ? '' : `<div class="row" style="margin-top:.45rem"><button class="btn sm primary" data-buy="${esc(r.symbol)}">קנייה</button><button class="btn sm" data-watch="${esc(r.symbol)}">${held().has(r.symbol) ? 'במעקב ✓' : 'עקוב'}</button><a class="btn sm ghost" href="#/asset/${esc(r.symbol)}">פרטים</a></div>`}</div>`;
+const sellCard = (r) => `<div class="card tight" style="margin-bottom:.5rem;border-color:var(--neg)"><div class="row spread"><a href="#/asset/${esc(r.symbol)}" style="font-size:1.1rem;font-weight:700">${esc(nameOf(r))}</a><span class="sig sig-${esc(r.signal.replace(' ', '_'))}">${esc(SIGNAL_HE[r.signal])}</span></div><div>${esc(why(r))}</div>${(D.paper?.open || []).some((p) => p.symbol === r.symbol) ? `<button class="btn sm danger" data-sell="${esc(r.symbol)}" style="margin-top:.4rem">מכירה</button>` : ''}</div>`;
+const mood = () => {
+  const g = D.regime; if (!g?.risk) return '<div class="empty">אין נתוני שוק עדיין</div>';
+  const label = `${REGIME_HE[g.trend] || g.trend} · ${REGIME_HE[g.risk] || g.risk}`;
+  const text = g.trend === 'Bull Trend' && g.risk === 'Risk On' ? 'השוק בעלייה והמשקיעים רגועים. אפשר לקנות בהדרגה.' : g.trend === 'Bear Trend' ? 'השוק בירידה. עדיף לחכות עם קניות ולהחזיק מזומן.' : g.risk === 'Risk Off' ? 'המשקיעים מפחדים. להיזהר ולהקטין סיכון.' : 'שוק מעורב. לקנות רק מה שמקבל סיגנל ברור, בסכומים קטנים.';
+  const color = g.trend === 'Bull Trend' && g.risk !== 'Risk Off' ? 'fact' : g.trend === 'Bear Trend' || g.risk === 'Risk Off' ? 'missing' : 'stale';
+  return `<span class="tag ${color}" style="font-size:1rem">${esc(label)}</span><p style="margin:.4rem 0 0">${esc(text)}</p>`;
+};
+
+const VIEWS = {
+  today(){
+    const buys = D.table.filter((r) => ['STRONG BUY', 'BUY'].includes(r.signal)).sort((a, b) => b.score - a.score);
+    const h = held(); const sells = D.table.filter((r) => h.has(r.symbol) && ['SELL', 'REDUCE'].includes(r.signal));
+    const P = positions();
+    return `<h1>היום</h1><div class="muted" style="margin-bottom:.8rem">${esc(D.rank?.date || '')}</div>
+    ${sec('מצב השוק', mood())}
+    ${sec('התיק שלי', P.rows.length ? `<div class="grid g2"><div class="kpi"><span class="v">${fmt.ils(P.val)}</span><span class="l">שווי עכשיו</span></div><div class="kpi"><span class="v ${cls(P.val - P.cost)}">${fmt.ils(P.val - P.cost)}</span><span class="l">רווח / הפסד</span></div></div><a class="btn" href="#/mine" style="margin-top:.5rem">לתיק המלא</a>` : '<div class="empty">עוד לא קנית כלום. עבור ל"לקנות".</div>')}
+    ${sec('מה לעשות היום', (sells.length ? sells.map(sellCard).join('') : '') + (buys.length ? buys.slice(0, 3).map((r) => buyCard(r)).join('') + (buys.length > 3 ? `<a class="btn" href="#/buy">עוד ${buys.length - 3} הזדמנויות</a>` : '') : (sells.length ? '' : '<div class="empty">אין היום פעולה מומלצת. לפעמים לא לעשות כלום זו ההחלטה הנכונה.</div>')))}`;
+  },
+  buy(){
+    const buys = D.table.filter((r) => ['STRONG BUY', 'BUY'].includes(r.signal)).sort((a, b) => b.score - a.score);
+    const watchOnly = D.table.filter((r) => r.signal === 'WATCH').sort((a, b) => b.score - a.score).slice(0, 6);
+    return `<h1>מה לקנות</h1><div class="muted" style="margin-bottom:.8rem">${buys.length} נכסים עם סיגנל קנייה · ${esc(D.rank?.date || '')}</div>
+    ${buys.length ? buys.map((r) => buyCard(r)).join('') : '<div class="empty">אין כרגע סיגנלי קנייה.</div>'}
+    ${watchOnly.length ? sec('כמעט — במעקב', watchOnly.map((r) => buyCard(r, true)).join(''), 'טובות, אבל עוד לא זמן לקנות') : ''}
+    <p class="muted">כלל אצבע: לא יותר מ-10% מהתיק בנכס אחד, ולקנות בשניים-שלושה שלבים ולא בבת אחת.</p>`;
+  },
+  sell(){
+    const h = held(); const sells = D.table.filter((r) => h.has(r.symbol) && ['SELL', 'REDUCE'].includes(r.signal));
+    const avoid = D.table.filter((r) => !h.has(r.symbol) && r.signal === 'SELL').sort((a, b) => a.score - b.score).slice(0, 8);
+    const mine = D.table.filter((r) => h.has(r.symbol) && !['SELL', 'REDUCE'].includes(r.signal));
+    return `<h1>מה למכור</h1><div class="muted" style="margin-bottom:.8rem">בודק את מה שיש לך ואת רשימת המעקב</div>
+    ${sells.length ? sells.map(sellCard).join('') : '<div class="empty">שום דבר שיש לך לא צריך מכירה כרגע.</div>'}
+    ${mine.length ? sec('מה שיש לך — במצב טוב', mine.map((r) => `<div class="row spread" style="padding:.35rem 0;border-bottom:1px solid var(--line)"><a href="#/asset/${esc(r.symbol)}">${esc(nameOf(r))}</a><span class="tag">${esc(SIGNAL_HE[r.signal])}</span></div>`).join('')) : ''}
+    ${avoid.length ? sec('להתרחק', avoid.map((r) => `<div class="row spread" style="padding:.35rem 0;border-bottom:1px solid var(--line)"><a href="#/asset/${esc(r.symbol)}">${esc(nameOf(r))}</a><span class="muted" style="font-size:.85rem">${esc(why(r))}</span></div>`).join(''), 'לא לקנות עכשיו') : ''}`;
+  },
+  mine(){
+    const P = positions(); const bal = D.reco?.profiles;
+    const prof = settings.get().riskProfile || 'balanced';
+    const p = bal?.[prof];
+    return `<h1>התיק שלי</h1>
+    ${sec('מה יש לי', P.rows.length ? `<div class="grid g2" style="margin-bottom:.6rem"><div class="kpi"><span class="v">${fmt.ils(P.val)}</span><span class="l">שווה עכשיו</span></div><div class="kpi"><span class="v ${cls(P.val - P.cost)}">${fmt.ils(P.val - P.cost)} <small>(${fmt.pct(P.cost ? P.val / P.cost - 1 : 0, 1, true)})</small></span><span class="l">רווח / הפסד</span></div></div>
+      ${P.rows.map((r) => `<div class="card tight" style="margin-bottom:.5rem"><div class="row spread"><a href="#/asset/${esc(r.symbol)}" style="font-weight:700;font-size:1.05rem">${esc(nameOf(D.by.get(r.symbol) || { symbol: r.symbol }))}</a><span class="${cls(r.pnlIls)}" style="font-weight:700">${fmt.ils(r.pnlIls)}</span></div><div class="muted" style="font-size:.85rem">${r.qty} יחידות · קניתי ב-$${fmt.num(r.price)} · עכשיו $${fmt.num(r.cur)} · שווה ${fmt.ils(r.valIls)}</div><div class="row" style="margin-top:.4rem">${D.by.get(r.symbol) ? `<span class="tag">המערכת אומרת: ${esc(SIGNAL_HE[D.by.get(r.symbol).signal])}</span>` : ''}<button class="btn sm" data-sell="${esc(r.symbol)}">מכירה</button><button class="btn sm ghost" data-cancel="${esc(r.id)}">בטל רישום</button></div></div>`).join('')}
+      <p class="muted">קניות ומכירות כאן הן תרגול (וירטואלי). כסף אמיתי לא זז.</p>` : '<div class="empty">התיק ריק. עבור ל"לקנות" ובחר נכס.</div>')}
+    ${sec('מה מומלץ לי', p ? `<div class="row" style="margin-bottom:.6rem">${[['conservative', 'בטוח'], ['balanced', 'בינוני'], ['growth', 'צמיחה'], ['aggressive', 'נועז']].map(([k, l]) => `<button class="chip ${k === prof ? 'on' : ''}" data-prof="${k}">${l}</button>`).join('')}</div>
+      <table><thead><tr><th>נכס</th><th class="num">אחוז</th><th class="num">סכום</th></tr></thead><tbody>${p.positions.map((x) => `<tr><td>${x.symbol === 'CASH' ? 'מזומן / פיקדון' : `<a href="#/asset/${esc(x.symbol)}">${esc(nameOf(D.by.get(x.symbol) || x))}</a>`}</td><td class="num">${fmt.pct(x.weight, 0)}</td><td class="num">${fmt.ils(x.ils)}</td></tr>`).join('')}</tbody></table>
+      <p class="muted">איך היה נראה תיק של ${fmt.ils(D.size)} ברמת סיכון "${esc({ conservative: 'בטוח', balanced: 'בינוני', growth: 'צמיחה', aggressive: 'נועז' }[prof])}": בשנה גרועה הוא עלול לרדת בערך ${fmt.pct(Math.abs(p.risk?.maxDrawdown || 0), 0)}. <a href="#/explain">איך זה נבנה?</a></p>` : '<div class="empty">ההמלצה תופיע אחרי הניתוח היומי.</div>', 'הצעה, לא ייעוץ')}`;
+  },
+};
+
+export async function render(main, params = {}){
+  const view = params.view || 'today';
+  main.innerHTML = loading('טוען…');
+  try { D = await load(); } catch (e) { main.innerHTML = errorBox(e) + '<p class="muted"><a href="#/settings">בדוק את החיבור בהגדרות</a></p>'; return; }
+  main.innerHTML = `<div style="max-width:720px;margin:0 auto">${VIEWS[view] ? VIEWS[view]() : VIEWS.today()}<p class="disclaimer">המערכת מנתחת נתונים ומציעה. היא לא יועץ השקעות. ההחלטה שלך.</p></div>`;
   if (main.__simpleClick) main.removeEventListener('click', main.__simpleClick);
   main.__simpleClick = async (e) => {
-    const b = e.target.closest('[data-buy],[data-sell],[data-watch],[data-cancel]'); if (!b) return;
-    if (b.dataset.cancel){ if (!confirm('למחוק את הרישום הזה מהתיק הווירטואלי?')) return; try { await api('/paper/trade?id=' + b.dataset.cancel, { method: 'DELETE' }); invalidate(''); toast('הרישום נמחק'); render(main); } catch (err) { toast(err.message, 'err'); } return; }
-    if (b.dataset.watch){ try { await api('/watchlist', { method: 'POST', body: { symbol: b.dataset.watch } }); invalidate(''); toast('נוסף למעקב'); render(main); } catch (err) { toast(err.message, 'err'); } return; }
+    const b = e.target.closest('[data-buy],[data-sell],[data-watch],[data-cancel],[data-prof]'); if (!b) return;
+    if (b.dataset.prof){ settings.set({ riskProfile: b.dataset.prof }); render(main, params); return; }
+    if (b.dataset.watch){ try { await api('/watchlist', { method: 'POST', body: { symbol: b.dataset.watch } }); invalidate(''); toast('נוסף למעקב'); render(main, params); } catch (err) { toast(err.message, 'err'); } return; }
+    if (b.dataset.cancel){ if (!confirm('למחוק את הרישום הזה?')) return; try { await api('/paper/trade?id=' + b.dataset.cancel, { method: 'DELETE' }); invalidate(''); toast('נמחק'); render(main, params); } catch (err) { toast(err.message, 'err'); } return; }
     const side = b.dataset.buy ? 'buy' : 'sell', sym = b.dataset.buy || b.dataset.sell;
-    const price = +b.dataset.price || by.get(sym)?.price;
-    const suggested = price && side === 'buy' ? Math.max(1, Math.floor((size * 0.05) / (by.get(sym)?.currency === 'ILS' ? price : price * 3.7))) : (pos.find((p) => p.symbol === sym)?.qty || 1);
-    const mm = modal(`<h2>${side === 'buy' ? 'קנייה' : 'מכירה'} וירטואלית — ${esc(nameOf(by.get(sym) || { symbol: sym }))}</h2><p class="muted">זה תרגול: לא זז כסף אמיתי. המערכת תעקוב אם ההחלטה הייתה טובה.</p><div class="stack"><label>כמות <input id="q" type="number" value="${suggested}" min="1"></label><p class="muted">מחיר נוכחי ${fmt.num(price)} · סה"כ כ-${fmt.num(price * suggested, 0)} ${by.get(sym)?.currency === 'ILS' ? '₪' : '$'}${side === 'buy' ? ' (כ-5% מהתיק)' : ''}</p><div class="row"><button class="btn primary" id="ok">אישור</button><button class="btn" data-close>ביטול</button></div><div id="err" class="neg" style="white-space:pre-wrap"></div></div>`);
+    const r = D.by.get(sym); const price = r?.price; const pos = (D.paper?.open || []).find((p) => p.symbol === sym);
+    const isIls = r?.currency === 'ILS';
+    const suggested = side === 'buy' ? Math.max(1, Math.floor((D.size * 0.05) / (isIls ? price : price * D.usdils))) : (pos?.qty || 1);
+    const mm = modal(`<h2>${side === 'buy' ? 'קנייה' : 'מכירה'} — ${esc(nameOf(r || { symbol: sym }))}</h2><p class="muted">תרגול: לא זז כסף אמיתי.</p><div class="stack"><label>כמה יחידות? <input id="q" type="number" value="${suggested}" min="1" style="font-size:1.2rem;width:120px"></label><p id="tot"></p><div class="row"><button class="btn primary" id="ok" style="font-size:1.05rem">אישור</button><button class="btn" data-close>ביטול</button></div><div id="err" class="neg" style="white-space:pre-wrap"></div></div>`);
+    const q = mm.el.querySelector('#q'), tot = mm.el.querySelector('#tot');
+    const upd = () => { const n = +q.value || 0; tot.innerHTML = `מחיר ליחידה ${isIls ? fmt.num(price) + ' ₪' : '$' + fmt.num(price)} · סה"כ <b>${isIls ? fmt.ils(n * price) : fmt.ils(n * price * D.usdils)}</b>${side === 'buy' ? ` (${fmt.pct((isIls ? n * price : n * price * D.usdils) / D.size, 0)} מהתיק)` : ''}`; };
+    q.oninput = upd; upd();
     mm.el.querySelector('#ok').onclick = async () => {
       const ok = mm.el.querySelector('#ok'); ok.disabled = true; ok.textContent = 'שולח…';
-      try { const r = await api('/paper/order', { method: 'POST', body: { symbol: sym, side, qty: +mm.el.querySelector('#q').value, reason: side === 'buy' ? `סיגנל ${by.get(sym)?.signal || ''}` : 'מכירה מהמסך הפשוט' } }); invalidate(''); mm.close(); await render(main); const sec = [...main.querySelectorAll('section.card')].find((x) => x.textContent.includes('התיק שלי')); if (sec){ sec.style.borderColor = 'var(--pos)'; sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); sec.insertAdjacentHTML('afterbegin', `<div class="tag fact" style="font-size:.95rem;margin-bottom:.5rem">✓ ${side === 'buy' ? 'נרשם' : 'נמכר'}: ${esc(nameOf(by.get(sym) || { symbol: sym }))} במחיר ${fmt.num(r.price)} (${esc(r.priceSource?.source || '')})</div>`); } }
-      catch (err) { ok.disabled = false; ok.textContent = 'אישור'; const s = settings.get(); mm.el.querySelector('#err').textContent = 'לא הצלחתי לרשום: ' + err.message + (err.status === 401 ? '\nהאפליקציה לא מחוברת עם הטוקן. פתח שוב את קישור החיבור מהמייל, או הדבק את הטוקן בהגדרות.' : err.status === 0 ? '\nאין חיבור לשרת. בדוק אינטרנט.' : '') + (!s.token ? '\n(לא שמור טוקן במכשיר הזה)' : ''); }
+      try { const res = await api('/paper/order', { method: 'POST', body: { symbol: sym, side, qty: +q.value, reason: side === 'buy' ? `סיגנל ${r?.signal || ''}` : 'מכירה' } }); invalidate(''); mm.close(); location.hash = '#/mine'; await render(main, { view: 'mine' }); toast(`✓ ${side === 'buy' ? 'נקנה' : 'נמכר'}: ${nameOf(r || { symbol: sym })} במחיר ${fmt.num(res.price)}`); }
+      catch (err) { ok.disabled = false; ok.textContent = 'אישור'; mm.el.querySelector('#err').textContent = 'לא הצלחתי: ' + err.message + (err.status === 401 ? '\nהאפליקציה לא מחוברת. פתח את קישור החיבור מהמייל.' : ''); }
     };
   };
   main.addEventListener('click', main.__simpleClick);
