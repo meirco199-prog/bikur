@@ -316,6 +316,11 @@ async function handle(req, env0, ctx){
       return json(perf);
     }
     needAuth();
+    if (p1 === 'trade' && req.method === 'DELETE'){ // ביטול רישום של פוזיציה פתוחה (טעות/כפילות) — עסקאות סגורות לא נמחקות
+      const id = q.id || body.id; const t = await broker.trades(); const x = t.find((y) => y.id === id);
+      if (!x) return err('לא נמצא'); if (x.exitDate) return err('עסקה סגורה לא ניתנת לביטול');
+      await broker.save(t.filter((y) => y.id !== id)); return json({ ok: true });
+    }
     if (p1 === 'order'){
       const s = sym(body.symbol);
       let price = isNum(body.price) ? body.price : null, priceSource = price ? { source: 'user' } : null;

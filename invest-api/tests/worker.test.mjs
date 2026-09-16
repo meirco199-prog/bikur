@@ -205,3 +205,10 @@ test('snapshot חסר (תקלת נתונים) מתמלא מחדש; ציון אמ
   const m = JSON.parse(store.get(`snap:${day}:MSFT`)); assert.equal(m.score, 12, 'ציון אמיתי נשמר');
   const r = JSON.parse(store.get(`rank:${day}`)); assert.ok(r.analyzed > 100, 'דירוג ריק הוחלף');
 });
+test('DELETE /paper/trade מוחק רישום פתוח בלבד', async () => {
+  const b = await get('/paper/order', { body: { symbol: 'GOOGL', side: 'buy', qty: 2, price: 100 }, auth: true }); const id = b.j.result.id;
+  assert.equal((await get('/paper/trade?id=' + id, { method: 'DELETE' })).status, 401);
+  const d = await get('/paper/trade?id=' + id, { method: 'DELETE', auth: true }); assert.equal(d.status, 200);
+  const p = await get('/paper'); assert.ok(!p.j.open.some((t) => t.id === id));
+  assert.equal((await get('/paper/trade?id=nope', { method: 'DELETE', auth: true })).status, 400);
+});
