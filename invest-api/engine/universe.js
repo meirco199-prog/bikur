@@ -41,10 +41,10 @@ export const SEED_UNIVERSE = [
 // מדדים ומאקרו (Stooq / FRED / EODHD)
 export const INDICES = [
   { id: 'SPX', symbol: '^SPX', name: 'S&P 500', stooq: '^spx', twelvedata: 'SPX', proxy: 'SPY', type: 'index', currency: 'USD' },
-  { id: 'NDQ', symbol: '^NDQ', name: 'Nasdaq Composite', stooq: '^ndq', twelvedata: 'IXIC', proxy: 'QQQ', type: 'index', currency: 'USD' },
-  { id: 'NDX', symbol: '^NDX', name: 'Nasdaq 100', stooq: '^ndx', twelvedata: 'NDX', proxy: 'QQQ', type: 'index', currency: 'USD' },
-  { id: 'RUT', symbol: '^RUT', name: 'Russell 2000', stooq: '^rut', twelvedata: 'RUT', proxy: 'IWM', type: 'index', currency: 'USD' },
-  { id: 'DJI', symbol: '^DJI', name: 'Dow Jones', stooq: '^dji', twelvedata: 'DJI', proxy: 'DIA', type: 'index', currency: 'USD' },
+  { id: 'NDQ', symbol: '^NDQ', name: 'Nasdaq Composite', stooq: '^ndq', proxy: 'QQQ', type: 'index', currency: 'USD' },
+  { id: 'NDX', symbol: '^NDX', name: 'Nasdaq 100', stooq: '^ndx', proxy: 'QQQ', type: 'index', currency: 'USD' },
+  { id: 'RUT', symbol: '^RUT', name: 'Russell 2000', stooq: '^rut', proxy: 'IWM', type: 'index', currency: 'USD' },
+  { id: 'DJI', symbol: '^DJI', name: 'Dow Jones', stooq: '^dji', proxy: 'DIA', type: 'index', currency: 'USD' },
   { id: 'TA35', symbol: 'TA35.TA', name: 'ת"א 35', eodhd: 'TA35.INDX', type: 'index', currency: 'ILS' },
   { id: 'TA125', symbol: 'TA125.TA', name: 'ת"א 125', eodhd: 'TA125.INDX', type: 'index', currency: 'ILS' },
 ];

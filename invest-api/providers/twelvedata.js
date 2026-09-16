@@ -7,10 +7,11 @@ async function call(ctx, path, params){
   if (r.status === 'error' || r.code) throw Object.assign(new Error('twelvedata: ' + (r.message || r.code)), { kind: r.code === 429 ? 'quota' : 'error' });
   return r;
 }
-const symFor = (symbol, asset) => (asset?.twelvedata || (symbol.startsWith('^') ? symbol.slice(1) : symbol.replace('.', '/')));
+const symFor = (symbol, asset) => asset?.twelvedata || symbol; // Twelve Data משתמש בנקודה (BRK.B); מדדים רק אם מופה במפורש
 export const twelvedata = {
   id: 'twelvedata', priority: 2, supports: ['prices', 'quote'],
   available: (env) => !!env.TWELVEDATA_KEY,
+  appliesTo: (symbol, asset) => !symbol.startsWith('^') || !!asset?.twelvedata, // מדדים לא מכוסים בתוכנית החינמית — ETF מייצג במקומם
   async prices(symbol, { from } = {}, ctx){
     const r = await call(ctx, 'time_series', { symbol: symFor(symbol, ctx.asset), interval: '1day', outputsize: from && from > '2020' ? '400' : '5000', order: 'ASC', ...(from ? { start_date: from } : {}) });
     const vals = r.values || [];

@@ -3,5 +3,5 @@
   "APP_TOKEN_SHA256": "adda97507c52ac7f2837e6df521266233379f4b1180d9122f0d8752054c24ef4",
   "CRON_SECRET": "invest-tick-2c85f4f730fb",
   "EDGAR_UA": "bikur-invest research meirco199@gmail.com",
-  "CRON_BATCH": "2"
+  "CRON_BATCH": "3"
 }

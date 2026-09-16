@@ -6,6 +6,7 @@ name: Tick invest (daily processing)
 on:
   schedule:
     - cron: '17 1 * * 2-6'
+    - cron: '47 3 * * 2-6'
   push:
     branches: [main]
     paths:
