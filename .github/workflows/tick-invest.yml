@@ -31,6 +31,8 @@ jobs:
           echo "=== health"; curl -sS --max-time 30 "$W/health" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("auth:", d.get("auth"), "kv:", d.get("kv"), "kvWriteLimitHit:", d.get("kvWriteLimitHit"), "ai:", d.get("ai")); print("keys:", [k["name"] for k in d.get("keys",[]) if k.get("set")]); print("budget:", d.get("budget")); print("cron:", d.get("cron")); print("recentErrors:"); [print("  ", e.get("ts","")[5:16], e.get("where"), "|", e.get("msg")) for e in d.get("recentErrors",[])]'
           TODAY=$(date -u +%F)
           echo "=== snapshot AAPL"; curl -sS --max-time 30 "$W/snapshot/$TODAY/AAPL" | head -c 700; echo
+          echo "=== paper"; curl -sS --max-time 30 "$W/paper" | head -c 900; echo
+          echo "=== quote AAPL"; curl -sS --max-time 30 "$W/asset/AAPL" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("price:", d.get("price"), d.get("priceSource"), "signal:", (d.get("signal") or {}).get("label"), "score:", (d.get("score") or {}).get("total"))'
           echo "=== prices SPY"; curl -sS --max-time 60 "$W/prices/SPY?from=2026-09-01" | head -c 600; echo
           echo "=== facts AAPL (EDGAR)"; curl -sS --max-time 60 "$W/bundle/AAPL?light=0" | python3 -c 'import json,sys; d=json.load(sys.stdin); f=d.get("facts",{}); print("facts:", f.get("source"), f.get("asOf"), "series:", {k: len(v) for k,v in (f.get("series") or {}).items()} if not f.get("missing") else f.get("reason")); print("prices:", d.get("prices",{}).get("source"), d.get("prices",{}).get("asOf"), d.get("prices",{}).get("reason"))'
           FORCE=""; [ "$CMD" = "cron-run-force" ] && { CMD=cron-run; FORCE="&force=1"; }
