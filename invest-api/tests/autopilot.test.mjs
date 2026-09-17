@@ -77,3 +77,39 @@ test('אוטומט: משקלי ענף ומספר פוזיציות מחושבים
   const d2 = decideOrders({ table, regime: bull, perf: perf(100000, pos), fx: 3.7, buysToday: 3 });
   assert.ok(!d2.orders.some((o) => o.side === 'buy')); assert.ok(d2.skipped.every((s) => /מכסת/.test(s.reason)));
 });
+
+const etf = (symbol, assetClass, role, price = 100) => ({ symbol, signal: 'HOLD', score: 55, price, currency: 'USD', type: 'etf', assetClass, role, sector: assetClass, vol1y: 0.15, components: {} });
+test('אוטומט: ליבה — קרן מדד, אג"ח וזהב נקנות בשלבים לפי ה-sleeves בלי קשר לסיגנל, ולא נספרות כלוויין', () => {
+  const table = [etf('VTI', 'equity', 'core', 300), etf('BND', 'bond', 'bond', 70), etf('GLD', 'gold', 'gold', 250), etf('SPY', 'equity', 'core', 600), row('AAA', 'BUY', 70)];
+  const d = decideOrders({ table, regime: bull, perf: perf(200000), fx: 3.7 });
+  const core = d.orders.filter((o) => o.rule === 'core');
+  assert.deepEqual(core.map((o) => o.symbol), ['VTI', 'BND', 'GLD'], JSON.stringify(d.orders));
+  const vti = core[0]; assert.ok(vti.estIls <= 200000 * 0.35 / 3 + 1 && vti.estIls > 20000, 'שלב = שליש מ-35%: ' + vti.estIls); assert.match(vti.reason, /ליבה.*שלב 1 מתוך 3/);
+  assert.ok(!d.orders.some((o) => o.symbol === 'SPY'), 'רק קרן ליבה אחת לכל sleeve');
+  assert.ok(d.orders.find((o) => o.symbol === 'AAA' && o.rule === 'open'), 'לוויין נקנה במקביל');
+  // ריצה שנייה: הליבה ממשיכה לשלב 2, לא נמכרת לפי סיגנל SELL
+  const pos = [{ symbol: 'VTI', qty: 23, valueIls: 25000, pnlPct: -0.2 }];
+  const t2 = table.map((r) => (r.symbol === 'VTI' ? { ...r, signal: 'SELL', score: 20 } : r));
+  const d2 = decideOrders({ table: t2, regime: bull, perf: perf(130000, pos), fx: 3.7 });
+  assert.ok(!d2.orders.some((o) => o.symbol === 'VTI' && o.side === 'sell'), 'ליבה לא נמכרת לפי סיגנל או עצירת הפסד');
+  assert.ok(d2.orders.find((o) => o.symbol === 'VTI' && o.rule === 'core' && /שלב 2/.test(o.reason)), JSON.stringify(d2.orders));
+});
+
+test('אוטומט: שוק דובי — ליבת המניות מוקטנת לחצי, אג"ח עדיין נקנה, מניות לא', () => {
+  const table = [etf('VTI', 'equity', 'core', 300), etf('BND', 'bond', 'bond', 70), row('AAA', 'STRONG BUY', 85)];
+  const pos = [{ symbol: 'VTI', qty: 63, valueIls: 70000, pnlPct: 0.1 }];
+  const d = decideOrders({ table, regime: { trend: 'Bear Trend', risk: 'Risk Off' }, perf: perf(130000, pos), fx: 3.7 });
+  const trim = d.orders.find((o) => o.symbol === 'VTI' && o.rule === 'bear-core'); assert.ok(trim, JSON.stringify(d.orders));
+  assert.ok(trim.qty >= 28 && trim.qty <= 33, 'מוכר עד יעד 17.5%: ' + trim.qty);
+  assert.ok(d.orders.find((o) => o.symbol === 'BND' && o.rule === 'core'));
+  assert.ok(!d.orders.some((o) => o.symbol === 'AAA'));
+});
+
+test('אוטומט: תקציב הלוויין (35%) מגביל קניות מניות בודדות', () => {
+  const table = [row('AAA', 'STRONG BUY', 85, { sector: 'A' }), row('BBB', 'STRONG BUY', 84, { sector: 'B' })];
+  const pos = [{ symbol: 'S1', qty: 1, valueIls: 68000, pnlPct: 0 }];
+  const t = [...table, row('S1', 'HOLD', 55, { sector: 'C' })];
+  const d = decideOrders({ table: t, regime: bull, perf: perf(132000, pos), fx: 3.7 });
+  assert.ok(d.orders.filter((o) => o.side === 'buy').length <= 1, JSON.stringify(d.orders));
+  assert.ok(d.skipped.some((s) => /תקציב המניות/.test(s.reason)), JSON.stringify(d.skipped));
+});
