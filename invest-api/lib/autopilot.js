@@ -71,8 +71,13 @@ export async function runAutopilot(ctx, { dry = false, force = false, trigger = 
         if (gate && (!qt || qt.missing || qt.stale || qt.isMarketOpen === false)){ rec.error = !qt || qt.missing ? 'אין שער חי — לא מבצעים (fail-closed)' : qt.isMarketOpen === false ? 'השוק סגור לנייר הזה' : 'שער ישן — לא מבצעים'; entry.orders.push(rec); continue; }
         // שער חי שסוטה מאוד מהסגירה (טעות ספק) — לא סוחרים עליו
         if (Math.abs(price / o.priceRef - 1) > 0.25){ rec.error = `שער חי ${price} רחוק מדי מהסגירה ${o.priceRef} — דילוג`; entry.orders.push(rec); continue; }
-        const r = await broker.placeOrder({ symbol: o.symbol, side: o.side, qty: o.qty, price, currency: o.currency || asset.currency || 'USD', fx, reason: `אוטומט: ${o.reason}`, signal: table.find((x) => x.symbol === o.symbol)?.signal || null, snapDate: day, priceSource });
-        rec.price = price; rec.priceSource = priceSource; rec.ok = true;
+        // סימולציה פנימית (לא ברוקר): מילוי במחיר הספק + החלקה שמרנית של 5 נקודות בסיס. נרשמים בנפרד: מחיר ההחלטה (סגירה
+        // שעליה נוצר הסיגנל), מחיר השליחה (ציטוט), מחיר המילוי, וההחלקה — כדי שבחיבור לברוקר אמיתי יהיה למה להשוות.
+        const SLIP = 0.0005;
+        const fill = round(o.side === 'buy' ? price * (1 + SLIP) : price * (1 - SLIP), 4);
+        const r = await broker.placeOrder({ symbol: o.symbol, side: o.side, qty: o.qty, price: fill, currency: o.currency || asset.currency || 'USD', fx, reason: `אוטומט: ${o.reason}`, signal: table.find((x) => x.symbol === o.symbol)?.signal || null, snapDate: day, priceSource });
+        rec.price = fill; rec.priceSource = priceSource; rec.ok = true;
+        rec.execution = { venue: 'simulated', decisionPrice: o.priceRef, submittedPrice: price, fillPrice: fill, slippagePct: SLIP, slippageIls: round(o.qty * Math.abs(fill - price) * (o.currency === 'ILS' ? 1 : fx), 2), quoteAsOf: qt?.asOf || null, marketOpen: qt?.isMarketOpen ?? null, orderType: 'market (simulated)', bid: null, ask: null, spread: null, fillLatencyMs: 0, partial: false };
         if (o.side === 'buy') rec.costIls = r.trade.costIls; else { rec.proceedsIls = r.proceedsIls; rec.pnlIls = round(r.closed.reduce((s, x) => s + (x.pnlIls || 0), 0), 0); }
       } catch (e) { rec.error = e.message; }
     }
