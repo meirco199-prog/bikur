@@ -14,6 +14,7 @@ if (process.env.SEED !== '0'){
   await db.put('user:watchlist', [{ symbol: 'NVDA', addedAt: '2026-09-01', note: 'בדיקה' }, { symbol: 'AAPL', addedAt: '2026-09-01' }]);
   const r = await cronStep(ctx, { batch: 300 }); console.log('seeded', r.done, 'finalized', r.finalized);
   const { runShadow } = await import('../../lib/shadow.js'); console.log('shadow', JSON.stringify((await runShadow(ctx)).agreement));
+  const { runAggressive } = await import('../../lib/aggressive.js'); console.log('aggressive', JSON.stringify((await runAggressive(ctx)).totalIls));
   // snapshot של אתמול (לצורך "מה השתנה") — מעתיקים עם ציון שונה
   const days = await db.get('idx:snapdays'); const day = days[0]; const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); await db.put(`snap:${y}:${s.symbol}`, { ...s, date: y, score: Math.max(0, (s.score || 50) - 12), signal: 'HOLD' }); }

@@ -1,7 +1,8 @@
 // יקום מכני — פונקציה טהורה. כלל: חברי S&P 500 → סינון נזילות → מכסה לפי ענף (יחסית להרכב המדד) → הגדולות בענף.
 // למה מכסה: התוכנית החינמית (KV 1,000 כתיבות/יום, מכסות ספקים) לא מאפשרת לנתח 500 חברות כל לילה. המכסה נשמרת
 // פרופורציונלית להרכב הענפי של המדד כדי לא להטות לטכנולוגיה/מגה-קאפ יותר מהמדד עצמו.
-export const MECHANICAL_RULE = { minVolume: 500000, cap: 100, maxAddPerRun: 25, minMembersForSectorQuota: 3 };
+// cap/maxAddPerRun גדולים מהמדד: כל חברי ה-S&P 500 נכנסים (הניתוח שלהם רץ ב-GitHub Actions ונשמר ב-shards, לא כתיבה לכל נייר)
+export const MECHANICAL_RULE = { minVolume: 500000, cap: 600, maxAddPerRun: 600, minMembersForSectorQuota: 3 };
 // דגימה יציבה כשאין נתוני גודל: hash של הסימבול (לא אלפביתי, לא אקראי בין ריצות)
 export const stableHash = (s) => { let h = 2166136261; for (const ch of String(s)){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
 

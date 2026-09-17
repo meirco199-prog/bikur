@@ -17,9 +17,19 @@ on:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cache S&P 500 data (prices, EDGAR facts)
+        uses: actions/cache@v4
+        with:
+          path: .cache/sp500
+          key: sp500-data-v1-${{ github.run_id }}
+          restore-keys: |
+            sp500-data-v1-
       - name: Run
         run: |
           W=https://invest-api.meirco199.workers.dev
@@ -36,6 +46,12 @@ jobs:
           echo "=== quote AAPL"; curl -sS --max-time 30 "$W/asset/AAPL" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("price:", d.get("price"), d.get("priceSource"), "signal:", (d.get("signal") or {}).get("label"), "score:", (d.get("score") or {}).get("total"))'
           echo "=== prices SPY"; curl -sS --max-time 60 "$W/prices/SPY?from=2026-09-01" | head -c 600; echo
           echo "=== facts AAPL (EDGAR)"; curl -sS --max-time 60 "$W/bundle/AAPL?light=0" | python3 -c 'import json,sys; d=json.load(sys.stdin); f=d.get("facts",{}); print("facts:", f.get("source"), f.get("asOf"), "series:", {k: len(v) for k,v in (f.get("series") or {}).items()} if not f.get("missing") else f.get("reason")); print("prices:", d.get("prices",{}).get("source"), d.get("prices",{}).get("asOf"), d.get("prices",{}).get("reason"))'
+          # ניתוח לילי של כל ה-S&P 500 כאן (Yahoo + EDGAR, בלי מכסות Worker) → shards ב-KV. בריצה המתוזמנת ובפקודת sp500-run
+          if [ "$CMD" = "sp500-run" ] || { [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%H)" -lt 3 ]; }; then
+            echo "=== sp500 nightly"; CRON_SECRET="$SECRET" WORKER_URL="$W" SP500_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/nightly-sp500.mjs || echo "::warning::sp500 nightly failed"
+            echo "=== shadow re-run (force)"; curl -sS --max-time 120 -X POST "$W/shadow/run?secret=$SECRET&force=1" | head -c 400; echo
+            echo "=== aggressive run"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET" | head -c 600; echo
+          fi
           FORCE=""; [ "$CMD" = "cron-run-force" ] && { CMD=cron-run; FORCE="&force=1"; }
           if [ "$CMD" = "cron-run" ]; then
             echo "=== cron-run (batch $BATCH)"
@@ -58,5 +74,6 @@ jobs:
           fi
           echo "=== auto status (last run)"; curl -sS --max-time 30 "$W/auto/status" | python3 -c 'import json,sys; d=json.load(sys.stdin); l=d.get("last") or {}; print("enabled:", d.get("enabled"), "profile:", d.get("profile"), "runs:", len(d.get("journal",[]))); print("last:", l.get("ts"), l.get("day"), l.get("trigger"), "rules v", l.get("rulesVersion")); print("regime:", (l.get("regime") or {}).get("summary")); print("before:", l.get("before"), "after:", l.get("after")); [print("  ", o["side"], o["qty"], "x", o["symbol"], o.get("name"), "@", o.get("price"), "ok" if o.get("ok") else "ERR " + str(o.get("error")), "|", o.get("reason")) for o in l.get("orders",[])]; print("notes:", l.get("notes")); [print("  skip", s["symbol"], "|", s["reason"]) for s in l.get("skipped",[])]'
           echo "=== shadow"; curl -sS --max-time 30 "$W/shadow/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("day:", d.get("day"), "n:", d.get("n"), "missing:", d.get("missing"), d.get("reason","")); print("agreement:", d.get("agreement")); print("actions:", {m: (d.get("models") or {}).get(m,{}).get("actions") for m in "ABC"}); print("top:", d.get("top")); print("revisions:", d.get("revisionsAvailable"), "used:", d.get("revisionsUsed"), "histDays:", d.get("revisionHistoryDays")); print("dupes:", (d.get("corr") or {}).get("dupes")); st=(d.get("stats") or {}).get("horizons") or {}; [print("  h", h, "days", v.get("days"), {m: {"n": x.get("n"), "ic": x.get("ic"), "mono": x.get("monotonic"), "buy": (x.get("actions") or {}).get("BUY"), "sell": (x.get("actions") or {}).get("SELL")} for m, x in (v.get("models") or {}).items()}) for h, v in st.items()]'
+          echo "=== aggressive"; curl -sS --max-time 30 "$W/aggressive/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("day:", d.get("day"), "total:", d.get("totalIls"), "cash:", d.get("cashIls"), "stocksShare:", d.get("stocksShare"), "missing:", d.get("missing")); print("metrics:", d.get("metrics")); print("stats:", d.get("stats")); print("positions:", [(p["symbol"], p["valueIls"], p.get("pnlPct")) for p in (d.get("positions") or [])]); [print("  ", t["day"], t["side"], t["qty"], "x", t["symbol"], "@", t["price"], "|", t.get("reason")) for t in (d.get("trades") or [])[:8]]'
           echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo
           echo "=== rank"; curl -sS --max-time 30 "$W/rank" | head -c 500; echo

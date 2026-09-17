@@ -9,6 +9,8 @@ import { evaluateAlerts, ALERT_TYPES, send as sendAlert } from './lib/alerts.js'
 import { ask } from './lib/ai.js';
 import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
+import { runAggressive, aggrReport } from './lib/aggressive.js';
+import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
 import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews, refreshMechanicalUniverse, refreshEarningsCalendar } from './lib/analysis.js';
 import { fetchWithFallback } from './providers/registry.js';
 import { filterUniverse, findAsset, SEED_UNIVERSE, INDICES } from './engine/universe.js';
@@ -55,7 +57,8 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   const watch0 = new Set(((await db.get('user:watchlist')) || []).map((w) => w.symbol));
   const universe = await getUniverse(db, ctx.env);
   const watch = (await db.get('user:watchlist')) || [];
-  const syms = [...new Set([...universe.map((a) => a.symbol), ...watch.map((w) => w.symbol)])];
+  // היקום המכני (S&P 500) מנותח ב-GitHub Actions ונכתב ב-shards (lib/snapstore.js) — לא בתור של ה-Worker (מכסות ספקים/KV)
+  const syms = [...new Set([...universe.filter((a) => a.origin !== 'mechanical' || watch0.has(a.symbol)).map((a) => a.symbol), ...watch.map((w) => w.symbol)])];
   let regime = await db.get(`regime:${day}`);
   if (!regime || force){
     regime = await computeRegime(ctx, { breadth: (await db.get(`rank:${(await latestRankDay(db)) || ''}`))?.breadth ?? null });
@@ -82,7 +85,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
       const ex = await db.get(`snap:${day}:${sym}`);
       let fresh = false;
       if (!ex || (ex.missing && !snap.missing)){ await db.put(`snap:${day}:${sym}`, snap); fresh = true; }
-      const prev = prevDay ? await db.get(`snap:${prevDay}:${sym}`) : null;
+      const prev = prevDay ? await getSnap(db, prevDay, sym) : null;
       if (fresh && !snap.missing){ const alerts = await evaluateAlerts(ctx, snap, prev, a); if (alerts.length) log.push(`${sym}: ${alerts.length} alerts`); }
       if (snap.missing) log.push(`${sym}: missing — ${snap.reason}`);
       done.add(sym);
@@ -94,8 +97,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   let finalized = !!(exRank && (exRank.analyzed > 0 || !force)); // דירוג ריק (כשל נתונים) ניתן להחלפה ב-force
   // דירוג ותיקים הם אגרגט של ה-snapshots (שלעולם לא נדרסים): מחושבים מחדש כשנוספו snapshots חדשים היום
   if (!left && (!finalized || pick.length)){
-    const snaps = [];
-    for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); if (s) snaps.push(s); }
+    const snaps = await listSnaps(db, day);
     const rank = rankSnapshots(snaps);
     if (exRank && (rank.analyzed > (exRank.analyzed || 0))){ await db.put(`rank:${day}`, rank); await db.delete(`reco:${day}`); finalized = true; }
     else if (!exRank) finalized = await db.putIfAbsent(`rank:${day}`, rank);
@@ -155,6 +157,12 @@ async function handle(req, env0, ctx){
     if (validDate(p1)) return json((await db.get(`shadow:${p1}`)) || { missing: true });
     return err('not found', 404);
   }
+  // מסלול אגרסיבי (תיק צל, סימולציה בלבד — לא חשבון התרגול): דוח + הרצה
+  if (r0 === 'aggressive'){
+    if (p1 === 'report' || !p1) return json(await aggrReport(db));
+    if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runAggressive(ctx, { day: q.date || null, force: q.force === '1' })); } catch (e) { await db.logError('aggressive', e.message); return err('מסלול אגרסיבי: ' + e.message, 500); } }
+    return err('not found', 404);
+  }
   // רענון יקום מכני + לוח דוחות לפי דרישה (בדיקת endpoints של FMP בפועל). cron עושה זאת לבד: לוח יומי, יקום בימי שני
   if (r0 === 'universe' && p1 === 'refresh' && req.method === 'POST'){
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
@@ -194,7 +202,7 @@ async function handle(req, env0, ctx){
     if (a.missing) return json(a, 200);
     const days = (await db.get('idx:snapdays')) || [];
     const hist = [];
-    for (const d of days.slice(-90)){ const sn = await db.get(`snap:${d}:${s}`); if (sn && !sn.missing) hist.push({ date: d, score: sn.score, signal: sn.signal, price: sn.price }); }
+    for (const d of days.slice(-90)){ const sn = await getSnap(db, d, s); if (sn && !sn.missing) hist.push({ date: d, score: sn.score, signal: sn.signal, price: sn.price }); }
     const watch = (await db.get('user:watchlist')) || [];
     return json({ ...a, history: hist, watched: watch.some((w) => w.symbol === s), series: a.bundle ? undefined : undefined });
   }
@@ -242,7 +250,7 @@ async function handle(req, env0, ctx){
     const dgs = await db.get('macro:DGS10');
     const a = analyzeBundle(b, { asOfDate: q.date, regime, benchRows: spy?.rows, dgs10Rows: dgs?.rows });
     const fwd = b.prices?.rows ? forwardReturns(b.prices.rows, q.date) : null;
-    const stored = await db.get(`snap:${q.date}:${s}`);
+    const stored = await getSnap(db, q.date, s);
     return json({ ...a, bundle: undefined, forward: fwd, storedSnapshot: stored ? { score: stored.score, signal: stored.signal, price: stored.price, weightsVersion: stored.weightsVersion } : null, regimeAtDate: { summary: regime.summary, risk: regime.risk, trend: regime.trend }, note: 'חושב רק מנתונים שהיו ידועים בתאריך (מחירים ≤ תאריך, דוחות לפי תאריך הגשה, חדשות לפי פרסום). קונצנזוס/תחזיות אנליסטים לא זמינים נקודתית.' });
   }
   if (r0 === 'regime'){
@@ -255,7 +263,26 @@ async function handle(req, env0, ctx){
   if (r0 === 'rank'){ const day = validDate(q.date) ? q.date : await latestRankDay(db); const r = day ? await db.get(`rank:${day}`) : null; return json(r || { missing: true, reason: 'אין דירוג עדיין — ה-cron היומי טרם הסתיים', day }); }
   if (r0 === 'reco'){ const day = validDate(q.date) ? q.date : await latestRankDay(db); const r = day ? await db.get(`reco:${day}`) : null; return json(r || { missing: true, reason: 'אין תיקים מומלצים עדיין', day }); }
   if (r0 === 'days') return json((await db.get('idx:snapdays')) || []);
-  if (r0 === 'snapshots' && p1){ const s = sym(p1); const days = (await db.get('idx:snapdays')) || []; const out = []; for (const d of days.slice(-(+q.limit || 120))){ const sn = await db.get(`snap:${d}:${s}`); if (sn) out.push(sn); } return json(out); }
+  if (r0 === 'snapshots' && p1){ const s = sym(p1); const days = (await db.get('idx:snapdays')) || []; const out = []; for (const d of days.slice(-(+q.limit || 120))){ const sn = await getSnap(db, d, s); if (sn) out.push(sn); } return json(out); }
+  // הזרמת snapshots מ-GitHub Actions (יקום S&P 500): נכתבים ב-shards (16 מסמכים ליום), הדירוג מחושב מחדש אם היום כבר סגור
+  if (r0 === 'ingest' && p1 === 'snapshots' && req.method === 'POST'){
+    if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth();
+    const day = validDate(body.date) ? body.date : today();
+    if (day > today()) return err('תאריך עתידי');
+    const snaps = (Array.isArray(body.snapshots) ? body.snapshots : []).filter((s) => s && validSym(s.symbol || '')).slice(0, 200);
+    const r = await putSnapsBatch(db, day, snaps, { source: body.source || 'github-actions' });
+    const watch = new Set(((await db.get('user:watchlist')) || []).map((w) => w.symbol));
+    const days = (await db.get('idx:snapdays')) || [];
+    const prevDay = days.filter((d) => d < day).slice(-1)[0] || null;
+    let alerts = 0;
+    for (const s of snaps) if (r.written && !s.missing && watch.has(s.symbol.toUpperCase())){ try { alerts += (await evaluateAlerts(ctx, { ...s, date: day }, prevDay ? await getSnap(db, prevDay, s.symbol.toUpperCase()) : null, null)).length; } catch {} }
+    let rerank = false;
+    if (body.finalize === true || q.finalize === '1'){
+      const exRank = await db.get(`rank:${day}`);
+      if (exRank){ const rank = rankSnapshots(await listSnaps(db, day)); if (rank.analyzed > (exRank.analyzed || 0)){ await db.put(`rank:${day}`, { ...rank, mergedBy: 'ingest' }); await db.delete(`reco:${day}`); rerank = true; } }
+    }
+    return json({ ok: true, day, received: snaps.length, ...r, alerts, rerank });
+  }
   if (r0 === 'snapshots' && !p1 && req.method === 'POST'){
     needAuth();
     const day = validDate(body.date) ? body.date : today();
@@ -266,7 +293,7 @@ async function handle(req, env0, ctx){
     let written = 0, alerts = 0;
     for (const s of snaps){
       const snap = { ...s, symbol: s.symbol.toUpperCase(), date: day, computedBy: 'browser' };
-      if (await db.putIfAbsent(`snap:${day}:${snap.symbol}`, snap)){ written++; if (!snap.missing){ const prev = prevDay ? await db.get(`snap:${prevDay}:${snap.symbol}`) : null; alerts += (await evaluateAlerts(ctx, snap, prev, null)).length; } }
+      if (await db.putIfAbsent(`snap:${day}:${snap.symbol}`, snap)){ written++; if (!snap.missing){ const prev = prevDay ? await getSnap(db, prevDay, snap.symbol) : null; alerts += (await evaluateAlerts(ctx, snap, prev, null)).length; } }
     }
     if (body.rank && Array.isArray(body.rank.table)) await db.putIfAbsent(`rank:${day}`, { ...body.rank, date: day, computedBy: 'browser' });
     if (body.reco && body.reco.profiles) await db.putIfAbsent(`reco:${day}`, { ...body.reco, date: day, computedBy: 'browser' });
@@ -274,14 +301,14 @@ async function handle(req, env0, ctx){
     if (!days.includes(day)){ days.push(day); await db.put('idx:snapdays', days.sort().slice(-3000)); }
     return json({ ok: true, day, received: snaps.length, written, alerts, note: written < snaps.length ? 'חלק מה-snapshots כבר היו קיימים ולא נדרסו' : undefined });
   }
-  if (r0 === 'snapshot' && p1 && p2){ const s = sym(p2); if (!validDate(p1)) return err('תאריך לא תקין'); return json((await db.get(`snap:${p1}:${s}`)) || { missing: true }); }
+  if (r0 === 'snapshot' && p1 && p2){ const s = sym(p2); if (!validDate(p1)) return err('תאריך לא תקין'); return json((await getSnap(db, p1, s)) || { missing: true }); }
 
   if (r0 === 'watchlist'){
     const list = (await db.get('user:watchlist')) || [];
     if (req.method === 'GET'){
       const day = await latestRankDay(db);
       const out = [];
-      for (const w of list){ const sn = day ? await db.get(`snap:${day}:${w.symbol}`) : null; out.push({ ...w, snapshot: sn }); }
+      for (const w of list){ const sn = day ? await getSnap(db, day, w.symbol) : null; out.push({ ...w, snapshot: sn }); }
       return json({ date: day, items: out });
     }
     needAuth();
@@ -335,11 +362,11 @@ async function handle(req, env0, ctx){
     const view = async () => {
       const t = await broker.trades();
       // מחיר נוכחי: הטרי מבין quote במטמון ו-snapshot של היום (quote ישן מאתמול לא גובר על סגירה חדשה)
-      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){ const qt = await db.get(`quote:${s}`); const sn = day ? await db.get(`snap:${day}:${s}`) : null; const qDay = qt?.asOf ? String(qt.asOf).slice(0, 10) : null; const snDay = sn?.barDate || sn?.date || null; const useQuote = qt?.price && (!sn?.price || !snDay || (qDay && qDay >= snDay)); priceCache[s] = useQuote ? qt.price : (sn?.price ?? qt?.price ?? null); }
+      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){ const qt = await db.get(`quote:${s}`); const sn = day ? await getSnap(db, day, s) : null; const qDay = qt?.asOf ? String(qt.asOf).slice(0, 10) : null; const snDay = sn?.barDate || sn?.date || null; const useQuote = qt?.price && (!sn?.price || !snDay || (qDay && qDay >= snDay)); priceCache[s] = useQuote ? qt.price : (sn?.price ?? qt?.price ?? null); }
       const perf = await broker.performance(priceOf, fx);
       const u = await getUniverse(db, env);
       perf.positions = perf.positions.map((p) => ({ ...p, name: u.find((a) => a.symbol === p.symbol)?.name || p.symbol, nameHe: u.find((a) => a.symbol === p.symbol)?.nameHe || null, signal: null }));
-      for (const p of perf.positions){ const sn = day ? await db.get(`snap:${day}:${p.symbol}`) : null; p.signal = sn?.signal || null; }
+      for (const p of perf.positions){ const sn = day ? await getSnap(db, day, p.symbol) : null; p.signal = sn?.signal || null; }
       perf.fxSource = fxDoc ? { rate: fx, source: fxDoc.source, asOf: fxDoc.asOf } : null;
       return perf;
     };
@@ -352,7 +379,7 @@ async function handle(req, env0, ctx){
       const asset = await assetMeta(db, s);
       let price = isNum(body.price) ? body.price : null, priceSource = price ? { source: 'user' } : null;
       if (!price){ const qt = await getQuote(s, { ...ctx, asset }); if (qt && !qt.missing){ price = qt.price; priceSource = { source: qt.source, asOf: qt.asOf, stale: !!qt.stale }; } else { const px = await getPrices(s, { ...ctx, asset }); if (px?.rows?.length){ price = px.rows[px.rows.length - 1][4]; priceSource = { source: px.source + ' (close)', asOf: px.asOf }; } } }
-      const sn = day ? await db.get(`snap:${day}:${s}`) : null;
+      const sn = day ? await getSnap(db, day, s) : null;
       try { const r = await broker.placeOrder({ symbol: s, side: body.side === 'sell' ? 'sell' : 'buy', qty: +body.qty, price, currency: asset.currency || 'USD', fx, reason: String(body.reason || '').slice(0, 300), signal: sn?.signal || null, snapDate: sn?.date || null, priceSource }); return json({ ok: true, result: r, price, priceSource, fx }); }
       catch (e) { return err(e.message); }
     }
@@ -392,7 +419,7 @@ export default {
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     try {
       const r = await cronStep(ctx);
-      if (r?.finalized){ try { await runShadow(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); } // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
+      if (r?.finalized){ try { await runShadow(ctx); await runAggressive(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); } // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
     } catch (e) { await ctx.db.logError('scheduled', e.message); }
     finally { await ctx.budget.flush().catch(() => {}); }
   },

@@ -8,13 +8,14 @@
 import { isNum, mean, round, correlation } from './util.js';
 
 export const SHADOW_VERSION = 1;
-export const SHADOW_RULES = Object.freeze({ strongTopPct: 0.15, buyTopPct: 0.30, sellBottomPct: 0.20, minSector: 5, minUniverse: 20, dupeThreshold: 0.6, horizons: [1, 5, 20], buckets: [80, 70, 60, 50] });
+export const SHADOW_RULES = Object.freeze({ strongTopPct: 0.15, buyTopPct: 0.30, sellBottomPct: 0.20, minSector: 5, minUniverse: 20, dupeThreshold: 0.6, horizons: [1, 5, 20, 60], buckets: [80, 70, 60, 50] });
 export const FACTOR_LABELS = { value: 'תמחור', profitability: 'רווחיות', growth: 'צמיחה', trend: 'מגמה', risk: 'סיכון', revision: 'ריוויזיות' };
 export const SHADOW_MODELS = Object.freeze({
   A: { label: 'הישן', desc: 'הציון והסיגנל שמפעילים את האוטומט היום', weights: null },
   B: { label: 'יחסי-ענף', desc: 'אחוזונים בתוך הענף, בלי כפילויות, בלי מאקרו/סנטימנט/אנליסטים', weights: Object.freeze({ value: 25, profitability: 20, growth: 20, trend: 25, risk: 10 }) },
   C: { label: 'B + ריוויזיות + מאקרו', desc: 'כמו B, עם ריוויזיות תחזיות כשקיימות (15) ושכבת מאקרו על הפעולה', weights: Object.freeze({ value: 25, profitability: 20, growth: 20, trend: 25, risk: 10, revision: 15 }) },
 });
+export const bucketOf = (score, edges = SHADOW_RULES.buckets) => { if (!isNum(score)) return null; for (const e of edges) if (score >= e) return `${e}+`; return `<${edges[edges.length - 1]}`; };
 const LEGACY_COMPONENTS = ['fundamental', 'valuation', 'growth', 'quality', 'technical', 'momentum', 'analyst', 'sentiment', 'macro', 'risk'];
 
 // אחוזון (0–100) של x בתוך a: מתחת + חצי מהשווים
@@ -50,6 +51,16 @@ export function rankActions(scores, { overlay = null, rules = SHADOW_RULES } = {
   return out;
 }
 
+// התפלגות ציונים של מודל ביום נתון: כדי לראות אם "קנייה חזקה" נהיית נפוצה מדי או שהציונים זוחלים למעלה
+export function scoreDistribution(scores, actions = []){
+  const v = scores.filter(isNum).sort((a, b) => a - b);
+  if (!v.length) return { n: 0 };
+  const q = (p) => v[Math.min(v.length - 1, Math.floor(p * (v.length - 1)))];
+  const buckets = {}; for (const x of v){ const b = bucketOf(x); buckets[b] = (buckets[b] || 0) + 1; }
+  const n = actions.filter(Boolean).length || v.length;
+  const share = (a) => round(actions.filter((x) => x === a).length / n, 3);
+  return { n: v.length, mean: round(mean(v), 1), median: round(q(0.5), 1), p10: round(q(0.1), 1), p90: round(q(0.9), 1), buckets, strongBuyShare: share('STRONG BUY'), buyShare: share('BUY'), sellShare: share('SELL') };
+}
 export function overlayFor(regime){ if (!regime) return null; if (regime.trend === 'Bear Trend') return 'bear'; if (regime.risk === 'Risk Off') return 'riskoff'; return null; }
 
 // מטריצת מתאמים בין רכיבי המודל הישן (לזיהוי כפילויות) + הציון
@@ -100,12 +111,13 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const overlap = (x, y) => { const a = buys(x), b = buys(y); const u = new Set([...a, ...b]); return u.size ? round([...a].filter((s) => b.has(s)).length / u.size, 3) : null; };
   const top = (key) => rows.filter((r) => isNum(r[key])).sort((a, b) => b[key] - a[key]).slice(0, 10).map((r) => r.symbol);
   const corr = componentCorrelation(stocks);
+  const dist = { A: scoreDistribution(rows.map((r) => r.A), actA), B: scoreDistribution(scoreB, actB), C: scoreDistribution(scoreC, actC) };
   return {
     version: SHADOW_VERSION, day, barDate, regime: regime ? { trend: regime.trend, risk: regime.risk } : null, overlay, n: rows.length, eligible: eligible.filter(Boolean).length,
     revisionsAvailable: revAvail.length, revisionsUsed: revAvail.length >= 10, rules: SHADOW_RULES,
     models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) } },
     agreement: { AB: agree(actA, actB), AC: agree(actA, actC), BC: agree(actB, actC), buyOverlapAB: overlap(actA, actB), buyOverlapAC: overlap(actA, actC) },
-    top: { A: top('A'), B: top('B'), C: top('C') }, corr, rows, fwd: {},
+    top: { A: top('A'), B: top('B'), C: top('C') }, dist, corr, rows, fwd: {},
   };
 }
 
@@ -119,7 +131,6 @@ export function fillForward(doc, h, priceNow, { spyNow = null, spyThen = null, d
   return { filled, already: false };
 }
 
-export const bucketOf = (score, edges = SHADOW_RULES.buckets) => { if (!isNum(score)) return null; for (const e of edges) if (score >= e) return `${e}+`; return `<${edges[edges.length - 1]}`; };
 const emptyStat = () => ({ n: 0, sum: 0, sumEx: 0, nEx: 0 });
 const addStat = (st, ret, ex) => { st.n++; st.sum += ret; if (isNum(ex)){ st.nEx++; st.sumEx += ex; } };
 // צבירה מצטברת של סטטיסטיקות (סכומים) — כדי שהדוח לא יקרא עשרות מסמכים בכל בקשה

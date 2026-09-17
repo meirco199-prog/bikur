@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeShadow, rankActions, pctRank, spearman, fillForward, accumulateStats, summarizeStats, componentCorrelation, rawFactors, SHADOW_MODELS } from '../engine/shadow.js';
+import { computeShadow, rankActions, pctRank, spearman, fillForward, accumulateStats, summarizeStats, componentCorrelation, rawFactors, SHADOW_MODELS, SHADOW_RULES, scoreDistribution } from '../engine/shadow.js';
 import { DB } from '../lib/db.js';
 import { runShadow, shadowReport } from '../lib/shadow.js';
 
@@ -84,4 +84,20 @@ test('מודל צל: הרצה לילית — מסמך ליום, אידמפוטנ
   assert.ok(rep.stats.horizons['1'].models.A.n === 30);
   assert.ok(rep.rows.find((r) => r.symbol === 'S1').revision === 0.1);
   assert.ok(rep.rows.find((r) => r.symbol === 'S2').revisionNote);
+});
+
+test('מודל צל: אופקים 1/5/20/60 והתפלגות ציונים יומית (חלק קנייה חזקה, חציון, קבוצות)', async () => {
+  assert.deepEqual(SHADOW_RULES.horizons, [1, 5, 20, 60]);
+  const d = scoreDistribution([10, 55, 65, 75, 85, 90], ['SELL', 'HOLD', 'HOLD', 'BUY', 'STRONG BUY', 'STRONG BUY']);
+  assert.equal(d.n, 6); assert.equal(d.buckets['80+'], 2); assert.equal(d.buckets['<50'], 1); assert.equal(d.strongBuyShare, 0.333); assert.equal(d.buyShare, 0.167); assert.equal(d.median, 65);
+  assert.deepEqual(scoreDistribution([]), { n: 0 });
+  const doc = computeShadow({ table: mk(30), revisions: {}, day: '2026-09-17' });
+  assert.ok(doc.dist.A.n === 30 && doc.dist.B.n === 30 && isFinite(doc.dist.C.mean));
+  assert.ok(doc.dist.B.strongBuyShare > 0.1 && doc.dist.B.strongBuyShare < 0.2, 'כ-15% קנייה חזקה');
+  const db = new DB(null); const ctx = { db, env: {} };
+  await db.put('idx:snapdays', ['2026-09-17']); await db.put('rank:2026-09-17', { table: mk(30) });
+  await runShadow(ctx, { day: '2026-09-17' });
+  const series = await db.get('shadow:dist');
+  assert.equal(series.length, 1); assert.equal(series[0].day, '2026-09-17'); assert.ok(isFinite(series[0].B.strong));
+  const rep = await shadowReport(db); assert.equal(rep.distSeries.length, 1);
 });

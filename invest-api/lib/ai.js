@@ -1,6 +1,7 @@
 // עוזר מחקר AI: RAG על נתוני המערכת בלבד. ה-LLM לא מחשב ציונים ולא ממציא נתונים — הוא מנסח ומצטט.
 // ספק: Anthropic Messages API (claude-opus-5) אם יש ANTHROPIC_API_KEY, אחרת Workers AI (Llama).
 // הערה: אין כאן SDK כי הריפו אוסר תלויות npm וה-Worker רץ כקובץ בודד → קריאת HTTP ישירה ל-/v1/messages.
+import { getSnap } from './snapstore.js';
 import { today, latestRankDay } from './analysis.js';
 
 const SYSTEM = `אתה עוזר מחקר בפלטפורמת השקעות אישית. ענה בעברית, קצר וענייני.
@@ -22,8 +23,8 @@ export async function buildContext(db, question){
   const days = (await db.get('idx:snapdays')) || [];
   const prevDay = days[days.length - 2];
   for (const s of syms){
-    const snap = day ? await db.get(`snap:${day}:${s}`) : null;
-    const prev = prevDay ? await db.get(`snap:${prevDay}:${s}`) : null;
+    const snap = day ? await getSnap(db, day, s) : null;
+    const prev = prevDay ? await getSnap(db, prevDay, s) : null;
     const news = await db.get(`news:${s}`);
     if (!snap) { ctx.assets[s] = 'אין snapshot במערכת לנכס זה'; continue; }
     ctx.assets[s] = {

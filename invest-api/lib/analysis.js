@@ -30,7 +30,7 @@ export async function addToUniverse(db, entries){
   const have = new Set([...SEED_UNIVERSE.map((a) => a.symbol), ...extra.map((a) => a.symbol)]);
   let added = 0;
   for (const e of entries){ if (!e?.symbol || have.has(e.symbol)) continue; extra.push({ ...e, addedAt: today() }); have.add(e.symbol); added++; }
-  if (added) await db.put('meta:universe', extra.slice(-400));
+  if (added) await db.put('meta:universe', extra.slice(-1500));
   return added;
 }
 export async function assetMeta(db, symbol){
