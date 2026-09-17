@@ -35,7 +35,8 @@ export async function runAutopilot(ctx, { dry = false, force = false, trigger = 
   const priceOf = (s) => table.find((r) => r.symbol === s)?.price ?? null;
   const perf = await broker.performance(priceOf, fx);
   const profile = st.riskProfile || 'balanced';
-  const decision = decideOrders({ table, regime, perf, profile, fx, today: day });
+  const buysToday = journal.filter((j) => j.day === day && j.executed).reduce((n, j) => n + (j.orders || []).filter((o) => o.side === 'buy' && o.ok).length, 0);
+  const decision = decideOrders({ table, regime, perf, profile, fx, today: day, buysToday });
   const u = await getUniverse(db, env);
   const nameOf = (s) => { const a = u.find((x) => x.symbol === s); return a?.nameHe || a?.name || s; };
   const entry = { ts: new Date().toISOString(), day, trigger, dry, executed: !dry, profile, rulesVersion: AUTO_RULES.version, regime: regime ? { trend: regime.trend, risk: regime.risk, summary: regime.summary } : null, before: { totalIls: round(perf.totalIls, 0), cashIls: round(perf.cashIls, 0), positions: perf.positions.length }, notes: [...legacyNotes, ...decision.notes], skipped: decision.skipped.slice(0, 12), orders: [] };

@@ -4,7 +4,7 @@ import { isNum, round } from './util.js';
 import { PROFILES } from './portfolio.js';
 
 export const AUTO_RULES = {
-  version: 2,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
+  version: 3,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
   maxConcentration: 1.5,    // פוזיציה גדולה מפי 1.5 מהיעד לנייר → מוכרים את העודף עד היעד
   stopLoss: 0.12,           // עצירת הפסד: מוכרים הכל אם הפוזיציה ירדה 12% מהקנייה (8% בשוק דובי)
   stopLossBear: 0.08,
@@ -31,7 +31,7 @@ const daysUntil = (from, to) => { if (!from || !to) return null; return Math.rou
  * regime: { trend, risk }
  * perf: תוצאת PaperBroker.performance (positions, cashIls, totalIls)
  */
-export function decideOrders({ table = [], regime = null, perf, profile = 'balanced', fx = 3.7, today = null, rules = AUTO_RULES } = {}){
+export function decideOrders({ table = [], regime = null, perf, profile = 'balanced', fx = 3.7, today = null, buysToday = 0, rules = AUTO_RULES } = {}){
   const P = PROFILES[profile] || PROFILES.balanced;
   const notes = [], orders = [], skipped = [];
   const by = new Map(table.map((r) => [r.symbol, r]));
@@ -66,13 +66,15 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   const reserve = (P.sleeves.cash || 0.05) * total;
   let free = cash + sellProceeds - reserve;
   const sold = new Set(orders.map((o) => o.symbol));
-  const heldIls = new Map(positions.map((p) => [p.symbol, p.valueIls ?? p.costIls ?? 0]));
-  const sectorIls = {}; for (const p of positions){ const r = by.get(p.symbol); const sec = r?.sector || 'אחר'; sectorIls[sec] = (sectorIls[sec] || 0) + (p.valueIls ?? p.costIls ?? 0); }
-  let count = positions.filter((p) => !sold.has(p.symbol)).length;
+  // משקלים אחרי המכירות של הריצה הזאת (לא לפניהן)
+  const soldIls = {}; for (const o of orders) soldIls[o.symbol] = (soldIls[o.symbol] || 0) + o.qty * o.priceRef * (o.currency === 'ILS' ? 1 : fx);
+  const heldIls = new Map(positions.map((p) => [p.symbol, Math.max(0, (p.valueIls ?? p.costIls ?? 0) - (soldIls[p.symbol] || 0))]));
+  const sectorIls = {}; for (const p of positions){ const r = by.get(p.symbol); const sec = r?.sector || 'אחר'; sectorIls[sec] = (sectorIls[sec] || 0) + (heldIls.get(p.symbol) || 0); }
+  let count = positions.filter((p) => (heldIls.get(p.symbol) || 0) > 0).length;
   const maxCount = P.maxStocks + 2;
   const cands = table.filter((r) => ['STRONG BUY', 'BUY'].includes(r.signal) && isNum(r.price) && r.price > 0 && (r.score ?? 0) >= P.minScore && (!riskOff || r.signal === 'STRONG BUY'))
     .sort((a, b) => (a.signal === b.signal ? b.score - a.score : a.signal === 'STRONG BUY' ? -1 : 1));
-  let buys = 0;
+  let buys = Math.max(0, buysToday | 0); // מכסה יומית כוללת ריצות קודמות היום
   for (const r of cands){
     if (buys >= rules.maxBuysPerRun){ skipped.push({ symbol: r.symbol, reason: `מכסת ${rules.maxBuysPerRun} קניות ליום` }); continue; }
     if (sold.has(r.symbol)) continue;

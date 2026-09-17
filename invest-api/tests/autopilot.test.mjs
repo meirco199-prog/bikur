@@ -68,3 +68,12 @@ test('אוטומט: ריכוז — פוזיציה של 50% מהתיק מוקטנ
   const small = decideOrders({ table, regime: bull, perf: perf(180000, [{ symbol: 'BIG', qty: 50, valueIls: 20000, pnlPct: 0 }]), fx: 3.7 });
   assert.ok(!small.orders.some((o) => o.rule === 'trim'), '10% מהתיק לא נחשב ריכוז');
 });
+
+test('אוטומט: משקלי ענף ומספר פוזיציות מחושבים אחרי המכירות של אותה ריצה; מכסה יומית כוללת ריצות קודמות', () => {
+  const table = [row('BIG', 'STRONG BUY', 80, { sector: 'Fin' }), row('V2', 'STRONG BUY', 79, { sector: 'Fin' }), row('X', 'BUY', 70, { sector: 'Tech' })];
+  const pos = [{ symbol: 'BIG', qty: 270, valueIls: 100000, pnlPct: 0 }];
+  const d = decideOrders({ table, regime: bull, perf: perf(100000, pos), fx: 3.7 });
+  assert.ok(d.orders.find((o) => o.symbol === 'V2' && o.side === 'buy'), 'אחרי הקטנת BIG הענף פנוי: ' + JSON.stringify(d.skipped));
+  const d2 = decideOrders({ table, regime: bull, perf: perf(100000, pos), fx: 3.7, buysToday: 3 });
+  assert.ok(!d2.orders.some((o) => o.side === 'buy')); assert.ok(d2.skipped.every((s) => /מכסת/.test(s.reason)));
+});
