@@ -7,6 +7,7 @@ import { providerStatus } from './providers/registry.js';
 import { PaperBroker } from './lib/broker.js';
 import { evaluateAlerts, ALERT_TYPES, send as sendAlert } from './lib/alerts.js';
 import { ask } from './lib/ai.js';
+import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews } from './lib/analysis.js';
 import { fetchWithFallback } from './providers/registry.js';
 import { filterUniverse, findAsset, SEED_UNIVERSE, INDICES } from './engine/universe.js';
@@ -286,6 +287,8 @@ async function handle(req, env0, ctx){
     if (body.weights && typeof body.weights === 'object'){ const w = {}; for (const k of Object.keys(DEFAULT_WEIGHTS)) w[k] = isNum(body.weights[k]) ? Math.max(0, Math.min(50, body.weights[k])) : DEFAULT_WEIGHTS[k]; next.weights = w; }
     if (Array.isArray(body.alertChannels)) next.alertChannels = body.alertChannels.filter((c) => ['browser', 'telegram', 'email'].includes(c));
     if (body.alertDefaults) next.alertDefaults = { ...cur.alertDefaults, ...body.alertDefaults };
+    if (typeof body.autopilot === 'boolean') next.autopilot = body.autopilot;
+    if (['conservative', 'balanced', 'growth', 'aggressive'].includes(body.riskProfile)) next.riskProfile = body.riskProfile;
     await db.put('user:settings', next);
     return json(next);
   }
@@ -336,6 +339,14 @@ async function handle(req, env0, ctx){
       catch (e) { return err(e.message); }
     }
   }
+  if (r0 === 'auto'){
+    if (p1 === 'status' || !p1) return json(await autoStatus(db));
+    if (p1 === 'run' && req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      // force רק עם טוקן (הסוד של ה-cron לא מאפשר ריצות חוזרות באותו יום)
+      try { return json(await runAutopilot(ctx, { dry: q.dry === '1', force: q.force === '1' && !bySecret, trigger: q.trigger || 'manual' })); } catch (e) { await db.logError('auto', e.message); return err('אוטומט: ' + e.message, 500); }
+    }
+  }
   if (r0 === 'ai' && p1 === 'ask' && req.method === 'POST'){
     const question = String(body.question || '').slice(0, 800);
     if (!question) return err('שאלה ריקה');
@@ -361,7 +372,10 @@ export default {
   },
   async scheduled(event, env, ec){
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
-    try { await cronStep(ctx); } catch (e) { await ctx.db.logError('scheduled', e.message); }
+    try {
+      const r = await cronStep(ctx);
+      if (r?.finalized){ const day = r.day; const j = (await ctx.db.get('auto:journal')) || []; if (!j.some((x) => x.day === day && x.executed)) await runAutopilot(ctx, { trigger: 'cron' }); }
+    } catch (e) { await ctx.db.logError('scheduled', e.message); }
     finally { await ctx.budget.flush().catch(() => {}); }
   },
 };

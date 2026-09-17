@@ -53,3 +53,6 @@ node invest-api/tests/e2e/mock-server.mjs &                 # API מדומה (ס
 python3 -m http.server 8000 &                                # הגשת הריפו
 node invest-api/tests/e2e/e2e.mjs                            # Chromium: כל מסך + פעולות
 ```
+
+## אוטומט לחשבון התרגול
+המערכת מנהלת את חשבון התרגול לבד לפי כללים גלויים (קנייה בשלבים, מכירה לפי סיגנל/עצירת הפסד, אין קניות בשוק דובי). פרטים: [docs/AUTOPILOT.md](docs/AUTOPILOT.md).

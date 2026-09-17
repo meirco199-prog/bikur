@@ -220,3 +220,34 @@ test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מ�
   const p = await get('/paper'); assert.ok(!p.j.open.some((t) => t.id === id)); assert.ok(Math.abs(p.j.cashIls - before) < 0.01, 'המזומן הוחזר');
   assert.equal((await get('/paper/trade?id=nope', { method: 'DELETE', auth: true })).status, 400);
 });
+
+test('אוטומט: /auto/status, /auto/run (dry ואמיתי), פעם ביום, כיבוי בהגדרות', async () => {
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+  const st = await get('/auto/status'); assert.equal(st.status, 200); assert.equal(st.j.enabled, true); assert.ok(st.j.rules.stopLoss > 0);
+  assert.equal((await get('/auto/run', { method: 'POST' })).status, 401);
+  const dry = await get('/auto/run?dry=1', { method: 'POST', auth: true }); assert.equal(dry.status, 200, JSON.stringify(dry.j).slice(0, 300));
+  assert.equal(dry.j.ran, true); assert.ok(Array.isArray(dry.j.orders)); assert.equal(dry.j.executed, false);
+  const p0 = await get('/paper');
+  const run = await get('/auto/run', { method: 'POST', auth: true }); assert.equal(run.status, 200); assert.equal(run.j.executed, true);
+  const p1 = await get('/paper');
+  const buys = run.j.orders.filter((o) => o.side === 'buy' && o.ok);
+  if (buys.length){ assert.ok(p1.j.cashIls < p0.j.cashIls, 'המזומן ירד אחרי קניות'); assert.ok(p1.j.positions.some((x) => x.symbol === buys[0].symbol)); assert.ok(p1.j.open.every((t) => !t.reason.startsWith('אוטומט') || t.reason.length > 10)); }
+  for (const o of run.j.orders) assert.ok(o.reason && o.name, 'לכל פקודה יש הסבר ושם');
+  const again = await get('/auto/run', { method: 'POST', auth: true }); assert.equal(again.j.ran, false); assert.match(again.j.reason, /כבר רץ/);
+  const st2 = await get('/auto/status'); assert.equal(st2.j.journal.length, 1); assert.equal(st2.j.last.day, run.j.day);
+  await get('/settings', { body: { autopilot: false, riskProfile: 'growth' }, auth: true });
+  const off = await get('/auto/run?force=1', { method: 'POST', auth: true }); assert.equal(off.j.ran, true, 'force מריץ גם כשכבוי');
+  const st3 = await get('/auto/status'); assert.equal(st3.j.enabled, false); assert.equal(st3.j.profile, 'growth');
+  const off2 = await get('/auto/run', { method: 'POST', auth: true }); assert.equal(off2.j.ran, false); assert.match(off2.j.reason, /כבוי/);
+  await get('/settings', { body: { autopilot: true, riskProfile: 'balanced' }, auth: true });
+});
+
+test('אוטומט: חשבון ירושה עם מזומן שלילי מאופס פעם אחת ונרשם ביומן; הסוד של ה-cron לא מאפשר force', async () => {
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+  await env.INVEST.put('paper:account', JSON.stringify({ initialIls: 200000, cashIls: -9748, createdAt: '2026-09-16T00:00:00Z', commissionsIls: 0 }));
+  await env.INVEST.put('paper:trades', JSON.stringify([{ id: 'pt_old', symbol: 'MA', side: 'buy', qty: 100, price: 573, currency: 'USD', fx: 3.66, costIls: 209748, date: '2026-09-15T00:00:00Z' }]));
+  const r = await get('/auto/run?force=1', { method: 'POST', auth: true }); assert.equal(r.status, 200); assert.equal(r.j.ran, true);
+  assert.ok(r.j.notes.some((n) => /אופס/.test(n)), JSON.stringify(r.j.notes));
+  const p = await get('/paper'); assert.ok(p.j.cashIls >= 0); assert.ok(!p.j.positions.some((x) => x.symbol === 'MA'));
+  const r2 = await get('/auto/run?force=1&secret=nope', { method: 'POST' }); assert.equal(r2.status, 401);
+});

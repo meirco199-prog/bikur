@@ -46,5 +46,8 @@ jobs:
               sleep 16
             done
           fi
+          if [ "$CMD" = "auto-run" ] || [ "$CMD" = "cron-run" ]; then
+            echo "=== autopilot"; curl -sS --max-time 120 -X POST "$W/auto/run?secret=$SECRET&trigger=github" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("ran:", d.get("ran"), d.get("reason",""), "day:", d.get("day")); print("regime:", (d.get("regime") or {}).get("summary")); print("before:", d.get("before"), "after:", d.get("after")); [print("  ", o["side"], o["qty"], "x", o["symbol"], o.get("name"), "@", o.get("price"), "ok" if o.get("ok") else "ERR " + str(o.get("error")), "|", o.get("reason")) for o in d.get("orders",[])]; print("notes:", d.get("notes")); [print("  skip", s["symbol"], "|", s["reason"]) for s in d.get("skipped",[])]'
+          fi
           echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo
           echo "=== rank"; curl -sS --max-time 30 "$W/rank" | head -c 500; echo
