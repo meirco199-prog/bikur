@@ -16,9 +16,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const today = () => new Date().toISOString().slice(0, 10);
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
-async function getJSON(url, opts = {}, tries = 3){
+async function getJSON(url, opts = {}, tries = 3, timeoutMs = 25000){
   for (let i = 0; i < tries; i++){
-    try { const r = await fetch(url, { ...opts, signal: AbortSignal.timeout(25000) }); if (r.status === 429 || r.status >= 500){ await sleep(1500 * (i + 1)); continue; } if (!r.ok) throw new Error(`HTTP ${r.status}`); return await r.json(); }
+    try { const r = await fetch(url, { ...opts, signal: AbortSignal.timeout(timeoutMs) }); if (r.status === 429 || r.status >= 500){ await sleep(1500 * (i + 1)); continue; } if (!r.ok) throw new Error(`HTTP ${r.status}`); return await r.json(); }
     catch (e) { if (i === tries - 1) throw e; await sleep(1000 * (i + 1)); }
   }
 }
@@ -84,7 +84,7 @@ export async function main(){
   for (let k = 0; k < snaps.length; k += 100){
     const batch = snaps.slice(k, k + 100);
     const last = k + 100 >= snaps.length;
-    const r = await getJSON(`${W}/ingest/snapshots?secret=${encodeURIComponent(SECRET)}${last ? '&finalize=1' : ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: day, source: 'github-actions', snapshots: batch }) });
+    const r = await getJSON(`${W}/ingest/snapshots?secret=${encodeURIComponent(SECRET)}${last ? '&finalize=1' : ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: day, source: 'github-actions', snapshots: batch }) }, 1, 120000); // בלי retry: ה-Worker אולי סיים גם אם התשובה איחרה
     written += r.written || 0; skipped += r.skipped || 0;
     if (last) log(`ingest: written ${written}, skipped ${skipped}, rerank ${r.rerank}, shards ${r.shards?.length}`);
   }
