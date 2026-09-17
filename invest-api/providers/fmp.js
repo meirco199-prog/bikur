@@ -88,6 +88,11 @@ export const fmp = {
     if (!Array.isArray(h) || !h.length) return { missing: true, reason: 'FMP: אין החזקות' };
     return { holdings: h.slice(0, 25).map((x) => ({ symbol: x.asset || x.symbol, name: x.name, weight: num(x.weightPercentage) !== null ? x.weightPercentage / 100 : null })), expense: num(info?.expenseRatio), aum: num(info?.aum ?? info?.assetsUnderManagement), source: 'fmp', asOf: today(), quality: 0.8 };
   },
+  // כל החזקות של ETF (לא רק 25) — משמש כמקור חלופי לחברי S&P 500 דרך SPY
+  async etfHoldingsFull(symbol, ctx){
+    const h = await call(ctx, 'etf/holdings', { symbol });
+    return (Array.isArray(h) ? h : []).map((x) => ({ symbol: String(x.asset || x.symbol || '').replace('-', '.'), name: x.name, weight: num(x.weightPercentage) !== null ? x.weightPercentage / 100 : null })).filter((x) => x.symbol);
+  },
   // תאריכי דוחות: הבא (ללא תוצאה בפועל) + 4 אחרונים עם הפתעה
   async earnings(symbol, _o, ctx){
     const arr = await call(ctx, 'earnings', { symbol, limit: 12 });
@@ -116,7 +121,9 @@ export const fmp = {
     if (!Array.isArray(arr)) throw new Error('fmp: earnings-calendar — תשובה לא צפויה');
     const byTicker = {};
     for (const e of arr){ const s = String(e.symbol || ''); if (!/^[A-Z][A-Z0-9.\-]{0,6}$/.test(s) || !e.date) continue; const cur = byTicker[s]; if (!cur || e.date < cur.date) byTicker[s] = { date: e.date, time: e.time || null, epsEst: num(e.epsEstimated) }; }
-    return { from, to, byTicker, count: Object.keys(byTicker).length, source: 'fmp', asOf: today() };
+    const count = Object.keys(byTicker).length;
+    // תוכנית חינמית עלולה להחזיר רק חלק מהלוח: לוח "שלם" (≥150 חברות ל-3 שבועות) רשאי לבטל תאריכים; חלקי — רק מוסיף
+    return { from, to, byTicker, count, complete: count >= 150, source: 'fmp', asOf: today() };
   },
   async screener(filters = {}, _o, ctx){
     const p = { limit: String(filters.limit || 100), isActivelyTrading: 'true' };

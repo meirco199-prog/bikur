@@ -45,13 +45,16 @@ test('תאריך דוח: הלוח היומי גובר על המטמון הפרט
   await db.put('earn:AAA', { next: addDays(T, 10), last: [{ date: '2026-06-01', surprisePct: 0.02 }], source: 'fmp', asOf: T, fetchedAt: new Date().toISOString() });
   await db.put('earn:BBB', { next: addDays(T, 12), last: [], source: 'fmp', asOf: T, fetchedAt: new Date().toISOString() });
   await db.put('earn:CCC', { next: addDays(T, 60), last: [], source: 'fmp', asOf: T, fetchedAt: new Date().toISOString() });
-  await db.put('meta:earncal', { asOf: T, from: T, to: addDays(T, 21), byTicker: { AAA: { date: addDays(T, 11), time: 'amc' } } });
+  await db.put('meta:earncal', { asOf: T, from: T, to: addDays(T, 21), complete: true, byTicker: { AAA: { date: addDays(T, 11), time: 'amc' } } });
   const a = await getEarnings('AAA', ctx);
   assert.equal(a.next, addDays(T, 11)); assert.equal(a.source, 'fmp-calendar'); assert.equal(a.last.length, 1, 'הפתעות העבר נשמרות מהפרטני');
   const b = await getEarnings('BBB', ctx);
   assert.equal(b.next, null, 'הלוח לא מציג דוח בטווח → התאריך הישן בוטל'); assert.match(b.nextNote, /בוטל/);
   const c = await getEarnings('CCC', ctx);
   assert.equal(c.next, addDays(T, 60), 'תאריך מעבר לטווח הלוח נשאר');
+  // לוח חלקי (תוכנית חינמית החזירה מעט שורות) רק מוסיף, לא מבטל
+  await db.put('meta:earncal', { asOf: T, from: T, to: addDays(T, 21), complete: false, count: 6, byTicker: {} });
+  assert.equal((await getEarnings('BBB', ctx)).next, addDays(T, 12), 'לוח חלקי לא מבטל תאריך');
   // לוח ישן (לפני 5 ימים) לא גובר
   await db.put('meta:earncal', { asOf: addDays(T, -5), from: addDays(T, -5), to: addDays(T, 16), byTicker: {} });
   assert.equal((await getEarnings('BBB', ctx)).next, addDays(T, 12));
@@ -65,5 +68,16 @@ test('POST /universe/refresh דורש אימות/סוד; בלי FMP_KEY מחזי
   const call = (path, h = {}) => worker.fetch(new Request('https://api.test' + path, { method: 'POST', headers: { 'CF-Connecting-IP': '9.9.9.9', ...h } }), env, { waitUntil(){} });
   assert.equal((await call('/universe/refresh')).status, 401);
   const r = await call('/universe/refresh?secret=s3'); const j = await r.json();
-  assert.equal(r.status, 200); assert.equal(j.universe.ok, false); assert.match(j.universe.reason, /FMP_KEY/); assert.equal(j.calendar.ok, false);
+  assert.equal(r.status, 200); assert.equal(j.universe.ok, false); assert.match(j.universe.reason, /אין מקור/); assert.ok(j.universe.notes.some((n) => /wikipedia/.test(n)), JSON.stringify(j.universe.notes)); assert.equal(j.calendar.ok, false);
+});
+
+test('ויקיפדיה: פרסור טבלת חברי S&P 500 (סימבול, שם, ענף GICS), וכשל ברור כשהמבנה השתנה', async () => {
+  const { parseWikipediaSp500 } = await import('../providers/sp500.js');
+  const row = (s, n, sec) => `<tr>\n<td><a rel="nofollow" class="external text" href="https://www.nyse.com/quote/XNYS:${s}">${s}</a>\n</td>\n<td><a href="/wiki/${n}" title="${n}">${n}</a>\n</td>\n<td>${sec}\n</td>\n<td>Sub\n</td>\n<td>City, State\n</td>\n<td>1957-03-04\n</td>\n<td>0000066740\n</td>\n<td>1902\n</td></tr>`;
+  const rows = [...Array(420)].map((_, i) => row(i === 0 ? 'BRK.B' : 'S' + i, 'Name &amp; Co ' + i, i % 2 ? 'Industrials' : 'Information Technology')).join('\n');
+  const html = `<html><table class="wikitable sortable" id="constituents"><thead><tr><th>Symbol</th></tr></thead><tbody>${rows}</tbody></table><table id="changes"></table></html>`;
+  const items = parseWikipediaSp500(html);
+  assert.equal(items.length, 420); assert.deepEqual(items[0], { symbol: 'BRK.B', name: 'Name & Co 0', sector: 'Information Technology', subSector: 'Sub' });
+  assert.throws(() => parseWikipediaSp500('<html></html>'), /constituents/);
+  assert.throws(() => parseWikipediaSp500(`<table id="constituents">${row('AAA', 'A', 'X')}</table>`), /רק 1 שורות/);
 });

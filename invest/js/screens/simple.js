@@ -6,11 +6,11 @@ import { loading, errorBox } from '../ui/components.js';
 
 let D = null; // נתונים משותפים לכל המסכים הפשוטים (מטמון קצר)
 async function load(){
-  const [regime, rank, watch, paper, reco, auto] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null)]);
+  const [regime, rank, watch, paper, reco, auto, shadow] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null), api('/shadow/report', { ttl: 60000 }).catch(() => null)]);
   const table = rank?.table || [];
   const by = new Map(table.map((r) => [r.symbol, r]));
   const usdils = regime?.inputs?.usdils || reco?.usdils || 3.7;
-  return { regime, rank, watch, paper, reco, auto, table, by, usdils, size: settings.get().portfolioSize || 200000 };
+  return { regime, rank, watch, paper, reco, auto, shadow, table, by, usdils, size: settings.get().portfolioSize || 200000 };
 }
 const ils = (usd) => fmt.ils(usd * (D?.usdils || 3.7));
 const riskWord = (r) => ({ 'נמוך': 'סיכון נמוך', 'בינוני': 'סיכון בינוני', 'גבוה': 'סיכון גבוה' }[r?.riskLevel] || 'סיכון לא ידוע');
@@ -53,6 +53,24 @@ const autoCard = (full = false) => {
   return sec('האוטומט מנהל את חשבון התרגול', head + body + hist + `<p class="muted" style="margin-top:.5rem;font-size:.85rem">כללים קבועים וגלויים: קונה רק סיגנלי קנייה, בשלבים, עד 3 ביום; מוכר בסיגנל מכירה או בעצירת הפסד לפי התנודתיות של כל נייר (8% עד 20%); כל פוזיציה מסכנת עד ${((a.rules?.riskBudget || 0.005) * 100).toFixed(1)}% מהתיק. <a href="#/explain">כל הכללים</a></p>`, 'רץ פעם ביום, אחרי הניתוח');
 };
 
+// מודל צל: ציונים חלופיים שמחושבים כל לילה במקביל למודל שמפעיל את האוטומט, בלי לסחור. מציג הסכמה, 5 המובילות, ותשואות עתידיות כשנצברו
+const shadowCard = () => {
+  const sh = D.shadow; if (!sh || sh.missing) return '';
+  const nm = (s) => esc(nameOf(D.by.get(s) || { symbol: s }));
+  const pct = (x) => (isNum(x) ? Math.round(x * 100) + '%' : '—');
+  const top = (m) => (sh.top?.[m] || []).slice(0, 5).map(nm).join(', ') || '—';
+  const H = sh.stats?.horizons?.['20'] || sh.stats?.horizons?.['5'] || sh.stats?.horizons?.['1'];
+  const hDays = H === sh.stats?.horizons?.['20'] ? 20 : H === sh.stats?.horizons?.['5'] ? 5 : 1;
+  const statRows = H ? ['A', 'B', 'C'].map((m) => { const M = H.models?.[m]; if (!M || !M.n) return ''; const buy = M.actions?.['STRONG BUY'] || M.actions?.BUY; return `<tr><td>${esc(sh.models?.[m]?.label || m)}</td><td class="num">${M.n}</td><td class="num">${buy ? fmt.pct(buy.mean, 1, true) : '—'}</td><td class="num">${M.actions?.SELL ? fmt.pct(M.actions.SELL.mean, 1, true) : '—'}</td><td class="num">${isNum(M.ic) ? M.ic : '—'}</td><td>${M.monotonic === null ? 'עוד אין' : M.monotonic ? 'כן' : 'לא'}</td></tr>`; }).join('') : '';
+  const rev = sh.revisionsUsed ? `ריוויזיות תחזיות בשימוש (${sh.revisionsAvailable} חברות)` : `ריוויזיות תחזיות: לא זמינות עדיין${isNum(sh.revisionHistoryDays) ? ` (נצברו ${sh.revisionHistoryDays} מתוך 30 ימי היסטוריה)` : ''} — מודל C רץ בלעדיהן, לא עם אפס`;
+  return sec('מודל צל (לא סוחר)', `<div class="muted" style="font-size:.85rem;margin-bottom:.4rem">${sh.n} מניות · ${esc(sh.day || '')}${sh.overlay ? ` · שכבת מאקרו: ${sh.overlay === 'bear' ? 'שוק דובי — בלי קניות' : 'בריחה מסיכון — רק קנייה חזקה'}` : ''}</div>
+    <div class="grid g2" style="margin-bottom:.4rem"><div class="kpi"><span class="v">${pct(sh.agreement?.AB)}</span><span class="l">הסכמה בפעולה: ישן מול יחסי-ענף</span></div><div class="kpi"><span class="v">${pct(sh.agreement?.buyOverlapAC)}</span><span class="l">חפיפה ברשימת הקנייה: ישן מול C</span></div></div>
+    <div style="font-size:.9rem"><div><b>הישן (A):</b> ${top('A')}</div><div><b>יחסי-ענף (B):</b> ${top('B')}</div><div><b>B + ריוויזיות + מאקרו (C):</b> ${top('C')}</div></div>
+    <div class="muted" style="font-size:.85rem;margin-top:.4rem">${esc(rev)}</div>
+    ${statRows ? `<div class="muted" style="font-size:.85rem;margin-top:.5rem">תשואה עתידית ל-${hDays} ימי מסחר, על ${H.days} ימי סיגנל שנסגרו</div><table><thead><tr><th>מודל</th><th class="num">n</th><th class="num">קנייה</th><th class="num">מכירה</th><th class="num">IC</th><th>מונוטוני?</th></tr></thead><tbody>${statRows}</tbody></table>` : '<div class="muted" style="font-size:.85rem;margin-top:.4rem">תשואות עתידיות (1/5/20 ימים) יתחילו להיסגר אחרי היום הראשון. ההשוואה בין המודלים תהיה משמעותית אחרי כמה שבועות.</div>'}
+    <p class="muted" style="margin-top:.5rem;font-size:.85rem">המודלים החדשים לא שולחים פקודות. הם נמדדים מול הישן ומחליפים אותו רק אם יוכיחו את עצמם. <a href="#/explain">איך זה נבדק</a></p>`, 'מודל ציון חדש בבדיקה');
+};
+
 const VIEWS = {
   today(){
     const buys = D.table.filter((r) => ['STRONG BUY', 'BUY'].includes(r.signal)).sort((a, b) => b.score - a.score);
@@ -62,6 +80,7 @@ const VIEWS = {
     ${sec('מצב השוק', mood())}
     ${sec('החשבון שלי', `<div class="grid g2"><div class="kpi"><span class="v">${fmt.ils(A.total)}</span><span class="l">סה"כ (מזומן + ניירות)</span></div><div class="kpi"><span class="v ${cls(A.pnl)}">${fmt.ils(A.pnl)} <small>(${fmt.pct(A.pnlPct, 1, true)})</small></span><span class="l">רווח / הפסד מההתחלה</span></div></div><div class="muted" style="margin-top:.4rem">מזומן פנוי: ${fmt.ils(A.cash)} · ניירות: ${fmt.ils(A.val)}</div><a class="btn" href="#/mine" style="margin-top:.5rem">לתיק המלא</a>`)}
     ${autoCard()}
+    ${shadowCard()}
     ${sec('מה לעשות היום', (sells.length ? sells.map(sellCard).join('') : '') + (buys.length ? buys.slice(0, 3).map((r) => buyCard(r)).join('') + (buys.length > 3 ? `<a class="btn" href="#/buy">עוד ${buys.length - 3} הזדמנויות</a>` : '') : (sells.length ? '' : '<div class="empty">אין היום פעולה מומלצת. לפעמים לא לעשות כלום זו ההחלטה הנכונה.</div>')))}`;
   },
   buy(){

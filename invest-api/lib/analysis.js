@@ -111,7 +111,7 @@ export async function getEarnings(symbol, ctx){
   const hit = cal.byTicker[symbol];
   const b = base && !base.missing ? base : { last: [] };
   if (hit) return { ...b, next: hit.date, nextTime: hit.time || null, source: 'fmp-calendar', asOf: cal.asOf, missing: false };
-  if (b.next && b.next >= cal.from && b.next <= cal.to) return { ...b, next: null, nextNote: `הלוח היומי (${cal.asOf}) לא מציג דוח עד ${cal.to} — התאריך ${b.next} מהמטמון בוטל` };
+  if (cal.complete && b.next && b.next >= cal.from && b.next <= cal.to) return { ...b, next: null, nextNote: `הלוח היומי (${cal.asOf}) לא מציג דוח עד ${cal.to} — התאריך ${b.next} מהמטמון בוטל` };
   return base;
 }
 export async function refreshEarningsCalendar(ctx){
@@ -125,26 +125,35 @@ export async function refreshEarningsCalendar(ctx){
 // יקום מכני: חברי S&P 500 (FMP) → נזילות (screener) → מכסה ענפית (engine/mechanical.js). נופל לרשימת "הגדולות" אם ה-endpoint לא זמין.
 export async function refreshMechanicalUniverse(ctx, { cap = null } = {}){
   const { db, env } = ctx;
-  if (!env.FMP_KEY) return { ok: false, reason: 'אין FMP_KEY' };
   const { fmp } = await import('../providers/fmp.js');
+  const { fetchSp500Members } = await import('../providers/sp500.js');
   const { selectMechanical, MECHANICAL_RULE } = await import('../engine/mechanical.js');
-  const notes = [];
-  let members = null;
-  try { members = (await fmp.sp500(ctx)).items; } catch (e) { notes.push(`sp500-constituent לא זמין: ${e.message.slice(0, 120)}`); }
+  const m = await fetchSp500Members(ctx, { fmp });
+  const notes = [...m.notes];
+  const members = m.items;
+  // נזילות/שווי שוק מה-screener (FMP). התוכנית החינמית מגבילה limit — מנסים 1000 ואז 100
   let screener = [];
-  try { screener = (await fetchWithFallback('screener', '', { minMarketCap: 2e9, minVolume: MECHANICAL_RULE.minVolume, limit: 1000, country: 'US', isEtf: false }, ctx)).items || []; } catch (e) { notes.push(`screener: ${e.message.slice(0, 120)}`); }
+  if (env.FMP_KEY){
+    for (const limit of [1000, 100]){
+      const r = await fetchWithFallback('screener', '', { minMarketCap: limit === 1000 ? 2e9 : 2e10, minVolume: MECHANICAL_RULE.minVolume, limit, country: 'US', isEtf: false }, ctx);
+      if (r.items?.length){ screener = r.items; break; }
+      notes.push(`screener(limit ${limit}): ${r.reason || 'ריק'}`);
+    }
+  } else notes.push('screener: אין FMP_KEY');
   const liquidity = Object.fromEntries(screener.map((x) => [x.symbol, { volume: x.volume, marketCap: x.marketCap, sector: x.sector, name: x.name }]));
+  // בלי screener: משקל ב-SPY (אם יש) כתחליף לשווי שוק; נזילות לא ידועה → לא מסננים (חברי המדד נזילים ממילא)
+  for (const x of members) if (!liquidity[x.symbol] && isNum(x.weight)) liquidity[x.symbol] = { volume: null, marketCap: x.weight * 1e12, sector: x.sector, name: x.name };
   let sel, source;
-  if (members?.length){ sel = selectMechanical({ members, liquidity, cap: cap || +env.UNIVERSE_CAP || MECHANICAL_RULE.cap }); source = 'sp500'; }
-  else {
+  if (members.length){ sel = selectMechanical({ members, liquidity, cap: cap || +env.UNIVERSE_CAP || MECHANICAL_RULE.cap }); source = m.source; }
+  else if (screener.length){
     const items = screener.filter((x) => (x.marketCap || 0) >= 2e10).sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0)).slice(0, 120);
-    sel = { items: items.map((x) => ({ symbol: x.symbol, name: x.name, sector: x.sector, marketCap: x.marketCap, volume: x.volume })), members: 0, liquid: items.length, liquidityKnown: true, sectors: {}, rule: 'גיבוי: US, שווי שוק ≥ $20B, מחזור ≥ 500k, 120 הגדולות (ה-S&P 500 לא זמין)' };
+    sel = { items: items.map((x) => ({ symbol: x.symbol, name: x.name, sector: x.sector, marketCap: x.marketCap, volume: x.volume })), members: 0, liquid: items.length, liquidityKnown: true, sectors: {}, rule: 'גיבוי: US, שווי שוק ≥ $20B, מחזור ≥ 500k, 120 הגדולות (רשימת ה-S&P 500 לא זמינה)' };
     source = 'screener-top';
-  }
+  } else return { ok: false, reason: 'אין מקור לחברי המדד וגם לא screener', notes };
   const items = sel.items.filter((x) => /^[A-Z][A-Z0-9.\-]{0,6}$/.test(x.symbol));
   if (!items.length) return { ok: false, reason: 'לא נבחרו חברות', notes };
   let probe = null;
-  try { const h = await fmp.sp500Historical(ctx); probe = { ok: true, count: h.count, first: h.first, last: h.last }; } catch (e) { probe = { ok: false, error: e.message.slice(0, 160) }; }
+  if (env.FMP_KEY) try { const h = await fmp.sp500Historical(ctx); probe = { ok: true, count: h.count, first: h.first, last: h.last }; } catch (e) { probe = { ok: false, error: e.message.slice(0, 160) }; }
   const meta = { asOf: today(), source, rule: sel.rule, members: sel.members, liquid: sel.liquid, liquidityKnown: sel.liquidityKnown, sectors: sel.sectors, symbols: items.map((x) => x.symbol), historicalConstituents: probe, notes };
   await db.put('meta:mechanical', meta);
   // הוספה ליקום + הסרת חברות "מכניות" שיצאו מהבחירה (חוץ מפוזיציות פתוחות ורשימת מעקב)

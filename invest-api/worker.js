@@ -8,6 +8,7 @@ import { PaperBroker } from './lib/broker.js';
 import { evaluateAlerts, ALERT_TYPES, send as sendAlert } from './lib/alerts.js';
 import { ask } from './lib/ai.js';
 import { runAutopilot, autoStatus } from './lib/autopilot.js';
+import { runShadow, shadowReport } from './lib/shadow.js';
 import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews, refreshMechanicalUniverse, refreshEarningsCalendar } from './lib/analysis.js';
 import { fetchWithFallback } from './providers/registry.js';
 import { filterUniverse, findAsset, SEED_UNIVERSE, INDICES } from './engine/universe.js';
@@ -145,6 +146,13 @@ async function handle(req, env0, ctx){
     needAuth();
     if (req.method === 'GET') return json(await keysStatus(env0, db));
     if (req.method === 'POST'){ try { await setKey(db, body.name, body.value); } catch (e) { return err(e.message); } return json({ ok: true, keys: await keysStatus(env0, db) }); }
+  }
+  // מודל צל: ציונים חלופיים במקביל למודל הישן, בלי פקודות. דוח = מסמך היום + סטטיסטיקות תשואה עתידית מצטברות
+  if (r0 === 'shadow'){
+    if (p1 === 'report' || !p1) return json(await shadowReport(db, { day: q.date || null }));
+    if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runShadow(ctx, { day: q.date || null, force: q.force === '1' })); } catch (e) { await db.logError('shadow', e.message); return err('מודל צל: ' + e.message, 500); } }
+    if (validDate(p1)) return json((await db.get(`shadow:${p1}`)) || { missing: true });
+    return err('not found', 404);
   }
   // רענון יקום מכני + לוח דוחות לפי דרישה (בדיקת endpoints של FMP בפועל). cron עושה זאת לבד: לוח יומי, יקום בימי שני
   if (r0 === 'universe' && p1 === 'refresh' && req.method === 'POST'){
@@ -383,7 +391,7 @@ export default {
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     try {
       const r = await cronStep(ctx);
-      if (r?.finalized) await runAutopilot(ctx, { trigger: 'cron' }); // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
+      if (r?.finalized){ try { await runShadow(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); } // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
     } catch (e) { await ctx.db.logError('scheduled', e.message); }
     finally { await ctx.budget.flush().catch(() => {}); }
   },
