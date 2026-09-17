@@ -70,7 +70,7 @@ test('אוטומט: ריכוז — פוזיציה של 50% מהתיק מוקטנ
 });
 
 test('אוטומט: משקלי ענף ומספר פוזיציות מחושבים אחרי המכירות של אותה ריצה; מכסה יומית כוללת ריצות קודמות', () => {
-  const table = [row('BIG', 'STRONG BUY', 80, { sector: 'Fin' }), row('V2', 'STRONG BUY', 79, { sector: 'Fin' }), row('X', 'BUY', 70, { sector: 'Tech' })];
+  const table = [row('BIG', 'STRONG BUY', 80, { sector: 'Fin', vol1y: 0.16 }), row('V2', 'STRONG BUY', 79, { sector: 'Fin' }), row('X', 'BUY', 70, { sector: 'Tech' })];
   const pos = [{ symbol: 'BIG', qty: 270, valueIls: 100000, pnlPct: 0 }];
   const d = decideOrders({ table, regime: bull, perf: perf(100000, pos), fx: 3.7 });
   assert.ok(d.orders.find((o) => o.symbol === 'V2' && o.side === 'buy'), 'אחרי הקטנת BIG הענף פנוי: ' + JSON.stringify(d.skipped));
@@ -134,4 +134,35 @@ test('אוטומט: שלב ליבה פעם ביום לכל נייר; לוויי�
   const sl = d.orders.filter((o) => o.rule === 'sleeve');
   assert.ok(sl.length >= 1 && sl[0].symbol === 'W', 'החלשה (WATCH, ציון 50) נמכרת קודם: ' + JSON.stringify(sl));
   assert.ok(!d.orders.some((o) => o.symbol === 'B1' && o.side === 'sell'), 'נייר עם סיגנל קנייה לא נמכר בגלל תקציב');
+});
+
+test('אוטומט: דירוג יחסי — קנייה רק ב-30% העליונים, קנייה חזקה רק ב-15% (ביקום של 20+)', () => {
+  const filler = Array.from({ length: 40 }, (_, i) => row(`F${i}`, 'HOLD', 40 + i, { sector: 'Z' + (i % 5) })); // ציונים 40..79
+  const table = [...filler, row('LOW', 'BUY', 66, { sector: 'A' }), row('MID', 'STRONG BUY', 74, { sector: 'B' }), row('TOP', 'STRONG BUY', 90, { sector: 'C' }), row('OKB', 'BUY', 75, { sector: 'D' })];
+  // 44 מניות: 15% העליונים = 7 (סף 75 → MID 74 נדחית, TOP 90 עוברת); 30% = 14 (סף 68 → LOW 66 נדחית, OKB 75 עוברת)
+  const d = decideOrders({ table, regime: bull, perf: perf(200000), fx: 3.7 });
+  const syms = d.orders.map((o) => o.symbol);
+  assert.ok(syms.includes('TOP') && syms.includes('OKB'), JSON.stringify(d.orders));
+  assert.ok(d.skipped.find((s) => s.symbol === 'MID' && /העליונים/.test(s.reason)), JSON.stringify(d.skipped));
+  assert.ok(d.skipped.find((s) => s.symbol === 'LOW' && /העליונים/.test(s.reason)));
+});
+
+test('אוטומט: מגבלות סיכון פתוח — כולל 3% ולענף 1.5%', () => {
+  const eight = Array.from({ length: 6 }, (_, i) => ({ symbol: `P${i}`, qty: 10, valueIls: 5000, pnlPct: 0 })); // 6 × 5000 × 20% (vol 40%) = 6000 = 3% מ-200k, ורק 15% מהתיק
+  const tbl = [...eight.map((p, i) => row(p.symbol, 'HOLD', 55, { sector: 'S' + i, vol1y: 0.40 })), row('NEW', 'STRONG BUY', 85, { sector: 'N' })];
+  const d = decideOrders({ table: tbl, regime: bull, perf: perf(170000, eight), fx: 3.7 });
+  assert.ok(!d.orders.some((o) => o.symbol === 'NEW'), JSON.stringify(d.orders));
+  assert.ok(d.skipped.find((s) => s.symbol === 'NEW' && /סיכון פתוח כולל/.test(s.reason)), JSON.stringify(d.skipped));
+  const two = [{ symbol: 'T1', qty: 10, valueIls: 10000, pnlPct: 0 }, { symbol: 'T2', qty: 10, valueIls: 10000, pnlPct: 0 }]; // ענף Tech: 20000 × 15% = 3000 = 1.5%
+  const tbl2 = [row('T1', 'HOLD', 55, { sector: 'Tech' }), row('T2', 'HOLD', 55, { sector: 'Tech' }), row('T3', 'STRONG BUY', 85, { sector: 'Tech' }), row('H1', 'STRONG BUY', 84, { sector: 'Health' })];
+  const d2 = decideOrders({ table: tbl2, regime: bull, perf: perf(180000, two), fx: 3.7 });
+  assert.ok(d2.skipped.find((s) => s.symbol === 'T3' && /בענף Tech/.test(s.reason)), JSON.stringify(d2.skipped));
+  assert.ok(d2.orders.find((o) => o.symbol === 'H1' && o.side === 'buy'), 'ענף אחר לא נחסם');
+});
+
+test('אוטומט: requireEarningsDate — בלי תאריך דוח לא פותחים פוזיציה (fail-closed)', () => {
+  const table = [row('ND', 'STRONG BUY', 85), row('WD', 'STRONG BUY', 84, { nextEarnings: '2026-12-01', sector: 'B' })];
+  const d = decideOrders({ table, regime: bull, perf: perf(200000), fx: 3.7, today: '2026-09-17', rules: { ...AUTO_RULES, requireEarningsDate: true } });
+  assert.ok(d.skipped.find((s) => s.symbol === 'ND' && /fail-closed/.test(s.reason)));
+  assert.ok(d.orders.find((o) => o.symbol === 'WD'));
 });
