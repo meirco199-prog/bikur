@@ -5,7 +5,7 @@ import { PROFILES } from './portfolio.js';
 import { RISK_LIMITS } from './risk-limits.js';
 
 export const AUTO_RULES = {
-  version: 7,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
+  version: 8,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
   maxConcentration: 1.5,    // פוזיציה גדולה מפי 1.5 מהיעד לנייר → מוכרים את העודף עד היעד
   // עצירת הפסד לפי תנודתיות: stop = clamp(vol1y × 0.5, 8%, 20%); בשוק דובי × 0.75. גודל פוזיציה = תקציב סיכון ÷ stop
   riskBudget: 0.005,        // כל פוזיציה מסכנת לכל היותר 0.5% מהתיק (1,000 ₪ ב-200,000)
@@ -18,6 +18,10 @@ export const AUTO_RULES = {
   // איכות יחסית בנוסף למוחלטת: קנייה רק אם הציון גם ב-30% העליונים של המניות שנותחו היום; קנייה חזקה — 15%
   buyTopPct: 0.30, strongTopPct: 0.15,
   requireEarningsDate: false, // חשבון תרגול: אין תאריך דוח → מותר. כסף אמיתי: RISK_LIMITS.requireEarningsDateLive
+  // ביטחון בנתונים: קנייה רק עם כיסוי נתונים ≥ 85% וכשרכיבי הליבה של הציון קיימים (ציון "יפה" על 70% מידע אינו ציון)
+  minCoverage: 0.85, requiredComponents: ['fundamental', 'valuation', 'growth', 'momentum'],
+  minEligibleUniverse: 100,   // פחות מ-100 מניות עם נתונים מלאים היום (תקלת ספק) → אין קניות של מניות בודדות
+  maxChasePct: 0.10,          // שלב נוסף רק אם המחיר לא ברח יותר מ-10% מעל מחיר הכניסה הממוצע
 };
 // עצירת הפסד לנייר לפי התנודתיות השנתית שלו (אין vol → ברירת מחדל 12%)
 export function stopPctFor(r, rules = AUTO_RULES, bear = false){
@@ -134,9 +138,17 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   const topCut = (pct) => (scored.length ? scored[Math.max(0, Math.ceil(scored.length * pct) - 1)] : -Infinity);
   const cutBuy = topCut(rules.buyTopPct), cutStrong = topCut(rules.strongTopPct);
   const relOk = (r) => scored.length < 20 || (r.signal === 'STRONG BUY' ? r.score >= cutStrong : r.score >= cutBuy); // יקום קטן מ-20 → אין משמעות לדירוג יחסי
-  const cands0 = bear ? [] : table.filter((r) => !isCore(r) && ['STRONG BUY', 'BUY'].includes(r.signal) && isNum(r.price) && r.price > 0 && (r.score ?? 0) >= P.minScore && (!riskOff || r.signal === 'STRONG BUY'));
-  for (const r of cands0) if (!relOk(r)) skipped.push({ symbol: r.symbol, reason: `ציון ${r.score} לא ב-${Math.round((r.signal === 'STRONG BUY' ? rules.strongTopPct : rules.buyTopPct) * 100)}% העליונים היום (סף ${r.signal === 'STRONG BUY' ? cutStrong : cutBuy})` });
-  const cands = cands0.filter(relOk).sort((a, b) => (a.signal === b.signal ? b.score - a.score : a.signal === 'STRONG BUY' ? -1 : 1));
+  // יקום כשיר מינימלי: כמה מניות עברו היום עם נתונים מלאים (כיסוי ≥ 85%)
+  const eligible = table.filter((r) => !isCore(r) && isNum(r.score) && (!isNum(r.coverage) || r.coverage >= rules.minCoverage)).length;
+  const nonCoreN = table.filter((r) => !isCore(r) && isNum(r.score)).length;
+  const needEligible = Math.min(rules.minEligibleUniverse, Math.floor(nonCoreN * 0.75)); // ביקום מלא: 100; ביקום קטן: 75% מהמניות שנותחו
+  const universeOk = eligible >= needEligible;
+  if (!universeOk) notes.push(`רק ${eligible} מניות עם נתונים מלאים היום (המינימום ${needEligible}) — אין קניות של מניות בודדות, כנראה תקלת נתונים`);
+  const dataOk = (r) => (!isNum(r.coverage) || r.coverage >= rules.minCoverage) && !(r.missingComponents || []).some((k) => rules.requiredComponents.includes(k));
+  const cands0 = (bear || !universeOk) ? [] : table.filter((r) => !isCore(r) && ['STRONG BUY', 'BUY'].includes(r.signal) && isNum(r.price) && r.price > 0 && (r.score ?? 0) >= P.minScore && (!riskOff || r.signal === 'STRONG BUY'));
+  for (const r of cands0.filter((r) => !dataOk(r))) skipped.push({ symbol: r.symbol, reason: isNum(r.coverage) && r.coverage < rules.minCoverage ? `כיסוי נתונים ${Math.round(r.coverage * 100)}% < ${Math.round(rules.minCoverage * 100)}% — הציון לא מספיק מבוסס` : `חסר רכיב ליבה בציון (${(r.missingComponents || []).filter((k) => rules.requiredComponents.includes(k)).join(', ')})` });
+  for (const r of cands0) if (dataOk(r) && !relOk(r)) skipped.push({ symbol: r.symbol, reason: `ציון ${r.score} לא ב-${Math.round((r.signal === 'STRONG BUY' ? rules.strongTopPct : rules.buyTopPct) * 100)}% העליונים היום (סף ${r.signal === 'STRONG BUY' ? cutStrong : cutBuy})` });
+  const cands = cands0.filter((r) => dataOk(r) && relOk(r)).sort((a, b) => (a.signal === b.signal ? b.score - a.score : a.signal === 'STRONG BUY' ? -1 : 1));
   // סיכון פתוח: שווי × מרחק לעצירה, על כל המניות הבודדות ולפי ענף (מגבלות קשיחות מ-RISK_LIMITS)
   let openRisk = 0; const sectorRisk = {};
   for (const [sym, v] of heldIls){ const r = by.get(sym); if (!r || isCore(r) || v <= 0) continue; const rk = v * stopPctFor(r, rules, bear); openRisk += rk; const sec = r.sector || 'אחר'; sectorRisk[sec] = (sectorRisk[sec] || 0) + rk; }
@@ -155,6 +167,8 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     const target = Math.min(maxPos, riskCap) * (rules.buyTargetFactor[r.signal] || 0.7) * (riskOff ? 0.5 : 1);
     const cur = heldIls.get(r.symbol) || 0;
     if (cur >= target * 0.9){ skipped.push({ symbol: r.symbol, reason: 'כבר בגודל היעד' }); continue; }
+    const held = positions.find((p) => p.symbol === r.symbol);
+    if (cur > 0 && held && isNum(held.avgPrice) && held.avgPrice > 0 && r.price > held.avgPrice * (1 + rules.maxChasePct)){ skipped.push({ symbol: r.symbol, reason: `המחיר עלה ${Math.round((r.price / held.avgPrice - 1) * 100)}% מעל מחיר הכניסה — לא רודפים אחרי שלב נוסף` }); continue; }
     if (!cur && count >= maxCount){ skipped.push({ symbol: r.symbol, reason: `כבר ${count} פוזיציות (המקסימום ${maxCount})` }); continue; }
     const sec = r.sector || 'אחר';
     if (r.type !== 'etf' && (sectorIls[sec] || 0) >= P.maxSector * total){ skipped.push({ symbol: r.symbol, reason: `ענף ${sec} כבר במשקל המרבי` }); continue; }

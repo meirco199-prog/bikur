@@ -102,7 +102,7 @@ export function rankSnapshots(snaps){
       avoid: top(ok.filter((s) => s.signal === 'SELL' || (s.components?.risk ?? 100) < 25 || s.score < 35).sort((a, b) => a.score - b.score), 10),
     },
     breadth: ok.length ? round(ok.filter((s) => ['עולה', 'עולה-חלש'].includes(s.trend)).length / ok.length, 3) : null,
-    table: ok.map((s) => ({ symbol: s.symbol, barDate: s.barDate || null, name: s.name, nameHe: s.nameHe || null, type: s.type, sector: s.sector, country: s.country, currency: s.currency, assetClass: s.assetClass, role: s.role, price: s.price, dailyChange: s.dailyChange, score: s.score, signal: s.signal, confidence: s.confidence, trend: s.trend, rsi: s.rsi, analystUpside: s.analystUpside, mos: s.mos, pe: s.pe, vol1y: s.vol1y, maxDD1y: s.maxDD1y, beta: s.beta, riskLevel: s.riskLevel, techBeta: s.techBeta, components: s.components, nextEarnings: s.nextEarnings, momentum12m: s.momentum12m, events: s.events, lastNews: s.lastNews, dataAsOf: s.dataAsOf?.prices })),
+    table: ok.map((s) => ({ symbol: s.symbol, barDate: s.barDate || null, coverage: s.coverage ?? null, missingComponents: s.missingComponents || [], name: s.name, nameHe: s.nameHe || null, type: s.type, sector: s.sector, country: s.country, currency: s.currency, assetClass: s.assetClass, role: s.role, price: s.price, dailyChange: s.dailyChange, score: s.score, signal: s.signal, confidence: s.confidence, trend: s.trend, rsi: s.rsi, analystUpside: s.analystUpside, mos: s.mos, pe: s.pe, vol1y: s.vol1y, maxDD1y: s.maxDD1y, beta: s.beta, riskLevel: s.riskLevel, techBeta: s.techBeta, components: s.components, nextEarnings: s.nextEarnings, momentum12m: s.momentum12m, events: s.events, lastNews: s.lastNews, dataAsOf: s.dataAsOf?.prices })),
   };
 }
 

@@ -166,3 +166,22 @@ test('אוטומט: requireEarningsDate — בלי תאריך דוח לא פות
   assert.ok(d.skipped.find((s) => s.symbol === 'ND' && /fail-closed/.test(s.reason)));
   assert.ok(d.orders.find((o) => o.symbol === 'WD'));
 });
+
+test('אוטומט v8: ביטחון בנתונים, יקום כשיר מינימלי, ולא רודפים אחרי מחיר בשלב נוסף', () => {
+  const big = Array.from({ length: 110 }, (_, i) => row(`U${i}`, 'HOLD', 40 + (i % 30), { sector: 'S' + (i % 8), coverage: 0.95 }));
+  const t = [...big, row('LOWCOV', 'STRONG BUY', 88, { coverage: 0.7, sector: 'A' }), row('NOGROW', 'STRONG BUY', 87, { coverage: 0.9, missingComponents: ['growth'], sector: 'B' }), row('GOOD', 'STRONG BUY', 86, { coverage: 0.92, sector: 'C' })];
+  const d = decideOrders({ table: t, regime: bull, perf: perf(200000), fx: 3.7 });
+  assert.ok(d.skipped.find((s) => s.symbol === 'LOWCOV' && /כיסוי נתונים/.test(s.reason)), JSON.stringify(d.skipped.slice(0, 5)));
+  assert.ok(d.skipped.find((s) => s.symbol === 'NOGROW' && /חסר רכיב ליבה/.test(s.reason)));
+  assert.ok(d.orders.find((o) => o.symbol === 'GOOD'), JSON.stringify(d.orders));
+  // יקום קטן מדי בגלל תקלה: רק 60 עם נתונים מלאים
+  const broken = t.map((r, i) => (i < 55 ? { ...r, coverage: 0.5 } : r));
+  const d2 = decideOrders({ table: broken, regime: bull, perf: perf(200000), fx: 3.7 });
+  assert.ok(!d2.orders.some((o) => o.side === 'buy' && o.rule !== 'core'), JSON.stringify(d2.orders));
+  assert.ok(d2.notes.some((n) => /תקלת נתונים/.test(n)));
+  // שלב נוסף: המחיר ברח 15% מעל הכניסה → לא רודפים
+  const pos = [{ symbol: 'GOOD', qty: 10, valueIls: 4255, avgPrice: 100, pnlPct: 0.15 }];
+  const t3 = t.map((r) => (r.symbol === 'GOOD' ? { ...r, price: 115 } : r));
+  const d3 = decideOrders({ table: t3, regime: bull, perf: perf(195745, pos), fx: 3.7 });
+  assert.ok(d3.skipped.find((s) => s.symbol === 'GOOD' && /לא רודפים/.test(s.reason)), JSON.stringify(d3.skipped.filter((s) => s.symbol === 'GOOD')));
+});
