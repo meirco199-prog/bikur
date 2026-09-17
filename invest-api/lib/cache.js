@@ -1,6 +1,6 @@
 // מטמון KV עם TTL לוגי: מחזיר fresh אם בתוקף, אחרת מנסה לרענן; אם הרענון נכשל — מחזיר stale מסומן.
 // לעולם לא מחליף בשקט נתון ישן בחדש-לכאורה: כל תשובה נושאת fetchedAt ו-stale.
-export const TTL = { prices: 20 * 3600, quote: 15 * 60, profile: 7 * 86400, facts: 7 * 86400, ratios: 7 * 86400, est: 7 * 86400, analyst: 24 * 3600, news: 6 * 3600, insider: 24 * 3600, etf: 7 * 86400, earn: 24 * 3600, macro: 12 * 3600, fx: 12 * 3600, screener: 24 * 3600 };
+export const TTL = { prices: 20 * 3600, quote: 15 * 60, profile: 7 * 86400, facts: 7 * 86400, ratios: 7 * 86400, est: 7 * 86400, analyst: 24 * 3600, news: 6 * 3600, insider: 24 * 3600, etf: 7 * 86400, earn: 3 * 86400, macro: 12 * 3600, fx: 12 * 3600, screener: 24 * 3600 };
 
 export async function cached(db, key, ttlSec, fetcher, { merge } = {}){
   const ex = await db.get(key);
