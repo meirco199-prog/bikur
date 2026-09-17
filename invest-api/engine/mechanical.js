@@ -1,0 +1,29 @@
+// יקום מכני — פונקציה טהורה. כלל: חברי S&P 500 → סינון נזילות → מכסה לפי ענף (יחסית להרכב המדד) → הגדולות בענף.
+// למה מכסה: התוכנית החינמית (KV 1,000 כתיבות/יום, מכסות ספקים) לא מאפשרת לנתח 500 חברות כל לילה. המכסה נשמרת
+// פרופורציונלית להרכב הענפי של המדד כדי לא להטות לטכנולוגיה/מגה-קאפ יותר מהמדד עצמו.
+export const MECHANICAL_RULE = { minVolume: 500000, cap: 150, minMembersForSectorQuota: 3 };
+
+// members: [{symbol,name,sector}] (S&P 500), liquidity: Map/obj symbol → {volume, marketCap, sector?, name?}
+export function selectMechanical({ members = [], liquidity = {}, cap = MECHANICAL_RULE.cap, minVolume = MECHANICAL_RULE.minVolume } = {}){
+  const liq = (s) => liquidity[s] || null;
+  const valid = members.filter((m) => m?.symbol && /^[A-Z][A-Z0-9.\-]{0,6}$/.test(m.symbol));
+  const withLiq = valid.filter((m) => liq(m.symbol));
+  // נזילות: אם אין נתוני מחזור לאף חבר (screener נכשל) — לא מסננים ומסמנים
+  const liquidityKnown = withLiq.length >= valid.length * 0.5;
+  const liquid = liquidityKnown ? valid.filter((m) => (liq(m.symbol)?.volume ?? 0) >= minVolume) : valid;
+  const sectorOf = (m) => m.sector || liq(m.symbol)?.sector || 'Unknown';
+  const capOf = (m) => liq(m.symbol)?.marketCap ?? 0;
+  const bySector = new Map();
+  for (const m of liquid){ const s = sectorOf(m); if (!bySector.has(s)) bySector.set(s, []); bySector.get(s).push(m); }
+  for (const arr of bySector.values()) arr.sort((a, b) => capOf(b) - capOf(a) || a.symbol.localeCompare(b.symbol));
+  // מכסה לענף: לפי חלקו בקבוצה המסוננת (עיגול למטה, לפחות minMembers), ואז השלמה עד cap לפי שווי שוק כללי
+  const n = liquid.length || 1;
+  const quota = new Map([...bySector.entries()].map(([s, arr]) => [s, Math.min(arr.length, Math.max(Math.min(arr.length, MECHANICAL_RULE.minMembersForSectorQuota), Math.floor(cap * arr.length / n)))]));
+  const chosen = new Set();
+  for (const [s, arr] of bySector) for (const m of arr.slice(0, quota.get(s))) chosen.add(m.symbol);
+  const rest = liquid.filter((m) => !chosen.has(m.symbol)).sort((a, b) => capOf(b) - capOf(a) || a.symbol.localeCompare(b.symbol));
+  for (const m of rest){ if (chosen.size >= cap) break; chosen.add(m.symbol); }
+  const out = liquid.filter((m) => chosen.has(m.symbol)).slice(0, cap).map((m) => ({ symbol: m.symbol, name: m.name || liq(m.symbol)?.name || m.symbol, sector: sectorOf(m), marketCap: capOf(m) || null, volume: liq(m.symbol)?.volume ?? null }));
+  const sectors = Object.fromEntries([...bySector.keys()].sort().map((s) => [s, { members: bySector.get(s).length, selected: out.filter((x) => x.sector === s).length }]));
+  return { items: out, members: valid.length, liquid: liquid.length, liquidityKnown, sectors, rule: `S&P 500 → מחזור יומי ≥ ${minVolume.toLocaleString('en-US')} → מכסה לענף לפי חלקו במדד → הגדולות בענף (עד ${cap})` };
+}

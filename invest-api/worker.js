@@ -8,7 +8,7 @@ import { PaperBroker } from './lib/broker.js';
 import { evaluateAlerts, ALERT_TYPES, send as sendAlert } from './lib/alerts.js';
 import { ask } from './lib/ai.js';
 import { runAutopilot, autoStatus } from './lib/autopilot.js';
-import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews } from './lib/analysis.js';
+import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews, refreshMechanicalUniverse, refreshEarningsCalendar } from './lib/analysis.js';
 import { fetchWithFallback } from './providers/registry.js';
 import { filterUniverse, findAsset, SEED_UNIVERSE, INDICES } from './engine/universe.js';
 import { DEFAULT_WEIGHTS } from './engine/scoring.js';
@@ -60,6 +60,8 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
     regime = await computeRegime(ctx, { breadth: (await db.get(`rank:${(await latestRankDay(db)) || ''}`))?.breadth ?? null });
     await db.putIfAbsent(`regime:${day}`, regime);
     log.push(`regime ${regime.summary}`);
+    // לוח דוחות יומי (קריאה אחת ל-FMP לכל השוק) — לפני ניתוח הנכסים כדי שהתאריכים יהיו טריים
+    if (ctx.env.FMP_KEY){ try { const c = await refreshEarningsCalendar(ctx); log.push(`earnings calendar: ${c.count} (${c.from}→${c.to})`); } catch (e) { await db.logError('earncal', e.message); } }
   }
   // snapshot "חסר" (תקלת נתונים, לא תוצר מודל) נחשב לא-גמור וניתן למילוי מחדש; ציון אמיתי לעולם לא נדרס
   const doneKeys = await db.list(`snap:${day}:`);
@@ -109,10 +111,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
         const eq = perf.equity || [];
         if (!eq.some((e) => e[0] === day)){ eq.push([day, perf.totalIls, spy]); await db.put('paper:equity', eq.slice(-2000)); }
       } catch (e) { await db.logError('paper equity', e.message); }
-      if (ctx.env.FMP_KEY && new Date().getUTCDay() === 1){
-        // יקום מכני (לא רשימה ידנית): החברות האמריקאיות הגדולות ביותר לפי שווי שוק, שבועית. נשמר גם meta:mechanical לצורך כשירות בלוויין
-        try { const r = await fetchWithFallback('screener', '', { minMarketCap: 2e10, minVolume: 500000, limit: 120, country: 'US', isEtf: false }, ctx); if (r.items){ const items = r.items.filter((x) => x.symbol && /^[A-Z.]{1,6}$/.test(x.symbol)); await db.put('meta:mechanical', { asOf: today(), rule: 'US, market cap ≥ $20B, volume ≥ 500k, top 120 by market cap', symbols: items.map((x) => x.symbol) }); log.push(`universe: mechanical ${items.length}, +${await addToUniverse(db, items.map((x) => ({ symbol: x.symbol, name: x.name, type: 'stock', assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'mechanical', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })))}`); } } catch (e) { await db.logError('screener', e.message); }
-      }
+      if (ctx.env.FMP_KEY && new Date().getUTCDay() === 1){ try { const r = await refreshMechanicalUniverse(ctx); log.push(`universe: ${r.ok ? `${r.source} ${r.selected} (+${r.added}/−${r.removed})` : r.reason}`); } catch (e) { await db.logError('universe', e.message); } }
       log.push(`finalized: ${snaps.length} snapshots (${rank.analyzed} analyzed), ${rank.categories.buySignals.length} buy signals`);
     }
     finalized = true;
@@ -147,12 +146,20 @@ async function handle(req, env0, ctx){
     if (req.method === 'GET') return json(await keysStatus(env0, db));
     if (req.method === 'POST'){ try { await setKey(db, body.name, body.value); } catch (e) { return err(e.message); } return json({ ok: true, keys: await keysStatus(env0, db) }); }
   }
+  // רענון יקום מכני + לוח דוחות לפי דרישה (בדיקת endpoints של FMP בפועל). cron עושה זאת לבד: לוח יומי, יקום בימי שני
+  if (r0 === 'universe' && p1 === 'refresh' && req.method === 'POST'){
+    const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+    const out = {};
+    try { out.universe = await refreshMechanicalUniverse(ctx, { cap: q.cap ? +q.cap : null }); } catch (e) { out.universe = { ok: false, error: e.message }; }
+    try { const c = await refreshEarningsCalendar(ctx); out.calendar = c ? { count: c.count, from: c.from, to: c.to } : { ok: false, reason: 'אין FMP_KEY' }; } catch (e) { out.calendar = { ok: false, error: e.message }; }
+    return json(out);
+  }
   if (r0 === 'universe'){
     const u = await getUniverse(db, env);
     const day = q.date || (await latestRankDay(db));
     const rank = day ? await db.get(`rank:${day}`) : null;
     const byS = new Map((rank?.table || []).map((r) => [r.symbol, r]));
-    const list = filterUniverse(u.map((a) => ({ ...a, ...(byS.get(a.symbol) || {}) })), { ...q, minMarketCap: q.minMarketCap ? +q.minMarketCap : undefined, maxMarketCap: q.maxMarketCap ? +q.maxMarketCap : undefined, maxVol: q.maxVol ? +q.maxVol : undefined, minDividend: q.minDividend ? +q.minDividend : undefined, minReturn1y: q.minReturn1y ? +q.minReturn1y : undefined });
+    const list = filterUniverse(u.filter((a) => !q.origin || a.origin === q.origin).map((a) => ({ ...a, ...(byS.get(a.symbol) || {}) })), { ...q, minMarketCap: q.minMarketCap ? +q.minMarketCap : undefined, maxMarketCap: q.maxMarketCap ? +q.maxMarketCap : undefined, maxVol: q.maxVol ? +q.maxVol : undefined, minDividend: q.minDividend ? +q.minDividend : undefined, minReturn1y: q.minReturn1y ? +q.minReturn1y : undefined });
     return json({ date: day, count: list.length, items: list, indices: INDICES });
   }
   if (r0 === 'screen'){

@@ -9,7 +9,7 @@ import { SEED_UNIVERSE, TASE_UNIVERSE, INDICES, MACRO_SERIES, findAsset, BENCHMA
 import { classifyRegime } from '../engine/regime.js';
 import { clusterNews } from '../engine/news.js';
 import { buildPortfolios } from '../engine/portfolio.js';
-import { isoDate, isNum, round } from '../engine/util.js';
+import { isoDate, isNum, round, addDays } from '../engine/util.js';
 import { analyzeBundle, toSnapshot, rankSnapshots } from '../engine/pipeline.js';
 export { analyzeBundle, toSnapshot, rankSnapshots };
 
@@ -68,30 +68,95 @@ export const getFacts = (symbol, ctx) => cached(ctx.db, `facts:${symbol}`, TTL.f
   return fetchWithFallback('facts', symbol, {}, ctx, { only: ['fmp'] });
 });
 export const getRatios = (symbol, ctx) => cached(ctx.db, `ratios:${symbol}`, TTL.ratios, () => fetchWithFallback('ratios', symbol, {}, ctx));
-// תחזיות אנליסטים + היסטוריה שבועית (esthist) כדי למדוד כיוון וגודל של שינויי תחזיות (revisions), לא רק "קנייה/החזקה"
+// תחזיות אנליסטים + היסטוריה שבועית (esthist) כדי למדוד כיוון וגודל של שינויי תחזיות (revisions), לא רק "קנייה/החזקה".
+// כל נקודה נושאת את תאריך שנת הכספים (fy1Date) כדי שההשוואה תהיה לאותה תקופה חשבונאית.
 export async function getEstimates(symbol, ctx){
   const est = await cached(ctx.db, `est:${symbol}`, TTL.est, () => fetchWithFallback('estimates', symbol, {}, ctx));
   try {
     if (est && !est.missing && (est.eps?.fy1 !== null && est.eps?.fy1 !== undefined)){
       const key = `esthist:${symbol}`; const hist = (await ctx.db.get(key)) || [];
       const last = hist[hist.length - 1]; const t = today();
-      if (!last || (Date.parse(t) - Date.parse(last.date)) / 86400000 >= 6){ hist.push({ date: t, epsFy1: est.eps.fy1, epsFy2: est.eps.fy2 ?? null, revFy1: est.revenue?.fy1 ?? null, analysts: est.analysts ?? null }); await ctx.db.put(key, hist.slice(-26)); }
+      if (!last || (Date.parse(t) - Date.parse(last.date)) / 86400000 >= 6){ hist.push({ date: t, epsFy1: est.eps.fy1, epsFy2: est.eps.fy2 ?? null, fy1Date: est.eps.fy1Date || null, fy2Date: est.eps.fy2Date || null, revFy1: est.revenue?.fy1 ?? null, analysts: est.analysts ?? null }); await ctx.db.put(key, hist.slice(-26)); }
     }
   } catch {}
   return est;
 }
-// שינוי תחזית ל-30 יום: (EPS היום − EPS לפני ~30 יום) / |EPS לפני 30 יום|; null אם אין היסטוריה
+// שינוי תחזית ל-30 יום, לאותה שנת כספים: (EPS FY היום − EPS אותה FY לפני ≥30 יום) / |ישן|.
+// לא ממציאים: בלי היסטוריה מספיקה → available:false עם סיבה (לא 0). שנה שהתחלפה (FY1 של היום היה FY2 אז) → משווים ל-epsFy2 הישן.
 export async function estimateRevision(db, symbol, days = 30){
   const hist = (await db.get(`esthist:${symbol}`)) || [];
-  if (hist.length < 2) return null;
-  const now = hist[hist.length - 1]; const cutoff = Date.parse(now.date) - days * 86400000;
-  const past = [...hist].reverse().find((h) => Date.parse(h.date) <= cutoff) || hist[0];
-  if (past === now || !past.epsFy1) return null;
-  return { days: Math.round((Date.parse(now.date) - Date.parse(past.date)) / 86400000), epsRevision: round((now.epsFy1 - past.epsFy1) / Math.abs(past.epsFy1), 4), from: past.date, to: now.date };
+  const now = hist[hist.length - 1];
+  if (!now) return { available: false, reason: 'אין היסטוריית תחזיות עדיין' };
+  const span = hist.length ? Math.round((Date.parse(now.date) - Date.parse(hist[0].date)) / 86400000) : 0;
+  if (span < days) return { available: false, reason: `היסטוריה של ${span} ימים בלבד (נדרשים ${days})`, historyDays: span, points: hist.length };
+  if (!now.fy1Date) return { available: false, reason: 'נקודה נוכחית בלי שנת כספים' };
+  const cutoff = Date.parse(now.date) - days * 86400000;
+  const past = [...hist].reverse().find((h) => Date.parse(h.date) <= cutoff);
+  if (!past) return { available: false, reason: 'אין נקודה ישנה מספיק' };
+  let old = null;
+  if (past.fy1Date === now.fy1Date) old = past.epsFy1;
+  else if (past.fy2Date === now.fy1Date) old = past.epsFy2;
+  if (!isNum(old) || !old) return { available: false, reason: 'אין תחזית לאותה שנת כספים בנקודה הישנה (השנה התחלפה)', fy: now.fy1Date };
+  return { available: true, days: Math.round((Date.parse(now.date) - Date.parse(past.date)) / 86400000), epsRevision: round((now.epsFy1 - old) / Math.abs(old), 4), fy: now.fy1Date, from: past.date, to: now.date, points: hist.length };
 }
 export const getEtf = (symbol, ctx) => cached(ctx.db, `etf:${symbol}`, TTL.etf, () => fetchWithFallback('etf', symbol, {}, ctx));
 export const getInsider = (symbol, ctx) => cached(ctx.db, `insider:${symbol}`, TTL.insider, () => fetchWithFallback('insider', symbol, {}, ctx));
-export const getEarnings = (symbol, ctx) => cached(ctx.db, `earn:${symbol}`, TTL.earn, () => fetchWithFallback('earnings', symbol, {}, ctx));
+// תאריך דוח: קודם מלוח הדוחות היומי (meta:earncal, קריאה אחת ליום לכל השוק, טווח 21 יום), ואז פרטני (שבועי) לתאריכים רחוקים ולהפתעות עבר.
+// לוח טרי בלי החברה = אין דוח בטווח הלוח, גם אם המטמון הפרטני חשב אחרת (תאריכים זזים).
+export async function getEarnings(symbol, ctx){
+  const base = await cached(ctx.db, `earn:${symbol}`, TTL.earn, () => fetchWithFallback('earnings', symbol, {}, ctx));
+  const cal = await ctx.db.get('meta:earncal');
+  const fresh = cal?.asOf && (Date.parse(today()) - Date.parse(cal.asOf)) / 86400000 <= 2 && cal.byTicker;
+  if (!fresh) return base;
+  const hit = cal.byTicker[symbol];
+  const b = base && !base.missing ? base : { last: [] };
+  if (hit) return { ...b, next: hit.date, nextTime: hit.time || null, source: 'fmp-calendar', asOf: cal.asOf, missing: false };
+  if (b.next && b.next >= cal.from && b.next <= cal.to) return { ...b, next: null, nextNote: `הלוח היומי (${cal.asOf}) לא מציג דוח עד ${cal.to} — התאריך ${b.next} מהמטמון בוטל` };
+  return base;
+}
+export async function refreshEarningsCalendar(ctx){
+  if (!ctx.env.FMP_KEY) return null;
+  const { fmp } = await import('../providers/fmp.js');
+  const from = today(), to = addDays(from, 21);
+  const r = await fmp.earningsCalendar({ from, to }, ctx);
+  await ctx.db.put('meta:earncal', r);
+  return r;
+}
+// יקום מכני: חברי S&P 500 (FMP) → נזילות (screener) → מכסה ענפית (engine/mechanical.js). נופל לרשימת "הגדולות" אם ה-endpoint לא זמין.
+export async function refreshMechanicalUniverse(ctx, { cap = null } = {}){
+  const { db, env } = ctx;
+  if (!env.FMP_KEY) return { ok: false, reason: 'אין FMP_KEY' };
+  const { fmp } = await import('../providers/fmp.js');
+  const { selectMechanical, MECHANICAL_RULE } = await import('../engine/mechanical.js');
+  const notes = [];
+  let members = null;
+  try { members = (await fmp.sp500(ctx)).items; } catch (e) { notes.push(`sp500-constituent לא זמין: ${e.message.slice(0, 120)}`); }
+  let screener = [];
+  try { screener = (await fetchWithFallback('screener', '', { minMarketCap: 2e9, minVolume: MECHANICAL_RULE.minVolume, limit: 1000, country: 'US', isEtf: false }, ctx)).items || []; } catch (e) { notes.push(`screener: ${e.message.slice(0, 120)}`); }
+  const liquidity = Object.fromEntries(screener.map((x) => [x.symbol, { volume: x.volume, marketCap: x.marketCap, sector: x.sector, name: x.name }]));
+  let sel, source;
+  if (members?.length){ sel = selectMechanical({ members, liquidity, cap: cap || +env.UNIVERSE_CAP || MECHANICAL_RULE.cap }); source = 'sp500'; }
+  else {
+    const items = screener.filter((x) => (x.marketCap || 0) >= 2e10).sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0)).slice(0, 120);
+    sel = { items: items.map((x) => ({ symbol: x.symbol, name: x.name, sector: x.sector, marketCap: x.marketCap, volume: x.volume })), members: 0, liquid: items.length, liquidityKnown: true, sectors: {}, rule: 'גיבוי: US, שווי שוק ≥ $20B, מחזור ≥ 500k, 120 הגדולות (ה-S&P 500 לא זמין)' };
+    source = 'screener-top';
+  }
+  const items = sel.items.filter((x) => /^[A-Z][A-Z0-9.\-]{0,6}$/.test(x.symbol));
+  if (!items.length) return { ok: false, reason: 'לא נבחרו חברות', notes };
+  let probe = null;
+  try { const h = await fmp.sp500Historical(ctx); probe = { ok: true, count: h.count, first: h.first, last: h.last }; } catch (e) { probe = { ok: false, error: e.message.slice(0, 160) }; }
+  const meta = { asOf: today(), source, rule: sel.rule, members: sel.members, liquid: sel.liquid, liquidityKnown: sel.liquidityKnown, sectors: sel.sectors, symbols: items.map((x) => x.symbol), historicalConstituents: probe, notes };
+  await db.put('meta:mechanical', meta);
+  // הוספה ליקום + הסרת חברות "מכניות" שיצאו מהבחירה (חוץ מפוזיציות פתוחות ורשימת מעקב)
+  const keep = new Set([...((await db.get('user:watchlist')) || []).map((w) => w.symbol), ...((await db.get('paper:trades')) || []).filter((t) => !t.exitDate).map((t) => t.symbol)]);
+  const extra = (await db.get('meta:universe')) || [];
+  const chosen = new Set(items.map((x) => x.symbol));
+  const kept = extra.filter((a) => a.origin !== 'mechanical' || chosen.has(a.symbol) || keep.has(a.symbol));
+  const removed = extra.length - kept.length;
+  if (removed) await db.put('meta:universe', kept);
+  const added = await addToUniverse(db, items.map((x) => ({ symbol: x.symbol, name: x.name, type: 'stock', assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'mechanical', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })));
+  return { ok: true, source, selected: items.length, added, removed, members: sel.members, liquid: sel.liquid, historicalConstituents: probe, notes };
+}
 export const getMacroSeries = (id, ctx) => cached(ctx.db, `macro:${id}`, TTL.macro, async (ex) => fetchWithFallback('macro', id, { from: ex?.rows?.length ? ex.rows[ex.rows.length - 1][0].slice(0, 4) + '-01-01' : '2000-01-01' }, ctx), { merge: (o, f) => ({ ...f, rows: DB.mergeRows(o.rows, f.rows) }) });
 export const getFx = (ctx) => cached(ctx.db, 'fx:USDILS', TTL.fx, async () => {
   const b = await fetchWithFallback('fx', 'USDILS', {}, ctx);

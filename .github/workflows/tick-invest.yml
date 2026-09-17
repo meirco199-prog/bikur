@@ -47,6 +47,10 @@ jobs:
               sleep 16
             done
           fi
+          if [ "$CMD" = "universe-refresh" ]; then
+            echo "=== universe-refresh"; curl -sS --max-time 120 -X POST "$W/universe/refresh?secret=$SECRET" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps(d, ensure_ascii=False)[:1500])'
+            echo "=== mechanical"; curl -sS --max-time 30 "$W/universe?origin=mechanical" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("count:", d.get("count"), [a["symbol"] for a in d.get("items",[])][:40])'
+          fi
           if [ "$CMD" = "auto-run" ] || [ "$CMD" = "cron-run" ]; then
             echo "=== autopilot"; curl -sS --max-time 120 -X POST "$W/auto/run?secret=$SECRET&trigger=github" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("ran:", d.get("ran"), d.get("reason",""), "day:", d.get("day")); print("regime:", (d.get("regime") or {}).get("summary")); print("before:", d.get("before"), "after:", d.get("after")); [print("  ", o["side"], o["qty"], "x", o["symbol"], o.get("name"), "@", o.get("price"), "ok" if o.get("ok") else "ERR " + str(o.get("error")), "|", o.get("reason")) for o in d.get("orders",[])]; print("notes:", d.get("notes")); [print("  skip", s["symbol"], "|", s["reason"]) for s in d.get("skipped",[])]'
           fi

@@ -98,6 +98,26 @@ export const fmp = {
       .map((e) => ({ date: e.date, epsActual: num(e.epsActual), epsEst: num(e.epsEstimated), surprisePct: num(e.epsEstimated) && num(e.epsActual) !== null ? (e.epsActual - e.epsEstimated) / Math.abs(e.epsEstimated) : null }));
     return { next, last, source: 'fmp', asOf: t };
   },
+  // חברי S&P 500 (רשימה נוכחית) — מקור אובייקטיבי ליקום, לא רשימה ידנית
+  async sp500(ctx){
+    const arr = await call(ctx, 'sp500-constituent');
+    if (!Array.isArray(arr) || !arr.length) throw new Error('fmp: sp500-constituent ריק');
+    return { items: arr.map((x) => ({ symbol: String(x.symbol || '').replace('-', '.'), name: x.name, sector: x.sector, subSector: x.subSector, dateAdded: x.dateFirstAdded || null })).filter((x) => x.symbol), source: 'fmp', asOf: today() };
+  },
+  // הרכב היסטורי (כניסות/יציאות) — נדרש לבדיקות עבר בלי הטיית שורדים. ייתכן שדורש תוכנית בתשלום: בודקים בפועל
+  async sp500Historical(ctx){
+    const arr = await call(ctx, 'historical-sp500-constituent');
+    if (!Array.isArray(arr)) throw new Error('fmp: historical-sp500-constituent — תשובה לא צפויה ' + JSON.stringify(arr).slice(0, 120));
+    return { count: arr.length, first: arr[arr.length - 1]?.date || null, last: arr[0]?.date || null, source: 'fmp', asOf: today() };
+  },
+  // לוח דוחות לטווח תאריכים — קריאה אחת ליום במקום קריאה לכל חברה
+  async earningsCalendar({ from, to }, ctx){
+    const arr = await call(ctx, 'earnings-calendar', { from, to });
+    if (!Array.isArray(arr)) throw new Error('fmp: earnings-calendar — תשובה לא צפויה');
+    const byTicker = {};
+    for (const e of arr){ const s = String(e.symbol || ''); if (!/^[A-Z][A-Z0-9.\-]{0,6}$/.test(s) || !e.date) continue; const cur = byTicker[s]; if (!cur || e.date < cur.date) byTicker[s] = { date: e.date, time: e.time || null, epsEst: num(e.epsEstimated) }; }
+    return { from, to, byTicker, count: Object.keys(byTicker).length, source: 'fmp', asOf: today() };
+  },
   async screener(filters = {}, _o, ctx){
     const p = { limit: String(filters.limit || 100), isActivelyTrading: 'true' };
     if (filters.minMarketCap) p.marketCapMoreThan = String(filters.minMarketCap);
