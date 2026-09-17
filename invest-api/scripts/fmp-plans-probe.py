@@ -36,6 +36,16 @@ else:
     for l in text_lines(t):
         if len(l) < 160 and l not in seen and re.search(r'^\$|/mo|/month|/year|per month|per year|Starter|Premium|Ultimate|Basic|Free|calls|bandwidth|Historical|Constituent|Screener|Earnings Calendar|Estimates|Bulk|Batch', l, re.I):
             seen.add(l); print(l)
+print('=== pricing page text (all lines, in order)')
+t = fetch('https://site.financialmodelingprep.com/pricing-plans')
+if not t.startswith('__ERR__'):
+    for l in text_lines(t)[:260]: print(' ', l[:120])
+print('=== docs/pricing')
+t = fetch('https://site.financialmodelingprep.com/developer/docs/pricing')
+if t.startswith('__ERR__'): print(t)
+else:
+    for l in text_lines(t):
+        if re.search(r'\$|/mo|/yr|Starter|Premium|Ultimate|Basic|Calls|Screener|Estimates|Earnings|Constituent|S&P', l) and len(l) < 160: print(' ', l)
 for ep in ['stable/sp-500', 'stable/historical-sp-500', 'stable/search-company-screener', 'stable/company-screener', 'stable/earnings-calendar', 'stable/financial-estimates', 'stable/analyst-estimates', 'stable/earnings-company']:
     print('=== doc', ep)
     t = fetch('https://site.financialmodelingprep.com/developer/docs/' + ep)

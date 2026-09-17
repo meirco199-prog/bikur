@@ -65,7 +65,7 @@ jobs:
           fi
           # בדיקת מסלולי FMP מהרץ של GitHub (הסביבה של הסוכן חסומה לאתר)
           if [ "$CMD" = "fmp-plans" ]; then
-            python3 invest-api/scripts/fmp-plans-probe.py | head -300
+            python3 invest-api/scripts/fmp-plans-probe.py | head -700
           fi
           if [ "$CMD" = "universe-refresh" ] || [ "$CMD" = "universe-reset" ]; then
             RESET=""; [ "$CMD" = "universe-reset" ] && RESET="&reset=1"
