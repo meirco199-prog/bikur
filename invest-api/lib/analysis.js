@@ -68,7 +68,27 @@ export const getFacts = (symbol, ctx) => cached(ctx.db, `facts:${symbol}`, TTL.f
   return fetchWithFallback('facts', symbol, {}, ctx, { only: ['fmp'] });
 });
 export const getRatios = (symbol, ctx) => cached(ctx.db, `ratios:${symbol}`, TTL.ratios, () => fetchWithFallback('ratios', symbol, {}, ctx));
-export const getEstimates = (symbol, ctx) => cached(ctx.db, `est:${symbol}`, TTL.est, () => fetchWithFallback('estimates', symbol, {}, ctx));
+// תחזיות אנליסטים + היסטוריה שבועית (esthist) כדי למדוד כיוון וגודל של שינויי תחזיות (revisions), לא רק "קנייה/החזקה"
+export async function getEstimates(symbol, ctx){
+  const est = await cached(ctx.db, `est:${symbol}`, TTL.est, () => fetchWithFallback('estimates', symbol, {}, ctx));
+  try {
+    if (est && !est.missing && (est.eps?.fy1 !== null && est.eps?.fy1 !== undefined)){
+      const key = `esthist:${symbol}`; const hist = (await ctx.db.get(key)) || [];
+      const last = hist[hist.length - 1]; const t = today();
+      if (!last || (Date.parse(t) - Date.parse(last.date)) / 86400000 >= 6){ hist.push({ date: t, epsFy1: est.eps.fy1, epsFy2: est.eps.fy2 ?? null, revFy1: est.revenue?.fy1 ?? null, analysts: est.analysts ?? null }); await ctx.db.put(key, hist.slice(-26)); }
+    }
+  } catch {}
+  return est;
+}
+// שינוי תחזית ל-30 יום: (EPS היום − EPS לפני ~30 יום) / |EPS לפני 30 יום|; null אם אין היסטוריה
+export async function estimateRevision(db, symbol, days = 30){
+  const hist = (await db.get(`esthist:${symbol}`)) || [];
+  if (hist.length < 2) return null;
+  const now = hist[hist.length - 1]; const cutoff = Date.parse(now.date) - days * 86400000;
+  const past = [...hist].reverse().find((h) => Date.parse(h.date) <= cutoff) || hist[0];
+  if (past === now || !past.epsFy1) return null;
+  return { days: Math.round((Date.parse(now.date) - Date.parse(past.date)) / 86400000), epsRevision: round((now.epsFy1 - past.epsFy1) / Math.abs(past.epsFy1), 4), from: past.date, to: now.date };
+}
 export const getEtf = (symbol, ctx) => cached(ctx.db, `etf:${symbol}`, TTL.etf, () => fetchWithFallback('etf', symbol, {}, ctx));
 export const getInsider = (symbol, ctx) => cached(ctx.db, `insider:${symbol}`, TTL.insider, () => fetchWithFallback('insider', symbol, {}, ctx));
 export const getEarnings = (symbol, ctx) => cached(ctx.db, `earn:${symbol}`, TTL.earn, () => fetchWithFallback('earnings', symbol, {}, ctx));

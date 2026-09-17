@@ -13,7 +13,7 @@ const first = (x) => (Array.isArray(x) ? x[0] : x);
 const today = () => new Date().toISOString().slice(0, 10);
 
 export const fmp = {
-  id: 'fmp', priority: 2, supports: ['profile', 'ratios', 'facts', 'estimates', 'targets', 'analyst', 'etf', 'screener', 'prices', 'insider'],
+  id: 'fmp', priority: 2, supports: ['profile', 'ratios', 'facts', 'estimates', 'targets', 'analyst', 'etf', 'screener', 'prices', 'insider', 'earnings'],
   available: (env) => !!env.FMP_KEY,
   async profile(symbol, _o, ctx){
     const p = first(await call(ctx, 'profile', { symbol }));
@@ -87,6 +87,16 @@ export const fmp = {
     const [h, info] = await Promise.all([call(ctx, 'etf/holdings', { symbol }).catch(() => []), call(ctx, 'etf/info', { symbol }).then(first).catch(() => null)]);
     if (!Array.isArray(h) || !h.length) return { missing: true, reason: 'FMP: אין החזקות' };
     return { holdings: h.slice(0, 25).map((x) => ({ symbol: x.asset || x.symbol, name: x.name, weight: num(x.weightPercentage) !== null ? x.weightPercentage / 100 : null })), expense: num(info?.expenseRatio), aum: num(info?.aum ?? info?.assetsUnderManagement), source: 'fmp', asOf: today(), quality: 0.8 };
+  },
+  // תאריכי דוחות: הבא (ללא תוצאה בפועל) + 4 אחרונים עם הפתעה
+  async earnings(symbol, _o, ctx){
+    const arr = await call(ctx, 'earnings', { symbol, limit: 12 });
+    if (!Array.isArray(arr) || !arr.length) return { missing: true, reason: 'FMP: אין תאריכי דוחות' };
+    const t = today();
+    const next = arr.filter((e) => e.date >= t && num(e.epsActual) === null).map((e) => e.date).sort()[0] || null;
+    const last = arr.filter((e) => num(e.epsActual) !== null && e.date < t).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4)
+      .map((e) => ({ date: e.date, epsActual: num(e.epsActual), epsEst: num(e.epsEstimated), surprisePct: num(e.epsEstimated) && num(e.epsActual) !== null ? (e.epsActual - e.epsEstimated) / Math.abs(e.epsEstimated) : null }));
+    return { next, last, source: 'fmp', asOf: t };
   },
   async screener(filters = {}, _o, ctx){
     const p = { limit: String(filters.limit || 100), isActivelyTrading: 'true' };

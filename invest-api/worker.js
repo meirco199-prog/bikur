@@ -110,7 +110,8 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
         if (!eq.some((e) => e[0] === day)){ eq.push([day, perf.totalIls, spy]); await db.put('paper:equity', eq.slice(-2000)); }
       } catch (e) { await db.logError('paper equity', e.message); }
       if (ctx.env.FMP_KEY && new Date().getUTCDay() === 1){
-        try { const r = await fetchWithFallback('screener', '', { minMarketCap: 2e9, minVolume: 500000, limit: 60, country: 'US' }, ctx); if (r.items) log.push(`screener: +${await addToUniverse(db, r.items.map((x) => ({ symbol: x.symbol, name: x.name, type: x.type, assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'screener', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })))}`); } catch (e) { await db.logError('screener', e.message); }
+        // יקום מכני (לא רשימה ידנית): החברות האמריקאיות הגדולות ביותר לפי שווי שוק, שבועית. נשמר גם meta:mechanical לצורך כשירות בלוויין
+        try { const r = await fetchWithFallback('screener', '', { minMarketCap: 2e10, minVolume: 500000, limit: 120, country: 'US', isEtf: false }, ctx); if (r.items){ const items = r.items.filter((x) => x.symbol && /^[A-Z.]{1,6}$/.test(x.symbol)); await db.put('meta:mechanical', { asOf: today(), rule: 'US, market cap ≥ $20B, volume ≥ 500k, top 120 by market cap', symbols: items.map((x) => x.symbol) }); log.push(`universe: mechanical ${items.length}, +${await addToUniverse(db, items.map((x) => ({ symbol: x.symbol, name: x.name, type: 'stock', assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'mechanical', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })))}`); } } catch (e) { await db.logError('screener', e.message); }
       }
       log.push(`finalized: ${snaps.length} snapshots (${rank.analyzed} analyzed), ${rank.categories.buySignals.length} buy signals`);
     }
@@ -375,7 +376,7 @@ export default {
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     try {
       const r = await cronStep(ctx);
-      if (r?.finalized){ const day = r.day; const j = (await ctx.db.get('auto:journal')) || []; if (!j.some((x) => x.day === day && x.executed)) await runAutopilot(ctx, { trigger: 'cron' }); }
+      if (r?.finalized) await runAutopilot(ctx, { trigger: 'cron' }); // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
     } catch (e) { await ctx.db.logError('scheduled', e.message); }
     finally { await ctx.budget.flush().catch(() => {}); }
   },
