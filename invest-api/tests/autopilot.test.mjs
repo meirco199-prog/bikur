@@ -124,3 +124,14 @@ test('אוטומט: תקציב הלוויין (20%) מגביל קניות מני
   assert.ok(d.orders.filter((o) => o.side === 'buy').length <= 1, JSON.stringify(d.orders));
   assert.ok(d.skipped.some((s) => /תקציב המניות/.test(s.reason)), JSON.stringify(d.skipped));
 });
+
+test('אוטומט: שלב ליבה פעם ביום לכל נייר; לוויין מעל התקציב → מוכרים את החלשה בלי סיגנל קנייה', () => {
+  const table = [etf('VTI', 'equity', 'core', 300), etf('BND', 'bond', 'bond', 70), row('W', 'WATCH', 50, { sector: 'A' }), row('H', 'HOLD', 60, { sector: 'B' }), row('B1', 'STRONG BUY', 80, { sector: 'C' })];
+  const pos = [{ symbol: 'W', qty: 60, valueIls: 22000, pnlPct: 0 }, { symbol: 'H', qty: 60, valueIls: 22000, pnlPct: 0 }, { symbol: 'B1', qty: 20, valueIls: 7000, pnlPct: 0 }];
+  const d = decideOrders({ table, regime: bull, perf: perf(149000, pos), fx: 3.7, boughtToday: ['VTI'] });
+  assert.ok(d.skipped.find((s) => s.symbol === 'VTI' && /כבר נקנה היום/.test(s.reason)), JSON.stringify(d.skipped));
+  assert.ok(d.orders.find((o) => o.symbol === 'BND' && o.rule === 'core'), 'BND עוד לא נקנה היום');
+  const sl = d.orders.filter((o) => o.rule === 'sleeve');
+  assert.ok(sl.length >= 1 && sl[0].symbol === 'W', 'החלשה (WATCH, ציון 50) נמכרת קודם: ' + JSON.stringify(sl));
+  assert.ok(!d.orders.some((o) => o.symbol === 'B1' && o.side === 'sell'), 'נייר עם סיגנל קנייה לא נמכר בגלל תקציב');
+});

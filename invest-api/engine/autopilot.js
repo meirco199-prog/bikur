@@ -4,7 +4,7 @@ import { isNum, round } from './util.js';
 import { PROFILES } from './portfolio.js';
 
 export const AUTO_RULES = {
-  version: 5,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
+  version: 6,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
   maxConcentration: 1.5,    // פוזיציה גדולה מפי 1.5 מהיעד לנייר → מוכרים את העודף עד היעד
   // עצירת הפסד לפי תנודתיות: stop = clamp(vol1y × 0.5, 8%, 20%); בשוק דובי × 0.75. גודל פוזיציה = תקציב סיכון ÷ stop
   riskBudget: 0.005,        // כל פוזיציה מסכנת לכל היותר 0.5% מהתיק (1,000 ₪ ב-200,000)
@@ -41,7 +41,7 @@ const daysUntil = (from, to) => { if (!from || !to) return null; return Math.rou
  * regime: { trend, risk }
  * perf: תוצאת PaperBroker.performance (positions, cashIls, totalIls)
  */
-export function decideOrders({ table = [], regime = null, perf, profile = 'balanced', fx = 3.7, today = null, buysToday = 0, rules = AUTO_RULES } = {}){
+export function decideOrders({ table = [], regime = null, perf, profile = 'balanced', fx = 3.7, today = null, buysToday = 0, boughtToday = [], rules = AUTO_RULES } = {}){
   const P = PROFILES[profile] || PROFILES.balanced;
   const notes = [], orders = [], skipped = [];
   const by = new Map(table.map((r) => [r.symbol, r]));
@@ -89,11 +89,29 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   const sectorIls = {}; for (const p of positions){ const r = by.get(p.symbol); const sec = r?.sector || 'אחר'; sectorIls[sec] = (sectorIls[sec] || 0) + (heldIls.get(p.symbol) || 0); }
   let count = positions.filter((p) => (heldIls.get(p.symbol) || 0) > 0 && !coreOf(p.symbol)).length;
   const maxCount = P.maxStocks + 2;
+  // ---- תקציב הלוויין: אם המניות הבודדות עברו את ה-sleeve ב-10%+, מוכרים את אלה בלי סיגנל קנייה (החלשה קודם) עד שחוזרים לתקציב ----
+  {
+    const isCoreSym = (sym) => { const r = by.get(sym); return !r || !!coreOf(sym) || r.assetClass === 'bond' || r.assetClass === 'gold' || r.role === 'core'; };
+    const budget = (P.sleeves.stocks || 0) * total;
+    let sat = 0; for (const [sym, v] of heldIls) if (!isCoreSym(sym)) sat += v;
+    if (budget > 0 && sat > budget * 1.1){
+      const weak = positions.filter((p) => !isCoreSym(p.symbol) && !sold.has(p.symbol) && (heldIls.get(p.symbol) || 0) > 0 && !['STRONG BUY', 'BUY'].includes(by.get(p.symbol)?.signal)).sort((a, b) => (by.get(a.symbol)?.score ?? 0) - (by.get(b.symbol)?.score ?? 0));
+      for (const p of weak){
+        if (sat <= budget) break;
+        const r = by.get(p.symbol); if (!isNum(r.price) || r.price <= 0) continue;
+        const unit = r.price * rateOf(r), val = heldIls.get(p.symbol) || 0;
+        const q = Math.min(p.qty, Math.ceil(Math.min(val, sat - budget) / unit)); if (q < 1) continue;
+        orders.push({ side: 'sell', symbol: p.symbol, qty: q, priceRef: r.price, currency: r.currency, rule: 'sleeve', reason: `המניות הבודדות תופסות ${Math.round(sat / total * 100)}% מהתיק (התקציב ${Math.round(budget / total * 100)}%) — מוכרים את החלשה שאין לה סיגנל קנייה (${SIG_HE[r.signal] || r.signal}, ציון ${r.score})` });
+        const ils = q * unit; sat -= ils; free += ils; heldIls.set(p.symbol, Math.max(0, val - ils)); sold.add(p.symbol); if (q >= p.qty) count--;
+      }
+    }
+  }
   // ---- ליבה: קנייה בשלבים עד היעד, בלי קשר לסיגנל (בשוק דובי ליבת המניות לא נקנית) ----
   for (const sl of Object.keys(coreSym)){
     const sym = coreSym[sl], r = by.get(sym);
     const target = coreTarget(sl), cur = heldIls.get(sym) || 0;
     if (cur >= target * 0.9) continue;
+    if (boughtToday.includes(sym)){ skipped.push({ symbol: sym, reason: 'שלב ליבה כבר נקנה היום — השלב הבא מחר' }); continue; }
     const step = target / rules.tranches;
     let ils = Math.min(target - cur, step, free);
     if (ils < rules.minOrderIls){ skipped.push({ symbol: sym, reason: free < rules.minOrderIls ? 'אין מספיק מזומן פנוי (שומרים רזרבה)' : 'הסכום שנותר עד היעד קטן מדי' }); continue; }
