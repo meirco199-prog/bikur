@@ -16,8 +16,22 @@ if t.startswith('__ERR__'): print(t)
 else:
     m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', t, re.S)
     if m:
+        import json
         j = m.group(1); print('next_data bytes:', len(j))
-        for k in re.findall(r'"(?:name|title|price|priceMonthly|priceYearly|monthly|yearly|annual|amount|calls|bandwidth)"\s*:\s*("[^"]{0,80}"|[0-9.]+)', j)[:150]: print('  ', k)
+        KEY = re.compile(r'Screener|Estimates|Earnings Calendar|Historical S&P|Constituent|Calls|Bandwidth|Price|Starter|Premium|Ultimate|Basic|Free', re.I)
+        out = []
+        def walk(o, path=''):
+            if isinstance(o, dict):
+                flat = {k: v for k, v in o.items() if not isinstance(v, (dict, list))}
+                if any(isinstance(v, str) and KEY.search(v) for v in flat.values()) or any(re.search(r'price|amount|monthly|annual|yearly', k, re.I) for k in flat):
+                    out.append((path, json.dumps(flat, ensure_ascii=False)[:400]))
+                for k, v in o.items(): walk(v, path + '/' + k)
+            elif isinstance(o, list):
+                for i, v in enumerate(o[:200]): walk(v, path + f'[{i}]')
+        try:
+            walk(json.loads(j))
+            for pth, d in out[:220]: print(' ', pth[-70:], d)
+        except Exception as e: print('parse error', e)
     seen = set()
     for l in text_lines(t):
         if len(l) < 160 and l not in seen and re.search(r'^\$|/mo|/month|/year|per month|per year|Starter|Premium|Ultimate|Basic|Free|calls|bandwidth|Historical|Constituent|Screener|Earnings Calendar|Estimates|Bulk|Batch', l, re.I):
