@@ -223,7 +223,7 @@ test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מ�
 
 test('אוטומט: /auto/status, /auto/run (dry ואמיתי), פעם ביום, כיבוי בהגדרות', async () => {
   await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
-  const st = await get('/auto/status'); assert.equal(st.status, 200); assert.equal(st.j.enabled, true); assert.ok(st.j.rules.stopLoss > 0);
+  const st = await get('/auto/status'); assert.equal(st.status, 200); assert.equal(st.j.enabled, true); assert.ok(st.j.rules.riskBudget > 0 && st.j.rules.stopMin > 0);
   assert.equal((await get('/auto/run', { method: 'POST' })).status, 401);
   const dry = await get('/auto/run?dry=1', { method: 'POST', auth: true }); assert.equal(dry.status, 200, JSON.stringify(dry.j).slice(0, 300));
   assert.equal(dry.j.ran, true); assert.ok(Array.isArray(dry.j.orders)); assert.equal(dry.j.executed, false);

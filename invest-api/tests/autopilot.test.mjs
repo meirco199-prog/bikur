@@ -18,19 +18,19 @@ test('אוטומט: קונה בשלבים לפי סיגנל וציון, עם מ�
 
 test('אוטומט: שוק דובי — אין קניות, עצירת הפסד הדוקה', () => {
   const table = [row('AAA', 'STRONG BUY', 80), row('HLD', 'HOLD', 55)];
-  const pos = [{ symbol: 'HLD', qty: 10, valueIls: 3300, costIls: 3700, pnlPct: -0.09 }];
+  const pos = [{ symbol: 'HLD', qty: 10, valueIls: 3300, costIls: 3700, pnlPct: -0.12 }];
   const d = decideOrders({ table, regime: { trend: 'Bear Trend', risk: 'Risk On' }, perf: perf(150000, pos), fx: 3.7 });
   assert.ok(!d.orders.some((o) => o.side === 'buy'));
   assert.ok(d.orders.find((o) => o.symbol === 'HLD' && o.rule === 'stop' && o.qty === 10));
   assert.ok(d.notes.some((n) => /דובי/.test(n)));
 });
 
-test('אוטומט: מכירה לפי סיגנל, הקטנה לחצי, עצירת הפסד 12%', () => {
-  const table = [row('S', 'SELL', 30), row('R', 'REDUCE', 45), row('L', 'HOLD', 55), row('K', 'BUY', 68)];
+test('אוטומט: מכירה לפי סיגנל, הקטנה לחצי, עצירת הפסד לפי תנודתיות (vol 30% → 15%)', () => {
+  const table = [row('S', 'SELL', 30), row('R', 'REDUCE', 45), row('L', 'HOLD', 55), row('K', 'BUY', 68, { vol1y: 0.16 })];
   const pos = [
     { symbol: 'S', qty: 7, valueIls: 2000, pnlPct: 0.05 },
     { symbol: 'R', qty: 9, valueIls: 2000, pnlPct: 0.1 },
-    { symbol: 'L', qty: 4, valueIls: 2000, pnlPct: -0.13 },
+    { symbol: 'L', qty: 4, valueIls: 2000, pnlPct: -0.16 },
     { symbol: 'K', qty: 3, valueIls: 2000, pnlPct: 0.02 },
   ];
   const d = decideOrders({ table, regime: bull, perf: perf(100000, pos), fx: 3.7 });
@@ -49,7 +49,7 @@ test('אוטומט: לא קונה לפני דוח, לא חורג מיעד, לא 
 });
 
 test('אוטומט: Risk Off — רק קנייה חזקה ובחצי גודל', () => {
-  const table = [row('A', 'STRONG BUY', 80), row('B', 'BUY', 75)];
+  const table = [row('A', 'STRONG BUY', 80, { vol1y: 0.16 }), row('B', 'BUY', 75, { vol1y: 0.16 })];
   const d = decideOrders({ table, regime: { trend: 'Bull Trend', risk: 'Risk Off' }, perf: perf(200000), fx: 3.7 });
   assert.deepEqual(d.orders.map((o) => o.symbol), ['A']);
   assert.ok(d.orders[0].estIls <= 200000 * 0.10 * 0.5 / 3 + 1, 'שלב = שליש מיעד מוקטן');
@@ -84,28 +84,39 @@ test('אוטומט: ליבה — קרן מדד, אג"ח וזהב נקנות בש
   const d = decideOrders({ table, regime: bull, perf: perf(200000), fx: 3.7 });
   const core = d.orders.filter((o) => o.rule === 'core');
   assert.deepEqual(core.map((o) => o.symbol), ['VTI', 'BND', 'GLD'], JSON.stringify(d.orders));
-  const vti = core[0]; assert.ok(vti.estIls <= 200000 * 0.35 / 3 + 1 && vti.estIls > 20000, 'שלב = שליש מ-35%: ' + vti.estIls); assert.match(vti.reason, /ליבה.*שלב 1 מתוך 3/);
+  const vti = core[0]; assert.ok(vti.estIls <= 200000 * 0.50 / 3 + 1 && vti.estIls > 30000, 'שלב = שליש מ-50%: ' + vti.estIls); assert.match(vti.reason, /ליבה.*שלב 1 מתוך 3/);
   assert.ok(!d.orders.some((o) => o.symbol === 'SPY'), 'רק קרן ליבה אחת לכל sleeve');
   assert.ok(d.orders.find((o) => o.symbol === 'AAA' && o.rule === 'open'), 'לוויין נקנה במקביל');
   // ריצה שנייה: הליבה ממשיכה לשלב 2, לא נמכרת לפי סיגנל SELL
-  const pos = [{ symbol: 'VTI', qty: 23, valueIls: 25000, pnlPct: -0.2 }];
+  const pos = [{ symbol: 'VTI', qty: 27, valueIls: 30000, pnlPct: -0.2 }];
   const t2 = table.map((r) => (r.symbol === 'VTI' ? { ...r, signal: 'SELL', score: 20 } : r));
   const d2 = decideOrders({ table: t2, regime: bull, perf: perf(130000, pos), fx: 3.7 });
   assert.ok(!d2.orders.some((o) => o.symbol === 'VTI' && o.side === 'sell'), 'ליבה לא נמכרת לפי סיגנל או עצירת הפסד');
   assert.ok(d2.orders.find((o) => o.symbol === 'VTI' && o.rule === 'core' && /שלב 2/.test(o.reason)), JSON.stringify(d2.orders));
 });
 
-test('אוטומט: שוק דובי — ליבת המניות מוקטנת לחצי, אג"ח עדיין נקנה, מניות לא', () => {
-  const table = [etf('VTI', 'equity', 'core', 300), etf('BND', 'bond', 'bond', 70), row('AAA', 'STRONG BUY', 85)];
-  const pos = [{ symbol: 'VTI', qty: 63, valueIls: 70000, pnlPct: 0.1 }];
+test('אוטומט: שוק דובי — הליבה נשארת ונקנית, מניות בודדות לא נקנות, עצירה הדוקה ב-25%', () => {
+  const table = [etf('VTI', 'equity', 'core', 300), etf('BND', 'bond', 'bond', 70), row('AAA', 'STRONG BUY', 85), row('HLD', 'HOLD', 55)];
+  const pos = [{ symbol: 'VTI', qty: 63, valueIls: 70000, pnlPct: -0.15 }, { symbol: 'HLD', qty: 10, valueIls: 3000, pnlPct: -0.12 }];
   const d = decideOrders({ table, regime: { trend: 'Bear Trend', risk: 'Risk Off' }, perf: perf(130000, pos), fx: 3.7 });
-  const trim = d.orders.find((o) => o.symbol === 'VTI' && o.rule === 'bear-core'); assert.ok(trim, JSON.stringify(d.orders));
-  assert.ok(trim.qty >= 28 && trim.qty <= 33, 'מוכר עד יעד 17.5%: ' + trim.qty);
+  assert.ok(!d.orders.some((o) => o.symbol === 'VTI' && o.side === 'sell'), 'ליבה לא נמכרת בשוק דובי');
+  assert.ok(d.orders.find((o) => o.symbol === 'VTI' && o.rule === 'core'), 'ליבה ממשיכה להיקנות: ' + JSON.stringify(d.orders));
   assert.ok(d.orders.find((o) => o.symbol === 'BND' && o.rule === 'core'));
   assert.ok(!d.orders.some((o) => o.symbol === 'AAA'));
+  assert.ok(d.orders.find((o) => o.symbol === 'HLD' && o.rule === 'stop'), 'עצירה 15%×0.75=11.25% → −12% מוכר');
 });
 
-test('אוטומט: תקציב הלוויין (35%) מגביל קניות מניות בודדות', () => {
+test('אוטומט: גודל פוזיציה לפי סיכון — מניה תנודתית מקבלת יעד קטן יותר ועצירה רחוקה יותר', () => {
+  const table = [row('CALM', 'STRONG BUY', 80, { vol1y: 0.16, sector: 'A' }), row('WILD', 'STRONG BUY', 80, { vol1y: 0.40, sector: 'B' })];
+  const d = decideOrders({ table, regime: bull, perf: perf(200000), fx: 3.7 });
+  const calm = d.orders.find((o) => o.symbol === 'CALM'), wild = d.orders.find((o) => o.symbol === 'WILD');
+  assert.ok(calm && wild, JSON.stringify(d.orders) + JSON.stringify(d.skipped));
+  assert.ok(calm.estIls > wild.estIls, `יציבה ${calm.estIls} > תנודתית ${wild.estIls}`);
+  assert.match(calm.reason, /עצירה 8%/); assert.match(wild.reason, /עצירה 20%/);
+  assert.match(calm.reason, /יעד 6\.\d?%|יעד 6%/); // 0.5% ÷ 8% = 6.25% מהתיק
+});
+
+test('אוטומט: תקציב הלוויין (20%) מגביל קניות מניות בודדות', () => {
   const table = [row('AAA', 'STRONG BUY', 85, { sector: 'A' }), row('BBB', 'STRONG BUY', 84, { sector: 'B' })];
   const pos = [{ symbol: 'S1', qty: 1, valueIls: 68000, pnlPct: 0 }];
   const t = [...table, row('S1', 'HOLD', 55, { sector: 'C' })];

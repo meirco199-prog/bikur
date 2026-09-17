@@ -4,7 +4,7 @@ import { alignedReturns, portfolioRisk } from './risk.js';
 
 export const PROFILES = {
   conservative: { label: 'שמרני', sleeves: { coreEquity: 0.25, stocks: 0.10, bonds: 0.45, gold: 0.10, cash: 0.10 }, maxPosition: 0.08, maxEtfPosition: 0.35, maxSector: 0.25, maxStocks: 4, minScore: 60, maxVol: 0.30 },
-  balanced: { label: 'מאוזן', sleeves: { coreEquity: 0.35, stocks: 0.35, bonds: 0.20, gold: 0.05, cash: 0.05 }, maxPosition: 0.10, maxEtfPosition: 0.35, maxSector: 0.30, maxStocks: 6, minScore: 60, maxVol: 0.45 },
+  balanced: { label: 'מאוזן', sleeves: { coreEquity: 0.50, stocks: 0.20, bonds: 0.20, gold: 0.05, cash: 0.05 }, maxPosition: 0.10, maxEtfPosition: 0.35, maxSector: 0.30, maxStocks: 6, minScore: 60, maxVol: 0.45 },
   growth: { label: 'צמיחה', sleeves: { coreEquity: 0.35, stocks: 0.45, bonds: 0.12, gold: 0.03, cash: 0.05 }, maxPosition: 0.12, maxEtfPosition: 0.30, maxSector: 0.35, maxStocks: 8, minScore: 58, maxVol: 0.60 },
   aggressive: { label: 'אגרסיבי', sleeves: { coreEquity: 0.25, stocks: 0.70, bonds: 0, gold: 0, cash: 0.05 }, maxPosition: 0.15, maxEtfPosition: 0.25, maxSector: 0.40, maxStocks: 10, minScore: 55, maxVol: 0.80 },
 };

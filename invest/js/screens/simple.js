@@ -50,7 +50,7 @@ const autoCard = (full = false) => {
   const head = `<div class="row spread" style="margin-bottom:.4rem"><span class="tag ${on ? 'fact' : 'missing'}">${on ? 'פעיל' : 'כבוי'}</span><div class="row"><button class="btn sm" data-auto-run="1">הרץ עכשיו</button><button class="btn sm ghost" data-auto-toggle="${on ? '0' : '1'}">${on ? 'כבה' : 'הפעל'}</button></div></div>`;
   const body = a.last ? `<div class="muted" style="font-size:.85rem;margin-bottom:.2rem">ריצה אחרונה</div>${runBlock(a.last)}` : '<div class="empty">עוד לא רץ. הוא ירוץ לבד אחרי העיבוד הלילי, או לחץ "הרץ עכשיו".</div>';
   const hist = full && a.journal?.length > 1 ? `<details style="margin-top:.5rem"><summary style="cursor:pointer">ריצות קודמות (${a.journal.length - 1})</summary>${a.journal.slice(1).map((j) => `<div style="margin:.5rem 0;padding-top:.4rem;border-top:1px solid var(--line)">${runBlock(j)}</div>`).join('')}</details>` : '';
-  return sec('האוטומט מנהל את חשבון התרגול', head + body + hist + `<p class="muted" style="margin-top:.5rem;font-size:.85rem">כללים קבועים וגלויים: קונה רק סיגנלי קנייה, בשלבים, עד 3 ביום; מוכר בסיגנל מכירה או בהפסד של ${Math.round((a.rules?.stopLoss || 0.12) * 100)}%. <a href="#/explain">כל הכללים</a></p>`, 'רץ פעם ביום, אחרי הניתוח');
+  return sec('האוטומט מנהל את חשבון התרגול', head + body + hist + `<p class="muted" style="margin-top:.5rem;font-size:.85rem">כללים קבועים וגלויים: קונה רק סיגנלי קנייה, בשלבים, עד 3 ביום; מוכר בסיגנל מכירה או בעצירת הפסד לפי התנודתיות של כל נייר (8% עד 20%); כל פוזיציה מסכנת עד ${((a.rules?.riskBudget || 0.005) * 100).toFixed(1)}% מהתיק. <a href="#/explain">כל הכללים</a></p>`, 'רץ פעם ביום, אחרי הניתוח');
 };
 
 const VIEWS = {

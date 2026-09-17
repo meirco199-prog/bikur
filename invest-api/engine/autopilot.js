@@ -4,17 +4,23 @@ import { isNum, round } from './util.js';
 import { PROFILES } from './portfolio.js';
 
 export const AUTO_RULES = {
-  version: 4,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
+  version: 5,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
   maxConcentration: 1.5,    // פוזיציה גדולה מפי 1.5 מהיעד לנייר → מוכרים את העודף עד היעד
-  stopLoss: 0.12,           // עצירת הפסד: מוכרים הכל אם הפוזיציה ירדה 12% מהקנייה (8% בשוק דובי)
-  stopLossBear: 0.08,
+  // עצירת הפסד לפי תנודתיות: stop = clamp(vol1y × 0.5, 8%, 20%); בשוק דובי × 0.75. גודל פוזיציה = תקציב סיכון ÷ stop
+  riskBudget: 0.005,        // כל פוזיציה מסכנת לכל היותר 0.5% מהתיק (1,000 ₪ ב-200,000)
+  stopMin: 0.08, stopMax: 0.20, stopVolFactor: 0.5, stopBearFactor: 0.75,
   tranches: 3,              // קונים בשלבים: שליש מהיעד בכל ריצה
   maxBuysPerRun: 3,         // לא יותר מ-3 קניות ביום
   minOrderIls: 1500,        // לא קונים בסכומים זעירים (עמלה יחסית גבוהה)
   earningsBlackoutDays: 5,  // לא קונים 5 ימים לפני דוח
   buyTargetFactor: { 'STRONG BUY': 1, BUY: 0.7 }, // יעד משקל: מלא לקנייה חזקה, 70% לקנייה
-  bearCoreFactor: 0.5,      // שוק דובי: ליבת המניות יורדת לחצי מהיעד
 };
+// עצירת הפסד לנייר לפי התנודתיות השנתית שלו (אין vol → ברירת מחדל 12%)
+export function stopPctFor(r, rules = AUTO_RULES, bear = false){
+  const v = isNum(r?.vol1y) ? r.vol1y : 0.24;
+  const s = Math.min(rules.stopMax, Math.max(rules.stopMin, v * rules.stopVolFactor));
+  return round(bear ? s * rules.stopBearFactor : s, 4);
+}
 // ליבה אסטרטגית (לפי sleeves של הפרופיל), נקנית בשלבים בלי קשר לסיגנלים: הראשון ברשימה שיש לו נתונים היום
 export const CORE_PICKS = { coreEquity: ['VTI', 'SPY', 'VOO'], bonds: ['BND', 'AGG', 'IEF'], gold: ['GLD', 'IAU'] };
 const CORE_HE = { coreEquity: 'קרן מדד רחבה (כל שוק המניות האמריקאי)', bonds: 'קרן אג"ח', gold: 'זהב' };
@@ -43,12 +49,11 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   const positions = perf?.positions || [];
   const bear = regime?.trend === 'Bear Trend', riskOff = regime?.risk === 'Risk Off';
   const rateOf = (r) => (r.currency === 'ILS' ? 1 : fx);
-  const stop = bear ? rules.stopLossBear : rules.stopLoss;
 
   // ליבה: sleeve → סימבול זמין היום
   const coreSym = {}; for (const [sl, list] of Object.entries(CORE_PICKS)){ if ((P.sleeves[sl] || 0) > 0){ const pick = list.find((sym) => { const r = by.get(sym); return r && isNum(r.price) && r.price > 0; }); if (pick) coreSym[sl] = pick; } }
   const coreOf = (sym) => Object.keys(coreSym).find((sl) => coreSym[sl] === sym) || null;
-  const coreTarget = (sl) => (P.sleeves[sl] || 0) * total * (sl === 'coreEquity' && bear ? rules.bearCoreFactor : 1);
+  const coreTarget = (sl) => (P.sleeves[sl] || 0) * total; // הליבה היא ליבה: לא משתנה לפי מצב השוק
 
   // ---- מכירות (קודם: משחררות מזומן) ----
   for (const p of positions){
@@ -56,12 +61,9 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     if (!r){ notes.push(`${p.symbol}: אין נתוני דירוג היום — מחזיקים`); continue; }
     const sig = r.signal;
     const sl = coreOf(p.symbol);
-    if (sl){ // ליבה: לא נמכרת לפי סיגנל; בשוק דובי ליבת המניות מוקטנת לחצי
-      const t = coreTarget(sl); const val = p.valueIls ?? p.costIls ?? 0;
-      if (bear && sl === 'coreEquity' && val > t * 1.1 && isNum(r.price) && r.price > 0){ const q = Math.min(p.qty - 1, Math.ceil((val - t) / (r.price * rateOf(r)))); if (q >= 1) orders.push({ side: 'sell', symbol: p.symbol, qty: q, priceRef: r.price, currency: r.currency, rule: 'bear-core', reason: `שוק דובי: מקטינים את ליבת המניות לחצי מהיעד (${Math.round(t / total * 100)}% מהתיק)` }); }
-      continue;
-    }
-    if (isNum(p.pnlPct) && p.pnlPct <= -stop){ orders.push({ side: 'sell', symbol: p.symbol, qty: p.qty, priceRef: r.price, currency: r.currency, rule: 'stop', reason: `עצירת הפסד: ירדה ${Math.round(-p.pnlPct * 100)}% מהקנייה (הגבול ${Math.round(stop * 100)}%)` }); continue; }
+    if (sl) continue; // ליבה: לא נמכרת לפי סיגנל, עצירת הפסד או מצב שוק
+    const stop = stopPctFor(r, rules, bear);
+    if (isNum(p.pnlPct) && p.pnlPct <= -stop){ orders.push({ side: 'sell', symbol: p.symbol, qty: p.qty, priceRef: r.price, currency: r.currency, rule: 'stop', reason: `עצירת הפסד: ירדה ${Math.round(-p.pnlPct * 100)}% מהקנייה (הגבול לנייר הזה ${Math.round(stop * 100)}%, לפי תנודתיות ${Math.round((r.vol1y || 0.24) * 100)}%)` }); continue; }
     if (sig === 'SELL'){ orders.push({ side: 'sell', symbol: p.symbol, qty: p.qty, priceRef: r.price, currency: r.currency, rule: 'signal', reason: `הסיגנל הפך ל"מכירה" (ציון ${r.score}${whyHe(r) ? ': ' + whyHe(r) : ''})` }); continue; }
     if (sig === 'REDUCE' && p.qty >= 2){ orders.push({ side: 'sell', symbol: p.symbol, qty: Math.ceil(p.qty / 2), priceRef: r.price, currency: r.currency, rule: 'reduce', reason: `הסיגנל הפך ל"הקטנה" — מוכרים חצי (ציון ${r.score})` }); continue; }
     // ריכוז: פוזיציה אחת גדולה מדי ביחס לתיק (למשל קניות ידניות) — מקטינים ליעד, גם אם הסיגנל טוב
@@ -76,7 +78,7 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   const sellProceeds = orders.reduce((s, o) => s + o.qty * o.priceRef * (o.currency === 'ILS' ? 1 : fx), 0);
 
   // ---- קניות ----
-  if (bear) notes.push('שוק דובי: לא קונים מניות היום (רק אג"ח וזהב לליבה), עצירת הפסד הדוקה');
+  if (bear) notes.push('שוק דובי: לא קונים מניות בודדות היום, עצירות הפסד הדוקות ב-25%. הליבה נשארת.');
   if (riskOff) notes.push('המשקיעים מפחדים (Risk Off): קונים רק "קנייה חזקה" ובחצי מהגודל');
   const reserve = (P.sleeves.cash || 0.05) * total;
   let free = cash + sellProceeds - reserve;
@@ -91,7 +93,6 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   for (const sl of Object.keys(coreSym)){
     const sym = coreSym[sl], r = by.get(sym);
     const target = coreTarget(sl), cur = heldIls.get(sym) || 0;
-    if (bear && sl === 'coreEquity') continue;
     if (cur >= target * 0.9) continue;
     const step = target / rules.tranches;
     let ils = Math.min(target - cur, step, free);
@@ -117,7 +118,9 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     if (isNum(dE) && dE >= 0 && dE <= rules.earningsBlackoutDays){ skipped.push({ symbol: r.symbol, reason: `דוח בעוד ${dE} ימים — מחכים` }); continue; }
     if (isNum(r.vol1y) && r.vol1y > P.maxVol){ skipped.push({ symbol: r.symbol, reason: `תנודתית מדי לפרופיל (${Math.round(r.vol1y * 100)}%)` }); continue; }
     const maxPos = (r.type === 'etf' ? P.maxEtfPosition : P.maxPosition) * total;
-    const target = maxPos * (rules.buyTargetFactor[r.signal] || 0.7) * (riskOff ? 0.5 : 1);
+    const stopPct = stopPctFor(r, rules, bear);
+    const riskCap = (rules.riskBudget * total) / stopPct; // גודל שבו הפסד עד העצירה = תקציב הסיכון
+    const target = Math.min(maxPos, riskCap) * (rules.buyTargetFactor[r.signal] || 0.7) * (riskOff ? 0.5 : 1);
     const cur = heldIls.get(r.symbol) || 0;
     if (cur >= target * 0.9){ skipped.push({ symbol: r.symbol, reason: 'כבר בגודל היעד' }); continue; }
     if (!cur && count >= maxCount){ skipped.push({ symbol: r.symbol, reason: `כבר ${count} פוזיציות (המקסימום ${maxCount})` }); continue; }
@@ -129,9 +132,9 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     const qty = Math.floor(ils / unit);
     if (qty < 1){ skipped.push({ symbol: r.symbol, reason: target - cur < unit ? 'קרוב ליעד: נותר פחות ממחיר יחידה אחת' : 'יחידה אחת יקרה מהתקציב לשלב' }); continue; }
     const est = round(qty * unit, 0);
-    orders.push({ side: 'buy', symbol: r.symbol, qty, priceRef: r.price, currency: r.currency, estIls: est, rule: cur ? 'add' : 'open', reason: `${SIG_HE[r.signal]} · ציון ${r.score}${whyHe(r) ? ' · ' + whyHe(r) : ''} · ${cur ? 'שלב נוסף' : 'שלב ראשון'} מתוך ${rules.tranches} (יעד ${Math.round(target / total * 100)}% מהתיק)` });
+    orders.push({ side: 'buy', symbol: r.symbol, qty, priceRef: r.price, currency: r.currency, estIls: est, rule: cur ? 'add' : 'open', reason: `${SIG_HE[r.signal]} · ציון ${r.score}${whyHe(r) ? ' · ' + whyHe(r) : ''} · ${cur ? 'שלב נוסף' : 'שלב ראשון'} מתוך ${rules.tranches} (יעד ${round(target / total * 100, 1)}% מהתיק, עצירה ${Math.round(stopPct * 100)}%)` });
     free -= est; buys++; satIls += est; if (!cur) count++; if (r.type !== 'etf') sectorIls[sec] = (sectorIls[sec] || 0) + est; heldIls.set(r.symbol, cur + est);
   }
   if (!orders.length && !notes.length) notes.push(cands.length ? 'כל המועמדים כבר בגודל היעד או נדחו לפי הכללים' : 'אין היום סיגנלי קנייה שעומדים בכללים');
-  return { orders, skipped, notes, rules: { ...rules, profile, stop, reserveIls: round(reserve, 0) } };
+  return { orders, skipped, notes, rules: { ...rules, profile, reserveIls: round(reserve, 0) } };
 }
