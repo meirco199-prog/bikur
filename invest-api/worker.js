@@ -112,7 +112,8 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
         const eq = perf.equity || [];
         if (!eq.some((e) => e[0] === day)){ eq.push([day, perf.totalIls, spy]); await db.put('paper:equity', eq.slice(-2000)); }
       } catch (e) { await db.logError('paper equity', e.message); }
-      if (ctx.env.FMP_KEY && new Date().getUTCDay() === 1){ try { const r = await refreshMechanicalUniverse(ctx); log.push(`universe: ${r.ok ? `${r.source} ${r.selected} (+${r.added}/−${r.removed})` : r.reason}`); } catch (e) { await db.logError('universe', e.message); } }
+      // יקום מכני: יומי (ויקיפדיה חינם; הוספה בקצב מוגבל עד שכל הנבחרות ביקום), FMP רק לגודל/הרכב היסטורי
+      try { const r = await refreshMechanicalUniverse(ctx); log.push(`universe: ${r.ok ? `${r.source} ${r.selected} (+${r.added}/−${r.removed}, ממתינות ${r.pending})` : r.reason}`); } catch (e) { await db.logError('universe', e.message); }
       log.push(`finalized: ${snaps.length} snapshots (${rank.analyzed} analyzed), ${rank.categories.buySignals.length} buy signals`);
     }
     finalized = true;
@@ -158,7 +159,7 @@ async function handle(req, env0, ctx){
   if (r0 === 'universe' && p1 === 'refresh' && req.method === 'POST'){
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
     const out = {};
-    try { out.universe = await refreshMechanicalUniverse(ctx, { cap: q.cap ? +q.cap : null }); } catch (e) { out.universe = { ok: false, error: e.message }; }
+    try { out.universe = await refreshMechanicalUniverse(ctx, { cap: q.cap ? +q.cap : null, reset: q.reset === '1', maxAdd: q.maxAdd ? +q.maxAdd : null }); } catch (e) { out.universe = { ok: false, error: e.message }; }
     try { const c = await refreshEarningsCalendar(ctx); out.calendar = c ? { count: c.count, from: c.from, to: c.to } : { ok: false, reason: 'אין FMP_KEY' }; } catch (e) { out.calendar = { ok: false, error: e.message }; }
     return json(out);
   }

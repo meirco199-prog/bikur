@@ -60,7 +60,7 @@ test('תאריך דוח: הלוח היומי גובר על המטמון הפרט
   assert.equal((await getEarnings('BBB', ctx)).next, addDays(T, 12));
 });
 
-test('POST /universe/refresh דורש אימות/סוד; בלי FMP_KEY מחזיר סיבה ולא נופל', async () => {
+test('POST /universe/refresh דורש אימות/סוד; בלי FMP_KEY: ויקיפדיה + דגימה מרובדת, הוספה בקצב מוגבל', async () => {
   const { installMockFetch } = await import('./mock-providers.mjs'); installMockFetch();
   const worker = (await import('../worker.js')).default;
   const store = new Map();
@@ -68,7 +68,7 @@ test('POST /universe/refresh דורש אימות/סוד; בלי FMP_KEY מחזי
   const call = (path, h = {}) => worker.fetch(new Request('https://api.test' + path, { method: 'POST', headers: { 'CF-Connecting-IP': '9.9.9.9', ...h } }), env, { waitUntil(){} });
   assert.equal((await call('/universe/refresh')).status, 401);
   const r = await call('/universe/refresh?secret=s3'); const j = await r.json();
-  assert.equal(r.status, 200); assert.equal(j.universe.ok, false); assert.match(j.universe.reason, /אין מקור/); assert.ok(j.universe.notes.some((n) => /wikipedia/.test(n)), JSON.stringify(j.universe.notes)); assert.equal(j.calendar.ok, false);
+  assert.equal(r.status, 200); assert.equal(j.universe.ok, true, JSON.stringify(j.universe)); assert.equal(j.universe.source, 'wikipedia'); assert.equal(j.universe.sizeKnown, false, 'בלי FMP אין נתוני גודל → דגימה מרובדת'); assert.equal(j.universe.added, 25, 'הוספה בקצב מוגבל'); assert.ok(j.universe.pending >= 100 - 25 - 4 && j.universe.pending <= 75, 'השאר ממתינות: ' + j.universe.pending); assert.equal(j.calendar.ok, false);
 });
 
 test('ויקיפדיה: פרסור טבלת חברי S&P 500 (סימבול, שם, ענף GICS), וכשל ברור כשהמבנה השתנה', async () => {
@@ -80,4 +80,24 @@ test('ויקיפדיה: פרסור טבלת חברי S&P 500 (סימבול, שם
   assert.equal(items.length, 420); assert.deepEqual(items[0], { symbol: 'BRK.B', name: 'Name & Co 0', sector: 'Information Technology', subSector: 'Sub' });
   assert.throws(() => parseWikipediaSp500('<html></html>'), /constituents/);
   assert.throws(() => parseWikipediaSp500(`<table id="constituents">${row('AAA', 'A', 'X')}</table>`), /רק 1 שורות/);
+});
+
+test('יקום מכני: הוספה מדורגת (25 לריצה), ממתינות לריצות הבאות, reset מסיר מכניות שלא מוחזקות, דגימה יציבה בין ריצות', async () => {
+  const { installMockFetch } = await import('./mock-providers.mjs'); installMockFetch();
+  const { refreshMechanicalUniverse, getUniverse } = await import('../lib/analysis.js');
+  const { Budget } = await import('../lib/budget.js');
+  const db = new DB(null); const ctx = { db, env: {}, budget: new Budget(db) };
+  await db.put('paper:trades', [{ symbol: 'W7', qty: 1 }]);
+  const r1 = await refreshMechanicalUniverse(ctx);
+  assert.equal(r1.ok, true); assert.equal(r1.selected, 100); assert.ok(r1.added <= 25 && r1.added > 0); assert.ok(r1.pending >= 100 - 25 - 4);
+  const meta1 = await db.get('meta:mechanical');
+  assert.equal(meta1.sizeKnown, false); assert.ok(Object.keys(meta1.sectors).length === 6, 'מכסה לכל ענף');
+  const r2 = await refreshMechanicalUniverse(ctx);
+  assert.deepEqual((await db.get('meta:mechanical')).symbols, meta1.symbols, 'אותה בחירה בריצה חוזרת (hash יציב)');
+  assert.ok(r2.added > 0 && r2.pending < r1.pending, 'הריצה הבאה ממשיכה להוסיף');
+  const u = await getUniverse(db, {}); const mech = u.filter((a) => a.origin === 'mechanical');
+  assert.equal(mech.length, r1.added + r2.added);
+  // reset: מכניות נמחקות חוץ מפוזיציה פתוחה (W7 אם נבחרה) ומתחילים מחדש ב-25
+  const r3 = await refreshMechanicalUniverse(ctx, { reset: true, maxAdd: 10 });
+  assert.ok(r3.removed >= mech.length - 1); assert.equal(r3.added, 10);
 });

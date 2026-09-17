@@ -123,7 +123,7 @@ export async function refreshEarningsCalendar(ctx){
   return r;
 }
 // יקום מכני: חברי S&P 500 (FMP) → נזילות (screener) → מכסה ענפית (engine/mechanical.js). נופל לרשימת "הגדולות" אם ה-endpoint לא זמין.
-export async function refreshMechanicalUniverse(ctx, { cap = null } = {}){
+export async function refreshMechanicalUniverse(ctx, { cap = null, reset = false, maxAdd = null } = {}){
   const { db, env } = ctx;
   const { fmp } = await import('../providers/fmp.js');
   const { fetchSp500Members } = await import('../providers/sp500.js');
@@ -131,40 +131,50 @@ export async function refreshMechanicalUniverse(ctx, { cap = null } = {}){
   const m = await fetchSp500Members(ctx, { fmp });
   const notes = [...m.notes];
   const members = m.items;
-  // נזילות/שווי שוק מה-screener (FMP). התוכנית החינמית מגבילה limit — מנסים 1000 ואז 100
+  // גודל/נזילות: screener של FMP (בתשלום ברוב התוכניות) → משקל ב-SPY (etf/holdings) → בלי נתוני גודל (דגימה מרובדת)
   let screener = [];
   if (env.FMP_KEY){
     for (const limit of [1000, 100]){
       const r = await fetchWithFallback('screener', '', { minMarketCap: limit === 1000 ? 2e9 : 2e10, minVolume: MECHANICAL_RULE.minVolume, limit, country: 'US', isEtf: false }, ctx);
       if (r.items?.length){ screener = r.items; break; }
       notes.push(`screener(limit ${limit}): ${r.reason || 'ריק'}`);
+      if (/paid plan|unauthorized/i.test(r.reason || '')) break;
     }
   } else notes.push('screener: אין FMP_KEY');
   const liquidity = Object.fromEntries(screener.map((x) => [x.symbol, { volume: x.volume, marketCap: x.marketCap, sector: x.sector, name: x.name }]));
-  // בלי screener: משקל ב-SPY (אם יש) כתחליף לשווי שוק; נזילות לא ידועה → לא מסננים (חברי המדד נזילים ממילא)
+  if (!screener.length && env.FMP_KEY){
+    try { const h = await fmp.etfHoldingsFull('SPY', ctx); let n = 0; for (const x of h) if (isNum(x.weight) && x.weight > 0){ liquidity[x.symbol] = { volume: null, marketCap: x.weight * 1e12, name: x.name }; n++; } notes.push(`spy holdings: ${n} משקלים כגודל`); } catch (e) { notes.push(`spy holdings: ${e.message.slice(0, 120)}`); }
+  }
   for (const x of members) if (!liquidity[x.symbol] && isNum(x.weight)) liquidity[x.symbol] = { volume: null, marketCap: x.weight * 1e12, sector: x.sector, name: x.name };
   let sel, source;
   if (members.length){ sel = selectMechanical({ members, liquidity, cap: cap || +env.UNIVERSE_CAP || MECHANICAL_RULE.cap }); source = m.source; }
   else if (screener.length){
     const items = screener.filter((x) => (x.marketCap || 0) >= 2e10).sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0)).slice(0, 120);
-    sel = { items: items.map((x) => ({ symbol: x.symbol, name: x.name, sector: x.sector, marketCap: x.marketCap, volume: x.volume })), members: 0, liquid: items.length, liquidityKnown: true, sectors: {}, rule: 'גיבוי: US, שווי שוק ≥ $20B, מחזור ≥ 500k, 120 הגדולות (רשימת ה-S&P 500 לא זמינה)' };
+    sel = { items: items.map((x) => ({ symbol: x.symbol, name: x.name, sector: x.sector, marketCap: x.marketCap, volume: x.volume })), members: 0, liquid: items.length, liquidityKnown: true, sizeKnown: true, sectors: {}, rule: 'גיבוי: US, שווי שוק ≥ $20B, מחזור ≥ 500k, 120 הגדולות (רשימת ה-S&P 500 לא זמינה)' };
     source = 'screener-top';
   } else return { ok: false, reason: 'אין מקור לחברי המדד וגם לא screener', notes };
   const items = sel.items.filter((x) => /^[A-Z][A-Z0-9.\-]{0,6}$/.test(x.symbol));
   if (!items.length) return { ok: false, reason: 'לא נבחרו חברות', notes };
-  let probe = null;
-  if (env.FMP_KEY) try { const h = await fmp.sp500Historical(ctx); probe = { ok: true, count: h.count, first: h.first, last: h.last }; } catch (e) { probe = { ok: false, error: e.message.slice(0, 160) }; }
-  const meta = { asOf: today(), source, rule: sel.rule, members: sel.members, liquid: sel.liquid, liquidityKnown: sel.liquidityKnown, sectors: sel.sectors, symbols: items.map((x) => x.symbol), historicalConstituents: probe, notes };
-  await db.put('meta:mechanical', meta);
-  // הוספה ליקום + הסרת חברות "מכניות" שיצאו מהבחירה (חוץ מפוזיציות פתוחות ורשימת מעקב)
+  // הרכב היסטורי (לבדיקות עבר) — נבדק פעם בשבוע בלבד (תקציב FMP); התוצאה נשמרת
+  const prevMeta = (await db.get('meta:mechanical')) || {};
+  let probe = prevMeta.historicalConstituents || null;
+  if (env.FMP_KEY && (!probe || new Date().getUTCDay() === 1)) try { const h = await fmp.sp500Historical(ctx); probe = { ok: true, count: h.count, first: h.first, last: h.last, checkedAt: today() }; } catch (e) { probe = { ok: false, error: e.message.slice(0, 160), checkedAt: today() }; }
+  // הוספה ליקום בקצב מוגבל (מכסת KV: כל נייר חדש = ~8 כתיבות מטמון בלילה הראשון); השאר ממתין לריצות הבאות (יומי)
   const keep = new Set([...((await db.get('user:watchlist')) || []).map((w) => w.symbol), ...((await db.get('paper:trades')) || []).filter((t) => !t.exitDate).map((t) => t.symbol)]);
-  const extra = (await db.get('meta:universe')) || [];
+  let extra = (await db.get('meta:universe')) || [];
   const chosen = new Set(items.map((x) => x.symbol));
-  const kept = extra.filter((a) => a.origin !== 'mechanical' || chosen.has(a.symbol) || keep.has(a.symbol));
+  const kept = extra.filter((a) => a.origin !== 'mechanical' || (!reset && chosen.has(a.symbol)) || keep.has(a.symbol));
   const removed = extra.length - kept.length;
   if (removed) await db.put('meta:universe', kept);
-  const added = await addToUniverse(db, items.map((x) => ({ symbol: x.symbol, name: x.name, type: 'stock', assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'mechanical', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })));
-  return { ok: true, source, selected: items.length, added, removed, members: sel.members, liquid: sel.liquid, historicalConstituents: probe, notes };
+  const have = new Set([...SEED_UNIVERSE.map((a) => a.symbol), ...kept.map((a) => a.symbol)]);
+  const perRun = maxAdd ?? (+env.UNIVERSE_ADD_PER_RUN || MECHANICAL_RULE.maxAddPerRun);
+  const missing = items.filter((x) => !have.has(x.symbol));
+  const batch = missing.slice(0, perRun);
+  const added = await addToUniverse(db, batch.map((x) => ({ symbol: x.symbol, name: x.name, type: 'stock', assetClass: 'equity', role: 'satellite', sector: x.sector, country: 'US', currency: 'USD', origin: 'mechanical', stooq: x.symbol.toLowerCase().replace('.', '-') + '.us' })));
+  const pending = missing.slice(perRun).map((x) => x.symbol);
+  const meta = { asOf: today(), source, rule: sel.rule, members: sel.members, liquid: sel.liquid, liquidityKnown: sel.liquidityKnown, sizeKnown: sel.sizeKnown, sectors: sel.sectors, symbols: items.map((x) => x.symbol), inUniverse: items.length - pending.length, pending, historicalConstituents: probe, notes };
+  await db.put('meta:mechanical', meta);
+  return { ok: true, source, selected: items.length, added, removed, pending: pending.length, sizeKnown: sel.sizeKnown, liquidityKnown: sel.liquidityKnown, members: sel.members, historicalConstituents: probe, notes };
 }
 export const getMacroSeries = (id, ctx) => cached(ctx.db, `macro:${id}`, TTL.macro, async (ex) => fetchWithFallback('macro', id, { from: ex?.rows?.length ? ex.rows[ex.rows.length - 1][0].slice(0, 4) + '-01-01' : '2000-01-01' }, ctx), { merge: (o, f) => ({ ...f, rows: DB.mergeRows(o.rows, f.rows) }) });
 export const getFx = (ctx) => cached(ctx.db, 'fx:USDILS', TTL.fx, async () => {

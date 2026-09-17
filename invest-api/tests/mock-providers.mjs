@@ -38,6 +38,12 @@ export function installMockFetch({ fail = [] } = {}){
     if (u.includes('data.sec.gov/api/xbrl/companyfacts')) return ok(companyFacts('X'));
     if (u.includes('data.sec.gov/submissions')) return ok({ filings: { recent: { form: ['8-K', '10-Q', '4'], filingDate: ['2026-09-10', '2026-08-01', '2026-09-02'], accessionNumber: ['0001-26-1', '0001-26-2', '0001-26-3'], primaryDocument: ['a.htm', 'b.htm', 'c.htm'], items: ['2.02', '', ''], primaryDocDescription: ['8-K', '10-Q', '4'] } } });
     if (u.includes('boi.org.il')) return ok({ exchangeRates: [{ key: 'USD', currentExchangeRate: 3.72, currentChange: -0.3, unit: 1, lastUpdate: '2026-09-14T00:00:00' }] });
+    if (u.includes('en.wikipedia.org/wiki/List_of_S%26P_500_companies')){
+      const secs = ['Information Technology', 'Health Care', 'Financials', 'Industrials', 'Consumer Discretionary', 'Utilities'];
+      const row = (sym, name, sec) => `<tr>\n<td><a rel="nofollow" class="external text" href="https://www.nyse.com/quote/XNYS:${sym}">${sym}</a>\n</td>\n<td><a href="/wiki/${name}" title="${name}">${name}</a>\n</td>\n<td>${sec}\n</td>\n<td>Sub\n</td>\n<td>City\n</td>\n<td>2000-01-01\n</td>\n<td>1\n</td>\n<td>1900\n</td></tr>`;
+      const rows = ['AAPL', 'MSFT', 'NVDA', 'JPM', ...[...Array(500)].map((_, i) => 'W' + i)].map((sym, i) => row(sym, sym + ' Inc', secs[i % secs.length])).join('\n');
+      return ok(`<html><table class="wikitable sortable" id="constituents"><tbody>${rows}</tbody></table></html>`, 'text/html');
+    }
     if (u.includes('api.telegram.org')) return ok({ ok: true });
     if (u.includes('api.anthropic.com')) return ok({ model: 'claude-opus-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'תשובה מדומה (Stooq, 2026-09-12)' }] });
     return new Response('not mocked: ' + u, { status: 404 });
