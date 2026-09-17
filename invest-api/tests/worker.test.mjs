@@ -4,7 +4,7 @@ import { installMockFetch, calls } from './mock-providers.mjs';
 import worker, { cronStep } from '../worker.js';
 
 installMockFetch();
-const env = { INVEST: null, FINNHUB_KEY: 'x', FRED_KEY: 'x', APP_TOKEN: 'secret', CRON_BATCH: '200', STOOQ_ENABLED: '1' };
+const env = { INVEST: null, FINNHUB_KEY: 'x', FRED_KEY: 'x', APP_TOKEN: 'secret', AUTO_ANY_TIME: '1', CRON_BATCH: '200', STOOQ_ENABLED: '1' };
 // KV מדומה בזיכרון משותף לכל הבקשות
 const store = new Map();
 env.INVEST = { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }) };
@@ -250,4 +250,18 @@ test('אוטומט: חשבון ירושה עם מזומן שלילי מאופס 
   assert.ok(r.j.notes.some((n) => /אופס/.test(n)), JSON.stringify(r.j.notes));
   const p = await get('/paper'); assert.ok(p.j.cashIls >= 0); assert.ok(!p.j.positions.some((x) => x.symbol === 'MA'));
   const r2 = await get('/auto/run?force=1&secret=nope', { method: 'POST' }); assert.equal(r2.status, 401);
+});
+
+test('אוטומט: ביצוע רק בשעות המסחר בניו יורק — מחוץ לחלון נדחה בלי לרשום ביומן', async () => {
+  const { inTradingWindow, nyClock } = await import('../lib/autopilot.js');
+  assert.equal(inTradingWindow(new Date('2026-09-17T13:00:00Z')), false, '09:00 ET לפני הפתיחה');
+  assert.equal(inTradingWindow(new Date('2026-09-17T14:00:00Z')), true, '10:00 EDT בתוך החלון');
+  assert.equal(inTradingWindow(new Date('2026-09-19T15:00:00Z')), false, 'שבת');
+  assert.equal(inTradingWindow(new Date('2026-12-15T14:30:00Z')), false, '09:30 EST (חורף) לפני 09:40');
+  assert.equal(inTradingWindow(new Date('2026-12-15T15:00:00Z')), true, '10:00 EST בתוך החלון');
+  assert.match(nyClock(new Date('2026-09-17T14:00:00Z')).text, /Thu 10:00 ET/);
+  const gated = { ...env, AUTO_ANY_TIME: '0' };
+  const r = await worker.fetch(new Request('https://api.test/auto/run', { method: 'POST', headers: { 'CF-Connecting-IP': '1.1.1.1', Authorization: 'Bearer secret' } }), gated, { waitUntil(){} });
+  const j = await r.json();
+  if (!inTradingWindow()) { assert.equal(j.ran, false); assert.ok(j.deferred); assert.match(j.reason, /שעות המסחר/); }
 });

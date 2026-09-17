@@ -5,7 +5,7 @@ import { PROFILES } from './portfolio.js';
 import { RISK_LIMITS } from './risk-limits.js';
 
 export const AUTO_RULES = {
-  version: 8,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
+  version: 9,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
   maxConcentration: 1.5,    // פוזיציה גדולה מפי 1.5 מהיעד לנייר → מוכרים את העודף עד היעד
   // עצירת הפסד לפי תנודתיות: stop = clamp(vol1y × 0.5, 8%, 20%); בשוק דובי × 0.75. גודל פוזיציה = תקציב סיכון ÷ stop
   riskBudget: 0.005,        // כל פוזיציה מסכנת לכל היותר 0.5% מהתיק (1,000 ₪ ב-200,000)
@@ -21,7 +21,7 @@ export const AUTO_RULES = {
   // ביטחון בנתונים: קנייה רק עם כיסוי נתונים ≥ 85% וכשרכיבי הליבה של הציון קיימים (ציון "יפה" על 70% מידע אינו ציון)
   minCoverage: 0.85, requiredComponents: ['fundamental', 'valuation', 'growth', 'momentum'],
   minEligibleUniverse: 100,   // פחות מ-100 מניות עם נתונים מלאים היום (תקלת ספק) → אין קניות של מניות בודדות
-  maxChasePct: 0.10,          // שלב נוסף רק אם המחיר לא ברח יותר מ-10% מעל מחיר הכניסה הממוצע
+  chaseStopFactor: 1.0,       // שלב נוסף רק אם המחיר לא ברח מעל הכניסה יותר ממרחק העצירה של הנייר (יחסי לתנודתיות, לא אחוז קבוע)
 };
 // עצירת הפסד לנייר לפי התנודתיות השנתית שלו (אין vol → ברירת מחדל 12%)
 export function stopPctFor(r, rules = AUTO_RULES, bear = false){
@@ -168,7 +168,8 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     const cur = heldIls.get(r.symbol) || 0;
     if (cur >= target * 0.9){ skipped.push({ symbol: r.symbol, reason: 'כבר בגודל היעד' }); continue; }
     const held = positions.find((p) => p.symbol === r.symbol);
-    if (cur > 0 && held && isNum(held.avgPrice) && held.avgPrice > 0 && r.price > held.avgPrice * (1 + rules.maxChasePct)){ skipped.push({ symbol: r.symbol, reason: `המחיר עלה ${Math.round((r.price / held.avgPrice - 1) * 100)}% מעל מחיר הכניסה — לא רודפים אחרי שלב נוסף` }); continue; }
+    const chase = stopPctFor(r, rules, bear) * rules.chaseStopFactor;
+    if (cur > 0 && held && isNum(held.avgPrice) && held.avgPrice > 0 && r.price > held.avgPrice * (1 + chase)){ skipped.push({ symbol: r.symbol, reason: `המחיר עלה ${Math.round((r.price / held.avgPrice - 1) * 100)}% מעל מחיר הכניסה (הגבול לנייר הזה ${Math.round(chase * 100)}%, לפי התנודתיות) — לא רודפים אחרי שלב נוסף` }); continue; }
     if (!cur && count >= maxCount){ skipped.push({ symbol: r.symbol, reason: `כבר ${count} פוזיציות (המקסימום ${maxCount})` }); continue; }
     const sec = r.sector || 'אחר';
     if (r.type !== 'etf' && (sectorIls[sec] || 0) >= P.maxSector * total){ skipped.push({ symbol: r.symbol, reason: `ענף ${sec} כבר במשקל המרבי` }); continue; }

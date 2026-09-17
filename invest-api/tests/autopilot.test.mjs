@@ -185,3 +185,11 @@ test('אוטומט v8: ביטחון בנתונים, יקום כשיר מינימ
   const d3 = decideOrders({ table: t3, regime: bull, perf: perf(195745, pos), fx: 3.7 });
   assert.ok(d3.skipped.find((s) => s.symbol === 'GOOD' && /לא רודפים/.test(s.reason)), JSON.stringify(d3.skipped.filter((s) => s.symbol === 'GOOD')));
 });
+
+test('אוטומט v9: לא רודפים — הגבול יחסי לתנודתיות (מניה יציבה 8%, תנודתית 20%)', () => {
+  const t = [row('CALM', 'STRONG BUY', 85, { vol1y: 0.16, price: 109, sector: 'A' }), row('WILD', 'STRONG BUY', 85, { vol1y: 0.40, price: 115, sector: 'B' })];
+  const pos = [{ symbol: 'CALM', qty: 10, valueIls: 4000, avgPrice: 100, pnlPct: 0.09 }, { symbol: 'WILD', qty: 5, valueIls: 2000, avgPrice: 100, pnlPct: 0.15 }];
+  const d = decideOrders({ table: t, regime: bull, perf: perf(194000, pos), fx: 3.7 });
+  assert.ok(d.skipped.find((s) => s.symbol === 'CALM' && /לא רודפים/.test(s.reason)), 'יציבה: 9% > 8% → נדחית ' + JSON.stringify(d.skipped));
+  assert.ok(d.orders.find((o) => o.symbol === 'WILD' && o.rule === 'add'), 'תנודתית: 15% < 20% → ממשיכים ' + JSON.stringify(d.skipped));
+});

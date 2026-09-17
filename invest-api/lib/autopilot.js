@@ -7,6 +7,18 @@ import { round, isNum } from '../engine/util.js';
 
 const JOURNAL_MAX = 400;
 
+// חלון ביצוע: שעות המסחר הרגילות בניו יורק (09:40–15:45 ET, ב'–ו'), מחושב לפי אזור הזמן America/New_York ולא לפי שעון ישראל
+export function nyClock(now = new Date()){
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit' }).formatToParts(now);
+  const get = (t) => parts.find((p) => p.type === t)?.value;
+  const h = +get('hour') % 24, m = +get('minute');
+  return { weekday: get('weekday'), minutes: h * 60 + m, text: `${get('weekday')} ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ET` };
+}
+export function inTradingWindow(now = new Date(), { start = 9 * 60 + 40, end = 15 * 60 + 45 } = {}){
+  const c = nyClock(now);
+  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(c.weekday) && c.minutes >= start && c.minutes <= end;
+}
+
 export async function autoStatus(db){
   const st = (await db.get('user:settings')) || {};
   const journal = (await db.get('auto:journal')) || [];
@@ -22,6 +34,12 @@ export async function runAutopilot(ctx, { dry = false, force = false, trigger = 
   const journal = (await db.get('auto:journal')) || [];
   const already = journal.find((j) => j.day === day && j.executed && (j.rulesVersion || 1) === AUTO_RULES.version);
   if (already && !force && !dry) return { ran: false, reason: `כבר רץ היום (${day})`, last: already };
+  // ביצוע רק בשעות המסחר הרגילות בניו יורק (לא overnight); AUTO_ANY_TIME=1 רק לבדיקות
+  const gate = env.AUTO_ANY_TIME !== '1' && !dry;
+  if (gate && !inTradingWindow()) return { ran: false, reason: `מחוץ לשעות המסחר בניו יורק (${nyClock().text}) — הביצוע בחלון 09:40–15:45 ET`, deferred: true };
+  if (gate){ // חג/שוק סגור לפי הספק: SPY חייב להיות פתוח
+    try { const spy = await getQuote('SPY', { ...ctx, asset: await assetMeta(db, 'SPY') }); if (spy && spy.isMarketOpen === false) return { ran: false, reason: 'השוק האמריקאי סגור לפי הספק (חג?) — מנסים שוב במחזור הבא', deferred: true }; } catch {}
+  }
   const rank = await db.get(`rank:${day}`);
   const regime = (await db.get(`regime:${day}`)) || null;
   const fxDoc = await db.get('fx:USDILS'); const fx = fxDoc?.rate || 3.7;
@@ -47,7 +65,10 @@ export async function runAutopilot(ctx, { dry = false, force = false, trigger = 
       try {
         const asset = await assetMeta(db, o.symbol);
         let price = o.priceRef, priceSource = { source: 'rank close', asOf: day };
-        try { const qt = await getQuote(o.symbol, { ...ctx, asset }); if (qt && !qt.missing && isNum(qt.price) && qt.price > 0){ price = qt.price; priceSource = { source: qt.source, asOf: qt.asOf, stale: !!qt.stale }; } } catch {}
+        let qt = null;
+        try { qt = await getQuote(o.symbol, { ...ctx, asset }); if (qt && !qt.missing && isNum(qt.price) && qt.price > 0){ price = qt.price; priceSource = { source: qt.source, asOf: qt.asOf, stale: !!qt.stale, marketOpen: qt.isMarketOpen ?? null }; } } catch {}
+        // fail-closed: בלי שער חי מהיום (או שער ישן/שוק סגור) לא מבצעים
+        if (gate && (!qt || qt.missing || qt.stale || qt.isMarketOpen === false)){ rec.error = !qt || qt.missing ? 'אין שער חי — לא מבצעים (fail-closed)' : qt.isMarketOpen === false ? 'השוק סגור לנייר הזה' : 'שער ישן — לא מבצעים'; entry.orders.push(rec); continue; }
         // שער חי שסוטה מאוד מהסגירה (טעות ספק) — לא סוחרים עליו
         if (Math.abs(price / o.priceRef - 1) > 0.25){ rec.error = `שער חי ${price} רחוק מדי מהסגירה ${o.priceRef} — דילוג`; entry.orders.push(rec); continue; }
         const r = await broker.placeOrder({ symbol: o.symbol, side: o.side, qty: o.qty, price, currency: o.currency || asset.currency || 'USD', fx, reason: `אוטומט: ${o.reason}`, signal: table.find((x) => x.symbol === o.symbol)?.signal || null, snapDate: day, priceSource });

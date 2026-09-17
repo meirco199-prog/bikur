@@ -22,6 +22,6 @@ export const twelvedata = {
   async quote(symbol, _o, ctx){
     const q = await call(ctx, 'quote', { symbol: symFor(symbol, ctx.asset) });
     if (num(q.close) === null) return { missing: true, reason: 'Twelve Data: אין quote' };
-    return { price: num(q.close), change: num(q.change), changePct: num(q.percent_change) !== null ? q.percent_change / 100 : null, high: num(q.high), low: num(q.low), open: num(q.open), prevClose: num(q.previous_close), asOf: q.datetime ? new Date(q.datetime).toISOString() : null, source: 'twelvedata', quality: 0.85 };
+    return { price: num(q.close), change: num(q.change), changePct: num(q.percent_change) !== null ? q.percent_change / 100 : null, high: num(q.high), low: num(q.low), open: num(q.open), prevClose: num(q.previous_close), asOf: q.datetime ? new Date(q.datetime).toISOString() : null, isMarketOpen: typeof q.is_market_open === 'boolean' ? q.is_market_open : null, source: 'twelvedata', quality: 0.85 };
   },
 };
