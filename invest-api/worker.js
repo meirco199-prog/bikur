@@ -317,7 +317,8 @@ async function handle(req, env0, ctx){
     const priceOf = (s) => priceCache[s];
     const view = async () => {
       const t = await broker.trades();
-      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){ const qt = await db.get(`quote:${s}`); const sn = day ? await db.get(`snap:${day}:${s}`) : null; priceCache[s] = qt?.price ?? sn?.price ?? null; }
+      // מחיר נוכחי: הטרי מבין quote במטמון ו-snapshot של היום (quote ישן מאתמול לא גובר על סגירה חדשה)
+      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){ const qt = await db.get(`quote:${s}`); const sn = day ? await db.get(`snap:${day}:${s}`) : null; const qDay = qt?.asOf ? String(qt.asOf).slice(0, 10) : null; const snDay = sn?.barDate || sn?.date || null; const useQuote = qt?.price && (!sn?.price || !snDay || (qDay && qDay >= snDay)); priceCache[s] = useQuote ? qt.price : (sn?.price ?? qt?.price ?? null); }
       const perf = await broker.performance(priceOf, fx);
       const u = await getUniverse(db, env);
       perf.positions = perf.positions.map((p) => ({ ...p, name: u.find((a) => a.symbol === p.symbol)?.name || p.symbol, nameHe: u.find((a) => a.symbol === p.symbol)?.nameHe || null, signal: null }));

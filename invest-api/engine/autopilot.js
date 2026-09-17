@@ -4,6 +4,8 @@ import { isNum, round } from './util.js';
 import { PROFILES } from './portfolio.js';
 
 export const AUTO_RULES = {
+  version: 2,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
+  maxConcentration: 1.5,    // פוזיציה גדולה מפי 1.5 מהיעד לנייר → מוכרים את העודף עד היעד
   stopLoss: 0.12,           // עצירת הפסד: מוכרים הכל אם הפוזיציה ירדה 12% מהקנייה (8% בשוק דובי)
   stopLossBear: 0.08,
   tranches: 3,              // קונים בשלבים: שליש מהיעד בכל ריצה
@@ -47,6 +49,14 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     if (isNum(p.pnlPct) && p.pnlPct <= -stop){ orders.push({ side: 'sell', symbol: p.symbol, qty: p.qty, priceRef: r.price, currency: r.currency, rule: 'stop', reason: `עצירת הפסד: ירדה ${Math.round(-p.pnlPct * 100)}% מהקנייה (הגבול ${Math.round(stop * 100)}%)` }); continue; }
     if (sig === 'SELL'){ orders.push({ side: 'sell', symbol: p.symbol, qty: p.qty, priceRef: r.price, currency: r.currency, rule: 'signal', reason: `הסיגנל הפך ל"מכירה" (ציון ${r.score}${whyHe(r) ? ': ' + whyHe(r) : ''})` }); continue; }
     if (sig === 'REDUCE' && p.qty >= 2){ orders.push({ side: 'sell', symbol: p.symbol, qty: Math.ceil(p.qty / 2), priceRef: r.price, currency: r.currency, rule: 'reduce', reason: `הסיגנל הפך ל"הקטנה" — מוכרים חצי (ציון ${r.score})` }); continue; }
+    // ריכוז: פוזיציה אחת גדולה מדי ביחס לתיק (למשל קניות ידניות) — מקטינים ליעד, גם אם הסיגנל טוב
+    const cap = (r.type === 'etf' ? P.maxEtfPosition : P.maxPosition) * total;
+    const val = p.valueIls ?? p.costIls ?? 0;
+    if (total > 0 && val > cap * rules.maxConcentration && isNum(r.price) && r.price > 0){
+      const unit = r.price * rateOf(r);
+      const sellQty = Math.min(p.qty - 1, Math.ceil((val - cap) / unit));
+      if (sellQty >= 1) orders.push({ side: 'sell', symbol: p.symbol, qty: sellQty, priceRef: r.price, currency: r.currency, rule: 'trim', reason: `ריכוז גבוה: ${Math.round(val / total * 100)}% מהתיק בנייר אחד (הגבול ${Math.round(cap / total * 100)}%) — מוכרים את העודף כדי לפזר` });
+    }
   }
   const sellProceeds = orders.reduce((s, o) => s + o.qty * o.priceRef * (o.currency === 'ILS' ? 1 : fx), 0);
 

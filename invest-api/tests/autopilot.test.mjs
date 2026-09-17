@@ -54,3 +54,17 @@ test('אוטומט: Risk Off — רק קנייה חזקה ובחצי גודל', 
   assert.deepEqual(d.orders.map((o) => o.symbol), ['A']);
   assert.ok(d.orders[0].estIls <= 200000 * 0.10 * 0.5 / 3 + 1, 'שלב = שליש מיעד מוקטן');
 });
+
+test('אוטומט: ריכוז — פוזיציה של 50% מהתיק מוקטנת ליעד גם עם סיגנל קנייה, והמזומן משמש לקניות אחרות', () => {
+  const table = [row('BIG', 'STRONG BUY', 80), row('OTH', 'BUY', 70, { sector: 'Health' })];
+  const pos = [{ symbol: 'BIG', qty: 270, valueIls: 100000, pnlPct: -0.005 }];
+  const d = decideOrders({ table, regime: bull, perf: perf(100000, pos), fx: 3.7 });
+  const trim = d.orders.find((o) => o.symbol === 'BIG' && o.side === 'sell');
+  assert.ok(trim && trim.rule === 'trim', JSON.stringify(d.orders));
+  assert.ok(trim.qty >= 200 && trim.qty < 270, 'מוכר את העודף מעל 10% אבל לא הכל: ' + trim.qty);
+  assert.match(trim.reason, /ריכוז/);
+  assert.ok(!d.orders.some((o) => o.symbol === 'BIG' && o.side === 'buy'), 'לא קונים נייר שזה עתה הקטנו');
+  assert.ok(d.orders.find((o) => o.symbol === 'OTH' && o.side === 'buy'));
+  const small = decideOrders({ table, regime: bull, perf: perf(180000, [{ symbol: 'BIG', qty: 50, valueIls: 20000, pnlPct: 0 }]), fx: 3.7 });
+  assert.ok(!small.orders.some((o) => o.rule === 'trim'), '10% מהתיק לא נחשב ריכוז');
+});

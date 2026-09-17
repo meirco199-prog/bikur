@@ -20,7 +20,7 @@ export async function runAutopilot(ctx, { dry = false, force = false, trigger = 
   const day = await latestRankDay(db);
   if (!day) return { ran: false, reason: 'אין דירוג עדיין' };
   const journal = (await db.get('auto:journal')) || [];
-  const already = journal.find((j) => j.day === day && j.executed);
+  const already = journal.find((j) => j.day === day && j.executed && (j.rulesVersion || 1) === AUTO_RULES.version);
   if (already && !force && !dry) return { ran: false, reason: `כבר רץ היום (${day})`, last: already };
   const rank = await db.get(`rank:${day}`);
   const regime = (await db.get(`regime:${day}`)) || null;
@@ -38,7 +38,7 @@ export async function runAutopilot(ctx, { dry = false, force = false, trigger = 
   const decision = decideOrders({ table, regime, perf, profile, fx, today: day });
   const u = await getUniverse(db, env);
   const nameOf = (s) => { const a = u.find((x) => x.symbol === s); return a?.nameHe || a?.name || s; };
-  const entry = { ts: new Date().toISOString(), day, trigger, dry, executed: !dry, profile, regime: regime ? { trend: regime.trend, risk: regime.risk, summary: regime.summary } : null, before: { totalIls: round(perf.totalIls, 0), cashIls: round(perf.cashIls, 0), positions: perf.positions.length }, notes: [...legacyNotes, ...decision.notes], skipped: decision.skipped.slice(0, 12), orders: [] };
+  const entry = { ts: new Date().toISOString(), day, trigger, dry, executed: !dry, profile, rulesVersion: AUTO_RULES.version, regime: regime ? { trend: regime.trend, risk: regime.risk, summary: regime.summary } : null, before: { totalIls: round(perf.totalIls, 0), cashIls: round(perf.cashIls, 0), positions: perf.positions.length }, notes: [...legacyNotes, ...decision.notes], skipped: decision.skipped.slice(0, 12), orders: [] };
   for (const o of decision.orders){
     const rec = { ...o, name: nameOf(o.symbol) };
     if (!dry){
