@@ -267,6 +267,16 @@ async function handle(req, env0, ctx){
   if (r0 === 'reco'){ const day = validDate(q.date) ? q.date : await latestRankDay(db); const r = day ? await db.get(`reco:${day}`) : null; return json(r || { missing: true, reason: 'אין תיקים מומלצים עדיין', day }); }
   if (r0 === 'days') return json((await db.get('idx:snapdays')) || []);
   if (r0 === 'snapshots' && p1){ const s = sym(p1); const days = (await db.get('idx:snapdays')) || []; const out = []; for (const d of days.slice(-(+q.limit || 120))){ const sn = await getSnap(db, d, s); if (sn) out.push(sn); } return json(out); }
+  // מחירי 09:40 ניו יורק (מ-scripts/entry940.mjs): מסמך אחד ליום מסחר — נקודת הכניסה הברת-ביצוע של תיקי הצל
+  if (r0 === 'ingest' && p1 === 'entry' && req.method === 'POST'){
+    if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth();
+    const day = validDate(body.day) ? body.day : null; if (!day) return err('חסר day');
+    const prices = Object.fromEntries(Object.entries(body.prices || {}).filter(([k, v]) => validSym(k) && isNum(v) && v > 0));
+    const ex = (await db.get(`entry940:${day}`)) || { day, prices: {} };
+    ex.prices = { ...ex.prices, ...prices }; ex.at = body.at || '09:40 ET'; ex.source = body.source || 'yahoo-5m'; ex.updatedAt = new Date().toISOString(); ex.count = Object.keys(ex.prices).length;
+    await db.put(`entry940:${day}`, ex);
+    return json({ ok: true, day, received: Object.keys(prices).length, count: ex.count });
+  }
   // הזרמת snapshots מ-GitHub Actions (יקום S&P 500): נכתבים ב-shards (16 מסמכים ליום), הדירוג מחושב מחדש אם היום כבר סגור
   if (r0 === 'ingest' && p1 === 'snapshots' && req.method === 'POST'){
     if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth();

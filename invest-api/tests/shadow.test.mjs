@@ -9,15 +9,18 @@ const mk = (n, f = () => ({})) => [...Array(n)].map((_, i) => ({ symbol: 'S' + i
 
 test('מודל צל: אחוזון בתוך הענף, איחוד כפילויות, זכאות רק עם ארבעת הגורמים, ריוויזיות חסרות = null (לא 0)', () => {
   const table = [...mk(40), { symbol: 'SPY', type: 'etf', price: 500, score: 70, signal: 'HOLD', components: {} }];
-  const revisions = Object.fromEntries(mk(40).map((r, i) => [r.symbol, i < 12 ? { available: true, epsRevision: (i - 6) / 100 } : { available: false, reason: 'היסטוריה של 3 ימים בלבד (נדרשים 30)' }]));
+  const revisions = Object.fromEntries(mk(40).map((r, i) => [r.symbol, i < 32 ? { available: true, epsRevision: (i - 6) / 100 } : { available: false, reason: 'היסטוריה של 3 ימים בלבד (נדרשים 30)' }]));
   const d = computeShadow({ table, revisions, regime: { trend: 'Bull Trend', risk: 'Risk On' }, day: '2026-09-17' });
   assert.equal(d.n, 40, 'ETF לא נכללת'); assert.equal(d.eligible, 40);
   const r0 = d.rows[0];
   assert.equal(r0.pct._relativeTo, 'sector'); assert.ok(r0.pct.value >= 0 && r0.pct.value <= 100);
   assert.equal(rawFactors(r0 && table[0].components).profitability, (30 + 35) / 2, 'פונדמנטלי+איכות → רווחיות');
-  assert.equal(d.revisionsAvailable, 12); assert.equal(d.revisionsUsed, true);
-  assert.equal(d.rows[20].revision, null); assert.match(d.rows[20].revisionNote, /היסטוריה של 3 ימים/); assert.equal(d.rows[20].revisionPct, null);
-  assert.ok(Object.keys(d.rows[20].contribC).every((k) => k !== 'revision'), 'בלי ריוויזיה: המשקל מתחלק בין השאר, לא אפס');
+  assert.equal(d.revisionsAvailable, 32); assert.equal(d.revisionsUsed, true, '80% כיסוי → D מלא'); assert.equal(d.revisionCoverage, 0.8); assert.equal(d.models.D.variant, 'D');
+  assert.equal(d.rows[35].revision, null); assert.match(d.rows[35].revisionNote, /היסטוריה של 3 ימים/); assert.equal(d.rows[35].revisionPct, null);
+  assert.ok(Object.keys(d.rows[35].contribC).every((k) => k !== 'revision'), 'בלי ריוויזיה: המשקל מתחלק בין השאר, לא אפס');
+  // כיסוי חלקי (12/40 = 30%) → ריוויזיות לא נכנסות בכלל, D-preRevision
+  const dPart = computeShadow({ table, revisions: Object.fromEntries(mk(40).map((r, i) => [r.symbol, i < 12 ? { available: true, epsRevision: 0.01 * i } : { available: false, reason: 'x' }])), regime: { trend: 'Bull Trend', risk: 'Risk On' }, day: '2026-09-17' });
+  assert.equal(dPart.revisionsUsed, false); assert.equal(dPart.models.D.variant, 'D-preRevision'); assert.equal(dPart.rows[3].revisionPct, null);
   assert.ok(Object.keys(d.rows[3].contribC).includes('revision'));
   assert.ok(isFinite(d.rows[3].C) && isFinite(d.rows[3].B));
   assert.deepEqual(Object.keys(d.models.A.actions), ['STRONG BUY', 'BUY', 'HOLD', 'SELL']);
@@ -143,3 +146,28 @@ test('מודל צל: כניסה בפתיחת היום הבא (לא סגירת ה
   assert.equal(r.pipeline, 'uniform'); assert.equal(r.uniformCount, 120); assert.equal(r.n, 110, 'רק חברות המדד מה-shards באחוזונים');
   const doc = await db.get('shadow:2026-09-17'); assert.equal(doc.rows[0].open, doc.rows[0].price - 1);
 });
+
+test('מודל צל: מחיר 09:40 הוא הכניסה הראשית (kind 0940), פתיחה משנית (retOpen), וה-ingest של entry940', async () => {
+  const d = computeShadow({ table: mk(30, (i) => ({ open: 100 + i })), revisions: {}, day: '2026-09-17' });
+  const priceNow = Object.fromEntries(d.rows.map((r) => [r.symbol, r.price * 1.1]));
+  const entryOpen = Object.fromEntries(d.rows.map((r) => [r.symbol, r.price * 1.05]));
+  const entry940 = Object.fromEntries(d.rows.slice(0, 20).map((r) => [r.symbol, r.price * 1.02]));
+  const f = fillForward(d, 5, priceNow, { spyNow: 110, spyThen: 100, spyEntry: 105, spyEntry940: 102, day: 'x', entryOpen, entry940 });
+  assert.equal(f.kinds['0940'], 20); assert.equal(f.kinds['next-open'], 10);
+  assert.ok(Math.abs(d.rows[0].fwd[5].ret - (1.1 / 1.02 - 1)) < 1e-4); assert.equal(d.rows[0].fwd[5].entryKind, '0940');
+  assert.ok(Math.abs(d.rows[0].fwd[5].retOpen - (1.1 / 1.05 - 1)) < 1e-4, 'הפתיחה נשמרת כסטטיסטיקה משנית');
+  assert.ok(Math.abs(d.fwd[5].spy - (110 / 102 - 1)) < 1e-4); assert.equal(d.fwd[5].spyEntryKind, '0940');
+  assert.equal(d.rows[25].fwd[5].entryKind, 'next-open');
+  const st = summarizeStats(accumulateStats(null, d, 5)).horizons['5'].models.B;
+  assert.equal(st.entryKinds['0940'], 20); assert.ok(st.actionsOpen && Object.keys(st.actionsOpen).length > 0);
+  // ingest route + שימוש בהרצה הלילית
+  installMockFetchOnce();
+  const worker = (await import('../worker.js')).default;
+  const store = new Map();
+  const env = { INVEST: { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }) }, APP_TOKEN: 'secret', CRON_SECRET: 's3' };
+  const post = (path, body) => worker.fetch(new Request('https://api.test' + path, { method: 'POST', headers: { 'CF-Connecting-IP': '9.9.9.9', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env, { waitUntil(){} });
+  assert.equal((await post('/ingest/entry?secret=bad', { day: '2026-09-17', prices: {} })).status, 401);
+  const r = await (await post('/ingest/entry?secret=s3', { day: '2026-09-17', prices: { AAPL: 101.5, SPY: 500.25, BAD$: 1, ZERO: 0 } })).json();
+  assert.equal(r.count, 2); const e = JSON.parse(store.get('entry940:2026-09-17')); assert.equal(e.prices.AAPL, 101.5); assert.equal(e.prices.SPY, 500.25);
+});
+async function installMockFetchOnce(){ const { installMockFetch } = await import('./mock-providers.mjs'); installMockFetch(); }

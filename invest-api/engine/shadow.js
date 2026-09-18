@@ -8,7 +8,7 @@
 import { isNum, mean, round, correlation } from './util.js';
 
 export const SHADOW_VERSION = 2;
-export const SHADOW_RULES = Object.freeze({ strongTopPct: 0.15, buyTopPct: 0.30, sellBottomPct: 0.20, minSector: 5, minUniverse: 20, dupeThreshold: 0.6, horizons: [1, 5, 20, 60], buckets: [80, 70, 60, 50] });
+export const SHADOW_RULES = Object.freeze({ strongTopPct: 0.15, buyTopPct: 0.30, sellBottomPct: 0.20, minSector: 5, minUniverse: 20, dupeThreshold: 0.6, horizons: [1, 5, 20, 60], buckets: [80, 70, 60, 50], revisionCoverageMin: 0.75 });
 export const FACTOR_LABELS = { value: 'תמחור', profitability: 'רווחיות', growth: 'צמיחה', trend: 'מגמה', risk: 'סיכון', revision: 'ריוויזיות', momentum: 'מומנטום', quality: 'איכות' };
 export const SHADOW_MODELS = Object.freeze({
   A: { label: 'הישן', desc: 'הציון והסיגנל שמפעילים את האוטומט היום', weights: null },
@@ -96,7 +96,11 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   // ריוויזיות: אחוזון בכל היקום בין אלה שזמינות; חסר = null (לא 0)
   const revVals = stocks.map((r) => (revisions[r.symbol]?.available ? revisions[r.symbol].epsRevision : null));
   const revAvail = revVals.filter(isNum);
-  const revPct = revVals.map((v) => (isNum(v) && revAvail.length >= 10 ? pctRank(revAvail, v) : null));
+  // D מלא רק כשיש ריוויזיה תקינה ל-≥75% מהמניות הכשירות (ולפחות 10); אחרת רכיב של 20% לחלק קטן מהיקום מעוות דירוג יחסי
+  const eligibleDCount = pct.filter((p) => ['momentum', 'growth'].every((k) => isNum(p[k]))).length;
+  const revCoverage = eligibleDCount ? round(revAvail.length / eligibleDCount, 3) : 0;
+  const revOn = revAvail.length >= 10 && revCoverage >= SHADOW_RULES.revisionCoverageMin;
+  const revPct = revVals.map((v) => (isNum(v) && revOn ? pctRank(revAvail, v) : null));
   const weighted = (p, w) => { let sw = 0, s = 0; for (const [k, wk] of Object.entries(w)){ if (isNum(p[k])){ sw += wk; s += wk * p[k]; } } return sw ? round(s / sw, 1) : null; };
   const eligible = pct.map((p) => ['value', 'profitability', 'growth', 'trend'].every((k) => isNum(p[k])));
   const scoreB = pct.map((p, i) => (eligible[i] ? weighted(p, SHADOW_MODELS.B.weights) : null));
@@ -124,29 +128,36 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const dist = { A: scoreDistribution(rows.map((r) => r.A), actA), B: scoreDistribution(scoreB, actB), C: scoreDistribution(scoreC, actC), D: scoreDistribution(scoreD, actD) };
   return {
     version: SHADOW_VERSION, day, barDate, regime: regime ? { trend: regime.trend, risk: regime.risk } : null, overlay, n: rows.length, eligible: eligible.filter(Boolean).length,
-    revisionsAvailable: revAvail.length, revisionsUsed: revAvail.length >= 10, rules: SHADOW_RULES,
+    revisionsAvailable: revAvail.length, revisionsUsed: revOn, revisionCoverage: revCoverage, rules: SHADOW_RULES,
     // D בלי ריוויזיות (עד שנצברים 30 יום) הוא בפועל מודל אחר (המשקלים מנורמלים מחדש) — נרשם כ-D-preRevision ונצבר בנפרד; לא מערבבים תקופות
-    universe, models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) }, D: { ...SHADOW_MODELS.D, actions: count(actD), variant: revAvail.length >= 10 ? 'D' : 'D-preRevision', effectiveWeights: revAvail.length >= 10 ? SHADOW_MODELS.D.weights : { momentum: 37.5, growth: 31.25, quality: 18.75, risk: 12.5 } } },
+    universe, models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) }, D: { ...SHADOW_MODELS.D, actions: count(actD), variant: revOn ? 'D' : 'D-preRevision', revisionCoverage: revCoverage, effectiveWeights: revOn ? SHADOW_MODELS.D.weights : { momentum: 37.5, growth: 31.25, quality: 18.75, risk: 12.5 } } },
     agreement: { AB: agree(actA, actB), AC: agree(actA, actC), BC: agree(actB, actC), CD: agree(actC, actD), AD: agree(actA, actD), buyOverlapAB: overlap(actA, actB), buyOverlapAC: overlap(actA, actC), buyOverlapCD: overlap(actC, actD) },
     top: { A: top('A'), B: top('B'), C: top('C'), D: top('D') }, dist, corr, rows, fwd: {},
   };
 }
 
 // מילוי תשואה עתידית לאופק h (ימי ניתוח) על מסמך ישן, לפי מחירי היום; spyNow/spyThen לתשואה עודפת
-// כניסה היפותטית: פתיחת יום המסחר הבא אחרי הסיגנל (entryOpen: symbol → open של יום הניתוח הבא), לא סגירת יום הסיגנל.
-// בלי פתיחה זמינה — סגירת הסיגנל, ומסומן entryKind:'close'. SPY נמדד מאותה נקודה (spyEntry = פתיחת SPY באותו יום).
-export function fillForward(doc, h, priceNow, { spyNow = null, spyThen = null, day = null, entryOpen = null, spyEntry = null } = {}){
+// כניסה היפותטית — המדד המרכזי: מחיר 09:40 ניו יורק ביום המסחר הבא (entry940: symbol → מחיר, מה-scripts/entry940.mjs), כי כך המערכת
+// מבצעת בפועל. סטטיסטיקה משנית: פתיחת היום הבא (entryOpen). בלי שניהם — סגירת הסיגנל, מסומן. SPY נמדד מאותה נקודה (spyEntry940 / spyEntry).
+export function fillForward(doc, h, priceNow, { spyNow = null, spyThen = null, day = null, entryOpen = null, spyEntry = null, entry940 = null, spyEntry940 = null } = {}){
   if (!doc || doc.fwd?.[h]) return { filled: 0, already: true };
-  const spyBase = isNum(spyEntry) && spyEntry > 0 ? spyEntry : spyThen;
+  const pick = (a, b, c) => (isNum(a) && a > 0 ? [a, '0940'] : isNum(b) && b > 0 ? [b, 'next-open'] : [c, 'close']);
+  const [spyBase, spyKind] = pick(spyEntry940, spyEntry, spyThen);
   const spy = isNum(spyNow) && isNum(spyBase) && spyBase > 0 ? round(spyNow / spyBase - 1, 4) : null;
-  let filled = 0, atOpen = 0;
+  const spyOpen = isNum(spyNow) && isNum(spyEntry) && spyEntry > 0 ? round(spyNow / spyEntry - 1, 4) : null;
+  let filled = 0; const kinds = { '0940': 0, 'next-open': 0, close: 0 };
   for (const r of doc.rows){
-    const p = priceNow[r.symbol]; const eo = entryOpen?.[r.symbol];
-    const entry = isNum(eo) && eo > 0 ? eo : r.price; const kind = isNum(eo) && eo > 0 ? 'next-open' : 'close';
-    if (isNum(p) && isNum(entry) && entry > 0){ const ret = round(p / entry - 1, 4); r.fwd[h] = { ret, excess: spy === null ? null : round(ret - spy, 4), entry: round(entry, 4), entryKind: kind }; filled++; if (kind === 'next-open') atOpen++; }
+    const p = priceNow[r.symbol];
+    const [entry, kind] = pick(entry940?.[r.symbol], entryOpen?.[r.symbol], r.price);
+    if (isNum(p) && isNum(entry) && entry > 0){
+      const ret = round(p / entry - 1, 4);
+      const eo = entryOpen?.[r.symbol]; const retOpen = isNum(eo) && eo > 0 ? round(p / eo - 1, 4) : null;
+      r.fwd[h] = { ret, excess: spy === null ? null : round(ret - spy, 4), entry: round(entry, 4), entryKind: kind, retOpen, excessOpen: retOpen === null || spyOpen === null ? null : round(retOpen - spyOpen, 4) };
+      filled++; kinds[kind]++;
+    }
   }
-  doc.fwd[h] = { day, spy, spyEntryKind: isNum(spyEntry) && spyEntry > 0 ? 'next-open' : 'close', filled, atOpen };
-  return { filled, atOpen, already: false };
+  doc.fwd[h] = { day, spy, spyOpen, spyEntryKind: spyKind, filled, kinds, atOpen: kinds['next-open'] + kinds['0940'] };
+  return { filled, kinds, already: false };
 }
 
 const emptyStat = () => ({ n: 0, sum: 0, sumEx: 0, nEx: 0 });
@@ -160,7 +171,8 @@ export function accumulateStats(stats, doc, h){
     const key = m === 'D' ? (doc.models?.D?.variant || 'D') : m; // D-preRevision נצבר בנפרד מ-D
     const M = (H[key] = H[key] || { buckets: {}, actions: {}, ic: { n: 0, sum: 0 }, byDay: [] });
     const sc = [], fw = [];
-    for (const r of doc.rows){ const f = r.fwd?.[h]; if (!f || !isNum(r[m])) continue; sc.push(r[m]); fw.push(f.ret); const b = bucketOf(r[m]); M.buckets[b] = M.buckets[b] || emptyStat(); addStat(M.buckets[b], f.ret, f.excess); const a = r['act' + m]; if (a){ M.actions[a] = M.actions[a] || emptyStat(); addStat(M.actions[a], f.ret, f.excess); } }
+    M.kinds = M.kinds || {}; M.actionsOpen = M.actionsOpen || {};
+    for (const r of doc.rows){ const f = r.fwd?.[h]; if (!f || !isNum(r[m])) continue; sc.push(r[m]); fw.push(f.ret); M.kinds[f.entryKind] = (M.kinds[f.entryKind] || 0) + 1; const b = bucketOf(r[m]); M.buckets[b] = M.buckets[b] || emptyStat(); addStat(M.buckets[b], f.ret, f.excess); const a = r['act' + m]; if (a){ M.actions[a] = M.actions[a] || emptyStat(); addStat(M.actions[a], f.ret, f.excess); if (isNum(f.retOpen)){ M.actionsOpen[a] = M.actionsOpen[a] || emptyStat(); addStat(M.actionsOpen[a], f.retOpen, f.excessOpen); } } }
     const ic = spearman(sc, fw); if (isNum(ic)){ M.ic.n++; M.ic.sum += ic; M.byDay.push([doc.day, ic]); M.byDay = M.byDay.slice(-120); }
   }
   return S;
@@ -177,7 +189,8 @@ export function summarizeStats(stats){
       const means = buckets.filter((b) => b.n >= 5).map((b) => b.mean);
       const monotonic = means.length >= 3 ? means.every((v, i) => i === 0 || v <= means[i - 1]) : null; // מהגבוה לנמוך: כל קבוצה ≤ הקודמת
       const actions = Object.fromEntries(Object.entries(M.actions).map(([a, s]) => [a, { n: s.n, mean: round(s.sum / s.n, 4), excess: s.nEx ? round(s.sumEx / s.nEx, 4) : null }]));
-      out.horizons[h].models[m] = { buckets, monotonic, ic: M.ic.n ? round(M.ic.sum / M.ic.n, 3) : null, icDays: M.ic.n, actions, n: buckets.reduce((s, b) => s + b.n, 0) };
+      const actionsOpen = Object.fromEntries(Object.entries(M.actionsOpen || {}).map(([a, s]) => [a, { n: s.n, mean: round(s.sum / s.n, 4), excess: s.nEx ? round(s.sumEx / s.nEx, 4) : null }]));
+      out.horizons[h].models[m] = { buckets, monotonic, ic: M.ic.n ? round(M.ic.sum / M.ic.n, 3) : null, icDays: M.ic.n, actions, actionsOpen, entryKinds: M.kinds || {}, n: buckets.reduce((s, b) => s + b.n, 0) };
     }
   }
   return out;

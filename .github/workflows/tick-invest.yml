@@ -67,6 +67,9 @@ jobs:
           if [ "$CMD" = "fmp-plans" ]; then
             python3 invest-api/scripts/fmp-plans-probe.py | head -700
           fi
+          if [ "$CMD" = "entry940-run" ]; then
+            echo "=== entry940 (בדיקה ידנית, הסשן האחרון)"; CRON_SECRET="$SECRET" WORKER_URL="$W" ENTRY_FORCE=1 ENTRY_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/entry940.mjs || echo "::warning::entry940 failed"
+          fi
           if [ "$CMD" = "aggressive-reset" ]; then
             echo "=== aggressive reset (מתחיל מחדש עם הציון האגרסיבי)"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET&reset=1" | head -c 800; echo
           fi

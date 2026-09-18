@@ -1,0 +1,20 @@
+# מחירי 09:40 ניו יורק לכל ה-S&P 500 + SPY — נקודת הכניסה הברת-ביצוע של תיקי הצל. שני תזמונים (שעון קיץ/חורף); הסקריפט בודק את השעה בניו יורק.
+name: Entry 09:40 NY (shadow fill price)
+on:
+  schedule:
+    - cron: '45 13 * * 1-5'
+    - cron: '45 14 * * 1-5'
+  workflow_dispatch:
+jobs:
+  entry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch 09:40 prices and ingest
+        run: |
+          SECRET=$(python3 -c 'import json; print(json.load(open("invest-api/config.json"))["CRON_SECRET"])')
+          CRON_SECRET="$SECRET" WORKER_URL=https://invest-api.meirco199.workers.dev node invest-api/scripts/entry940.mjs

@@ -47,8 +47,11 @@ export async function runShadow(ctx, { day = null, force = false } = {}){
     const entryDoc = entryDay ? await db.get(`shadow:${entryDay}`) : null;
     const entryOpen = entryDoc ? Object.fromEntries(entryDoc.rows.map((r) => [r.symbol, r.open])) : null;
     const spyEntry = entryDay ? (await db.get(`rank:${entryDay}`))?.table?.find((r) => r.symbol === 'SPY')?.open ?? null : null;
-    const f = fillForward(old, h, priceNow, { spyNow, spyThen, day, entryOpen, spyEntry });
-    if (f.filled){ await db.put(`shadow:${then}`, old); stats = accumulateStats(stats, old, h); filled[h] = { day: then, filled: f.filled }; }
+    // מחיר 09:40 ניו יורק של יום המסחר שאחרי הסיגנל (entry940:{then}; יום הניתוח then = הסשן שאחרי הסגירה שעליה נוצר הסיגנל)
+    const e940 = await db.get(`entry940:${then}`);
+    const entry940 = e940?.prices || null; const spyEntry940 = e940?.prices?.SPY ?? null;
+    const f = fillForward(old, h, priceNow, { spyNow, spyThen, day, entryOpen, spyEntry, entry940, spyEntry940 });
+    if (f.filled){ await db.put(`shadow:${then}`, old); stats = accumulateStats(stats, old, h); filled[h] = { day: then, filled: f.filled, kinds: f.kinds }; }
   }
   if (Object.keys(filled).length) await db.put('shadow:stats', stats);
   // סדרת התפלגות יומית (מסמך אחד, עד 250 ימים): חלק "קנייה חזקה"/"קנייה", ממוצע וחציון לכל מודל
