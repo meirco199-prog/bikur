@@ -25,13 +25,15 @@ export async function fetchWithFallback(cap, symbol, opts, ctx, { only } = {}){
   if (!list.length) return { missing: true, reason: `אין ספק זמין ל-${cap} (חסר מפתח?)`, tried };
   for (const p of list){
     try {
+      if (await ctx.budget.blocked(p.id, cap)){ tried.push({ provider: p.id, error: 'לא כלול בתוכנית (נבדק היום)' }); continue; }
       if (!(await ctx.budget.canSpend(p.id))){ tried.push({ provider: p.id, error: 'תקציב יומי נגמר' }); continue; }
       const r = await p[cap](symbol, opts || {}, ctx);
       if (r && !r.missing) return { ...r, provider: p.id, tried };
       tried.push({ provider: p.id, error: r?.reason || 'missing' });
     } catch (e) {
       tried.push({ provider: p.id, error: e.message, kind: e.kind });
-      await ctx.db.logError(`${p.id}.${cap}(${symbol})`, e.message);
+      if (e.kind === 'paid' || e.kind === 'auth'){ await ctx.budget.block(p.id, cap); await ctx.db.logError(`${p.id}.${cap}`, `${e.message} — נחסם להיום (לא נקרא שוב לניירות אחרים)`); }
+      else await ctx.db.logError(`${p.id}.${cap}(${symbol})`, e.message);
     }
   }
   return { missing: true, reason: tried.map((t) => `${t.provider}: ${t.error}`).join(' | ') || 'no provider', tried };

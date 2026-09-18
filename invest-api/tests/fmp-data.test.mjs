@@ -103,3 +103,12 @@ test('יקום מכני: כל חברי המדד נכנסים; maxAdd מגביל 
   const r4 = await refreshMechanicalUniverse(ctx, { reset: true });
   assert.equal(r4.selected, 504); assert.equal(r4.pending, 0);
 });
+
+test('תקציב: endpoint שהתוכנית לא כוללת נחסם להיום ולא נקרא שוב לכל נייר', async () => {
+  const { Budget } = await import('../lib/budget.js');
+  const db = new DB(null); const b = new Budget(db);
+  assert.equal(await b.blocked('fmp', 'earnings'), false);
+  await b.block('fmp', 'earnings'); await b.flush();
+  assert.equal(await new Budget(db).blocked('fmp', 'earnings'), true, 'נשמר עם התקציב היומי');
+  assert.equal(await b.blocked('fmp', 'profile'), false);
+});

@@ -19,6 +19,9 @@ export class Budget {
     if (MINUTE_LIMITS[p]){ const k = `${p}:${Math.floor(Date.now() / 60000)}`; MINUTE.set(k, (MINUTE.get(k) || 0) + n); if (MINUTE.size > 200) MINUTE.clear(); }
     return b[p];
   }
+  // endpoint שהתוכנית לא כוללת (402/401/403): לא לשרוף עליו קריאה לכל נייר בכל לילה — חסימה ליום (נשמרת עם התקציב)
+  async block(p, cap){ const b = await this.load(); b._blocked = b._blocked || {}; b._blocked[`${p}:${cap}`] = new Date().toISOString(); this.dirty = true; }
+  async blocked(p, cap){ const b = await this.load(); return !!b._blocked?.[`${p}:${cap}`]; }
   async flush(){ if (!this.dirty) return; this.dirty = false; await this.db.put(this.key(), this.loaded, { ttl: 48 * 3600 }); }
   async status(){ const b = await this.load(); const out = {}; for (const p of Object.keys(this.limits)) out[p] = { used: b[p] || 0, limit: this.limits[p] }; return out; }
 }
