@@ -5,9 +5,13 @@ name: Tick invest (daily processing)
 
 on:
   schedule:
+    # GitHub מריץ תזמונים בריפו הזה באיחור של כמה שעות (בפועל ~06:00 ו-~08:50 UTC במקום 01:17/03:47), לכן: כמה חלונות,
+    # וכל שלב בודק בעצמו אם העבודה של היום כבר נעשתה (הסריקה הלילית לפי הדירוג, מחירי 09:40 לפי GET /entry/{day})
     - cron: '17 1 * * 2-6'
     - cron: '47 3 * * 2-6'
+    - cron: '30 5 * * 2-6'
     - cron: '50 14 * * 1-5'   # גיבוי לביצוע האוטומט בשעות המסחר בניו יורק (10:50 EDT / 09:50 EST)
+    - cron: '20 16 * * 1-5'   # מחירי 09:40 של היום (גם אם GitHub מאחר) + גיבוי נוסף לביצוע
   push:
     branches: [main]
     paths:
@@ -47,7 +51,8 @@ jobs:
           echo "=== prices SPY"; curl -sS --max-time 60 "$W/prices/SPY?from=2026-09-01" | head -c 600; echo
           echo "=== facts AAPL (EDGAR)"; curl -sS --max-time 60 "$W/bundle/AAPL?light=0" | python3 -c 'import json,sys; d=json.load(sys.stdin); f=d.get("facts",{}); print("facts:", f.get("source"), f.get("asOf"), "series:", {k: len(v) for k,v in (f.get("series") or {}).items()} if not f.get("missing") else f.get("reason")); print("prices:", d.get("prices",{}).get("source"), d.get("prices",{}).get("asOf"), d.get("prices",{}).get("reason"))'
           # ניתוח לילי של כל ה-S&P 500 כאן (Yahoo + EDGAR, בלי מכסות Worker) → shards ב-KV. בריצה המתוזמנת ובפקודת sp500-run
-          if [ "$CMD" = "sp500-run" ] || { [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%H)" -lt 3 ]; }; then
+          # (הסקריפט מדלג אם הדירוג של היום כבר כולל את המדד; רץ בכל ריצה מתוזמנת לפני פתיחת ניו יורק, כי GitHub מאחר בתזמון)
+          if [ "$CMD" = "sp500-run" ] || { [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%H)" -lt 13 ]; }; then
             echo "=== sp500 nightly"; CRON_SECRET="$SECRET" WORKER_URL="$W" TWELVEDATA_KEY="${{ secrets.TWELVEDATA_KEY }}" SP500_PRICE_SOURCE="${{ vars.SP500_PRICE_SOURCE }}" SP500_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/nightly-sp500.mjs || echo "::warning::sp500 nightly failed"
             echo "=== shadow re-run (force)"; curl -sS --max-time 120 -X POST "$W/shadow/run?secret=$SECRET&force=1" | head -c 400; echo
             echo "=== aggressive decide"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET" | head -c 600; echo
@@ -67,8 +72,10 @@ jobs:
           if [ "$CMD" = "fmp-plans" ]; then
             python3 invest-api/scripts/fmp-plans-probe.py | head -700
           fi
-          if [ "$CMD" = "entry940-run" ]; then
-            echo "=== entry940 (בדיקה ידנית, הסשן האחרון)"; CRON_SECRET="$SECRET" WORKER_URL="$W" ENTRY_FORCE=1 ENTRY_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/entry940.mjs || echo "::warning::entry940 failed"
+          # מחירי 09:40 ניו יורק לסשן האחרון: בכל ריצה מתוזמנת ובפקודות (הסקריפט מדלג אם הסשן כבר נאסף; entry940-run אוסף מחדש)
+          if [ "$CMD" = "entry940-run" ] || [ "$CMD" = "sp500-run" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            FORCE940=""; [ "$CMD" = "entry940-run" ] && FORCE940=1
+            echo "=== entry940 (הסשן האחרון)"; CRON_SECRET="$SECRET" WORKER_URL="$W" ENTRY_FORCE="$FORCE940" ENTRY_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/entry940.mjs || echo "::warning::entry940 failed"
           fi
           if [ "$CMD" = "aggressive-reset" ]; then
             echo "=== aggressive reset (מתחיל מחדש עם הציון האגרסיבי)"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET&reset=1" | head -c 800; echo

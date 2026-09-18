@@ -267,6 +267,8 @@ async function handle(req, env0, ctx){
   if (r0 === 'reco'){ const day = validDate(q.date) ? q.date : await latestRankDay(db); const r = day ? await db.get(`reco:${day}`) : null; return json(r || { missing: true, reason: 'אין תיקים מומלצים עדיין', day }); }
   if (r0 === 'days') return json((await db.get('idx:snapdays')) || []);
   if (r0 === 'snapshots' && p1){ const s = sym(p1); const days = (await db.get('idx:snapdays')) || []; const out = []; for (const d of days.slice(-(+q.limit || 120))){ const sn = await getSnap(db, d, s); if (sn) out.push(sn); } return json(out); }
+  // מצב מחירי 09:40 ליום מסחר (לסקריפט ב-Actions: לדלג אם היום כבר נאסף; ?full=1 מחזיר גם את המחירים)
+  if (r0 === 'entry' && validDate(p1) && req.method === 'GET'){ const ex = await db.get(`entry940:${p1}`); if (!ex) return json({ day: p1, count: 0, missing: true }); return json({ day: p1, count: ex.count || Object.keys(ex.prices || {}).length, at: ex.at, source: ex.source, updatedAt: ex.updatedAt, prices: q.full === '1' ? ex.prices : undefined }); }
   // מחירי 09:40 ניו יורק (מ-scripts/entry940.mjs): מסמך אחד ליום מסחר — נקודת הכניסה הברת-ביצוע של תיקי הצל
   if (r0 === 'ingest' && p1 === 'entry' && req.method === 'POST'){
     if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth();

@@ -169,5 +169,10 @@ test('מודל צל: מחיר 09:40 הוא הכניסה הראשית (kind 0940)
   assert.equal((await post('/ingest/entry?secret=bad', { day: '2026-09-17', prices: {} })).status, 401);
   const r = await (await post('/ingest/entry?secret=s3', { day: '2026-09-17', prices: { AAPL: 101.5, SPY: 500.25, BAD$: 1, ZERO: 0 } })).json();
   assert.equal(r.count, 2); const e = JSON.parse(store.get('entry940:2026-09-17')); assert.equal(e.prices.AAPL, 101.5); assert.equal(e.prices.SPY, 500.25);
+  // GET /entry/{day}: ספירה בלבד (הסקריפט מדלג כשהיום כבר נאסף), ?full=1 עם המחירים; יום חסר → count 0
+  const get = (path) => worker.fetch(new Request('https://api.test' + path, { headers: { 'CF-Connecting-IP': '9.9.9.9' } }), env, { waitUntil(){} }).then((x) => x.json());
+  const g = await get('/entry/2026-09-17'); assert.equal(g.count, 2); assert.equal(g.prices, undefined);
+  assert.equal((await get('/entry/2026-09-17?full=1')).prices.SPY, 500.25);
+  assert.equal((await get('/entry/2026-09-16')).count, 0);
 });
 async function installMockFetchOnce(){ const { installMockFetch } = await import('./mock-providers.mjs'); installMockFetch(); }

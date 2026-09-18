@@ -12,6 +12,8 @@ const SECRET = process.env.CRON_SECRET;
 const CACHE = process.env.SP500_CACHE_DIR || '.cache/sp500';
 const UA = process.env.EDGAR_UA || 'bikur-invest research (github.com/meirco199-prog/bikur) contact via GitHub';
 const LIMIT = +process.env.SP500_LIMIT || 0; // לבדיקות: כמה סימבולים לכל היותר
+const FORCE = process.env.SP500_FORCE === '1'; // להריץ גם אם הדירוג של היום כבר כולל את המדד
+const DONE_SHARE = 0.9; // הדירוג של היום כבר כולל ≥90% מחברות המדד → הסריקה כבר רצה (הריצות המתוזמנות של GitHub מאחרות ולא סדירות, לכן כל ריצה בודקת)
 // מקור מחירים: yahoo (ברירת מחדל, לניסוי הצל בלבד — לא מקור לפרודקשן) | twelvedata (מפתח ב-Actions secret TWELVEDATA_KEY, 7 קריאות/דקה).
 // גיבוי לכל סימבול שנכשל: /prices/{sym} דרך ה-Worker (Twelve Data מהתקציב שלו), עד SP500_FALLBACK_MAX בלילה — כדי ששינוי אצל Yahoo לא ימחק סריקה שלמה.
 const PRICE_SOURCE = process.env.SP500_PRICE_SOURCE || (process.env.TWELVEDATA_KEY ? 'twelvedata' : 'yahoo');
@@ -89,6 +91,11 @@ export async function main(){
   if (!syms.length) syms = (universe.items || []).filter((a) => a.origin === 'mechanical' && a.type === 'stock').map((a) => a.symbol);
   if (LIMIT) syms = syms.slice(0, LIMIT);
   log(`יקום מכני: ${syms.length} חברות, יום ${day}`);
+  if (!FORCE && !LIMIT){
+    const rank = await getJSON(`${W}/rank`).catch(() => null);
+    const have = rank?.date === day ? (rank.universes?.sp500 || 0) : 0;
+    if (have >= DONE_SHARE * syms.length){ log(`הדירוג של ${day} כבר כולל ${have} חברות מדד — הסריקה כבר רצה, מדלג`); return { day, skipped: true, have }; }
+  }
   const regime = await getJSON(`${W}/regime`).catch(() => null);
   const spy = await prices('SPY'); const qqq = await prices('QQQ').catch(() => null);
   const macro = await getJSON(`${W}/macro/DGS10`).catch(() => null);
