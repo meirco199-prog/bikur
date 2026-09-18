@@ -117,3 +117,29 @@ test('מודל צל: מודל D (אגרסיבי, בלי תמחור) ויקום �
   const t3 = mk(60); t3.forEach((r, i) => { r.universe = i < 50 ? 'sp500' : 'extended'; });
   assert.equal(computeShadow({ table: t3, revisions: {}, day: 'x' }).n, 60);
 });
+
+test('מודל צל: כניסה בפתיחת היום הבא (לא סגירת הסיגנל), SPY מאותה נקודה, ו-D-preRevision נצבר בנפרד', async () => {
+  const d = computeShadow({ table: mk(30, (i) => ({ open: 100 + i })), revisions: {}, day: '2026-09-17' });
+  assert.equal(d.models.D.variant, 'D-preRevision'); assert.equal(d.rows[0].open, 100);
+  const priceNow = Object.fromEntries(d.rows.map((r) => [r.symbol, r.price * 1.1]));
+  const entryOpen = Object.fromEntries(d.rows.map((r) => [r.symbol, r.price * 1.05])); // פתיחת מחר גבוהה ב-5% מסגירת הסיגנל (גאפ)
+  fillForward(d, 1, priceNow, { spyNow: 110, spyThen: 100, spyEntry: 105, day: '2026-09-18', entryOpen });
+  assert.ok(Math.abs(d.rows[0].fwd[1].ret - (1.1 / 1.05 - 1)) < 1e-4, 'התשואה נמדדת מהפתיחה, לא מהסגירה'); assert.equal(d.rows[0].fwd[1].entryKind, 'next-open');
+  assert.ok(Math.abs(d.fwd[1].spy - (110 / 105 - 1)) < 1e-4, 'SPY מאותה נקודת כניסה'); assert.equal(d.fwd[1].atOpen, 30);
+  const st = accumulateStats(null, d, 1);
+  assert.ok(st.horizons[1]['D-preRevision'] && !st.horizons[1].D, 'רקורד נפרד עד שיש ריוויזיות');
+  // בלי פתיחה → סגירה, מסומן
+  const d2 = computeShadow({ table: mk(30), revisions: {}, day: '2026-09-17' });
+  fillForward(d2, 1, priceNow, { spyNow: 110, spyThen: 100, day: 'x' });
+  assert.equal(d2.rows[0].fwd[1].entryKind, 'close'); assert.equal(d2.fwd[1].spyEntryKind, 'close');
+  // הרצה לילית: shards (צינור אחיד) → הפול = חברות המדד מה-shards; שורות ה-Worker שלא ב-shards = מורחב
+  const { putSnapsBatch } = await import('../lib/snapstore.js');
+  const db = new DB(null); const ctx = { db, env: {} };
+  const uni = mk(120).map((r) => ({ ...r, symbol: 'U' + r.symbol.slice(1), open: r.price - 1 }));
+  await putSnapsBatch(db, '2026-09-17', uni);
+  await db.put('meta:mechanical', { symbols: uni.slice(0, 110).map((r) => r.symbol) });
+  await db.put('idx:snapdays', ['2026-09-17']); await db.put('rank:2026-09-17', { table: [...mk(20), { symbol: 'SPY', type: 'etf', price: 500, open: 498, score: 70, signal: 'HOLD', components: {} }] });
+  const r = await runShadow(ctx, { day: '2026-09-17' });
+  assert.equal(r.pipeline, 'uniform'); assert.equal(r.uniformCount, 120); assert.equal(r.n, 110, 'רק חברות המדד מה-shards באחוזונים');
+  const doc = await db.get('shadow:2026-09-17'); assert.equal(doc.rows[0].open, doc.rows[0].price - 1);
+});

@@ -27,6 +27,7 @@ export function analyzeBundle(b, { asOfDate = null, regime = null, benchRows = n
   let quoteNote = null;
   if (liveQuote && isNum(technical.price) && technical.price > 0 && Math.abs(liveQuote.price / technical.price - 1) > 0.25){ quoteNote = `quote ${liveQuote.price} (${liveQuote.source}) סוטה >25% מהסגירה ${technical.price} — לא בשימוש`; liveQuote = null; }
   const price = liveQuote ? liveQuote.price : technical.price;
+  const lastOpen = rows[rows.length - 1][1]; // פתיחת הבר האחרון — משמש כמחיר כניסה היפותטי ("פתיחה של מחר" מנקודת המבט של הסיגנל של אתמול)
   const priceSource = liveQuote ? { source: liveQuote.source, asOf: liveQuote.asOf, kind: 'quote' } : { source: b.prices.source, asOf: rows[rows.length - 1][0], kind: 'close', note: quoteNote };
   const facts = b.facts && !b.facts.missing ? factsAsOf(b.facts, asOfDate) : null;
   const metrics = !isEtf && facts ? computeMetrics(facts, { price, sharesOut: asOfDate ? null : b.profile?.sharesOut, ratios: asOfDate ? null : (b.ratios && !b.ratios.missing ? b.ratios : null), marketCap: asOfDate ? null : b.profile?.marketCap }) : (b.ratios && !b.ratios.missing && !asOfDate ? { ...b.ratios, derived: false, fields: {}, missing: false } : null);
@@ -47,7 +48,7 @@ export function analyzeBundle(b, { asOfDate = null, regime = null, benchRows = n
   const score = computeScore({ metrics, technical, fair, peHist, peers, estimates, analyst, sentiment, regime, profile, quality, riskExtras: { earningsInDays, currency: asset.currency || 'USD', baseCurrency: 'ILS', avgDollarVolume: risk?.avgDollarVolume20, beta: risk?.beta, gapRate: risk?.gapRate } }, w);
   const signal = deriveSignal({ score, technical, fair, regime, profile, price, earningsInDays });
   return {
-    symbol: asset.symbol, date: asOfDate || today(), barDate: date, asOfDate, asset: { ...asset, beta: risk?.beta ?? asset.beta }, price, priceSource,
+    symbol: asset.symbol, date: asOfDate || today(), barDate: date, asOfDate, asset: { ...asset, beta: risk?.beta ?? asset.beta }, price, open: isNum(lastOpen) ? lastOpen : null, priceSource,
     dailyChange: liveQuote ? liveQuote.changePct : technical.dailyChange,
     technical, metrics, fair, score, signal, risk, sentiment: sentiment.missing ? sentiment : { ...sentiment, clusters: clusters.slice(0, 15) },
     analyst, estimates, earnings: asOfDate ? null : b.earn, insider: asOfDate ? null : (b.insider?.items || []).slice(0, 15), etf: b.etf && !b.etf.missing ? b.etf : null,
@@ -65,7 +66,7 @@ export function toSnapshot(a){
   const cv = (k) => (c[k] && !c[k].missing ? c[k].value : null);
   return {
     symbol: a.symbol, date: a.date, barDate: a.barDate, name: a.asset.name, nameHe: a.asset.nameHe || null, type: a.asset.type, sector: a.asset.sector, country: a.asset.country, currency: a.asset.currency, assetClass: a.asset.assetClass, role: a.asset.role,
-    price: a.price, dailyChange: a.dailyChange, score: a.score.total, coverage: a.score.coverage, confidence: a.score.confidence, confidenceLabel: a.score.confidenceLabel,
+    price: a.price, open: a.open ?? null, dailyChange: a.dailyChange, score: a.score.total, coverage: a.score.coverage, confidence: a.score.confidence, confidenceLabel: a.score.confidenceLabel,
     components: Object.fromEntries(Object.keys(c).map((k) => [k, cv(k)])), componentReasons: Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.missing ? { missing: v.reason } : { reasons: v.reasons, subs: v.subs?.map((s) => ({ label: s.label, value: s.value })) }])),
     signal: a.signal.label, signalDetail: { levels: a.signal.levels, horizon: a.signal.horizon, why: a.signal.why, top5: a.signal.top5, risks: a.signal.risks, changeIf: a.signal.changeIf, contradict: a.signal.contradict, entryNote: a.signal.entryNote, noSignalReason: a.signal.noSignalReason },
     trend: a.technical.trend, rsi: round(a.technical.rsi, 1), events: a.technical.events.map((e) => e.id), momentum12m: round(a.technical.momentum.r12m, 4), distFromHigh52: round(a.technical.distFromHigh52, 4),
@@ -105,7 +106,7 @@ export function rankSnapshots(snaps, { sp500 = null } = {}){
     },
     breadth: ok.length ? round(ok.filter((s) => ['עולה', 'עולה-חלש'].includes(s.trend)).length / ok.length, 3) : null,
     universes: sp500 ? { sp500: ok.filter((s) => uni(s) === 'sp500').length, extended: ok.filter((s) => uni(s) === 'extended').length } : null,
-    table: ok.map((s) => ({ symbol: s.symbol, universe: uni(s), barDate: s.barDate || null, coverage: s.coverage ?? null, missingComponents: s.missingComponents || [], name: s.name, nameHe: s.nameHe || null, type: s.type, sector: s.sector, country: s.country, currency: s.currency, assetClass: s.assetClass, role: s.role, price: s.price, dailyChange: s.dailyChange, score: s.score, signal: s.signal, confidence: s.confidence, trend: s.trend, rsi: s.rsi, analystUpside: s.analystUpside, mos: s.mos, pe: s.pe, vol1y: s.vol1y, maxDD1y: s.maxDD1y, beta: s.beta, riskLevel: s.riskLevel, techBeta: s.techBeta, components: s.components, nextEarnings: s.nextEarnings, momentum12m: s.momentum12m, events: s.events, lastNews: s.lastNews, dataAsOf: s.dataAsOf?.prices })),
+    table: ok.map((s) => ({ symbol: s.symbol, universe: uni(s), barDate: s.barDate || null, coverage: s.coverage ?? null, missingComponents: s.missingComponents || [], name: s.name, nameHe: s.nameHe || null, type: s.type, sector: s.sector, country: s.country, currency: s.currency, assetClass: s.assetClass, role: s.role, price: s.price, open: s.open ?? null, dailyChange: s.dailyChange, score: s.score, signal: s.signal, confidence: s.confidence, trend: s.trend, rsi: s.rsi, analystUpside: s.analystUpside, mos: s.mos, pe: s.pe, vol1y: s.vol1y, maxDD1y: s.maxDD1y, beta: s.beta, riskLevel: s.riskLevel, techBeta: s.techBeta, components: s.components, nextEarnings: s.nextEarnings, momentum12m: s.momentum12m, events: s.events, lastNews: s.lastNews, dataAsOf: s.dataAsOf?.prices })),
   };
 }
 

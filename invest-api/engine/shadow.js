@@ -110,7 +110,7 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const actD = rankActions(scoreD, { overlay });
   const contribC = (i) => { const p = { ...pct[i], revision: revPct[i] }; const w = SHADOW_MODELS.C.weights; const sw = Object.entries(w).filter(([k]) => isNum(p[k])).reduce((s, [, v]) => s + v, 0); return Object.fromEntries(Object.entries(w).filter(([k]) => isNum(p[k])).map(([k, v]) => [k, round((v / sw) * p[k], 1)])); };
   const rows = stocks.map((r, i) => ({
-    symbol: r.symbol, name: r.nameHe || r.name || r.symbol, sector: r.sector || null, price: r.price, currency: r.currency || 'USD',
+    symbol: r.symbol, name: r.nameHe || r.name || r.symbol, sector: r.sector || null, price: r.price, open: isNum(r.open) ? r.open : null, currency: r.currency || 'USD',
     A: r.score, actA: actA[i], B: scoreB[i], actB: actB[i], C: scoreC[i], actC: actC[i], D: scoreD[i], actD: actD[i], eligible: eligible[i], eligibleD: eligibleD[i],
     raw: raw[i], pct: pct[i], revision: isNum(revVals[i]) ? revVals[i] : null, revisionPct: revPct[i], revisionNote: revisions[r.symbol]?.available ? null : (revisions[r.symbol]?.reason || 'לא זמין'),
     contribC: eligible[i] ? contribC(i) : null, fwd: {},
@@ -125,20 +125,28 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   return {
     version: SHADOW_VERSION, day, barDate, regime: regime ? { trend: regime.trend, risk: regime.risk } : null, overlay, n: rows.length, eligible: eligible.filter(Boolean).length,
     revisionsAvailable: revAvail.length, revisionsUsed: revAvail.length >= 10, rules: SHADOW_RULES,
-    universe, models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) }, D: { ...SHADOW_MODELS.D, actions: count(actD) } },
+    // D בלי ריוויזיות (עד שנצברים 30 יום) הוא בפועל מודל אחר (המשקלים מנורמלים מחדש) — נרשם כ-D-preRevision ונצבר בנפרד; לא מערבבים תקופות
+    universe, models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) }, D: { ...SHADOW_MODELS.D, actions: count(actD), variant: revAvail.length >= 10 ? 'D' : 'D-preRevision', effectiveWeights: revAvail.length >= 10 ? SHADOW_MODELS.D.weights : { momentum: 37.5, growth: 31.25, quality: 18.75, risk: 12.5 } } },
     agreement: { AB: agree(actA, actB), AC: agree(actA, actC), BC: agree(actB, actC), CD: agree(actC, actD), AD: agree(actA, actD), buyOverlapAB: overlap(actA, actB), buyOverlapAC: overlap(actA, actC), buyOverlapCD: overlap(actC, actD) },
     top: { A: top('A'), B: top('B'), C: top('C'), D: top('D') }, dist, corr, rows, fwd: {},
   };
 }
 
 // מילוי תשואה עתידית לאופק h (ימי ניתוח) על מסמך ישן, לפי מחירי היום; spyNow/spyThen לתשואה עודפת
-export function fillForward(doc, h, priceNow, { spyNow = null, spyThen = null, day = null } = {}){
+// כניסה היפותטית: פתיחת יום המסחר הבא אחרי הסיגנל (entryOpen: symbol → open של יום הניתוח הבא), לא סגירת יום הסיגנל.
+// בלי פתיחה זמינה — סגירת הסיגנל, ומסומן entryKind:'close'. SPY נמדד מאותה נקודה (spyEntry = פתיחת SPY באותו יום).
+export function fillForward(doc, h, priceNow, { spyNow = null, spyThen = null, day = null, entryOpen = null, spyEntry = null } = {}){
   if (!doc || doc.fwd?.[h]) return { filled: 0, already: true };
-  const spy = isNum(spyNow) && isNum(spyThen) && spyThen > 0 ? round(spyNow / spyThen - 1, 4) : null;
-  let filled = 0;
-  for (const r of doc.rows){ const p = priceNow[r.symbol]; if (isNum(p) && isNum(r.price) && r.price > 0){ const ret = round(p / r.price - 1, 4); r.fwd[h] = { ret, excess: spy === null ? null : round(ret - spy, 4) }; filled++; } }
-  doc.fwd[h] = { day, spy, filled };
-  return { filled, already: false };
+  const spyBase = isNum(spyEntry) && spyEntry > 0 ? spyEntry : spyThen;
+  const spy = isNum(spyNow) && isNum(spyBase) && spyBase > 0 ? round(spyNow / spyBase - 1, 4) : null;
+  let filled = 0, atOpen = 0;
+  for (const r of doc.rows){
+    const p = priceNow[r.symbol]; const eo = entryOpen?.[r.symbol];
+    const entry = isNum(eo) && eo > 0 ? eo : r.price; const kind = isNum(eo) && eo > 0 ? 'next-open' : 'close';
+    if (isNum(p) && isNum(entry) && entry > 0){ const ret = round(p / entry - 1, 4); r.fwd[h] = { ret, excess: spy === null ? null : round(ret - spy, 4), entry: round(entry, 4), entryKind: kind }; filled++; if (kind === 'next-open') atOpen++; }
+  }
+  doc.fwd[h] = { day, spy, spyEntryKind: isNum(spyEntry) && spyEntry > 0 ? 'next-open' : 'close', filled, atOpen };
+  return { filled, atOpen, already: false };
 }
 
 const emptyStat = () => ({ n: 0, sum: 0, sumEx: 0, nEx: 0 });
@@ -149,7 +157,8 @@ export function accumulateStats(stats, doc, h){
   S.days[h] = S.days[h] || []; if (S.days[h].includes(doc.day)) return S; S.days[h].push(doc.day);
   const H = (S.horizons[h] = S.horizons[h] || {});
   for (const m of MODEL_KEYS){
-    const M = (H[m] = H[m] || { buckets: {}, actions: {}, ic: { n: 0, sum: 0 }, byDay: [] });
+    const key = m === 'D' ? (doc.models?.D?.variant || 'D') : m; // D-preRevision נצבר בנפרד מ-D
+    const M = (H[key] = H[key] || { buckets: {}, actions: {}, ic: { n: 0, sum: 0 }, byDay: [] });
     const sc = [], fw = [];
     for (const r of doc.rows){ const f = r.fwd?.[h]; if (!f || !isNum(r[m])) continue; sc.push(r[m]); fw.push(f.ret); const b = bucketOf(r[m]); M.buckets[b] = M.buckets[b] || emptyStat(); addStat(M.buckets[b], f.ret, f.excess); const a = r['act' + m]; if (a){ M.actions[a] = M.actions[a] || emptyStat(); addStat(M.actions[a], f.ret, f.excess); } }
     const ic = spearman(sc, fw); if (isNum(ic)){ M.ic.n++; M.ic.sum += ic; M.byDay.push([doc.day, ic]); M.byDay = M.byDay.slice(-120); }

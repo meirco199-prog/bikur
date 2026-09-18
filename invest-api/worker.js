@@ -9,7 +9,7 @@ import { evaluateAlerts, ALERT_TYPES, send as sendAlert } from './lib/alerts.js'
 import { ask } from './lib/ai.js';
 import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
-import { runAggressive, aggrReport } from './lib/aggressive.js';
+import { runAggressive, aggrReport, executeAggressive } from './lib/aggressive.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
 const sp500Set = async (db) => { const m = await db.get('meta:mechanical'); return m?.symbols?.length ? new Set(m.symbols) : null; };
 import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews, refreshMechanicalUniverse, refreshEarningsCalendar } from './lib/analysis.js';
@@ -162,6 +162,7 @@ async function handle(req, env0, ctx){
   if (r0 === 'aggressive'){
     if (p1 === 'report' || !p1) return json(await aggrReport(db));
     if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runAggressive(ctx, { day: q.date || null, force: q.force === '1', reset: q.reset === '1' })); } catch (e) { await db.logError('aggressive', e.message); return err('מסלול אגרסיבי: ' + e.message, 500); } }
+    if (p1 === 'execute' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await executeAggressive(ctx, { force: q.force === '1' && !bySecret })); } catch (e) { await db.logError('aggressive-exec', e.message); return err('ביצוע אגרסיבי: ' + e.message, 500); } }
     return err('not found', 404);
   }
   // רענון יקום מכני + לוח דוחות לפי דרישה (בדיקת endpoints של FMP בפועל). cron עושה זאת לבד: לוח יומי, יקום בימי שני
@@ -172,6 +173,7 @@ async function handle(req, env0, ctx){
     try { const c = await refreshEarningsCalendar(ctx); out.calendar = c ? { count: c.count, from: c.from, to: c.to } : { ok: false, reason: 'אין FMP_KEY' }; } catch (e) { out.calendar = { ok: false, error: e.message }; }
     return json(out);
   }
+  if (r0 === 'universe' && p1 === 'sp500'){ const m = (await db.get('meta:mechanical')) || {}; const u = await getUniverse(db, env); const by = new Map(u.map((a) => [a.symbol, a])); return json({ asOf: m.asOf || null, count: (m.symbols || []).length, items: (m.symbols || []).map((sym) => { const a = by.get(sym) || {}; return { symbol: sym, name: a.name || sym, nameHe: a.nameHe || null, sector: a.sector || null, origin: a.origin || null }; }) }); }
   if (r0 === 'universe'){
     const u = await getUniverse(db, env);
     const day = q.date || (await latestRankDay(db));
@@ -420,7 +422,8 @@ export default {
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     try {
       const r = await cronStep(ctx);
-      if (r?.finalized){ try { await runShadow(ctx); await runAggressive(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); } // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
+      if (r?.finalized){ try { await runShadow(ctx); await runAggressive(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); }
+      try { await executeAggressive(ctx); } catch (e) { await ctx.db.logError('aggressive-exec', e.message); } // מילוי פקודות הצל בחלון ניו יורק לפי ציטוט חי // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
     } catch (e) { await ctx.db.logError('scheduled', e.message); }
     finally { await ctx.budget.flush().catch(() => {}); }
   },

@@ -22,6 +22,12 @@ export async function listSnaps(db, day){
   for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); if (s) out.set(k.slice(`snap:${day}:`.length), s); }
   return [...out.values()];
 }
+// רק ה-shards (הצינור האחיד של GitHub Actions) — למודל הצל, כדי שכל חברות המדד יושוו מאותו צינור ואותו זמן
+export async function listShardSnaps(db, day){
+  const out = [];
+  for (let i = 0; i < SNAP_SHARDS; i++){ const sh = await db.get(shardKey(day, i)); if (sh?.items) out.push(...Object.values(sh.items)); }
+  return out;
+}
 export async function shardSymbols(db, day){
   const syms = new Set();
   for (let i = 0; i < SNAP_SHARDS; i++){ const sh = await db.get(shardKey(day, i)); if (sh?.items) for (const s of Object.keys(sh.items)) syms.add(s); }

@@ -82,8 +82,11 @@ async function facts(symbol){
 export async function main(){
   if (!SECRET) throw new Error('חסר CRON_SECRET');
   const day = today();
+  // כל חברי המדד (כולל אלה שגם ביקום הבסיס) עוברים כאן אותו צינור ובאותו זמן — כדי שאחוזוני B/C/D יהיו על נתונים מאותו סוג
   const universe = await getJSON(`${W}/universe`);
-  let syms = (universe.items || []).filter((a) => a.origin === 'mechanical' && a.type === 'stock').map((a) => a.symbol);
+  const sp = await getJSON(`${W}/universe/sp500`);
+  let syms = (sp.items || []).map((a) => a.symbol);
+  if (!syms.length) syms = (universe.items || []).filter((a) => a.origin === 'mechanical' && a.type === 'stock').map((a) => a.symbol);
   if (LIMIT) syms = syms.slice(0, LIMIT);
   log(`יקום מכני: ${syms.length} חברות, יום ${day}`);
   const regime = await getJSON(`${W}/regime`).catch(() => null);
@@ -96,7 +99,7 @@ export async function main(){
   for (const sym of syms){
     i++;
     try {
-      const asset = meta.get(sym);
+      const asset = meta.get(sym) || { symbol: sym, name: sym, type: 'stock', assetClass: 'equity', role: 'satellite', sector: (sp.items || []).find((a) => a.symbol === sym)?.sector || null, country: 'US', currency: 'USD' };
       const [px, f] = await Promise.all([prices(sym), facts(sym).catch((e) => ({ missing: true, reason: 'EDGAR: ' + e.message }))]);
       const bundle = { asset, prices: px, quote: { missing: true, reason: 'לילה' }, profile: { missing: true, reason: 'לא נמשך ב-Actions' }, facts: f, ratios: { missing: true, reason: 'אין FMP ב-Actions' }, est: { missing: true, reason: 'אין FMP ב-Actions' }, analyst: { missing: true, reason: 'אין FMP ב-Actions' }, news: { missing: true, reason: 'לא נמשך' }, insider: { missing: true, reason: 'לא נמשך' }, etf: { missing: true, reason: 'לא ETF' }, earn: { missing: true, reason: 'תאריכי דוחות מ-FMP (Worker) בלבד' } };
       const a = analyzeBundle(bundle, { regime, benchRows: spy.rows, techRows: asset?.sector === 'Technology' ? qqq?.rows : null, peers: [], dgs10Rows });
