@@ -79,7 +79,7 @@ jobs:
             python3 invest-api/scripts/fmp-plans-probe.py | head -700
           fi
           # מחירי 09:40 ניו יורק לסשן האחרון: בכל ריצה מתוזמנת ובפקודות (הסקריפט מדלג אם הסשן כבר נאסף; entry940-run אוסף מחדש)
-          if [ "$CMD" = "entry940-run" ] || [ "$CMD" = "sp500-run" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "$CMD" = "entry940-run" ] || [ "$CMD" = "sp500-run" ] || [ "$CMD" = "auto-run" ] || [ "${{ github.event_name }}" = "schedule" ]; then
             FORCE940=""; [ "$CMD" = "entry940-run" ] && FORCE940=1
             echo "=== entry940 (הסשן האחרון)"; CRON_SECRET="$SECRET" WORKER_URL="$W" ENTRY_FORCE="$FORCE940" ENTRY_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/entry940.mjs || echo "::warning::entry940 failed"
           fi
