@@ -1,6 +1,7 @@
 // אורקסטרציה: איסוף נתונים לנכס → engine → snapshot. רץ ב-Worker (cron / on-demand).
 // כל בלוק נתונים נושא source/asOf/quality; חסר = missing. אין השלמות שקטות.
 import { cached, TTL } from './cache.js';
+import { pricesCoverLastSession } from '../engine/session.js';
 import { DB } from './db.js';
 import { fetchWithFallback } from '../providers/registry.js';
 import { edgar } from '../providers/edgar.js';
@@ -44,13 +45,17 @@ export async function assetMeta(db, symbol){
 }
 
 // ---------- נתוני שוק (עם מטמון) ----------
+// המטמון (20 שעות) פוקע גם כשהסדרה לא כוללת עדיין את הסגירה האחרונה בניו יורק (נכסים בדולר) — אחרת הניתוח הלילי ותמחור התיק
+// עלולים לעבוד על הסגירה של שלשום. אם הספק טרם פרסם את הסגירה, מנסים שוב לכל היותר כל 30 דקות.
+const PRICES_RETRY_SEC = 30 * 60;
 export async function getPrices(symbol, ctx){
   const key = `px:${symbol}`;
+  const usd = (ctx.asset?.currency || 'USD') !== 'ILS';
   return cached(ctx.db, key, TTL.prices, async (ex) => {
     const from = ex?.rows?.length ? ex.rows[ex.rows.length - 1][0].slice(0, 4) + '-01-01' : undefined; // רענון: מהשנה האחרונה
     const r = await fetchWithFallback('prices', symbol, { from }, ctx);
     return r;
-  }, { merge: (old, fresh) => ({ ...fresh, rows: DB.mergeRows(old.rows, fresh.rows) }) });
+  }, { merge: (old, fresh) => ({ ...fresh, rows: DB.mergeRows(old.rows, fresh.rows) }), staleIf: (ex, age) => usd && age > PRICES_RETRY_SEC && !pricesCoverLastSession(ex.rows, ex.fetchedAt) });
 }
 export const getQuote = (symbol, ctx) => cached(ctx.db, `quote:${symbol}`, TTL.quote, () => fetchWithFallback('quote', symbol, {}, ctx));
 export const getProfile = (symbol, ctx) => cached(ctx.db, `profile:${symbol}`, TTL.profile, async () => {

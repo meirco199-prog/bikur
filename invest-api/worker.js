@@ -376,9 +376,22 @@ async function handle(req, env0, ctx){
     const priceOf = (s) => priceCache[s];
     const view = async () => {
       const t = await broker.trades();
-      // מחיר נוכחי: הטרי מבין quote במטמון ו-snapshot של היום (quote ישן מאתמול לא גובר על סגירה חדשה)
-      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){ const qt = await db.get(`quote:${s}`); const sn = day ? await getSnap(db, day, s) : null; const qDay = qt?.asOf ? String(qt.asOf).slice(0, 10) : null; const snDay = sn?.barDate || sn?.date || null; const useQuote = qt?.price && (!sn?.price || !snDay || (qDay && qDay >= snDay)); priceCache[s] = useQuote ? qt.price : (sn?.price ?? qt?.price ?? null); }
+      // מחיר נוכחי: הטרי מבין quote במטמון, snapshot של היום, והסגירה האחרונה בסדרת המחירים (שמתרעננת אחרי כל סגירה בניו יורק).
+      // quote ישן לא גובר על סגירה חדשה — אחרת התיק מוצג לפי שער של שלשום עד שמישהו מבקש quote
+      const asOfCache = {};
+      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){
+        const qt = await db.get(`quote:${s}`); const sn = day ? await getSnap(db, day, s) : null;
+        const px = await getPrices(s, { ...ctx, asset: await assetMeta(db, s) }).catch(() => null);
+        const lastRow = px?.rows?.length ? px.rows[px.rows.length - 1] : null;
+        const cands = [
+          qt?.price > 0 ? { price: qt.price, asOf: qt.asOf ? String(qt.asOf).slice(0, 10) : '', source: 'quote', rank: 2 } : null,
+          sn?.price > 0 ? { price: sn.price, asOf: sn.barDate || sn.date || '', source: 'snapshot', rank: 1 } : null,
+          lastRow?.[4] > 0 ? { price: lastRow[4], asOf: lastRow[0], source: 'close', rank: 0 } : null,
+        ].filter(Boolean).sort((a, b) => (b.asOf.localeCompare(a.asOf)) || (b.rank - a.rank));
+        priceCache[s] = cands[0]?.price ?? null; asOfCache[s] = cands[0] ? { asOf: cands[0].asOf, source: cands[0].source } : null;
+      }
       const perf = await broker.performance(priceOf, fx);
+      perf.positions = perf.positions.map((p) => ({ ...p, priceAsOf: asOfCache[p.symbol]?.asOf || null, priceSource: asOfCache[p.symbol]?.source || null }));
       const u = await getUniverse(db, env);
       perf.positions = perf.positions.map((p) => ({ ...p, name: u.find((a) => a.symbol === p.symbol)?.name || p.symbol, nameHe: u.find((a) => a.symbol === p.symbol)?.nameHe || null, signal: null }));
       for (const p of perf.positions){ const sn = day ? await getSnap(db, day, p.symbol) : null; p.signal = sn?.signal || null; }

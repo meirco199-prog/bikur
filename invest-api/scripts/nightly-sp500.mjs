@@ -6,6 +6,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { analyzeBundle, toSnapshot } from '../engine/pipeline.js';
 import { normalizeCompanyFacts } from '../providers/edgar.js';
+import { pricesCoverLastSession } from '../engine/session.js';
 
 const W = process.env.WORKER_URL || 'https://invest-api.meirco199.workers.dev';
 const SECRET = process.env.CRON_SECRET;
@@ -61,7 +62,8 @@ async function pricesWorker(symbol){
   return { rows: j.rows, currency: j.currency || 'USD', source: (j.source || 'worker') + '-via-worker', asOf: j.asOf, quality: j.quality ?? 0.7 };
 }
 async function prices(symbol){
-  const cached = await cacheGet(`px-${symbol}`, 18 * 3600 * 1000); if (cached) return cached;
+  // מטמון תקף רק אם הסדרה כבר כוללת את הסגירה האחרונה בניו יורק (TTL לבד היה מחזיר את הסגירה של שלשום בריצה של הבוקר)
+  const cached = await cacheGet(`px-${symbol}`, 18 * 3600 * 1000); if (cached && pricesCoverLastSession(cached.rows)) return cached;
   const chain = PRICE_SOURCE === 'twelvedata' ? [pricesTwelveData, pricesYahoo, pricesWorker] : [pricesYahoo, pricesWorker];
   let lastErr = null;
   for (const f of chain){ try { const out = await f(symbol); sourceCounts[out.source] = (sourceCounts[out.source] || 0) + 1; await cachePut(`px-${symbol}`, out); return out; } catch (e) { lastErr = e; } }
