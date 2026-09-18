@@ -34,7 +34,8 @@ export async function shardSymbols(db, day){
   return syms;
 }
 // כתיבה מקובצת: לא דורסים snapshot קיים עם ציון (חוזה ה-snapshots); "חסר" ניתן להחלפה. מחזיר כמה נכתבו ואילו shards עודכנו
-export async function putSnapsBatch(db, day, snaps, { source = 'github-actions' } = {}){
+// overwrite: הסריקה הלילית היא המקור היחיד ל-shards, ולכן ריצה חוזרת (למשל אחרי תיקון מקור נתונים) מחליפה snapshot קיים
+export async function putSnapsBatch(db, day, snaps, { source = 'github-actions', overwrite = false } = {}){
   const groups = new Map();
   for (const s of snaps){ const i = shardOf(s.symbol); if (!groups.has(i)) groups.set(i, []); groups.get(i).push(s); }
   let written = 0, skipped = 0; const shards = [];
@@ -45,7 +46,7 @@ export async function putSnapsBatch(db, day, snaps, { source = 'github-actions' 
     for (const s of arr){
       const sym = s.symbol.toUpperCase();
       const ex = sh.items[sym];
-      if (ex && !(ex.missing && !s.missing)){ skipped++; continue; }
+      if (ex && !overwrite && !(ex.missing && !s.missing)){ skipped++; continue; }
       sh.items[sym] = { ...s, symbol: sym, date: day, computedBy: source }; written++; changed = true;
     }
     if (changed){ sh.updatedAt = new Date().toISOString(); sh.count = Object.keys(sh.items).length; await db.put(key, sh); shards.push(i); }

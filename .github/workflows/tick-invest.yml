@@ -53,9 +53,15 @@ jobs:
           # ניתוח לילי של כל ה-S&P 500 כאן (Yahoo + EDGAR, בלי מכסות Worker) → shards ב-KV. בריצה המתוזמנת ובפקודת sp500-run
           # (הסקריפט מדלג אם הדירוג של היום כבר כולל את המדד; רץ בכל ריצה מתוזמנת לפני פתיחת ניו יורק, כי GitHub מאחר בתזמון)
           if [ "$CMD" = "sp500-run" ] || { [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%H)" -lt 13 ]; }; then
-            echo "=== sp500 nightly"; CRON_SECRET="$SECRET" WORKER_URL="$W" TWELVEDATA_KEY="${{ secrets.TWELVEDATA_KEY }}" SP500_PRICE_SOURCE="${{ vars.SP500_PRICE_SOURCE }}" SP500_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/nightly-sp500.mjs || echo "::warning::sp500 nightly failed"
+            # EDGAR דורש User-Agent עם איש קשר (אחרת 403) — אותו UA שמוגדר ל-Worker ב-config.json. sp500-run ידני = הרצה מחדש בכוח
+            EDGAR_UA_CFG=$(python3 -c 'import json; print(json.load(open("invest-api/config.json")).get("EDGAR_UA",""))')
+            FORCE500=""; [ "$CMD" = "sp500-run" ] && FORCE500=1
+            rm -f .sp500-ran
+            echo "=== sp500 nightly"; CRON_SECRET="$SECRET" WORKER_URL="$W" EDGAR_UA="$EDGAR_UA_CFG" SP500_FORCE="$FORCE500" TWELVEDATA_KEY="${{ secrets.TWELVEDATA_KEY }}" SP500_PRICE_SOURCE="${{ vars.SP500_PRICE_SOURCE }}" SP500_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/nightly-sp500.mjs || echo "::warning::sp500 nightly failed"
             echo "=== shadow re-run (force)"; curl -sS --max-time 120 -X POST "$W/shadow/run?secret=$SECRET&force=1" | head -c 400; echo
-            echo "=== aggressive decide"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET" | head -c 600; echo
+            # אם הסריקה רצה עכשיו (ולא דילגה) — ההחלטה הלילית של המסלול האגרסיבי מתקבלת מחדש על מודל הצל המעודכן (פקודות שטרם בוצעו מתבטלות)
+            FORCEAGG=""; [ -f .sp500-ran ] && FORCEAGG="&force=1"
+            echo "=== aggressive decide"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET$FORCEAGG" | head -c 600; echo
           fi
           FORCE=""; [ "$CMD" = "cron-run-force" ] && { CMD=cron-run; FORCE="&force=1"; }
           if [ "$CMD" = "cron-run" ]; then

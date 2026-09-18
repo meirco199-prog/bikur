@@ -15,6 +15,9 @@ test('snapstore: כתיבה מקובצת ל-16 shards, בלי דריסת ציו�
   const r2 = await putSnapsBatch(db, '2026-09-17', [{ symbol: 'Z5', score: 99 }, { symbol: 'ZZ', score: 7 }]);
   assert.equal(r2.skipped, 1); assert.equal(r2.written, 1);
   assert.equal((await getSnap(db, '2026-09-17', 'Z5')).score, 5); assert.equal((await getSnap(db, '2026-09-17', 'ZZ')).score, 7);
+  // overwrite: ריצה חוזרת של הסריקה מחליפה snapshot קיים (למשל אחרי שמקור הדוחות חזר לעבוד)
+  const r3 = await putSnapsBatch(db, '2026-09-17', [{ symbol: 'Z5', score: 61 }], { overwrite: true });
+  assert.equal(r3.written, 1); assert.equal(r3.skipped, 0); assert.equal((await getSnap(db, '2026-09-17', 'Z5')).score, 61);
   // המסלול הפר-נייר גובר ומאוחד ברשימה
   await db.put('snap:2026-09-17:AAPL', { symbol: 'AAPL', score: 70 });
   await db.put('snap:2026-09-17:Z5', { symbol: 'Z5', score: 55 });

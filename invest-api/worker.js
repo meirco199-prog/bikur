@@ -285,7 +285,8 @@ async function handle(req, env0, ctx){
     const day = validDate(body.date) ? body.date : today();
     if (day > today()) return err('תאריך עתידי');
     const snaps = (Array.isArray(body.snapshots) ? body.snapshots : []).filter((s) => s && validSym(s.symbol || '')).slice(0, 200);
-    const r = await putSnapsBatch(db, day, snaps, { source: body.source || 'github-actions' });
+    const overwrite = body.overwrite === true || q.overwrite === '1';
+    const r = await putSnapsBatch(db, day, snaps, { source: body.source || 'github-actions', overwrite });
     const watch = new Set(((await db.get('user:watchlist')) || []).map((w) => w.symbol));
     const days = (await db.get('idx:snapdays')) || [];
     const prevDay = days.filter((d) => d < day).slice(-1)[0] || null;
@@ -294,7 +295,7 @@ async function handle(req, env0, ctx){
     let rerank = false;
     if (body.finalize === true || q.finalize === '1'){
       const exRank = await db.get(`rank:${day}`);
-      if (exRank){ const rank = rankSnapshots(await listSnaps(db, day), { sp500: await sp500Set(db) }); if (rank.analyzed > (exRank.analyzed || 0)){ await db.put(`rank:${day}`, { ...rank, mergedBy: 'ingest' }); await db.delete(`reco:${day}`); rerank = true; } }
+      if (exRank){ const rank = rankSnapshots(await listSnaps(db, day), { sp500: await sp500Set(db) }); if (overwrite || rank.analyzed > (exRank.analyzed || 0)){ await db.put(`rank:${day}`, { ...rank, mergedBy: 'ingest' }); await db.delete(`reco:${day}`); rerank = true; } }
     }
     return json({ ok: true, day, received: snaps.length, ...r, alerts, rerank });
   }

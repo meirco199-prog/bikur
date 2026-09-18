@@ -94,9 +94,13 @@ export async function main(){
   if (LIMIT) syms = syms.slice(0, LIMIT);
   log(`יקום מכני: ${syms.length} חברות, יום ${day}`);
   if (!FORCE && !LIMIT){
+    // כבר רצה היום? רק אם הדירוג כולל את המדד וגם מודל הצל של היום מצא ≥50% מניות כשירות (אחרת — למשל EDGAR חסום — רצים שוב ומחליפים)
     const rank = await getJSON(`${W}/rank`).catch(() => null);
     const have = rank?.date === day ? (rank.universes?.sp500 || 0) : 0;
-    if (have >= DONE_SHARE * syms.length){ log(`הדירוג של ${day} כבר כולל ${have} חברות מדד — הסריקה כבר רצה, מדלג`); return { day, skipped: true, have }; }
+    const sh = await getJSON(`${W}/shadow/report`).catch(() => null);
+    const eligShare = sh?.day === day && sh.n ? (sh.eligible || 0) / sh.n : 0;
+    if (have >= DONE_SHARE * syms.length && eligShare >= 0.5){ log(`הדירוג של ${day} כבר כולל ${have} חברות מדד ו-${Math.round(eligShare * 100)}% כשירות במודל הצל — הסריקה כבר רצה, מדלג`); return { day, skipped: true, have, eligShare }; }
+    if (have >= DONE_SHARE * syms.length) log(`הדירוג של ${day} כולל את המדד אבל רק ${Math.round(eligShare * 100)}% כשירות במודל הצל — רץ שוב ומחליף`);
   }
   const regime = await getJSON(`${W}/regime`).catch(() => null);
   const spy = await prices('SPY'); const qqq = await prices('QQQ').catch(() => null);
@@ -121,13 +125,19 @@ export async function main(){
   for (let k = 0; k < snaps.length; k += 100){
     const batch = snaps.slice(k, k + 100);
     const last = k + 100 >= snaps.length;
-    const r = await getJSON(`${W}/ingest/snapshots?secret=${encodeURIComponent(SECRET)}${last ? '&finalize=1' : ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: day, source: 'github-actions', snapshots: batch }) }, 1, 120000); // בלי retry: ה-Worker אולי סיים גם אם התשובה איחרה
+    // overwrite: הסריקה היא המקור היחיד ל-shards — ריצה חוזרת מחליפה (למשל אחרי שמקור נתונים חזר לעבוד)
+    const r = await getJSON(`${W}/ingest/snapshots?secret=${encodeURIComponent(SECRET)}&overwrite=1${last ? '&finalize=1' : ''}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: day, source: 'github-actions', overwrite: true, snapshots: batch }) }, 1, 120000); // בלי retry: ה-Worker אולי סיים גם אם התשובה איחרה
     written += r.written || 0; skipped += r.skipped || 0;
     if (last) log(`ingest: written ${written}, skipped ${skipped}, rerank ${r.rerank}, shards ${r.shards?.length}`);
   }
   const ok = snaps.filter((s) => !s.missing).length;
-  log(`סיום: ${ok}/${snaps.length} עם ציון; שגיאות: ${errors.length}; מקורות מחירים: ${JSON.stringify(sourceCounts)} (מקור ראשי ${PRICE_SOURCE}, גיבויים ${fallbacksUsed}/${FALLBACK_MAX})`);
+  // כיסוי דוחות (EDGAR): בלי פונדמנטלס מודלי הצל B/C/D לא כשירים — חובה לראות את זה בלוג
+  const factsOk = snaps.filter((s) => !s.missing && !s.dataAsOf?.facts?.missing).length;
+  const factsReasons = {}; for (const s of snaps){ const r = s.dataAsOf?.facts?.missing ? String(s.dataAsOf.facts.reason || 'missing').slice(0, 40) : null; if (r) factsReasons[r] = (factsReasons[r] || 0) + 1; }
+  log(`סיום: ${ok}/${snaps.length} עם ציון; דוחות EDGAR: ${factsOk}/${snaps.length}${Object.keys(factsReasons).length ? ' חסרים: ' + JSON.stringify(factsReasons) : ''}; שגיאות: ${errors.length}; מקורות מחירים: ${JSON.stringify(sourceCounts)} (מקור ראשי ${PRICE_SOURCE}, גיבויים ${fallbacksUsed}/${FALLBACK_MAX})`);
+  if (factsOk < 0.5 * snaps.length) console.log('::warning::sp500 nightly: דוחות EDGAR חסרים לרוב החברות — מודלי הצל B/C/D לא כשירים');
   for (const e of errors.slice(0, 15)) log('  ', e.sym, e.msg);
-  return { day, total: snaps.length, ok, written, skipped, errors: errors.length, priceSource: PRICE_SOURCE, sources: sourceCounts, fallbacks: fallbacksUsed };
+  await writeFile('.sp500-ran', day).catch(() => {}); // סימון לריצת ה-workflow: הסריקה רצה (→ החלטת המסלול האגרסיבי מחדש)
+  return { day, total: snaps.length, ok, factsOk, written, skipped, errors: errors.length, priceSource: PRICE_SOURCE, sources: sourceCounts, fallbacks: fallbacksUsed };
 }
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) main().then((r) => { console.log(JSON.stringify(r)); }).catch((e) => { console.error('nightly-sp500 failed:', e.message); process.exit(1); });
