@@ -389,10 +389,17 @@ async function handle(req, env0, ctx){
           sn?.price > 0 ? { price: sn.price, asOf: sn.barDate || sn.date || '', source: 'snapshot', rank: 1 } : null,
           lastRow?.[4] > 0 ? { price: lastRow[4], asOf: lastRow[0], source: 'close', rank: 0 } : null,
         ].filter(Boolean).sort((a, b) => (b.asOf.localeCompare(a.asOf)) || (b.rank - a.rank));
-        priceCache[s] = cands[0]?.price ?? null; asOfCache[s] = cands[0] ? { asOf: cands[0].asOf, source: cands[0].source } : null;
+        // שינוי יומי: מול הסגירה שלפני השער שנבחר (מסדרת המחירים); quote תוך-יומי → מול הסגירה האחרונה
+        let prevClose = null;
+        if (cands[0] && px?.rows?.length){ const rows = px.rows; const i = rows.findIndex((r) => r[0] === cands[0].asOf); if (i > 0) prevClose = rows[i - 1][4]; else if (i < 0 && cands[0].asOf > rows[rows.length - 1][0]) prevClose = rows[rows.length - 1][4]; }
+        priceCache[s] = cands[0]?.price ?? null; asOfCache[s] = cands[0] ? { asOf: cands[0].asOf, source: cands[0].source, prevClose: prevClose > 0 ? prevClose : null } : null;
       }
       const perf = await broker.performance(priceOf, fx);
-      perf.positions = perf.positions.map((p) => ({ ...p, priceAsOf: asOfCache[p.symbol]?.asOf || null, priceSource: asOfCache[p.symbol]?.source || null }));
+      perf.positions = perf.positions.map((p) => { const a = asOfCache[p.symbol]; const rate = p.currency === 'ILS' ? 1 : fx; const dayPnlIls = a?.prevClose && isNum(p.current) ? Math.round(p.qty * (p.current - a.prevClose) * rate * 100) / 100 : null; return { ...p, priceAsOf: a?.asOf || null, priceSource: a?.source || null, prevClose: a?.prevClose ?? null, dayChangePct: a?.prevClose && isNum(p.current) ? Math.round((p.current / a.prevClose - 1) * 10000) / 10000 : null, dayPnlIls }; });
+      // ברמת החשבון: סכום השינוי היומי של הפוזיציות, נכון לסגירה האחרונה שיש לה שער (asOf)
+      const dayPnlIls = perf.positions.reduce((sum, p) => sum + (p.dayPnlIls || 0), 0);
+      perf.dayPnlIls = Math.round(dayPnlIls * 100) / 100; perf.dayPnlPct = perf.totalIls - dayPnlIls > 0 ? Math.round((dayPnlIls / (perf.totalIls - dayPnlIls)) * 10000) / 10000 : null;
+      perf.asOf = perf.positions.map((p) => p.priceAsOf).filter(Boolean).sort().pop() || null;
       const u = await getUniverse(db, env);
       perf.positions = perf.positions.map((p) => ({ ...p, name: u.find((a) => a.symbol === p.symbol)?.name || p.symbol, nameHe: u.find((a) => a.symbol === p.symbol)?.nameHe || null, signal: null }));
       for (const p of perf.positions){ const sn = day ? await getSnap(db, day, p.symbol) : null; p.signal = sn?.signal || null; }

@@ -111,6 +111,8 @@ test('paper trading כחשבון אמיתי: מזומן, עמלה, חסימת ק
   const p = await get('/paper');
   assert.equal(p.j.positions.length, 1); assert.equal(p.j.positions[0].qty, 15); assert.ok(Math.abs(p.j.cashIls - (200000 - cost - b2.j.result.trade.costIls)) < 0.01);
   assert.ok(Math.abs(p.j.totalIls - (p.j.cashIls + p.j.valueIls)) < 0.01);
+  // תאריך השער ושינוי יומי מול הסגירה הקודמת (מסדרת המחירים)
+  assert.match(p.j.positions[0].priceAsOf || '', /^\d{4}-\d{2}-\d{2}$/); assert.ok(typeof p.j.positions[0].dayChangePct === 'number'); assert.ok(typeof p.j.dayPnlIls === 'number'); assert.equal(p.j.asOf, p.j.positions[0].priceAsOf);
   const big = await get('/paper/order', { body: { symbol: 'MSFT', side: 'buy', qty: 100000 }, auth: true }); assert.equal(big.status, 400); assert.ok(/אין מספיק מזומן/.test(big.j.error));
   const tooMany = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 50, price: 100 }, auth: true }); assert.equal(tooMany.status, 400);
   const s = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 4, price: b.j.price + 10 }, auth: true });
