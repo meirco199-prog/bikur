@@ -77,6 +77,10 @@ jobs:
             FORCE940=""; [ "$CMD" = "entry940-run" ] && FORCE940=1
             echo "=== entry940 (הסשן האחרון)"; CRON_SECRET="$SECRET" WORKER_URL="$W" ENTRY_FORCE="$FORCE940" ENTRY_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/entry940.mjs || echo "::warning::entry940 failed"
           fi
+          # אבחון: dump <ts> <path> [<path>...] — מדפיס תשובות JSON מה-Worker (עד 8000 תווים לכל נתיב)
+          if [ "$CMD" = "dump" ]; then
+            for P in $(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3-); do echo "=== dump $P"; curl -sS --max-time 60 "$W/$P" | head -c 8000; echo; done
+          fi
           if [ "$CMD" = "aggressive-reset" ]; then
             echo "=== aggressive reset (מתחיל מחדש עם הציון האגרסיבי)"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET&reset=1" | head -c 800; echo
           fi
