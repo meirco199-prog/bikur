@@ -7,14 +7,17 @@
 //   C = B + ריוויזיות תחזיות (כשקיימות) + שכבת מאקרו על *הפעולה* (לא על הציון): שוק דובי → אין קניות; Risk Off → רק קנייה חזקה.
 import { isNum, mean, round, correlation } from './util.js';
 
-export const SHADOW_VERSION = 1;
+export const SHADOW_VERSION = 2;
 export const SHADOW_RULES = Object.freeze({ strongTopPct: 0.15, buyTopPct: 0.30, sellBottomPct: 0.20, minSector: 5, minUniverse: 20, dupeThreshold: 0.6, horizons: [1, 5, 20, 60], buckets: [80, 70, 60, 50] });
-export const FACTOR_LABELS = { value: 'תמחור', profitability: 'רווחיות', growth: 'צמיחה', trend: 'מגמה', risk: 'סיכון', revision: 'ריוויזיות' };
+export const FACTOR_LABELS = { value: 'תמחור', profitability: 'רווחיות', growth: 'צמיחה', trend: 'מגמה', risk: 'סיכון', revision: 'ריוויזיות', momentum: 'מומנטום', quality: 'איכות' };
 export const SHADOW_MODELS = Object.freeze({
   A: { label: 'הישן', desc: 'הציון והסיגנל שמפעילים את האוטומט היום', weights: null },
   B: { label: 'יחסי-ענף', desc: 'אחוזונים בתוך הענף, בלי כפילויות, בלי מאקרו/סנטימנט/אנליסטים', weights: Object.freeze({ value: 25, profitability: 20, growth: 20, trend: 25, risk: 10 }) },
   C: { label: 'B + ריוויזיות + מאקרו', desc: 'כמו B, עם ריוויזיות תחזיות כשקיימות (15) ושכבת מאקרו על הפעולה', weights: Object.freeze({ value: 25, profitability: 20, growth: 20, trend: 25, risk: 10, revision: 15 }) },
+  // D = ציון אגרסיבי: מומנטום, צמיחה, ריוויזיות, איכות, סיכון — בלי תמחור. הבסיס למסלול האגרסיבי; מושווה ל-C (ניסוי, לא משקלים סופיים)
+  D: { label: 'אגרסיבי', desc: 'מומנטום 30, צמיחה 25, ריוויזיות 20, איכות 15, סיכון 10 — בלי תמחור; שכבת מאקרו על הפעולה', weights: Object.freeze({ momentum: 30, growth: 25, revision: 20, quality: 15, risk: 10 }) },
 });
+export const MODEL_KEYS = ['A', 'B', 'C', 'D'];
 export const bucketOf = (score, edges = SHADOW_RULES.buckets) => { if (!isNum(score)) return null; for (const e of edges) if (score >= e) return `${e}+`; return `<${edges[edges.length - 1]}`; };
 const LEGACY_COMPONENTS = ['fundamental', 'valuation', 'growth', 'quality', 'technical', 'momentum', 'analyst', 'sentiment', 'macro', 'risk'];
 
@@ -33,7 +36,7 @@ const legacyAction = (signal) => (signal === 'STRONG BUY' ? 'STRONG BUY' : signa
 // גורמים גולמיים (0–100) מרכיבי המודל הישן, אחרי איחוד כפילויות
 export function rawFactors(components = {}){
   const c = components;
-  return { value: isNum(c.valuation) ? c.valuation : null, profitability: avg2(c.fundamental, c.quality), growth: isNum(c.growth) ? c.growth : null, trend: avg2(c.technical, c.momentum), risk: isNum(c.risk) ? c.risk : null };
+  return { value: isNum(c.valuation) ? c.valuation : null, profitability: avg2(c.fundamental, c.quality), growth: isNum(c.growth) ? c.growth : null, trend: avg2(c.technical, c.momentum), risk: isNum(c.risk) ? c.risk : null, momentum: isNum(c.momentum) ? c.momentum : null, quality: isNum(c.quality) ? c.quality : null };
 }
 
 // פעולה לפי דירוג יחסי בתוך הרשימה (ציון גבוה = טוב); overlay: 'bear' → אין קניות, 'riskoff' → רק קנייה חזקה
@@ -75,11 +78,15 @@ export function componentCorrelation(rows, keys = [...LEGACY_COMPONENTS, 'score'
 
 // חישוב יומי. table: שורות הדירוג (מהמודל הישן); revisions: {symbol → {available, epsRevision, reason}}; regime: {trend, risk}
 export function computeShadow({ table = [], revisions = {}, regime = null, day = null, barDate = null } = {}){
-  const stocks = table.filter((r) => r.type === 'stock' && isNum(r.score));
+  // יקום הייחוס: חברי S&P 500 (universe='sp500') כשיש ≥100 כאלה; אחרת כל המניות. קרנות/ישראליות/אחרות לא מזיזות אחוזונים של חברות המדד
+  const allStocks = table.filter((r) => r.type === 'stock' && isNum(r.score));
+  const sp = allStocks.filter((r) => r.universe === 'sp500');
+  const stocks = sp.length >= 100 ? sp : allStocks;
+  const universe = sp.length >= 100 ? 'sp500' : 'all';
   const raw = stocks.map((r) => rawFactors(r.components));
   const bySector = new Map();
   stocks.forEach((r, i) => { const s = r.sector || 'Unknown'; if (!bySector.has(s)) bySector.set(s, []); bySector.get(s).push(i); });
-  const factorKeys = ['value', 'profitability', 'growth', 'trend', 'risk'];
+  const factorKeys = ['value', 'profitability', 'growth', 'trend', 'risk', 'momentum', 'quality'];
   const pct = stocks.map((r, i) => {
     const grp = bySector.get(r.sector || 'Unknown'); const useSector = grp.length >= SHADOW_RULES.minSector; const pool = useSector ? grp : stocks.map((_, k) => k);
     const o = { _relativeTo: useSector ? 'sector' : 'universe' };
@@ -94,14 +101,17 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const eligible = pct.map((p) => ['value', 'profitability', 'growth', 'trend'].every((k) => isNum(p[k])));
   const scoreB = pct.map((p, i) => (eligible[i] ? weighted(p, SHADOW_MODELS.B.weights) : null));
   const scoreC = pct.map((p, i) => (eligible[i] ? weighted({ ...p, revision: revPct[i] }, SHADOW_MODELS.C.weights) : null));
+  const eligibleD = pct.map((p) => ['momentum', 'growth'].every((k) => isNum(p[k])));
+  const scoreD = pct.map((p, i) => (eligibleD[i] ? weighted({ ...p, revision: revPct[i] }, SHADOW_MODELS.D.weights) : null));
   const overlay = overlayFor(regime);
   const actA = stocks.map((r) => legacyAction(r.signal));
   const actB = rankActions(scoreB);
   const actC = rankActions(scoreC, { overlay });
+  const actD = rankActions(scoreD, { overlay });
   const contribC = (i) => { const p = { ...pct[i], revision: revPct[i] }; const w = SHADOW_MODELS.C.weights; const sw = Object.entries(w).filter(([k]) => isNum(p[k])).reduce((s, [, v]) => s + v, 0); return Object.fromEntries(Object.entries(w).filter(([k]) => isNum(p[k])).map(([k, v]) => [k, round((v / sw) * p[k], 1)])); };
   const rows = stocks.map((r, i) => ({
     symbol: r.symbol, name: r.nameHe || r.name || r.symbol, sector: r.sector || null, price: r.price, currency: r.currency || 'USD',
-    A: r.score, actA: actA[i], B: scoreB[i], actB: actB[i], C: scoreC[i], actC: actC[i], eligible: eligible[i],
+    A: r.score, actA: actA[i], B: scoreB[i], actB: actB[i], C: scoreC[i], actC: actC[i], D: scoreD[i], actD: actD[i], eligible: eligible[i], eligibleD: eligibleD[i],
     raw: raw[i], pct: pct[i], revision: isNum(revVals[i]) ? revVals[i] : null, revisionPct: revPct[i], revisionNote: revisions[r.symbol]?.available ? null : (revisions[r.symbol]?.reason || 'לא זמין'),
     contribC: eligible[i] ? contribC(i) : null, fwd: {},
   }));
@@ -111,13 +121,13 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const overlap = (x, y) => { const a = buys(x), b = buys(y); const u = new Set([...a, ...b]); return u.size ? round([...a].filter((s) => b.has(s)).length / u.size, 3) : null; };
   const top = (key) => rows.filter((r) => isNum(r[key])).sort((a, b) => b[key] - a[key]).slice(0, 10).map((r) => r.symbol);
   const corr = componentCorrelation(stocks);
-  const dist = { A: scoreDistribution(rows.map((r) => r.A), actA), B: scoreDistribution(scoreB, actB), C: scoreDistribution(scoreC, actC) };
+  const dist = { A: scoreDistribution(rows.map((r) => r.A), actA), B: scoreDistribution(scoreB, actB), C: scoreDistribution(scoreC, actC), D: scoreDistribution(scoreD, actD) };
   return {
     version: SHADOW_VERSION, day, barDate, regime: regime ? { trend: regime.trend, risk: regime.risk } : null, overlay, n: rows.length, eligible: eligible.filter(Boolean).length,
     revisionsAvailable: revAvail.length, revisionsUsed: revAvail.length >= 10, rules: SHADOW_RULES,
-    models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) } },
-    agreement: { AB: agree(actA, actB), AC: agree(actA, actC), BC: agree(actB, actC), buyOverlapAB: overlap(actA, actB), buyOverlapAC: overlap(actA, actC) },
-    top: { A: top('A'), B: top('B'), C: top('C') }, dist, corr, rows, fwd: {},
+    universe, models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) }, D: { ...SHADOW_MODELS.D, actions: count(actD) } },
+    agreement: { AB: agree(actA, actB), AC: agree(actA, actC), BC: agree(actB, actC), CD: agree(actC, actD), AD: agree(actA, actD), buyOverlapAB: overlap(actA, actB), buyOverlapAC: overlap(actA, actC), buyOverlapCD: overlap(actC, actD) },
+    top: { A: top('A'), B: top('B'), C: top('C'), D: top('D') }, dist, corr, rows, fwd: {},
   };
 }
 
@@ -138,7 +148,7 @@ export function accumulateStats(stats, doc, h){
   const S = stats || { version: SHADOW_VERSION, horizons: {}, days: {} };
   S.days[h] = S.days[h] || []; if (S.days[h].includes(doc.day)) return S; S.days[h].push(doc.day);
   const H = (S.horizons[h] = S.horizons[h] || {});
-  for (const m of ['A', 'B', 'C']){
+  for (const m of MODEL_KEYS){
     const M = (H[m] = H[m] || { buckets: {}, actions: {}, ic: { n: 0, sum: 0 }, byDay: [] });
     const sc = [], fw = [];
     for (const r of doc.rows){ const f = r.fwd?.[h]; if (!f || !isNum(r[m])) continue; sc.push(r[m]); fw.push(f.ret); const b = bucketOf(r[m]); M.buckets[b] = M.buckets[b] || emptyStat(); addStat(M.buckets[b], f.ret, f.excess); const a = r['act' + m]; if (a){ M.actions[a] = M.actions[a] || emptyStat(); addStat(M.actions[a], f.ret, f.excess); } }

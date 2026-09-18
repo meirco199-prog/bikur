@@ -8,14 +8,28 @@ export const AGGR_RULES = Object.freeze({
   core: 'SPY', coreWeight: 0.20,        // ליבה קטנה, לא נמכרת
   stocksWeight: 0.75, cashReserve: 0.05,
   maxPositions: 10, positionWeight: 0.075, maxSector: 0.40, maxBuysPerDay: 5,
-  model: 'C', buyActions: ['STRONG BUY', 'BUY'], sellActions: ['SELL'],
+  model: 'D', buyActions: ['STRONG BUY', 'BUY'], sellActions: ['SELL'],
   stopPct: 0.12, trailPct: 0.15,       // עצירה מהכניסה 12%; עצירה נגררת 15% מהשיא
   bearStocksTarget: 0.25,              // שוק דובי: מוכרים את החלשות עד שהמניות ≤ 25% מהתיק, אין קניות
   riskOffOnlyStrong: true,             // Risk Off: קניות רק לקנייה חזקה
   slippage: 0.001, feeIls: 4,          // מחיר סגירה + החלקה 10 נ"ב + עמלה קבועה
   coreDriftPct: 0.05,                  // משלימים ליבה כשהיא מתחת ל-20% × (1 − 5%)
   cooldownDays: 7,                     // אחרי מכירה: לא קונים את אותו נייר שוב בתוך שבוע (מונע פינג-פונג סביב עצירה)
+  lookThrough: true,                   // חשיפה ענפית כוללת את מה שבתוך SPY (משקלי ענף משוערים, לא מדויקים ליום)
 });
+// משקלי ענף משוערים של S&P 500 (GICS, 2025–2026). קירוב מתועד: FMP חינמי לא מספק החזקות; לעדכן כשיש מקור. סכום = 1.
+export const SPY_SECTOR_WEIGHTS = Object.freeze({ 'Information Technology': 0.33, Financials: 0.135, 'Consumer Discretionary': 0.105, 'Communication Services': 0.095, 'Health Care': 0.095, Industrials: 0.085, 'Consumer Staples': 0.055, Energy: 0.03, Utilities: 0.025, 'Real Estate': 0.02, Materials: 0.02 });
+const SECTOR_ALIAS = { Technology: 'Information Technology', 'Information Technology': 'Information Technology', Healthcare: 'Health Care', 'Health Care': 'Health Care', 'Financial Services': 'Financials', Financials: 'Financials', 'Consumer Cyclical': 'Consumer Discretionary', 'Consumer Discretionary': 'Consumer Discretionary', 'Consumer Defensive': 'Consumer Staples', 'Consumer Staples': 'Consumer Staples', 'Basic Materials': 'Materials', Materials: 'Materials', 'Communication Services': 'Communication Services', Industrials: 'Industrials', Utilities: 'Utilities', Energy: 'Energy', 'Real Estate': 'Real Estate' };
+export const normalizeSector = (s) => SECTOR_ALIAS[s] || s || 'Unknown';
+// חשיפה ענפית look-through: מניות ישירות + SPY × משקל הענף במדד
+export function sectorExposure(rows, totalIls, rules = AGGR_RULES){
+  const out = {};
+  for (const x of rows){
+    if (x.core){ if (rules.lookThrough) for (const [sec, w] of Object.entries(SPY_SECTOR_WEIGHTS)) out[sec] = (out[sec] || 0) + x.valueIls * w; }
+    else { const sec = normalizeSector(x.sector); out[sec] = (out[sec] || 0) + x.valueIls; }
+  }
+  return Object.entries(out).map(([sector, ils]) => ({ sector, ils: round(ils, 0), share: totalIls ? round(ils / totalIls, 3) : 0 })).sort((a, b) => b.ils - a.ils);
+}
 
 export function newAggrState(initialIls = AGGR_RULES.initialIls, day = null){ return { version: AGGR_RULES.version, initialIls, cashIls: initialIls, positions: {}, cooldown: {}, lastDay: null, createdDay: day, stats: { trades: 0, wins: 0, losses: 0, feesIls: 0 } }; }
 
@@ -23,7 +37,11 @@ const usd = (p, fx) => p * fx;
 export function markToMarket(state, priceOf, fx){
   let value = 0; const rows = [];
   for (const [sym, p] of Object.entries(state.positions)){ const px = priceOf(sym) ?? p.last ?? p.entry; const v = p.qty * usd(px, fx); value += v; rows.push({ symbol: sym, qty: p.qty, price: px, valueIls: round(v, 0), pnlPct: round(px / p.entry - 1, 4), sector: p.sector || null, core: sym === AGGR_RULES.core }); }
-  return { valueIls: value, totalIls: state.cashIls + value, rows };
+  const total = state.cashIls + value;
+  const etfIls = rows.filter((x) => x.core).reduce((s, x) => s + x.valueIls, 0), stocksIls = value - etfIls;
+  // חשיפה: מניות בודדות, קרן (SPY), מזומן, וסך חשיפה מנייתית (מניות + קרן) — כל אחד בנפרד, בלי לבלבל
+  const exposure = { stocksIls: round(stocksIls, 0), etfIls: round(etfIls, 0), cashIls: round(state.cashIls, 0), equityIls: round(value, 0), stocksShare: total ? round(stocksIls / total, 3) : 0, etfShare: total ? round(etfIls / total, 3) : 0, cashShare: total ? round(state.cashIls / total, 3) : 0, equityShare: total ? round(value / total, 3) : 0 };
+  return { valueIls: value, totalIls: total, rows, exposure };
 }
 
 // יום אחד: rows = שורות מודל הצל (symbol, sector, price, C, actC, eligible), spyPrice = מחיר SPY היום
@@ -80,7 +98,7 @@ export function stepAggressive({ state, rows = [], spyPrice = null, regime = nul
     let cands = rows.filter((r) => r.eligible !== false && isNum(r[rules.model]) && rules.buyActions.includes(r['act' + rules.model]) && !held.has(r.symbol) && !cool(r.symbol) && isNum(r.price) && r.price > 0).sort((a, b) => b[rules.model] - a[rules.model]);
     if (riskOff && rules.riskOffOnlyStrong){ cands = cands.filter((r) => r['act' + rules.model] === 'STRONG BUY'); notes.push('בריחה מסיכון: קניות רק לקנייה חזקה'); }
     let buys = 0;
-    const sectorVal = (sec) => markToMarket(st, priceOf, fx).rows.filter((x) => !x.core && x.sector === sec).reduce((s, x) => s + x.valueIls, 0);
+    const sectorVal = (sec) => { const m = markToMarket(st, priceOf, fx); return sectorExposure(m.rows, m.totalIls, rules).find((e) => e.sector === normalizeSector(sec))?.ils || 0; };
     for (const r of cands){
       if (buys >= rules.maxBuysPerDay) break;
       const nPos = Object.keys(st.positions).filter((s) => s !== rules.core).length;
@@ -88,7 +106,7 @@ export function stepAggressive({ state, rows = [], spyPrice = null, regime = nul
       const total = markToMarket(st, priceOf, fx).totalIls;
       const stocksVal = markToMarket(st, priceOf, fx).rows.filter((x) => !x.core).reduce((s, x) => s + x.valueIls, 0);
       if (stocksVal >= total * rules.stocksWeight) { notes.push('תקציב המניות מלא'); break; }
-      if (r.sector && sectorVal(r.sector) + total * rules.positionWeight > total * rules.maxSector * (stocksVal / Math.max(total * rules.stocksWeight, 1) || 1) && sectorVal(r.sector) >= total * rules.maxSector * rules.stocksWeight) continue;
+      if (r.sector && sectorVal(r.sector) + total * rules.positionWeight > total * rules.maxSector){ notes.push(`${r.symbol}: ענף ${normalizeSector(r.sector)} כבר ב-${Math.round(sectorVal(r.sector) / total * 100)}% (כולל look-through של SPY) — מעל 40%`); continue; }
       const budget = Math.min(total * rules.positionWeight, st.cashIls - total * rules.cashReserve);
       const qty = Math.floor(budget / (usd(r.price, fx) * (1 + rules.slippage)));
       if (qty < 1) continue;
@@ -98,7 +116,7 @@ export function stepAggressive({ state, rows = [], spyPrice = null, regime = nul
   }
   st.lastDay = day;
   const finalMtm = markToMarket(st, priceOf, fx);
-  return { state: st, trades, notes, totalIls: round(finalMtm.totalIls, 0), cashIls: round(st.cashIls, 0), positions: finalMtm.rows };
+  return { state: st, trades, notes, totalIls: round(finalMtm.totalIls, 0), cashIls: round(st.cashIls, 0), positions: finalMtm.rows, exposure: finalMtm.exposure, sectors: sectorExposure(finalMtm.rows, finalMtm.totalIls, rules) };
 }
 
 // מדדי ביצוע מעקומת הון [[day, totalIls, spyPrice]]

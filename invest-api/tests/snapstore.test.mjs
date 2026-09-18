@@ -44,3 +44,12 @@ test('POST /ingest/snapshots: סוד, shards, דירוג מחושב מחדש כ�
   assert.equal(r2.rerank, true);
   const rank = await get('/rank?date=' + day); assert.equal(rank.analyzed, 61); assert.equal(rank.mergedBy, 'ingest');
 });
+
+test('rankSnapshots: תיוג universe לפי חברי המדד וספירה', async () => {
+  const { rankSnapshots } = await import('../engine/pipeline.js');
+  const snaps = [{ symbol: 'AAA', score: 60, signal: 'HOLD', type: 'stock', components: {} }, { symbol: 'BBB', score: 55, signal: 'HOLD', type: 'stock', components: {} }, { symbol: 'SPY', score: 70, signal: 'HOLD', type: 'etf', components: {} }];
+  const r = rankSnapshots(snaps, { sp500: new Set(['AAA']) });
+  assert.deepEqual(r.universes, { sp500: 1, extended: 2 });
+  assert.equal(r.table.find((x) => x.symbol === 'AAA').universe, 'sp500'); assert.equal(r.table.find((x) => x.symbol === 'SPY').universe, 'extended');
+  assert.equal(rankSnapshots(snaps).universes, null); assert.equal(rankSnapshots(snaps).table[0].universe, null);
+});

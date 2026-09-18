@@ -5,7 +5,7 @@ import { PROFILES } from './portfolio.js';
 import { RISK_LIMITS } from './risk-limits.js';
 
 export const AUTO_RULES = {
-  version: 9,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
+  version: 10,               // שינוי כללים מאפשר הערכה מחדש באותו יום (פעם אחת לכל גרסה)
   maxConcentration: 1.5,    // פוזיציה גדולה מפי 1.5 מהיעד לנייר → מוכרים את העודף עד היעד
   // עצירת הפסד לפי תנודתיות: stop = clamp(vol1y × 0.5, 8%, 20%); בשוק דובי × 0.75. גודל פוזיציה = תקציב סיכון ÷ stop
   riskBudget: 0.005,        // כל פוזיציה מסכנת לכל היותר 0.5% מהתיק (1,000 ₪ ב-200,000)
@@ -134,7 +134,11 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   const stocksBudget = Math.min((P.sleeves.stocks || 0), RISK_LIMITS.maxActiveShare) * total;
   let satIls = 0; for (const [sym, v] of heldIls){ const r = by.get(sym); if (r && !isCore(r)) satIls += v; }
   // דירוג יחסי: אחוזון הציון בין המניות (לא ליבה) שנותחו היום
-  const scored = table.filter((r) => !isCore(r) && isNum(r.score)).map((r) => r.score).sort((a, b) => b - a);
+  // v10: הדירוג היחסי מול יקום ייחוס יציב — חברי S&P 500 (universe='sp500') כשיש לפחות 100 כאלה; אחרת כל המניות שנותחו
+  const sp = table.filter((r) => !isCore(r) && isNum(r.score) && r.universe === 'sp500');
+  const pool = sp.length >= 100 ? sp : table.filter((r) => !isCore(r) && isNum(r.score));
+  const scored = pool.map((r) => r.score).sort((a, b) => b - a);
+  if (sp.length >= 100) notes.push(`דירוג יחסי מול ${sp.length} חברות S&P 500`);
   const topCut = (pct) => (scored.length ? scored[Math.max(0, Math.ceil(scored.length * pct) - 1)] : -Infinity);
   const cutBuy = topCut(rules.buyTopPct), cutStrong = topCut(rules.strongTopPct);
   const relOk = (r) => scored.length < 20 || (r.signal === 'STRONG BUY' ? r.score >= cutStrong : r.score >= cutBuy); // יקום קטן מ-20 → אין משמעות לדירוג יחסי

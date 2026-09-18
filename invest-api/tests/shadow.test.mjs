@@ -101,3 +101,19 @@ test('מודל צל: אופקים 1/5/20/60 והתפלגות ציונים יומ
   assert.equal(series.length, 1); assert.equal(series[0].day, '2026-09-17'); assert.ok(isFinite(series[0].B.strong));
   const rep = await shadowReport(db); assert.equal(rep.distSeries.length, 1);
 });
+
+test('מודל צל: מודל D (אגרסיבי, בלי תמחור) ויקום ייחוס S&P 500 בלבד כשמתויג', () => {
+  const t = mk(120); t.forEach((r, i) => { r.universe = i < 105 ? 'sp500' : 'extended'; });
+  const d = computeShadow({ table: t, revisions: {}, day: '2026-09-17' });
+  assert.equal(d.universe, 'sp500'); assert.equal(d.n, 105, 'המורחב לא נכנס לאחוזונים');
+  assert.ok(d.models.D && d.top.D.length === 10 && isFinite(d.rows[0].D));
+  assert.ok(!('value' in SHADOW_MODELS.D.weights), 'בלי תמחור');
+  assert.ok(d.dist.D.n === 105 && isFinite(d.agreement.CD));
+  // מניה בלי מומנטום → לא זכאית ב-D
+  const t2 = mk(30, (i) => (i === 0 ? { components: { fundamental: 50, valuation: 50, growth: 50, quality: 50, technical: 50, risk: 50 } } : {}));
+  const d2 = computeShadow({ table: t2, revisions: {}, day: '2026-09-17' });
+  assert.equal(d2.rows[0].eligibleD, false); assert.equal(d2.rows[0].D, null); assert.equal(d2.universe, 'all');
+  // בלי תיוג / פחות מ-100 מתויגות → כל המניות
+  const t3 = mk(60); t3.forEach((r, i) => { r.universe = i < 50 ? 'sp500' : 'extended'; });
+  assert.equal(computeShadow({ table: t3, revisions: {}, day: 'x' }).n, 60);
+});

@@ -12,6 +12,11 @@ const SECRET = process.env.CRON_SECRET;
 const CACHE = process.env.SP500_CACHE_DIR || '.cache/sp500';
 const UA = process.env.EDGAR_UA || 'bikur-invest research (github.com/meirco199-prog/bikur) contact via GitHub';
 const LIMIT = +process.env.SP500_LIMIT || 0; // לבדיקות: כמה סימבולים לכל היותר
+// מקור מחירים: yahoo (ברירת מחדל, לניסוי הצל בלבד — לא מקור לפרודקשן) | twelvedata (מפתח ב-Actions secret TWELVEDATA_KEY, 7 קריאות/דקה).
+// גיבוי לכל סימבול שנכשל: /prices/{sym} דרך ה-Worker (Twelve Data מהתקציב שלו), עד SP500_FALLBACK_MAX בלילה — כדי ששינוי אצל Yahoo לא ימחק סריקה שלמה.
+const PRICE_SOURCE = process.env.SP500_PRICE_SOURCE || (process.env.TWELVEDATA_KEY ? 'twelvedata' : 'yahoo');
+const FALLBACK_MAX = +process.env.SP500_FALLBACK_MAX || 60;
+let fallbacksUsed = 0; const sourceCounts = {};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const today = () => new Date().toISOString().slice(0, 10);
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -33,12 +38,32 @@ export function parseYahooChart(j){
   return rows;
 }
 const yahooSym = (s) => s.replace('.', '-');
-async function prices(symbol){
-  const cached = await cacheGet(`px-${symbol}`, 18 * 3600 * 1000); if (cached) return cached;
+async function pricesYahoo(symbol){
   const j = await getJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym(symbol))}?range=7y&interval=1d&events=splits`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bikur-invest/1.0)', Accept: 'application/json' } });
   const rows = parseYahooChart(j); if (!rows?.length) throw new Error('yahoo: אין שורות');
-  const out = { rows, currency: j.chart.result[0].meta?.currency || 'USD', source: 'yahoo', asOf: rows[rows.length - 1][0], quality: 0.7 };
-  await cachePut(`px-${symbol}`, out); return out;
+  return { rows, currency: j.chart.result[0].meta?.currency || 'USD', source: 'yahoo', asOf: rows[rows.length - 1][0], quality: 0.7 };
+}
+let tdLast = 0;
+async function pricesTwelveData(symbol){
+  const gap = 60000 / 7 - (Date.now() - tdLast); if (gap > 0) await sleep(gap); tdLast = Date.now();
+  const j = await getJSON(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=1600&apikey=${process.env.TWELVEDATA_KEY}`);
+  if (j?.status === 'error' || !Array.isArray(j?.values)) throw new Error('twelvedata: ' + (j?.message || 'אין נתונים'));
+  const rows = j.values.map((v) => [v.datetime, +v.open, +v.high, +v.low, +v.close, +v.volume || 0]).filter((r) => Number.isFinite(r[4])).sort((a, b) => a[0].localeCompare(b[0]));
+  return { rows, currency: j.meta?.currency || 'USD', source: 'twelvedata', asOf: rows[rows.length - 1][0], quality: 0.8 };
+}
+async function pricesWorker(symbol){
+  if (fallbacksUsed >= FALLBACK_MAX) throw new Error('גיבוי דרך ה-Worker מוצה להלילה');
+  fallbacksUsed++;
+  const j = await getJSON(`${W}/prices/${encodeURIComponent(symbol)}`);
+  if (j?.missing || !Array.isArray(j?.rows) || !j.rows.length) throw new Error('worker: ' + (j?.reason || 'אין שורות'));
+  return { rows: j.rows, currency: j.currency || 'USD', source: (j.source || 'worker') + '-via-worker', asOf: j.asOf, quality: j.quality ?? 0.7 };
+}
+async function prices(symbol){
+  const cached = await cacheGet(`px-${symbol}`, 18 * 3600 * 1000); if (cached) return cached;
+  const chain = PRICE_SOURCE === 'twelvedata' ? [pricesTwelveData, pricesYahoo, pricesWorker] : [pricesYahoo, pricesWorker];
+  let lastErr = null;
+  for (const f of chain){ try { const out = await f(symbol); sourceCounts[out.source] = (sourceCounts[out.source] || 0) + 1; await cachePut(`px-${symbol}`, out); return out; } catch (e) { lastErr = e; } }
+  throw lastErr || new Error('אין מקור מחירים');
 }
 let tickerMap = null;
 async function cikFor(symbol){
@@ -89,8 +114,8 @@ export async function main(){
     if (last) log(`ingest: written ${written}, skipped ${skipped}, rerank ${r.rerank}, shards ${r.shards?.length}`);
   }
   const ok = snaps.filter((s) => !s.missing).length;
-  log(`סיום: ${ok}/${snaps.length} עם ציון; שגיאות: ${errors.length}`);
+  log(`סיום: ${ok}/${snaps.length} עם ציון; שגיאות: ${errors.length}; מקורות מחירים: ${JSON.stringify(sourceCounts)} (מקור ראשי ${PRICE_SOURCE}, גיבויים ${fallbacksUsed}/${FALLBACK_MAX})`);
   for (const e of errors.slice(0, 15)) log('  ', e.sym, e.msg);
-  return { day, total: snaps.length, ok, written, skipped, errors: errors.length };
+  return { day, total: snaps.length, ok, written, skipped, errors: errors.length, priceSource: PRICE_SOURCE, sources: sourceCounts, fallbacks: fallbacksUsed };
 }
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) main().then((r) => { console.log(JSON.stringify(r)); }).catch((e) => { console.error('nightly-sp500 failed:', e.message); process.exit(1); });

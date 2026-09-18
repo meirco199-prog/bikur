@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stepAggressive, newAggrState, aggrMetrics, AGGR_RULES } from '../engine/aggressive.js';
+import { stepAggressive, newAggrState, aggrMetrics, sectorExposure, normalizeSector, SPY_SECTOR_WEIGHTS, AGGR_RULES } from '../engine/aggressive.js';
 import { runAggressive, aggrReport } from '../lib/aggressive.js';
 import { DB } from '../lib/db.js';
 
-const rows = (n = 30, f = () => ({})) => [...Array(n)].map((_, i) => ({ symbol: 'S' + i, sector: ['Tech', 'Health', 'Fin'][i % 3], price: 100 + i, C: 40 + i * 2, actC: i >= n - 6 ? 'STRONG BUY' : i >= n - 10 ? 'BUY' : i < 5 ? 'SELL' : 'HOLD', eligible: true, ...f(i) }));
+const rows = (n = 30, f = () => ({})) => [...Array(n)].map((_, i) => ({ symbol: 'S' + i, sector: ['Tech', 'Health', 'Fin'][i % 3], price: 100 + i, D: 40 + i * 2, actD: i >= n - 6 ? 'STRONG BUY' : i >= n - 10 ? 'BUY' : i < 5 ? 'SELL' : 'HOLD', C: 50, actC: 'HOLD', eligible: true, eligibleD: true, ...f(i) }));
 const bull = { trend: 'Bull Trend', risk: 'Risk On' };
 
-test('אגרסיבי: יום ראשון — ליבה 20% SPY, עד 5 קניות של 7.5% לפי מודל C, רזרבת מזומן, עמלות והחלקה', () => {
+test('אגרסיבי: יום ראשון — ליבה 20% SPY, עד 5 קניות של 7.5% לפי הציון האגרסיבי (D), רזרבת מזומן, עמלות והחלקה', () => {
   const r = stepAggressive({ state: newAggrState(200000, '2026-09-17'), rows: rows(), spyPrice: 500, regime: bull, fx: 3.7, day: '2026-09-17' });
   const spy = r.trades.find((t) => t.symbol === 'SPY');
   assert.ok(spy && spy.side === 'buy' && Math.abs(spy.ils - 40000) < 2000, 'ליבה ~20%');
@@ -18,6 +18,25 @@ test('אגרסיבי: יום ראשון — ליבה 20% SPY, עד 5 קניות 
   assert.ok(r.cashIls > 200000 * AGGR_RULES.cashReserve);
   assert.ok(r.state.stats.feesIls === AGGR_RULES.feeIls * r.trades.length);
   assert.ok(r.totalIls < 200000 && r.totalIls > 199000, 'עמלות+החלקה בלבד');
+  // חשיפה: מניות בודדות, קרן, מזומן וסך מנייתי — בנפרד
+  const e = r.exposure;
+  assert.ok(Math.abs(e.stocksShare - 0.375) < 0.02, 'חמש מניות × 7.5%'); assert.ok(Math.abs(e.etfShare - 0.20) < 0.02); assert.ok(Math.abs(e.equityShare - (e.stocksShare + e.etfShare)) < 0.002); assert.ok(Math.abs(e.cashShare + e.equityShare - 1) < 0.002);
+  assert.equal(e.stocksIls + e.etfIls, e.equityIls);
+  // look-through: SPY תורם לענפים לפי משקלי המדד
+  const it = r.sectors.find((x) => x.sector === 'Information Technology');
+  assert.ok(it && it.ils > e.etfIls * SPY_SECTOR_WEIGHTS['Information Technology'] * 0.99, 'טכנולוגיה כוללת את חלקה ב-SPY');
+  assert.equal(normalizeSector('Technology'), 'Information Technology'); assert.equal(normalizeSector('Healthcare'), 'Health Care'); assert.equal(normalizeSector('Financial Services'), 'Financials');
+});
+
+test('אגרסיבי: תקרת ענף 40% נספרת look-through — טכנולוגיה ישירה + חלקה ב-SPY', () => {
+  // כל המועמדות טכנולוגיה: 20% SPY × 33% = 6.6% + מניות ישירות; אחרי 4 מניות (30%) + 6.6% = 36.6%, החמישית תחרוג → נדחית
+  const techRows = rows(30, () => ({ sector: 'Technology' }));
+  const r = stepAggressive({ state: newAggrState(200000, '2026-09-17'), rows: techRows, spyPrice: 500, regime: bull, fx: 3.7, day: '2026-09-17' });
+  const buys = r.trades.filter((t) => t.side === 'buy' && t.symbol !== 'SPY');
+  assert.equal(buys.length, 4, 'הקנייה החמישית הייתה מעבירה את הענף מעל 40% look-through');
+  assert.ok(r.notes.some((n) => /look-through/.test(n)));
+  const tech = r.sectors.find((x) => x.sector === 'Information Technology');
+  assert.ok(tech.share < 0.40 && tech.share > 0.33);
 });
 
 test('אגרסיבי: מכירה בסיגנל/עצירה/עצירה נגררת, בלי קנייה חוזרת בתוך שבוע (cooldown), ניצחונות/הפסדים', () => {
@@ -26,7 +45,7 @@ test('אגרסיבי: מכירה בסיגנל/עצירה/עצירה נגררת, 
   let r2 = stepAggressive({ state: r.state, rows: rows(30, (i) => (i === 28 ? { price: 128 * 1.3 } : {})), spyPrice: 500, regime: bull, fx: 3.7, day: '2026-09-18' });
   assert.equal(r2.trades.filter((t) => t.side === 'sell').length, 0);
   assert.ok(r2.state.positions.S28.high > 128 * 1.29);
-  const day3 = rows(30, (i) => (i === 29 ? { price: 129 * 0.8 } : i === 28 ? { price: 128 * 1.3 * 0.84 } : i === 27 ? { actC: 'SELL', C: 20 } : {}));
+  const day3 = rows(30, (i) => (i === 29 ? { price: 129 * 0.8 } : i === 28 ? { price: 128 * 1.3 * 0.84 } : i === 27 ? { actD: 'SELL', D: 20 } : {}));
   let r3 = stepAggressive({ state: r2.state, rows: day3, spyPrice: 500, regime: bull, fx: 3.7, day: '2026-09-19' });
   const sells = r3.trades.filter((t) => t.side === 'sell');
   assert.deepEqual(sells.map((t) => t.symbol).sort(), ['S27', 'S28', 'S29']);
@@ -64,7 +83,9 @@ test('אגרסיבי: מדדים (תשואה, מול SPY, drawdown, תנודתי
   const r = await runAggressive(ctx);
   assert.equal(r.ran, true); assert.equal(r.positions, 6); assert.ok(r.trades.length === 6);
   assert.equal((await runAggressive(ctx)).ran, false, 'כבר רץ היום');
+  const rr = await runAggressive(ctx, { reset: true });
+  assert.equal(rr.ran, true); assert.equal(rr.reset, true); assert.equal(rr.model, 'D'); assert.ok((await db.list('aggr:archive:')).length === 1, 'המצב הישן בארכיון');
   const rep = await aggrReport(db);
   assert.equal(rep.positions.length, 6); assert.ok(rep.positions[0].core, 'SPY הגדולה'); assert.equal(rep.equity.length, 1); assert.equal(rep.metrics.days, 1); assert.equal(rep.trades.length, 6);
-  assert.ok(rep.stocksShare > 0.3 && rep.stocksShare < 0.4);
+  assert.ok(rep.stocksShare > 0.3 && rep.stocksShare < 0.4); assert.ok(rep.exposure.equityShare > 0.5); assert.ok(rep.sectors.length >= 3);
 });

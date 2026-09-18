@@ -11,6 +11,7 @@ import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
 import { runAggressive, aggrReport } from './lib/aggressive.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
+const sp500Set = async (db) => { const m = await db.get('meta:mechanical'); return m?.symbols?.length ? new Set(m.symbols) : null; };
 import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews, refreshMechanicalUniverse, refreshEarningsCalendar } from './lib/analysis.js';
 import { fetchWithFallback } from './providers/registry.js';
 import { filterUniverse, findAsset, SEED_UNIVERSE, INDICES } from './engine/universe.js';
@@ -98,7 +99,7 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
   // דירוג ותיקים הם אגרגט של ה-snapshots (שלעולם לא נדרסים): מחושבים מחדש כשנוספו snapshots חדשים היום
   if (!left && (!finalized || pick.length)){
     const snaps = await listSnaps(db, day);
-    const rank = rankSnapshots(snaps);
+    const rank = rankSnapshots(snaps, { sp500: await sp500Set(db) });
     if (exRank && (rank.analyzed > (exRank.analyzed || 0))){ await db.put(`rank:${day}`, rank); await db.delete(`reco:${day}`); finalized = true; }
     else if (!exRank) finalized = await db.putIfAbsent(`rank:${day}`, rank);
     else finalized = false;
@@ -160,7 +161,7 @@ async function handle(req, env0, ctx){
   // מסלול אגרסיבי (תיק צל, סימולציה בלבד — לא חשבון התרגול): דוח + הרצה
   if (r0 === 'aggressive'){
     if (p1 === 'report' || !p1) return json(await aggrReport(db));
-    if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runAggressive(ctx, { day: q.date || null, force: q.force === '1' })); } catch (e) { await db.logError('aggressive', e.message); return err('מסלול אגרסיבי: ' + e.message, 500); } }
+    if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runAggressive(ctx, { day: q.date || null, force: q.force === '1', reset: q.reset === '1' })); } catch (e) { await db.logError('aggressive', e.message); return err('מסלול אגרסיבי: ' + e.message, 500); } }
     return err('not found', 404);
   }
   // רענון יקום מכני + לוח דוחות לפי דרישה (בדיקת endpoints של FMP בפועל). cron עושה זאת לבד: לוח יומי, יקום בימי שני
@@ -279,7 +280,7 @@ async function handle(req, env0, ctx){
     let rerank = false;
     if (body.finalize === true || q.finalize === '1'){
       const exRank = await db.get(`rank:${day}`);
-      if (exRank){ const rank = rankSnapshots(await listSnaps(db, day)); if (rank.analyzed > (exRank.analyzed || 0)){ await db.put(`rank:${day}`, { ...rank, mergedBy: 'ingest' }); await db.delete(`reco:${day}`); rerank = true; } }
+      if (exRank){ const rank = rankSnapshots(await listSnaps(db, day), { sp500: await sp500Set(db) }); if (rank.analyzed > (exRank.analyzed || 0)){ await db.put(`rank:${day}`, { ...rank, mergedBy: 'ingest' }); await db.delete(`reco:${day}`); rerank = true; } }
     }
     return json({ ok: true, day, received: snaps.length, ...r, alerts, rerank });
   }

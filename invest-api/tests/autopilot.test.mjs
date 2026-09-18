@@ -193,3 +193,13 @@ test('אוטומט v9: לא רודפים — הגבול יחסי לתנודתי�
   assert.ok(d.skipped.find((s) => s.symbol === 'CALM' && /לא רודפים/.test(s.reason)), 'יציבה: 9% > 8% → נדחית ' + JSON.stringify(d.skipped));
   assert.ok(d.orders.find((o) => o.symbol === 'WILD' && o.rule === 'add'), 'תנודתית: 15% < 20% → ממשיכים ' + JSON.stringify(d.skipped));
 });
+
+test('אוטומט v10: ספי הדירוג היחסי מחושבים מול חברות S&P 500 (universe=sp500) כשיש ≥100, ומוחלים על כל המועמדות', () => {
+  // 120 חברות מדד עם ציונים 50..79 (ללא סיגנל), ומועמדת מהיקום המורחב עם ציון 72 — מעל סף 30% של המדד? הסף הוא ~71 → עוברת; ציון 65 → נופלת
+  const sp = [...Array(120)].map((_, i) => row('P' + i, 'HOLD', 50 + (i % 30), { universe: 'sp500' }));
+  const table = [...sp, row('EXT', 'BUY', 72, { universe: 'extended' }), row('LOW', 'BUY', 65, { universe: 'extended' })];
+  const d = decideOrders({ table, regime: bull, perf: perf(200000), fx: 3.7, today: '2026-09-17' });
+  assert.ok(d.notes.some((n) => /S&P 500/.test(n)), 'הערה על יקום הייחוס');
+  assert.ok(d.orders.some((o) => o.symbol === 'EXT'));
+  assert.ok(d.skipped.some((s) => s.symbol === 'LOW' && /העליונים/.test(s.reason)));
+});
