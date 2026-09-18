@@ -410,7 +410,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const ip = req.headers.get('CF-Connecting-IP') || 'local';
     const path = new URL(req.url).pathname;
-    if (rateLimited(ip, path)) return err('rate limited', 429);
+    if (env.RATE_LIMIT_OFF !== '1' && rateLimited(ip, path)) return err('rate limited', 429); // RATE_LIMIT_OFF רק לבדיקות E2E (הרבה בקשות בדקה מאותה כתובת)
     let ctx;
     try { ctx = await makeCtx(env, ec?.waitUntil?.bind(ec)); return await handle(req, env, ctx); }
     catch (e) { if (e.status) return err(e.message, e.status); await ctx?.db?.logError(path, e.message); return err('internal: ' + e.message, 500); }
