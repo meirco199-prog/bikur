@@ -11,6 +11,11 @@ import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
 import { runAggressive, aggrReport, executeAggressive } from './lib/aggressive.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
+import { runTracksDecide, runTracksFill, trackReport, tracksCompare } from './lib/tracks.js';
+import { TRACK_IDS } from './engine/tracks.js';
+import { paperBreakdown } from './engine/paper-breakdown.js';
+import { AUTO_RULES } from './engine/autopilot.js';
+import { PROFILES } from './engine/portfolio.js';
 const sp500Set = async (db) => { const m = await db.get('meta:mechanical'); return m?.symbols?.length ? new Set(m.symbols) : null; };
 import { SYM_RE, today, getUniverse, addToUniverse, assetMeta, getPrices, getQuote, loadBundle, analyzeSymbol, analyzeBundle, toSnapshot, computeRegime, rankSnapshots, buildRecommendations, loadMacro, latestRankDay, getNews, refreshMechanicalUniverse, refreshEarningsCalendar } from './lib/analysis.js';
 import { fetchWithFallback } from './providers/registry.js';
@@ -165,6 +170,14 @@ async function handle(req, env0, ctx){
     if (p1 === 'execute' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await executeAggressive(ctx, { force: q.force === '1' && !bySecret })); } catch (e) { await db.logError('aggressive-exec', e.message); return err('ביצוע אגרסיבי: ' + e.message, 500); } }
     return err('not found', 404);
   }
+  // מסלולי השוואה (תיקי צל): regB, regC, אגרסיבי B, לצד חשבון התרגול המאוזן והמסלול האגרסיבי הקיים — שום פקודה אמיתית
+  if (r0 === 'tracks'){
+    if (!p1 || p1 === 'compare') return json(await tracksCompare(db));
+    if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { const decide = await runTracksDecide(ctx, { day: q.date || null, force: q.force === '1' }); const fill = await runTracksFill(ctx, { day: decide.day || q.date || null }); return json({ decide, fill }); } catch (e) { await db.logError('tracks', e.message); return err('מסלולים: ' + e.message, 500); } }
+    if (p1 === 'fill' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runTracksFill(ctx, { day: q.date || null })); } catch (e) { await db.logError('tracks-fill', e.message); return err('מילוי מסלולים: ' + e.message, 500); } }
+    if (TRACK_IDS.includes(p1)) return json(await trackReport(db, p1));
+    return err('not found', 404);
+  }
   // רענון יקום מכני + לוח דוחות לפי דרישה (בדיקת endpoints של FMP בפועל). cron עושה זאת לבד: לוח יומי, יקום בימי שני
   if (r0 === 'universe' && p1 === 'refresh' && req.method === 'POST'){
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
@@ -277,7 +290,9 @@ async function handle(req, env0, ctx){
     const ex = (await db.get(`entry940:${day}`)) || { day, prices: {} };
     ex.prices = { ...ex.prices, ...prices }; ex.at = body.at || '09:40 ET'; ex.source = body.source || 'yahoo-5m'; ex.updatedAt = new Date().toISOString(); ex.count = Object.keys(ex.prices).length;
     await db.put(`entry940:${day}`, ex);
-    return json({ ok: true, day, received: Object.keys(prices).length, count: ex.count });
+    // מילוי מסלולי ההשוואה (regB/regC/אגרסיבי B) לפי מחירי 09:40 שהגיעו הרגע — אותה נקודת ביצוע לכל המסלולים
+    let tracks = null; try { tracks = await runTracksFill(ctx, { day }); } catch (e) { await db.logError('tracks-fill-ingest', e.message); }
+    return json({ ok: true, day, received: Object.keys(prices).length, count: ex.count, tracks });
   }
   // הזרמת snapshots מ-GitHub Actions (יקום S&P 500): נכתבים ב-shards (16 מסמכים ליום), הדירוג מחושב מחדש אם היום כבר סגור
   if (r0 === 'ingest' && p1 === 'snapshots' && req.method === 'POST'){
@@ -406,6 +421,20 @@ async function handle(req, env0, ctx){
       perf.fxSource = fxDoc ? { rate: fx, source: fxDoc.source, asOf: fxDoc.asOf } : null;
       return perf;
     };
+    // פירוק מלא: רווח/הפסד ממומש/לא ממומש לכל נייר, עמלות, הפרשי מטבע, ידני מול אוטומט, לפני/מאז גרסת האסטרטגיה הנוכחית, הקצאה בפועל מול יעד
+    if (p1 === 'breakdown' && req.method === 'GET'){
+      await view(); // ממלא את priceCache עבור priceOf
+      const rank = day ? await db.get(`rank:${day}`) : null;
+      const table = rank?.table || [];
+      const u = await getUniverse(db, env);
+      const nameOf = (s) => u.find((a) => a.symbol === s)?.nameHe || u.find((a) => a.symbol === s)?.name || s;
+      const journal = (await db.get('auto:journal')) || [];
+      const st = (await db.get('user:settings')) || {};
+      const profile = st.riskProfile || 'balanced';
+      const account = await broker.account();
+      const trades = await broker.trades();
+      return json(paperBreakdown({ trades, account, priceOf, fx, table, nameOf, journal, currentVersion: AUTO_RULES.version, targets: PROFILES[profile]?.sleeves || null }));
+    }
     if (req.method === 'GET') return json(await view());
     needAuth();
     if (p1 === 'reset' && req.method === 'POST'){ const st = (await db.get('user:settings')) || {}; const acc = await broker.reset(isNum(body.initialIls) && body.initialIls > 0 ? body.initialIls : (st.portfolioSize || 200000)); return json({ ok: true, account: acc }); }
@@ -455,7 +484,7 @@ export default {
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     try {
       const r = await cronStep(ctx);
-      if (r?.finalized){ try { await runShadow(ctx); await runAggressive(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); }
+      if (r?.finalized){ try { await runShadow(ctx); await runAggressive(ctx); await runTracksDecide(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); }
       try { await executeAggressive(ctx); } catch (e) { await ctx.db.logError('aggressive-exec', e.message); } // מילוי פקודות הצל בחלון ניו יורק לפי ציטוט חי // runAutopilot עצמו בודק: כבר רץ היום (לפי גרסת כללים), חלון שעות, שוק פתוח
     } catch (e) { await ctx.db.logError('scheduled', e.message); }
     finally { await ctx.budget.flush().catch(() => {}); }

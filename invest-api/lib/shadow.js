@@ -57,7 +57,7 @@ export async function runShadow(ctx, { day = null, force = false } = {}){
   // סדרת התפלגות יומית (מסמך אחד, עד 250 ימים): חלק "קנייה חזקה"/"קנייה", ממוצע וחציון לכל מודל
   if (created){
     const series = (await db.get('shadow:dist')) || [];
-    const row = { day, n: doc.n, ...Object.fromEntries(['A', 'B', 'C', 'D'].map((m) => [m, { mean: doc.dist?.[m]?.mean ?? null, median: doc.dist?.[m]?.median ?? null, strong: doc.dist?.[m]?.strongBuyShare ?? null, buy: doc.dist?.[m]?.buyShare ?? null, sell: doc.dist?.[m]?.sellShare ?? null }])) };
+    const row = { day, n: doc.n, ...Object.fromEntries(['A', 'B', 'C', 'D', 'DF'].map((m) => [m, { mean: doc.dist?.[m]?.mean ?? null, median: doc.dist?.[m]?.median ?? null, strong: doc.dist?.[m]?.strongBuyShare ?? null, buy: doc.dist?.[m]?.buyShare ?? null, sell: doc.dist?.[m]?.sellShare ?? null }])) };
     const i = series.findIndex((x) => x.day === day); if (i >= 0) series[i] = row; else series.push(row);
     await db.put('shadow:dist', series.sort((a, b) => a.day.localeCompare(b.day)).slice(-250));
   }

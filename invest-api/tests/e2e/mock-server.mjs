@@ -15,6 +15,16 @@ if (process.env.SEED !== '0'){
   const r = await cronStep(ctx, { batch: 300 }); console.log('seeded', r.done, 'finalized', r.finalized);
   const { runShadow } = await import('../../lib/shadow.js'); console.log('shadow', JSON.stringify((await runShadow(ctx)).agreement));
   const { runAggressive, executeAggressive } = await import('../../lib/aggressive.js'); console.log('aggressive', JSON.stringify((await runAggressive(ctx)).totalIls), 'exec', JSON.stringify((await executeAggressive(ctx)).filled?.length));
+  // מסלולי השוואה (regB/regC/אגרסיבי B): החלטה + מחירי 09:40 מדומים (קרוב לסגירה) + מילוי, כדי שיהיו נתונים למסך ההשוואה
+  const { runTracksDecide, runTracksFill } = await import('../../lib/tracks.js');
+  const decideDay = await db.get('idx:snapdays').then((d) => d[d.length - 1]);
+  const rankForEntry = await db.get(`rank:${decideDay}`);
+  if (rankForEntry?.table?.length){
+    await db.put(`entry940:${decideDay}`, { day: decideDay, count: rankForEntry.table.length, at: '09:40 ET', source: 'seed', prices: Object.fromEntries(rankForEntry.table.filter((x) => x.price > 0).map((x) => [x.symbol, x.price * 1.001])) });
+    const dTracks = await runTracksDecide(ctx, { day: decideDay });
+    const fTracks = await runTracksFill(ctx, { day: decideDay });
+    console.log('tracks decide', JSON.stringify(Object.fromEntries(Object.entries(dTracks.tracks).map(([k, v]) => [k, v.orders ?? v]))), 'fill', JSON.stringify(Object.fromEntries(Object.entries(fTracks.tracks).map(([k, v]) => [k, v.filled ?? v]))));
+  }
   // snapshot של אתמול (לצורך "מה השתנה") — מעתיקים עם ציון שונה
   const days = await db.get('idx:snapdays'); const day = days[0]; const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   for (const k of await db.list(`snap:${day}:`)){ const s = await db.get(k); await db.put(`snap:${y}:${s.symbol}`, { ...s, date: y, score: Math.max(0, (s.score || 50) - 12), signal: 'HOLD' }); }

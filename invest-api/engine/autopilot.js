@@ -49,8 +49,11 @@ const daysUntil = (from, to) => { if (!from || !to) return null; return Math.rou
  * regime: { trend, risk }
  * perf: תוצאת PaperBroker.performance (positions, cashIls, totalIls)
  */
-export function decideOrders({ table = [], regime = null, perf, profile = 'balanced', fx = 3.7, today = null, buysToday = 0, boughtToday = [], rules = AUTO_RULES } = {}){
-  const P = PROFILES[profile] || PROFILES.balanced;
+// profile: שם פרופיל מ-PROFILES או אובייקט פרופיל (תיקי צל עם הקצאה משלהם). limits: מגבלות קשיחות — ברירת המחדל RISK_LIMITS של חשבון
+// התרגול; תיק צל עם תקציב מניות גדול יותר מביא מגבלות משלו (TRACK-ספציפיות) ולא עוקף את אלה של החשבון האמיתי.
+export function decideOrders({ table = [], regime = null, perf, profile = 'balanced', fx = 3.7, today = null, buysToday = 0, boughtToday = [], rules = AUTO_RULES, limits = RISK_LIMITS } = {}){
+  const P = typeof profile === 'object' && profile ? profile : (PROFILES[profile] || PROFILES.balanced);
+  const RL = limits;
   const notes = [], orders = [], skipped = [];
   const by = new Map(table.map((r) => [r.symbol, r]));
   const total = perf?.totalIls || 0, cash = perf?.cashIls || 0;
@@ -131,7 +134,7 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   }
   // ---- לוויין: מניות בודדות (וקרנות ענפיות) עם סיגנל קנייה, בתוך תקציב ה-sleeve ----
   const isCore = (r) => !!coreOf(r.symbol) || r.assetClass === 'bond' || r.assetClass === 'gold' || r.role === 'core';
-  const stocksBudget = Math.min((P.sleeves.stocks || 0), RISK_LIMITS.maxActiveShare) * total;
+  const stocksBudget = Math.min((P.sleeves.stocks || 0), RL.maxActiveShare) * total;
   let satIls = 0; for (const [sym, v] of heldIls){ const r = by.get(sym); if (r && !isCore(r)) satIls += v; }
   // דירוג יחסי: אחוזון הציון בין המניות (לא ליבה) שנותחו היום
   // v10: הדירוג היחסי מול יקום ייחוס יציב — חברי S&P 500 (universe='sp500') כשיש לפחות 100 כאלה; אחרת כל המניות שנותחו
@@ -159,13 +162,13 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
   let buys = Math.max(0, buysToday | 0); // מכסה יומית כוללת ריצות קודמות היום
   for (const r of cands){
     if (satIls >= stocksBudget * 0.98){ skipped.push({ symbol: r.symbol, reason: `תקציב המניות הבודדות (${Math.round((P.sleeves.stocks || 0) * 100)}% מהתיק) מלא` }); continue; }
-    if (buys >= rules.maxBuysPerRun){ skipped.push({ symbol: r.symbol, reason: `מכסת ${rules.maxBuysPerRun} קניות ליום` }); continue; }
+    if (buys >= Math.min(rules.maxBuysPerRun, RL.maxBuysPerDay)){ skipped.push({ symbol: r.symbol, reason: `מכסת ${rules.maxBuysPerRun} קניות ליום` }); continue; }
     if (sold.has(r.symbol)) continue;
     const dE = daysUntil(today, r.nextEarnings);
     if (isNum(dE) && dE >= 0 && dE <= rules.earningsBlackoutDays){ skipped.push({ symbol: r.symbol, reason: `דוח בעוד ${dE} ימים — מחכים` }); continue; }
     if (rules.requireEarningsDate && !r.nextEarnings){ skipped.push({ symbol: r.symbol, reason: 'אין תאריך דוח ידוע — לא פותחים פוזיציה (fail-closed)' }); continue; }
     if (isNum(r.vol1y) && r.vol1y > P.maxVol){ skipped.push({ symbol: r.symbol, reason: `תנודתית מדי לפרופיל (${Math.round(r.vol1y * 100)}%)` }); continue; }
-    const maxPos = Math.min(r.type === 'etf' ? P.maxEtfPosition : P.maxPosition, RISK_LIMITS.maxPositionShare) * total;
+    const maxPos = Math.min(r.type === 'etf' ? P.maxEtfPosition : P.maxPosition, RL.maxPositionShare) * total;
     const stopPct = stopPctFor(r, rules, bear);
     const riskCap = (rules.riskBudget * total) / stopPct; // גודל שבו הפסד עד העצירה = תקציב הסיכון
     const target = Math.min(maxPos, riskCap) * (rules.buyTargetFactor[r.signal] || 0.7) * (riskOff ? 0.5 : 1);
@@ -181,9 +184,9 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     if (ils < rules.minOrderIls){ skipped.push({ symbol: r.symbol, reason: free < rules.minOrderIls ? 'אין מספיק מזומן פנוי (שומרים רזרבה)' : stocksBudget - satIls < rules.minOrderIls ? 'תקציב המניות הבודדות כמעט מלא' : 'הסכום שנותר עד היעד קטן מדי' }); continue; }
     // מגבלת סיכון פתוח כולל ולענף: מקטינים את השלב כך שלא נחרוג, ואם לא נשאר כלום — דוחים
     const secR = r.sector || 'אחר';
-    const roomTotal = RISK_LIMITS.maxOpenRisk * total - openRisk, roomSector = RISK_LIMITS.maxSectorOpenRisk * total - (sectorRisk[secR] || 0);
+    const roomTotal = RL.maxOpenRisk * total - openRisk, roomSector = RL.maxSectorOpenRisk * total - (sectorRisk[secR] || 0);
     const roomIls = Math.min(roomTotal, roomSector) / stopPct;
-    if (roomIls < rules.minOrderIls){ skipped.push({ symbol: r.symbol, reason: roomTotal <= roomSector ? `סיכון פתוח כולל כבר ${round(openRisk / total * 100, 1)}% (הגבול ${RISK_LIMITS.maxOpenRisk * 100}%)` : `סיכון פתוח בענף ${secR} כבר ${round((sectorRisk[secR] || 0) / total * 100, 1)}% (הגבול ${RISK_LIMITS.maxSectorOpenRisk * 100}%)` }); continue; }
+    if (roomIls < rules.minOrderIls){ skipped.push({ symbol: r.symbol, reason: roomTotal <= roomSector ? `סיכון פתוח כולל כבר ${round(openRisk / total * 100, 1)}% (הגבול ${RL.maxOpenRisk * 100}%)` : `סיכון פתוח בענף ${secR} כבר ${round((sectorRisk[secR] || 0) / total * 100, 1)}% (הגבול ${RL.maxSectorOpenRisk * 100}%)` }); continue; }
     ils = Math.min(ils, roomIls);
     const unit = r.price * rateOf(r);
     const qty = Math.floor(ils / unit);
@@ -194,5 +197,5 @@ export function decideOrders({ table = [], regime = null, perf, profile = 'balan
     free -= est; buys++; satIls += est; if (!cur) count++; if (r.type !== 'etf') sectorIls[sec] = (sectorIls[sec] || 0) + est; heldIls.set(r.symbol, cur + est);
   }
   if (!orders.length && !notes.length) notes.push(cands.length ? 'כל המועמדים כבר בגודל היעד או נדחו לפי הכללים' : 'אין היום סיגנלי קנייה שעומדים בכללים');
-  return { orders, skipped, notes, rules: { ...rules, profile, reserveIls: round(reserve, 0), limits: RISK_LIMITS, openRiskPct: total ? round(openRisk / total, 4) : 0 } };
+  return { orders, skipped, notes, rules: { ...rules, profile, reserveIls: round(reserve, 0), limits: RL, openRiskPct: total ? round(openRisk / total, 4) : 0 } };
 }

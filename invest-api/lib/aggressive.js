@@ -25,8 +25,9 @@ export async function runAggressive(ctx, { day = null, force = false, reset = fa
   r.state.lastTotalIls = r.totalIls; r.state.variant = shadow.models?.D?.variant || null;
   if (cancelled) r.notes.push(`${cancelled} פקודות מאתמול לא בוצעו (אין ציטוט בחלון) ובוטלו`);
   await db.put('aggr:state', r.state);
+  // היסטוריית חשיפה יומית (לא רק שווי כולל): מניות בודדות, SPY, מזומן וסך מנייתי — כדי לראות איך זה השתנה יום אחר יום, לא רק יעדים
   const eq = (await db.get('aggr:equity')) || [];
-  const i = eq.findIndex((e) => e[0] === day); const row = [day, r.totalIls, spyPrice, r.state.variant];
+  const i = eq.findIndex((e) => e[0] === day); const row = [day, r.totalIls, spyPrice, r.state.variant, { stocksIls: r.exposure.stocksIls, etfIls: r.exposure.etfIls, cashIls: r.exposure.cashIls, stocksShare: r.exposure.stocksShare, etfShare: r.exposure.etfShare, cashShare: r.exposure.cashShare, equityShare: r.exposure.equityShare, positions: r.positions.length }];
   if (i >= 0) eq[i] = row; else eq.push(row);
   await db.put('aggr:equity', eq.sort((a, b) => a[0].localeCompare(b[0])).slice(-2000));
   return { ran: true, day, reset, model: AGGR_RULES.model, variant: r.state.variant, totalIls: r.totalIls, cashIls: r.cashIls, positions: r.positions.length, exposure: r.exposure, pending: r.orders, notes: r.notes };
@@ -75,6 +76,16 @@ export async function aggrReport(db){
   const mtm = markToMarket(state, priceOf, fx);
   const metrics = aggrMetrics(equity, state.initialIls, state.spyRef ?? null);
   const stocksIls = mtm.rows.filter((x) => !x.core).reduce((s, x) => s + x.valueIls, 0);
-  return { day, model: AGGR_RULES.model, initialIls: state.initialIls, totalIls: round(mtm.totalIls, 0), cashIls: round(state.cashIls, 0), stocksShare: round(stocksIls / mtm.totalIls, 3), exposure: mtm.exposure, sectors: sectorExposure(mtm.rows, mtm.totalIls), positions: mtm.rows.sort((a, b) => b.valueIls - a.valueIls), stats: state.stats, metrics, spyRef: state.spyRef ?? null, spyRefAt: state.spyRefAt ?? null, variant: state.variant ?? null, pending: state.pending || null, equity: equity.slice(-120), trades: journal.slice(-30).reverse(), rules: AGGR_RULES, cooldown: state.cooldown || {} };
+  // הסבר קריא לכל פוזיציה: למה נבחרה (ציון+גורמים בכניסה) ומתי תימכר (סיגנל מכירה / עצירת הפסד / עצירה נגררת)
+  const explain = (p) => {
+    if (p.core) return { why: 'ליבת התיק (SPY, לא נמכרת לפי סיגנל)', sellTrigger: 'לא נמכרת — רק מוקטנת אם היא חורגת מהיעד' };
+    const why = p.entryScore != null ? `מודל ${p.entryModel || AGGR_RULES.model}: ${p.entryAction || ''} (ציון ${p.entryScore})${p.entryFactors ? ` — מומנטום ${p.entryFactors.momentum ?? '—'}, צמיחה ${p.entryFactors.growth ?? '—'}, איכות ${p.entryFactors.quality ?? '—'}, סיכון ${p.entryFactors.risk ?? '—'}` : ''}` : 'נתוני כניסה לא זמינים (פוזיציה ישנה)';
+    const sellTrigger = `סיגנל מכירה במודל, או ירידה מתחת ל-${p.stopLevel} (עצירת הפסד ${Math.round(AGGR_RULES.stopPct * 100)}%), או ירידה מתחת ל-${p.trailLevel} (עצירה נגררת ${Math.round(AGGR_RULES.trailPct * 100)}% מהשיא ${p.high})`;
+    return { why, sellTrigger };
+  };
+  const positions = mtm.rows.sort((a, b) => b.valueIls - a.valueIls).map((p) => ({ ...p, ...explain(p) }));
+  // היסטוריית חשיפה יומית קריאה: יום + מניות/SPY/מזומן בפועל (לא רק יעדים) — משלימה את equity (שווי בלבד)
+  const exposureHistory = equity.filter((e) => e[4]).map((e) => ({ day: e[0], totalIls: e[1], spy: e[2], variant: e[3], ...e[4] })).slice(-120);
+  return { day, model: AGGR_RULES.model, initialIls: state.initialIls, totalIls: round(mtm.totalIls, 0), cashIls: round(state.cashIls, 0), stocksShare: round(stocksIls / mtm.totalIls, 3), exposure: mtm.exposure, sectors: sectorExposure(mtm.rows, mtm.totalIls), positions, stats: state.stats, metrics, spyRef: state.spyRef ?? null, spyRefAt: state.spyRefAt ?? null, variant: state.variant ?? null, pending: state.pending || null, equity: equity.slice(-120), exposureHistory, trades: journal.slice(-30).reverse(), rules: AGGR_RULES, cooldown: state.cooldown || {} };
 }
 export const _isNum = isNum;

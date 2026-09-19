@@ -16,8 +16,13 @@ export const SHADOW_MODELS = Object.freeze({
   C: { label: 'B + ריוויזיות + מאקרו', desc: 'כמו B, עם ריוויזיות תחזיות כשקיימות (15) ושכבת מאקרו על הפעולה', weights: Object.freeze({ value: 25, profitability: 20, growth: 20, trend: 25, risk: 10, revision: 15 }) },
   // D = ציון אגרסיבי: מומנטום, צמיחה, ריוויזיות, איכות, סיכון — בלי תמחור. הבסיס למסלול האגרסיבי; מושווה ל-C (ניסוי, לא משקלים סופיים)
   D: { label: 'אגרסיבי', desc: 'מומנטום 30, צמיחה 25, ריוויזיות 20, איכות 15, סיכון 10 — בלי תמחור; שכבת מאקרו על הפעולה', weights: Object.freeze({ momentum: 30, growth: 25, revision: 20, quality: 15, risk: 10 }) },
+  DF: { label: 'אגרסיבי מסונן', desc: 'D עם ספי איכות מוחלטים: מומנטום ≥ 55, צמיחה ≥ 40, איכות ≥ 40, סיכון ≥ 30, כיסוי ≥ 85%; קנייה רק מציון 60 (חזקה 70). בלי הזדמנויות — מזומן', weights: Object.freeze({ momentum: 30, growth: 25, revision: 20, quality: 15, risk: 10 }) },
 });
-export const MODEL_KEYS = ['A', 'B', 'C', 'D'];
+// DF = D מסונן: אותם משקלים כמו D, אבל כשירות דורשת ספי איכות מוחלטים (לא רק דירוג יחסי): מומנטום חיובי, צמיחה ואיכות מינימליות,
+// סיכון סביר, וכיסוי נתונים. פעולה: הדירוג היחסי של D על הקבוצה המסוננת, ובנוסף סף ציון מוחלט (קנייה חזקה ≥ 70, קנייה ≥ 60).
+// כשאין מספיק מניות שעוברות — אין קניות (מותר להחזיק מזומן). D עצמו לא משתנה; DF נצבר בנפרד.
+export const DF_RULES = Object.freeze({ minMomentum: 55, minGrowth: 40, minQuality: 40, minRisk: 30, minCoverage: 0.85, minScoreBuy: 60, minScoreStrong: 70 });
+export const MODEL_KEYS = ['A', 'B', 'C', 'D', 'DF'];
 export const bucketOf = (score, edges = SHADOW_RULES.buckets) => { if (!isNum(score)) return null; for (const e of edges) if (score >= e) return `${e}+`; return `<${edges[edges.length - 1]}`; };
 const LEGACY_COMPONENTS = ['fundamental', 'valuation', 'growth', 'quality', 'technical', 'momentum', 'analyst', 'sentiment', 'macro', 'risk'];
 
@@ -112,10 +117,14 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const actB = rankActions(scoreB);
   const actC = rankActions(scoreC, { overlay });
   const actD = rankActions(scoreD, { overlay });
+  // DF: כשירות מוחלטת על הגורמים הגולמיים (0–100) + כיסוי נתונים; הפעולה מהדירוג היחסי בתוך המסוננים, ואז סף ציון מוחלט
+  const eligibleDF = pct.map((p, i) => eligibleD[i] && raw[i].momentum >= DF_RULES.minMomentum && isNum(raw[i].growth) && raw[i].growth >= DF_RULES.minGrowth && isNum(raw[i].quality) && raw[i].quality >= DF_RULES.minQuality && isNum(raw[i].risk) && raw[i].risk >= DF_RULES.minRisk && (!isNum(stocks[i].coverage) || stocks[i].coverage >= DF_RULES.minCoverage));
+  const scoreDF = scoreD.map((v, i) => (eligibleDF[i] ? v : null));
+  const actDF = rankActions(scoreDF, { overlay }).map((a, i) => (a === 'STRONG BUY' && scoreDF[i] < DF_RULES.minScoreStrong ? (scoreDF[i] >= DF_RULES.minScoreBuy ? 'BUY' : 'HOLD') : a === 'BUY' && scoreDF[i] < DF_RULES.minScoreBuy ? 'HOLD' : a));
   const contribC = (i) => { const p = { ...pct[i], revision: revPct[i] }; const w = SHADOW_MODELS.C.weights; const sw = Object.entries(w).filter(([k]) => isNum(p[k])).reduce((s, [, v]) => s + v, 0); return Object.fromEntries(Object.entries(w).filter(([k]) => isNum(p[k])).map(([k, v]) => [k, round((v / sw) * p[k], 1)])); };
   const rows = stocks.map((r, i) => ({
     symbol: r.symbol, name: r.nameHe || r.name || r.symbol, sector: r.sector || null, price: r.price, open: isNum(r.open) ? r.open : null, currency: r.currency || 'USD',
-    A: r.score, actA: actA[i], B: scoreB[i], actB: actB[i], C: scoreC[i], actC: actC[i], D: scoreD[i], actD: actD[i], eligible: eligible[i], eligibleD: eligibleD[i],
+    A: r.score, actA: actA[i], B: scoreB[i], actB: actB[i], C: scoreC[i], actC: actC[i], D: scoreD[i], actD: actD[i], DF: scoreDF[i], actDF: actDF[i], eligible: eligible[i], eligibleD: eligibleD[i], eligibleDF: eligibleDF[i], coverage: isNum(r.coverage) ? r.coverage : null,
     raw: raw[i], pct: pct[i], revision: isNum(revVals[i]) ? revVals[i] : null, revisionPct: revPct[i], revisionNote: revisions[r.symbol]?.available ? null : (revisions[r.symbol]?.reason || 'לא זמין'),
     contribC: eligible[i] ? contribC(i) : null, fwd: {},
   }));
@@ -125,14 +134,14 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const overlap = (x, y) => { const a = buys(x), b = buys(y); const u = new Set([...a, ...b]); return u.size ? round([...a].filter((s) => b.has(s)).length / u.size, 3) : null; };
   const top = (key) => rows.filter((r) => isNum(r[key])).sort((a, b) => b[key] - a[key]).slice(0, 10).map((r) => r.symbol);
   const corr = componentCorrelation(stocks);
-  const dist = { A: scoreDistribution(rows.map((r) => r.A), actA), B: scoreDistribution(scoreB, actB), C: scoreDistribution(scoreC, actC), D: scoreDistribution(scoreD, actD) };
+  const dist = { A: scoreDistribution(rows.map((r) => r.A), actA), B: scoreDistribution(scoreB, actB), C: scoreDistribution(scoreC, actC), D: scoreDistribution(scoreD, actD), DF: scoreDistribution(scoreDF, actDF) };
   return {
     version: SHADOW_VERSION, day, barDate, regime: regime ? { trend: regime.trend, risk: regime.risk } : null, overlay, n: rows.length, eligible: eligible.filter(Boolean).length,
     revisionsAvailable: revAvail.length, revisionsUsed: revOn, revisionCoverage: revCoverage, rules: SHADOW_RULES,
     // D בלי ריוויזיות (עד שנצברים 30 יום) הוא בפועל מודל אחר (המשקלים מנורמלים מחדש) — נרשם כ-D-preRevision ונצבר בנפרד; לא מערבבים תקופות
-    universe, models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) }, D: { ...SHADOW_MODELS.D, actions: count(actD), variant: revOn ? 'D' : 'D-preRevision', revisionCoverage: revCoverage, effectiveWeights: revOn ? SHADOW_MODELS.D.weights : { momentum: 37.5, growth: 31.25, quality: 18.75, risk: 12.5 } } },
-    agreement: { AB: agree(actA, actB), AC: agree(actA, actC), BC: agree(actB, actC), CD: agree(actC, actD), AD: agree(actA, actD), buyOverlapAB: overlap(actA, actB), buyOverlapAC: overlap(actA, actC), buyOverlapCD: overlap(actC, actD) },
-    top: { A: top('A'), B: top('B'), C: top('C'), D: top('D') }, dist, corr, rows, fwd: {},
+    universe, models: { A: { ...SHADOW_MODELS.A, actions: count(actA) }, B: { ...SHADOW_MODELS.B, actions: count(actB) }, C: { ...SHADOW_MODELS.C, actions: count(actC) }, D: { ...SHADOW_MODELS.D, actions: count(actD), variant: revOn ? 'D' : 'D-preRevision', revisionCoverage: revCoverage, effectiveWeights: revOn ? SHADOW_MODELS.D.weights : { momentum: 37.5, growth: 31.25, quality: 18.75, risk: 12.5 } } , DF: { ...SHADOW_MODELS.DF, actions: count(actDF), variant: revOn ? 'DF' : 'DF-preRevision', eligible: eligibleDF.filter(Boolean).length, rules: DF_RULES } },
+    agreement: { AB: agree(actA, actB), AC: agree(actA, actC), BC: agree(actB, actC), CD: agree(actC, actD), AD: agree(actA, actD), buyOverlapAB: overlap(actA, actB), buyOverlapAC: overlap(actA, actC), buyOverlapCD: overlap(actC, actD), DDF: agree(actD, actDF), buyOverlapDDF: overlap(actD, actDF) },
+    top: { A: top('A'), B: top('B'), C: top('C'), D: top('D'), DF: top('DF') }, dist, corr, rows, fwd: {},
   };
 }
 
@@ -168,7 +177,8 @@ export function accumulateStats(stats, doc, h){
   S.days[h] = S.days[h] || []; if (S.days[h].includes(doc.day)) return S; S.days[h].push(doc.day);
   const H = (S.horizons[h] = S.horizons[h] || {});
   for (const m of MODEL_KEYS){
-    const key = m === 'D' ? (doc.models?.D?.variant || 'D') : m; // D-preRevision נצבר בנפרד מ-D
+    const key = m === 'D' ? (doc.models?.D?.variant || 'D') : m === 'DF' ? (doc.models?.DF?.variant || 'DF') : m; // D-preRevision נצבר בנפרד מ-D (וכך DF)
+    if (m === 'DF' && !doc.models?.DF) continue; // מסמכים מלפני DF
     const M = (H[key] = H[key] || { buckets: {}, actions: {}, ic: { n: 0, sum: 0 }, byDay: [] });
     const sc = [], fw = [];
     M.kinds = M.kinds || {}; M.actionsOpen = M.actionsOpen || {};

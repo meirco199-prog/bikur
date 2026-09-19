@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeShadow, rankActions, pctRank, spearman, fillForward, accumulateStats, summarizeStats, componentCorrelation, rawFactors, SHADOW_MODELS, SHADOW_RULES, scoreDistribution } from '../engine/shadow.js';
 import { DB } from '../lib/db.js';
+import { isNum } from '../engine/util.js';
 import { runShadow, shadowReport } from '../lib/shadow.js';
 
 const secs = ['Technology', 'Healthcare', 'Financials'];
@@ -176,3 +177,23 @@ test('מודל צל: מחיר 09:40 הוא הכניסה הראשית (kind 0940)
   assert.equal((await get('/entry/2026-09-16')).count, 0);
 });
 async function installMockFetchOnce(){ const { installMockFetch } = await import('./mock-providers.mjs'); installMockFetch(); }
+
+test('מודל DF: D מסונן בספי איכות מוחלטים — מניה עם מומנטום חלש/כיסוי נמוך לא כשירה, D עצמו לא משתנה, סף ציון מוחלט לפעולה', async () => {
+  const { DF_RULES } = await import('../engine/shadow.js');
+  const rows = mk(60, (i) => ({ coverage: i % 10 === 0 ? 0.6 : 0.95, components: { fundamental: 60, valuation: 50, growth: 45 + (i % 5) * 10, quality: 50 + (i % 3) * 10, technical: 50 + i / 2, momentum: i < 20 ? 30 : 60 + (i % 4) * 8, risk: 60 } }));
+  const d = computeShadow({ table: rows, revisions: {}, day: '2026-09-18' });
+  assert.ok(d.models.DF && d.models.DF.variant === 'DF-preRevision');
+  const byS = Object.fromEntries(d.rows.map((r) => [r.symbol, r]));
+  for (let i = 0; i < 20; i++) assert.equal(byS['S' + i].eligibleDF, false, 'מומנטום 30 < 55 → לא כשיר'); // ה-D שלהן קיים
+  assert.ok(isNum(byS.S1.D), 'D לא מושפע מהסינון');
+  assert.equal(byS.S30.eligibleDF, false, 'כיסוי 60% < 85%');
+  const elig = d.rows.filter((r) => r.eligibleDF); assert.ok(elig.length >= 30 && elig.length < 40, 'רק המסוננות כשירות: ' + elig.length);
+  for (const r of d.rows){ if (r.actDF === 'STRONG BUY') assert.ok(r.DF >= DF_RULES.minScoreStrong); if (r.actDF === 'BUY') assert.ok(r.DF >= DF_RULES.minScoreBuy); if (!r.eligibleDF) assert.equal(r.actDF, null); }
+  assert.deepEqual(Object.keys(d.dist).sort(), ['A', 'B', 'C', 'D', 'DF']);
+  assert.ok(isNum(d.agreement.DDF));
+  // צבירה: DF נצבר במפתח נפרד (DF-preRevision) ולא מערבב עם D
+  const priceNow = Object.fromEntries(d.rows.map((r) => [r.symbol, r.price * 1.01]));
+  fillForward(d, 1, priceNow, { spyNow: 101, spyThen: 100, day: 'y' });
+  const st = summarizeStats(accumulateStats(null, d, 1)).horizons['1'].models;
+  assert.ok(st['DF-preRevision'] && st['D-preRevision'] && st['DF-preRevision'].n < st['D-preRevision'].n);
+});

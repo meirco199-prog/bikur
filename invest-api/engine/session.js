@@ -23,3 +23,13 @@ export function pricesCoverLastSession(rows, fetchedAt, now = new Date()){
   const s = lastSessionClose(now);
   return !!last && last >= s.date;
 }
+
+// חותמת זמן UTC של שעה בניו יורק ביום נתון (למשל 09:40 ET של יום המסחר) — לרישום מילויים של תיקי צל בזמן הסשן ולא בזמן העיבוד
+export function nyTimeIso(day, h = 9, mi = 40){
+  const [y, m, d] = day.split('-').map(Number);
+  let guess = Date.UTC(y, m - 1, d, h + 4, mi); // הנחת קיץ (UTC−4), מתוקן לפי ההיסט בפועל באותו יום
+  const p = nyParts(new Date(guess));
+  const diffMin = (p.h * 60 + p.mi) - (h * 60 + mi) + (p.d - d) * 1440;
+  guess -= diffMin * 60000;
+  return new Date(guess).toISOString();
+}

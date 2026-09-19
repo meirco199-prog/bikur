@@ -36,7 +36,7 @@ export function newAggrState(initialIls = AGGR_RULES.initialIls, day = null){ re
 const usd = (p, fx) => p * fx;
 export function markToMarket(state, priceOf, fx){
   let value = 0; const rows = [];
-  for (const [sym, p] of Object.entries(state.positions)){ const px = priceOf(sym) ?? p.last ?? p.entry; const v = p.qty * usd(px, fx); value += v; rows.push({ symbol: sym, qty: p.qty, price: px, valueIls: round(v, 0), pnlPct: round(px / p.entry - 1, 4), sector: p.sector || null, core: sym === AGGR_RULES.core }); }
+  for (const [sym, p] of Object.entries(state.positions)){ const px = priceOf(sym) ?? p.last ?? p.entry; const v = p.qty * usd(px, fx); value += v; rows.push({ symbol: sym, qty: p.qty, price: px, valueIls: round(v, 0), pnlPct: round(px / p.entry - 1, 4), sector: p.sector || null, core: sym === AGGR_RULES.core, entry: round(p.entry, 4), high: round(p.high || p.entry, 4), openedDay: p.openedDay || null, entryScore: p.entryScore ?? null, entryAction: p.entryAction || null, entryFactors: p.entryFactors || null, stopLevel: round(p.entry * (1 - AGGR_RULES.stopPct), 2), trailLevel: round((p.high || p.entry) * (1 - AGGR_RULES.trailPct), 2) }); }
   const total = state.cashIls + value;
   const etfIls = rows.filter((x) => x.core).reduce((s, x) => s + x.valueIls, 0), stocksIls = value - etfIls;
   // חשיפה: מניות בודדות, קרן (SPY), מזומן, וסך חשיפה מנייתית (מניות + קרן) — כל אחד בנפרד, בלי לבלבל
@@ -81,7 +81,7 @@ export function decideAggressive({ state, rows = [], spyPrice = null, regime = n
     notes.push('שוק דובי: אין קניות חדשות של מניות');
   }
   mtm = markToMarket(after, priceOf, fx);
-  const buy = (sym, qty, px, reason, sector) => { orders.push({ side: 'buy', symbol: sym, qty, decisionPrice: round(px, 4), reason, sector }); const cost = qty * usd(px, fx) * (1 + rules.slippage) + rules.feeIls; after.cashIls -= cost; const p = after.positions[sym] || { qty: 0, entry: px, high: px, sector }; p.qty += qty; after.positions[sym] = p; };
+  const buy = (sym, qty, px, reason, sector, meta = {}) => { orders.push({ side: 'buy', symbol: sym, qty, decisionPrice: round(px, 4), reason, sector, ...meta }); const cost = qty * usd(px, fx) * (1 + rules.slippage) + rules.feeIls; after.cashIls -= cost; const p = after.positions[sym] || { qty: 0, entry: px, high: px, sector }; p.qty += qty; after.positions[sym] = p; };
   // 4. ליבה: SPY עד 20% (השלמה כשנופלת מתחת ליעד פחות סחיפה)
   if (isNum(spyPrice) && spyPrice > 0){
     const coreVal = mtm.rows.find((x) => x.core)?.valueIls || 0;
@@ -108,7 +108,7 @@ export function decideAggressive({ state, rows = [], spyPrice = null, regime = n
       const budget = Math.min(total * rules.positionWeight, after.cashIls - total * rules.cashReserve);
       const qty = Math.floor(budget / (usd(r.price, fx) * (1 + rules.slippage)));
       if (qty < 1) continue;
-      buy(r.symbol, qty, r.price, `מודל ${rules.model}: ${r['act' + rules.model]} (ציון ${r[rules.model]})`, r.sector || null);
+      buy(r.symbol, qty, r.price, `מודל ${rules.model}: ${r['act' + rules.model]} (ציון ${r[rules.model]})`, r.sector || null, { score: r[rules.model], action: r['act' + rules.model], model: rules.model, pct: r.pct ? { momentum: r.pct.momentum ?? null, growth: r.pct.growth ?? null, quality: r.pct.quality ?? null, risk: r.pct.risk ?? null } : null });
       buys++;
     }
   }
@@ -128,7 +128,7 @@ export function applyFills(state, fills = [], { fx = 3.7, day, rules = AGGR_RULE
     const base = { day, side: f.side, symbol: f.symbol, qty: f.qty, price: round(fill, 4), quotePrice: round(f.price, 4), decisionPrice: f.decisionPrice ?? null, gapPct, quoteAsOf: f.quoteAsOf || null, fillKind: f.fillKind || 'live-quote', ils: round(ils, 0), reason: f.reason };
     if (f.side === 'buy'){
       st.cashIls -= ils + rules.feeIls;
-      const p = st.positions[f.symbol] || { qty: 0, entry: fill, high: fill, openedDay: day, sector: f.sector || null };
+      const p = st.positions[f.symbol] || { qty: 0, entry: fill, high: fill, openedDay: day, sector: f.sector || null, entryScore: f.score ?? null, entryAction: f.action || null, entryModel: f.model || null, entryFactors: f.pct || null, entryReason: f.reason || null };
       const newQty = p.qty + f.qty; p.entry = (p.entry * p.qty + fill * f.qty) / newQty; p.qty = newQty; p.high = Math.max(p.high, fill); p.last = fill; st.positions[f.symbol] = p;
       trades.push(base);
     } else {

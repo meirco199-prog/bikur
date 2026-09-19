@@ -38,7 +38,9 @@ export async function main(){
   const now = ny();
   if (spyBar.date === now.date && now.minutes < 9 * 60 + 46){ log(`הסשן ${spyBar.date} עוד לא הגיע ל-09:46 ET — לא רץ`); return { skipped: true, reason: 'too-early', day: spyBar.date }; }
   const sp = await getJSON(`${W}/universe/sp500`);
-  let syms = ['SPY', ...(sp.items || []).map((a) => a.symbol)];
+  // קרנות הליבה של כל המסלולים (מאוזן/צל) נאספות גם הן — אותה נקודת ביצוע לכל התיקים ולמדדי הייחוס
+  const CORE = ['SPY', 'VTI', 'VOO', 'BND', 'AGG', 'IEF', 'GLD', 'IAU', 'QQQ'];
+  let syms = [...CORE, ...(sp.items || []).map((a) => a.symbol).filter((x) => !CORE.includes(x))];
   if (LIMIT) syms = syms.slice(0, LIMIT);
   const have = await getJSON(`${W}/entry/${spyBar.date}`).catch(() => ({ count: 0 }));
   if (!FORCE && (have.count || 0) >= DONE_SHARE * syms.length){ log(`entry940 ${spyBar.date}: כבר נאסף (${have.count}/${syms.length}) — מדלג`); return { skipped: true, reason: 'done', day: spyBar.date, count: have.count }; }

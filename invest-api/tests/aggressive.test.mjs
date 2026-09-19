@@ -100,3 +100,28 @@ test('אגרסיבי: מדדים; לילה = החלטה בלבד (pending), מי
   assert.ok(rep.pending && rep.pending.orders.length === 6); assert.equal(rep.positions.length, 0); assert.equal(rep.equity.length, 1);
 });
 const round4 = (x) => Math.round(x * 10000) / 10000;
+
+test('אגרסיבי: היסטוריית חשיפה יומית (מניות/SPY/מזומן בפועל, לא רק יעדים) והסבר קריא לכל פוזיציה (למה נבחרה ומתי תימכר)', async () => {
+  installMockFetch();
+  const db = new DB(null); const ctx = { db, env: { FINNHUB_KEY: 'x', AUTO_ANY_TIME: '1' }, budget: new Budget(db) };
+  await db.put('idx:snapdays', ['2026-09-17']); await db.put('rank:2026-09-17', { table: [{ symbol: 'SPY', price: 500, type: 'etf' }] }); await db.put('regime:2026-09-17', bull);
+  await db.put('shadow:2026-09-17', { day: '2026-09-17', rows: rows(), models: { D: { variant: 'D-preRevision' } } });
+  await runAggressive(ctx);
+  await executeAggressive(ctx);
+  const rep = await aggrReport(db);
+  // חשיפה יומית: יש רשומה ליום עם מניות/SPY/מזומן בפועל (לא רק את השווי הכולל)
+  assert.equal(rep.exposureHistory.length, 1);
+  const eh = rep.exposureHistory[0];
+  assert.equal(eh.day, '2026-09-17');
+  assert.ok(isNum(eh.stocksShare) && isNum(eh.etfShare) && isNum(eh.cashShare));
+  assert.ok(eh.positions === 0, 'ביום ההחלטה עוד לא בוצע מילוי — החשיפה שנרשמה היא לפני המילוי');
+  // פוזיציה בודדת: הסבר כניסה (ציון/מודל/גורמים) והסבר יציאה (עצירה/עצירה נגררת/סיגנל)
+  const pos = rep.positions.find((p) => !p.core);
+  assert.ok(pos, 'יש לפחות פוזיציה אחת');
+  assert.match(pos.why, /מודל D: STRONG BUY \(ציון \d/);
+  assert.match(pos.sellTrigger, /עצירת הפסד 12%/); assert.match(pos.sellTrigger, /עצירה נגררת 15%/);
+  assert.ok(isNum(pos.entryScore) && isNum(pos.stopLevel) && pos.stopLevel < pos.entry);
+  const core = rep.positions.find((p) => p.core);
+  assert.match(core.why, /ליבת התיק/); assert.match(core.sellTrigger, /לא נמכרת/);
+});
+const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
