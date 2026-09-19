@@ -1,8 +1,9 @@
-# קבצי סיכון קריטיים: כל שינוי בהם דורש אישור של בעל הריפו, לא רק של מי שכותב את שאר הקוד (כולל סוכן AI).
-# הערה חשובה: הקובץ הזה לבדו לא חוסם push ישיר ל-main. GitHub אוכף אותו רק כ-"Require review from Code Owners"
-# בהגדרת Branch Protection על הענף (Settings → Branches → main) — פעולה ידנית חד-פעמית של בעל הריפו.
-# עד אז ההגנה הטכנית האמיתית היא invest-api/tests/risk-limits-lock.test.mjs, שרץ בכל CI לפני כל פריסה.
-# פירוט מלא: invest/docs/SECURITY.md
+# קבצי סיכון קריטיים: כל שינוי בהם צריך לדרוש אישור של בעל הריפו, לא רק של מי שכותב את שאר הקוד (כולל סוכן AI).
+# הערה קריטית: הקובץ הזה, כמו גם invest-api/tests/risk-limits-lock.test.mjs, לא חוסמים שום דבר בפועל כל עוד
+# יש לסוכן AI הרשאת push ישיר ל-main — מי שיכול לשנות את risk-limits.js יכול, באותו commit, לשנות גם את הבדיקה
+# שמאשרת אותו וגם את הקובץ הזה. אין כאן שום חסימה טכנית עד שמופעלת Branch Protection על main עם "Require a pull
+# request before merging" + "Require review from Code Owners" (Settings → Branches → main, פעולה ידנית של בעל
+# הריפו) — ורצוי גם בלי אפשרות bypass למנהלים/אוטומציה. פירוט מלא: invest/docs/SECURITY.md
 
 /invest-api/engine/risk-limits.js            @meirco199-prog
 /invest-api/engine/tracks.js                 @meirco199-prog
