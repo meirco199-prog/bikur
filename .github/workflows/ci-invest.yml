@@ -1,0 +1,21 @@
+# CI לפלטפורמת ההשקעות: רץ על כל Pull Request ל-main (בלי paths filter — כדי שה-check תמיד יתחיל, גם
+# ל-PR שלא נוגע ב-invest-api, ולא ייתקע כ"required status check שאף פעם לא רץ"). לא פורס שום דבר — הפריסה
+# בפועל קורית רק אחרי merge/push ל-main, דרך deploy-invest-api.yml (worker נפרד: test ואז deploy).
+# המטרה: לאפשר Require status checks to pass ב-Branch Protection בלי לתקוע PR-ים. ראה AI_COUNCIL.md#9.
+name: CI (invest-api)
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: invest-api tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Engine + worker tests
+        run: node --test invest-api/tests/*.test.mjs
