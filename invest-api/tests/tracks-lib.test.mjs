@@ -6,7 +6,8 @@ import { installMockFetch } from './mock-providers.mjs';
 import { DB } from '../lib/db.js';
 import { PaperBroker } from '../lib/broker.js';
 import { runTracksDecide, runTracksFill, trackReport, tracksCompare } from '../lib/tracks.js';
-import { TRACKS, INITIAL_ILS } from '../engine/tracks.js';
+import { TRACKS, INITIAL_ILS, decideAggressiveB } from '../engine/tracks.js';
+import { applyFills } from '../engine/aggressive.js';
 import { isNum } from '../engine/util.js';
 
 installMockFetch();
@@ -173,6 +174,36 @@ test('tracksCompare: מחזיר 5 פריטים + חשבון התרגול + אג�
   assert.equal(paper.control, true); assert.equal(paper.totalIls, INITIAL_ILS);
   assert.ok(cmp.notes.some((n) => /מדגם קטן/.test(n)));
   assert.ok(cmp.benchmarks.spy); assert.ok(cmp.benchmarks.spy95);
+});
+
+test('אגרסיבי B: מכירת SPY מקדימה למימון קניות מבוצעת פעם אחת בדיוק — לא נספרת גם בהחלטה וגם במילוי', async () => {
+  const ctx = mkCtx();
+  const day = '2026-09-17';
+  const { rank, shadow } = await seedDay(ctx.db, day, { n: 40 }); // 16 מועמדות DF (8 חזקה + 8 קנייה) — הרבה יותר מ-maxBuysPerDay
+  const spyPrice = rank.table.find((r) => r.symbol === 'SPY').price; // 500
+  const regime = { trend: 'Bull Trend', risk: 'Risk On' };
+  const rules = TRACKS.aggrB.rules;
+  // תיק קיים: 240 יחידות SPY (60% מתיק של כ-126,000 ₪ בקירוב) ומעט מזומן — מספיק כדי לדרוש מימון מקדים
+  const preSeeded = { version: rules.version, initialIls: 200000, cashIls: 6000, positions: { SPY: { qty: 240, entry: 500, high: 500, sector: 'core', openedDay: '2026-09-10' } }, cooldown: {}, lastDay: '2026-09-16', createdDay: '2026-09-10', stats: { trades: 0, wins: 0, losses: 0, feesIls: 0 }, track: 'aggrB' };
+
+  // "תשובת מחברת" — הפעלת orders מהמנוע הטהור פעם אחת בדיוק, ישירות על מצב ההתחלה, בלי לעבור בכלל דרך KV
+  const decisionOnly = decideAggressiveB({ state: JSON.parse(JSON.stringify(preSeeded)), rows: shadow.rows, spyPrice, regime, fx: 3.7, day, rules });
+  assert.ok(decisionOnly.orders.some((o) => o.side === 'sell' && o.symbol === 'SPY'), 'התרחיש חייב לכלול מכירת SPY מקדימה, אחרת אין מה לבדוק');
+  const textbook = applyFills(JSON.parse(JSON.stringify(preSeeded)), decisionOnly.orders.map((o) => ({ ...o, price: o.decisionPrice, fillKind: 'textbook' })), { fx: 3.7, day, rules }).state;
+
+  // הזרימה האמיתית דרך lib/tracks.js (decide נשמר ל-KV, ואז fill למחרת) — עם אותם מחירי 09:40 בדיוק כמו מחיר ההחלטה (בלי gap)
+  await ctx.db.put('track:aggrB:state', JSON.parse(JSON.stringify(preSeeded)));
+  const dec = await runTracksDecide(ctx, { day });
+  assert.ok(!dec.tracks.aggrB.error && !dec.tracks.aggrB.skipped, JSON.stringify(dec.tracks.aggrB));
+  const afterDecide = await ctx.db.get('track:aggrB:state');
+  assert.equal(afterDecide.positions.SPY.qty, 240, 'החלטה בלבד לא צריכה "לבצע" את המכירה המקדימה — היא עדיין רק pending');
+  assert.equal(afterDecide.cashIls, 6000, 'החלטה בלבד לא צריכה לשנות את המזומן בפועל');
+  await seedEntry940(ctx.db, day, entryPricesFor(rank, 1)); // jitter=1: מחיר המילוי זהה למחיר ההחלטה, בלי gap
+  const fill = await runTracksFill(ctx, { day });
+  assert.ok(fill.tracks.aggrB.filled > 0, JSON.stringify(fill.tracks.aggrB));
+  const finalState = await ctx.db.get('track:aggrB:state');
+  assert.equal(finalState.positions.SPY.qty, textbook.positions.SPY.qty, `כמות SPY אחרי מילוי (${finalState.positions.SPY.qty}) חייבת לרדת פעם אחת בדיוק כמו במחברת (${textbook.positions.SPY.qty}), לא פעמיים`);
+  assert.ok(Math.abs(finalState.cashIls - textbook.cashIls) < 0.5, `מזומן אחרי מילוי (${finalState.cashIls}) חייב להתאים בדיוק למחברת (${textbook.cashIls})`);
 });
 
 test('runTracksDecide פעם ביום: הרצה שנייה לאותו יום בלי force לא יוצרת פקודות כפולות', async () => {

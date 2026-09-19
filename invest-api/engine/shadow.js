@@ -118,7 +118,8 @@ export function computeShadow({ table = [], revisions = {}, regime = null, day =
   const actC = rankActions(scoreC, { overlay });
   const actD = rankActions(scoreD, { overlay });
   // DF: כשירות מוחלטת על הגורמים הגולמיים (0–100) + כיסוי נתונים; הפעולה מהדירוג היחסי בתוך המסוננים, ואז סף ציון מוחלט
-  const eligibleDF = pct.map((p, i) => eligibleD[i] && raw[i].momentum >= DF_RULES.minMomentum && isNum(raw[i].growth) && raw[i].growth >= DF_RULES.minGrowth && isNum(raw[i].quality) && raw[i].quality >= DF_RULES.minQuality && isNum(raw[i].risk) && raw[i].risk >= DF_RULES.minRisk && (!isNum(stocks[i].coverage) || stocks[i].coverage >= DF_RULES.minCoverage));
+  // fail-closed: כיסוי נתונים חסר/לא מספרי לא עובר את הסף — DF דורש כיסוי ידוע ומספיק, לא "אין מידע אז נניח שזה בסדר"
+  const eligibleDF = pct.map((p, i) => eligibleD[i] && raw[i].momentum >= DF_RULES.minMomentum && isNum(raw[i].growth) && raw[i].growth >= DF_RULES.minGrowth && isNum(raw[i].quality) && raw[i].quality >= DF_RULES.minQuality && isNum(raw[i].risk) && raw[i].risk >= DF_RULES.minRisk && isNum(stocks[i].coverage) && stocks[i].coverage >= DF_RULES.minCoverage);
   const scoreDF = scoreD.map((v, i) => (eligibleDF[i] ? v : null));
   const actDF = rankActions(scoreDF, { overlay }).map((a, i) => (a === 'STRONG BUY' && scoreDF[i] < DF_RULES.minScoreStrong ? (scoreDF[i] >= DF_RULES.minScoreBuy ? 'BUY' : 'HOLD') : a === 'BUY' && scoreDF[i] < DF_RULES.minScoreBuy ? 'HOLD' : a));
   const contribC = (i) => { const p = { ...pct[i], revision: revPct[i] }; const w = SHADOW_MODELS.C.weights; const sw = Object.entries(w).filter(([k]) => isNum(p[k])).reduce((s, [, v]) => s + v, 0); return Object.fromEntries(Object.entries(w).filter(([k]) => isNum(p[k])).map(([k, v]) => [k, round((v / sw) * p[k], 1)])); };

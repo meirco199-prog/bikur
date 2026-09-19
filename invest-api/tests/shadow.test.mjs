@@ -197,3 +197,15 @@ test('מודל DF: D מסונן בספי איכות מוחלטים — מניה 
   const st = summarizeStats(accumulateStats(null, d, 1)).horizons['1'].models;
   assert.ok(st['DF-preRevision'] && st['D-preRevision'] && st['DF-preRevision'].n < st['D-preRevision'].n);
 });
+
+test('מודל DF: כיסוי נתונים חסר (לא רק נמוך) הוא fail-closed — לא עובר את הסינון, לא נניח שהוא בסדר', async () => {
+  // כל הגורמים האחרים עוברים את הסף (מומנטום/צמיחה/איכות/סיכון); ההבדל היחיד בין המניות הוא coverage: מוגדר-וגבוה
+  // מול לא-מוגדר בכלל (undefined) — לא רשום כ-0.6 (נמוך) אלא נעדר לחלוטין, מדמה נתון שלא הגיע מהספק.
+  const rows = mk(40, (i) => ({ coverage: i % 2 === 0 ? 0.95 : undefined, components: { fundamental: 60, valuation: 50, growth: 70, quality: 70, technical: 60, momentum: 70, risk: 60 } }));
+  const d = computeShadow({ table: rows, revisions: {}, day: '2026-09-18' });
+  const byS = Object.fromEntries(d.rows.map((r) => [r.symbol, r]));
+  for (let i = 0; i < 40; i++){
+    if (i % 2 === 0) assert.equal(byS['S' + i].coverage, 0.95);
+    else { assert.equal(byS['S' + i].coverage, null, 'coverage לא מספרי מנורמל ל-null'); assert.equal(byS['S' + i].eligibleDF, false, `S${i}: coverage חסר חייב להיות לא-כשיר, לא כשיר-בהיעדר-מידע`); }
+  }
+});

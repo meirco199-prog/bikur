@@ -105,6 +105,35 @@ test('בדיקות תקינות (preflight): פקודות ממסלול אחר, �
   assert.equal(preflight({ ...base, pending: ok, perf: { cashIls: 200000, totalIls: 200000, stocksIls: 0 } }).ok, true);
 });
 
+test('מודל תאריכים (isExpectedFillDay): סוף שבוע וחג — signalDay עצמו לא-יום-מסחר, fillDay יום המסחר הבא בפועל; אין סלחנות בין שני ימי חול', async () => {
+  const { isExpectedFillDay } = await import('../engine/session.js');
+  // שישי (סגירה) → נסרק ומתויג "שבת" לפי today() גולמי (nightly-sp500.mjs, ראה session.js) → מילוי אמיתי רק בשני
+  assert.equal(isExpectedFillDay('2026-09-19', '2026-09-21'), true, 'שבת (תיוג) → שני (מילוי אמיתי) חייב להתקבל');
+  assert.equal(isExpectedFillDay('2026-09-20', '2026-09-21'), true, 'ראשון → שני חייב להתקבל');
+  // ערב חג: יום ההודיה 2026-11-26 (חמישי, שוק סגור) מתויג כ"signalDay" (סריקה שרצה אחרי סגירת רביעי) → מילוי בפועל שישי הבא
+  assert.equal(isExpectedFillDay('2026-11-26', '2026-11-27'), true, 'חג באמצע השבוע → יום המסחר הבא חייב להתקבל');
+  // שני ימי מסחר רגילים ברצף — אין שום סלחנות; pending תקוע מאתמול חייב להיחסם כ-stale-day, לא "לגיטימי בטעות"
+  assert.equal(isExpectedFillDay('2026-09-17', '2026-09-18'), false, 'חמישי→שישי (שני ימי מסחר רגילים) לא אמור להתקבל');
+  // סוף שבוע/חג, אבל פער ארוך מדי (עדיין תקוע אמיתית, לא רק המתנה לגיטימית ליום המסחר הבא)
+  assert.equal(isExpectedFillDay('2026-09-19', '2026-09-25'), false, 'פער של 6 ימים מ-signalDay שהוא סוף שבוע עדיין נחשב stale');
+  // fillDay עצמו סוף שבוע/חג — אף פעם לא תקין (אין entry940 אמיתי ליום כזה)
+  assert.equal(isExpectedFillDay('2026-09-19', '2026-09-20'), false, 'fillDay עצמו לא יכול להיות סוף שבוע');
+});
+
+test('preflight ברמת אינטגרציה: אותה בדיקה על מסלול אמיתי — שבת→שני מתקבל, חמישי→שישי עדיין נחסם', () => {
+  const track = TRACKS.regB;
+  // signalDay="2026-09-19" (שבת — סריקה שרצה מוקדם שבת אחרי סגירת שישי, מתויגת today() גולמי); fillDay="2026-09-21" (שני, entry940 אמיתי)
+  const weekendPending = { track: 'regB', day: '2026-09-19', orders: [{ side: 'buy', symbol: 'AAA', qty: 5, decisionPrice: 100 }] };
+  const weekendPriceDoc = { day: '2026-09-21', count: 500, prices: { AAA: 100 } };
+  const rWeekend = preflight({ track, fillDay: '2026-09-21', priceDoc: weekendPriceDoc, fx: 3.7, pending: weekendPending, perf: { cashIls: 200000, totalIls: 200000, stocksIls: 0 } });
+  assert.equal(rWeekend.violations.some((v) => v.code === 'stale-day'), false, JSON.stringify(rWeekend.violations));
+  // ולעומת זאת pending תקוע מיום חול רגיל (חמישי) לא "נסלח" רק כי יש היום entry940 של שישי
+  const stalePending = { track: 'regB', day: '2026-09-17', orders: [{ side: 'buy', symbol: 'AAA', qty: 5, decisionPrice: 100 }] };
+  const stalePriceDoc = { day: '2026-09-18', count: 500, prices: { AAA: 100 } };
+  const rStale = preflight({ track, fillDay: '2026-09-18', priceDoc: stalePriceDoc, fx: 3.7, pending: stalePending, perf: { cashIls: 200000, totalIls: 200000, stocksIls: 0 } });
+  assert.equal(rStale.violations[0].code, 'stale-day');
+});
+
 test('מדדי ייחוס שקליים: SPY מלא ו-95/5, נכנסים ב-09:40 עם עמלה והחלקה', () => {
   const b1 = benchStart({ id: 'spy', day: '2026-09-17', price940: 500, fx: 3.7 });
   assert.equal(b1.qty, Math.floor(200000 / (500 * (1 + FILL_SLIPPAGE) * 3.7)));

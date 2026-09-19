@@ -11,6 +11,7 @@ import { decideOrders, AUTO_RULES } from './autopilot.js';
 import { decideAggressive, applyFills, markToMarket, AGGR_RULES } from './aggressive.js';
 import { RISK_LIMITS } from './risk-limits.js';
 import { commissionIls } from '../lib/broker.js';
+import { isExpectedFillDay } from './session.js';
 
 export const TRACKS_VERSION = 1;
 export const INITIAL_ILS = 200000;
@@ -66,6 +67,11 @@ export function decideAggressiveB({ state, rows = [], spyPrice = null, regime = 
   const held = new Set(Object.keys(st0.positions));
   const cool = (s) => { const d = st0.cooldown?.[s]; return d && day && (Date.parse(day) - Date.parse(d)) / 86400000 < rules.cooldownDays; };
   const qualifying = rows.filter((r) => r['eligible' + rules.model] !== false && isNum(r[rules.model]) && rules.buyActions.includes(r['act' + rules.model]) && (!riskOff || r['act' + rules.model] === 'STRONG BUY') && !held.has(r.symbol) && !cool(r.symbol) && isNum(r.price) && r.price > 0);
+  // preSellQty/coreSnapshot: המכירה המקדימה מוחלת על st0 רק בשביל לתת ל-decideAggressive לראות את המזומן שיתפנה
+  // (כדי שגודל הקניות המחושב יתאים) — היא עדיין הזמנה ב-pending בלבד, לא ביצוע. בלי הביטול בהמשך, ה-state
+  // המוחזר (שנשמר ל-KV לפני המילוי בפועל) היה "מבצע" אותה כבר עכשיו, ואז applyFills במילוי האמיתי למחרת היה
+  // מבצע אותה שוב — כמות ה-SPY יורדת פעמיים והמזומן עולה פעמיים על אותה מכירה בפועל אחת.
+  let preSellQty = 0, coreSnapshot = null;
   if (!bear && isNum(spyPrice) && spyPrice > 0 && qualifying.length){
     const nPos = Object.keys(st0.positions).filter((s) => s !== rules.core).length;
     const want = Math.max(0, Math.min(qualifying.length, rules.maxPositions - nPos, rules.maxBuysPerDay));
@@ -76,6 +82,7 @@ export function decideAggressiveB({ state, rows = [], spyPrice = null, regime = 
     if (need > avail && spyExcess > 0){
       const qty = Math.min(st0.positions[rules.core]?.qty || 0, Math.floor(Math.min(need - avail, spyExcess) / usd(spyPrice)));
       if (qty >= 1){
+        preSellQty = qty; coreSnapshot = { ...st0.positions[rules.core] };
         pre.push({ side: 'sell', symbol: rules.core, qty, decisionPrice: round(spyPrice, 4), reason: `מימון ${want} קניות איכותיות מהליבה: SPY מעל 20% (${Math.round(spyVal / mtm0.totalIls * 100)}%)`, sector: 'core' });
         st0.cashIls += qty * usd(spyPrice) * (1 - rules.slippage) - rules.feeIls;
         const p = st0.positions[rules.core]; p.qty -= qty; if (p.qty <= 0) delete st0.positions[rules.core];
@@ -84,6 +91,13 @@ export function decideAggressiveB({ state, rows = [], spyPrice = null, regime = 
     }
   }
   const d = decideAggressive({ state: st0, rows, spyPrice, regime, fx, day, rules });
+  // מבטלים כאן את האפקט הכספי של המכירה המקדימה מה-state המוחזר (ראה הערה למעלה) — היא נשארת רק בתוך orders/pending,
+  // ותבוצע פעם אחת בלבד, בפועל, כשה-pending הזו תתמלא (applyFills) למחרת ב-09:40.
+  if (preSellQty > 0){
+    d.state.cashIls -= preSellQty * usd(spyPrice) * (1 - rules.slippage) - rules.feeIls;
+    const p = d.state.positions[rules.core];
+    if (p) p.qty += preSellQty; else d.state.positions[rules.core] = { ...coreSnapshot, qty: preSellQty };
+  }
   const orders = [...pre, ...d.orders];
   // חשיפה צפויה אחרי כל הפקודות (מילוי במחיר ההחלטה — קירוב)
   const projected = applyFills(d.state, orders.map((o) => ({ ...o, price: o.decisionPrice, fillKind: 'projection' })), { fx, day, rules }).state;
@@ -116,7 +130,10 @@ export function preflight({ track, pending, priceDoc, fillDay, state = null, per
   if (!pending) add('no-pending', 'אין פקודות ממתינות');
   else {
     if (pending.track && pending.track !== track.id) add('mixing', `פקודות של ${pending.track} הגיעו למסלול ${track.id}`);
-    if (pending.day !== fillDay) add('stale-day', `הפקודות ליום ${pending.day}, המילוי ליום ${fillDay}`);
+    // בדרך כלל fillDay חייב להיות בדיוק pending.day (העיבוד הלילי מתייג לפי היום שבו הוא רץ, לפני 09:40 של אותו יום).
+    // חריגה מותרת רק כשsignalDay עצמו סוף שבוע/חג (nightly-sp500.mjs מתייג לפי today() גולמי, בלי לוח חגים) —
+    // אז ה-fillDay האמיתי (entry940, שמתויג לפי הבר האמיתי) הוא יום המסחר הבא, לא אותו יום. ראה session.js.
+    if (!isExpectedFillDay(pending.day, fillDay)) add('stale-day', `הפקודות ליום ${pending.day}, המילוי ליום ${fillDay}`);
     if (alreadyFilled || pending.filled) add('double-execution', `הפקודות ליום ${pending.day} כבר בוצעו`);
   }
   if (!priceDoc || priceDoc.day !== fillDay) add('stale-price', `אין מחירי 09:40 ליום ${fillDay}${priceDoc?.day ? ` (יש ל-${priceDoc.day})` : ''}`);
