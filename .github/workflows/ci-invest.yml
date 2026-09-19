@@ -2,6 +2,7 @@
 # ל-PR שלא נוגע ב-invest-api, ולא ייתקע כ"required status check שאף פעם לא רץ"). לא פורס שום דבר — הפריסה
 # בפועל קורית רק אחרי merge/push ל-main, דרך deploy-invest-api.yml (worker נפרד: test ואז deploy).
 # המטרה: לאפשר Require status checks to pass ב-Branch Protection בלי לתקוע PR-ים. ראה AI_COUNCIL.md#9.
+# (שורת בדיקה זמנית — PR ייעודי לוודא ששם ה-status check שנוצר, לפני שמגדירים אותו כ-required; ראה AI_COUNCIL#12.)
 name: CI (invest-api)
 
 on:
