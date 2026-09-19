@@ -1,7 +1,6 @@
 {
-  "_comment": "הגדרות לא-סודיות של ה-Worker, נקראות בפריסה. APP_TOKEN_SHA256 = sha256 של הטוקן (הטוקן עצמו לא בריפו). CRON_SECRET מאפשר ל-GitHub Actions להריץ עיבוד בלבד (לא לשנות נתונים).",
+  "_comment": "הגדרות לא-סודיות של ה-Worker, נכנסות ב-deploy כ-plain_text (גלויות בדשבורד + בריפו הציבורי — לא לשים כאן שום דבר שהוא בגדר סוד). APP_TOKEN_SHA256 = sha256 של הטוקן (הטוקן עצמו לא בריפו, כי אי אפשר לשחזר אותו מה-hash). CRON_SECRET הוסר מהקובץ הזה (היה גלוי בפומבי) ועבר ל-secret_text — ראה invest/docs/SECURITY.md.",
   "APP_TOKEN_SHA256": "adda97507c52ac7f2837e6df521266233379f4b1180d9122f0d8752054c24ef4",
-  "CRON_SECRET": "invest-tick-2c85f4f730fb",
   "EDGAR_UA": "bikur-invest research meirco199@gmail.com",
   "CRON_BATCH": "3"
 }

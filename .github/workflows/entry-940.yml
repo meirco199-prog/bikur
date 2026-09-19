@@ -18,5 +18,6 @@ jobs:
           node-version: '22'
       - name: Fetch 09:40 prices and ingest
         run: |
-          SECRET=$(python3 -c 'import json; print(json.load(open("invest-api/config.json"))["CRON_SECRET"])')
+          SECRET="${{ secrets.CRON_SECRET }}"
+          if [ -z "$SECRET" ]; then echo "::error::חסר הסוד CRON_SECRET בהגדרות הריפו (Settings → Secrets and variables → Actions) — ראה invest/docs/SECURITY.md"; exit 1; fi
           CRON_SECRET="$SECRET" WORKER_URL=https://invest-api.meirco199.workers.dev node invest-api/scripts/entry940.mjs

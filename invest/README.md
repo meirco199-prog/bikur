@@ -18,6 +18,10 @@
 | [docs/SIGNAL_MODEL.md](docs/SIGNAL_MODEL.md) | בדיוק איך מחושב הציון והסיגנל |
 | [docs/BACKTESTING_RULES.md](docs/BACKTESTING_RULES.md) | מניעת look-ahead/leakage, עלויות, walk-forward, As-Of |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | שלבים, מה הושלם, ביצוע פקודות בברוקר (שלב 3) |
+| [docs/SHADOW_MODEL.md](docs/SHADOW_MODEL.md) | מודלי הציון המקבילים (A/B/C/D/DF) ומדידתם מול הישן |
+| [docs/TRACKS.md](docs/TRACKS.md) | חמישה מסלולי השקעה מקבילים (regB/regC/אגרסיבי B + שתי קבוצות ביקורת), מדדי ייחוס שקליים |
+| [docs/STOPS.md](docs/STOPS.md) | סקירת סיכון gap/תוך-יומי בעצירות הנוכחיות + הצעת עיצוב לעצירות ברוקר אמיתיות ב-IBKR |
+| [docs/SECURITY.md](docs/SECURITY.md) | CRON_SECRET כ-secret_text, נעילת מנוע הסיכון (CODEOWNERS + בדיקת נעילה) |
 
 ## הפעלה ראשונה (חד-פעמי)
 1. **הפריסה אוטומטית** בדחיפה ל-`main` (`.github/workflows/deploy-invest-api.yml` יוצר KV `invest`, binding ל-Workers AI, cron).
@@ -48,7 +52,7 @@ invest-api/        Cloudflare Worker
 
 ## בדיקות
 ```
-node --test invest-api/tests/*.test.mjs                     # 67 בדיקות
+node --test invest-api/tests/*.test.mjs                     # 152 בדיקות
 node invest-api/tests/e2e/mock-server.mjs &                 # API מדומה (ספקים מדומים, KV בזיכרון)
 python3 -m http.server 8000 &                                # הגשת הריפו
 node invest-api/tests/e2e/e2e.mjs                            # Chromium: כל מסך + פעולות
@@ -58,8 +62,8 @@ node invest-api/tests/e2e/e2e.mjs                            # Chromium: כל מ
 המערכת מנהלת את חשבון התרגול לבד לפי כללים גלויים (קנייה בשלבים, מכירה לפי סיגנל/עצירת הפסד, אין קניות בשוק דובי). פרטים: [docs/AUTOPILOT.md](docs/AUTOPILOT.md).
 
 
-## מודל הצל והמסלול האגרסיבי
-מודל ציון חדש רץ כל לילה במקביל לישן בלי לסחור, ונמדד מולו (תשואות 1/5/20/60 יום, מונוטוניות, IC, התפלגות ציונים). במקביל רץ תיק צל אגרסיבי (ריכוזי, לפי מודל C) שנמדד מול SPY. פירוט: `docs/SHADOW_MODEL.md`. כרטיסים במסך "היום".
+## מודל הצל וחמישה מסלולי השקעה מקבילים
+מודל ציון חדש רץ כל לילה במקביל לישן בלי לסחור, ונמדד מולו (תשואות 1/5/20/60 יום, מונוטוניות, IC, התפלגות ציונים). במקביל רצות חמש סימולציות תיק (חשבון התרגול המאוזן והמסלול האגרסיבי הקיימים כקבוצות ביקורת, ושלושה מסלולי צל חדשים — regB, regC, אגרסיבי B), כולן מול אותם מדדי ייחוס שקליים. פירוט: `docs/SHADOW_MODEL.md`, `docs/TRACKS.md`. כרטיסים במסך "היום", השוואה מלאה ב-`#/tracks`.
 
 ## יקום: כל ה-S&P 500
 הרשימה מוויקיפדיה; הניתוח הלילי של 500 החברות רץ ב-GitHub Actions (`invest-api/scripts/nightly-sp500.mjs`) ונשמר ב-KV ב-16 מסמכים ליום (`lib/snapstore.js`).
