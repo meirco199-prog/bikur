@@ -48,6 +48,19 @@ function entryPricesFor(rank, jitter = 1.001){ const p = {}; for (const r of ran
 
 function mkCtx(){ const db = new DB(null); return { db, env: {} }; }
 
+// runTracksDecide רושם decidedAt לפי השעון האמיתי (new Date()), בדיוק כמו בפרודקשן — preflight (engine/session.js
+// decidedBeforeFillWindow) חוסם מילוי אם ההחלטה נוצרה אחרי 09:40 ניו יורק של יום המילוי, כדי שלא "יבצעו" החלטה
+// במחיר שכבר היה ידוע. הבדיקות כאן מדמות ימים בדויים (day='2026-09-17' וכו') שלא קשורים לשעון האמיתי של מי
+// שמריץ את הבדיקות — בלי התיקון הזה, decidedAt (עכשיו, באמת) היה נופל אחרי 09:40 של אותו יום בדוי בכל ריצה
+// אחרי 2026-09-17, וחוסם מילוי שהוא לגיטימי לגמרי בהקשר הבדיקה. מתקנים את decidedAt ישירות ל-05:00 UTC של אותו
+// יום (הרבה לפני 09:40 ET), בדיוק כפי שהיה נראה decidedAt אמיתי של ריצה לילית תקינה.
+async function backdateDecisions(db, day, ids = ['regB', 'regC', 'aggrB']){
+  for (const id of ids){
+    const key = `track:${id}:pending`; const p = await db.get(key);
+    if (p) { p.decidedAt = new Date(day + 'T05:00:00.000Z').toISOString(); await db.put(key, p); }
+  }
+}
+
 test('בידוד: מפתחות המסלולים נפרדים לגמרי מ-paper:*/aggr:* — כתיבה לתיק חדש לא נוגעת בחשבון התרגול', async () => {
   const ctx = mkCtx();
   const broker = new PaperBroker(ctx.db); // חשבון התרגול הרגיל
@@ -77,6 +90,7 @@ test('regB/regC: החלטה לילית → פקודות ממתינות, מילו
   assert.ok(dec.tracks.regB.orders > 0); assert.ok(dec.tracks.regC.orders > 0);
   const pendB = await ctx.db.get('track:regB:pending');
   assert.equal(pendB.track, 'regB'); assert.equal(pendB.filled, false);
+  await backdateDecisions(ctx.db, day);
   await seedEntry940(ctx.db, day, entryPricesFor(rank));
   const fill = await runTracksFill(ctx, { day });
   assert.equal(fill.tracks.regB.filled > 0, true);
@@ -99,6 +113,7 @@ test('הקצאת יעד: regB מתכנס לקרן ליבה 60%, מניות ~20% 
     const { rank } = await seedDay(ctx.db, d);
     lastRank = rank;
     await runTracksDecide(ctx, { day: d });
+    await backdateDecisions(ctx.db, d);
     await seedEntry940(ctx.db, d, entryPricesFor(rank));
     await runTracksFill(ctx, { day: d });
   }
@@ -112,6 +127,7 @@ test('אגרסיבי B: זורם מהחלטה למילוי, חשיפה מניי�
   const day = '2026-09-17';
   const { rank } = await seedDay(ctx.db, day);
   await runTracksDecide(ctx, { day });
+  await backdateDecisions(ctx.db, day);
   await seedEntry940(ctx.db, day, entryPricesFor(rank));
   await runTracksFill(ctx, { day });
   const r = await trackReport(ctx.db, 'aggrB');
@@ -126,6 +142,7 @@ test('preflight חוסם מילוי: מחיר 09:40 חסר ליום — הפקו
   const day = '2026-09-17';
   await seedDay(ctx.db, day);
   await runTracksDecide(ctx, { day });
+  await backdateDecisions(ctx.db, day);
   const fill = await runTracksFill(ctx, { day }); // בלי entry940 בכלל
   assert.ok(fill.tracks.regB.blocked, JSON.stringify(fill.tracks.regB));
   assert.ok(fill.tracks.regB.blocked.includes('stale-price'));
@@ -140,6 +157,7 @@ test('preflight חוסם מזומן שלילי: תקציב מוגזם בטבלת
   await runTracksDecide(ctx, { day });
   const pend = await ctx.db.get('track:regB:pending');
   pend.orders.push({ side: 'buy', symbol: 'ST0', qty: 100000, decisionPrice: 50, currency: 'USD', reason: 'הזרקת בדיקה' });
+  pend.decidedAt = new Date(day + 'T05:00:00.000Z').toISOString();
   await ctx.db.put('track:regB:pending', pend);
   await seedEntry940(ctx.db, day, entryPricesFor(rank));
   const fill = await runTracksFill(ctx, { day });
@@ -153,6 +171,7 @@ test('preflight חוסם ערבוב: פקודות עם track שגוי לא מת�
   await runTracksDecide(ctx, { day });
   const pend = await ctx.db.get('track:regB:pending');
   pend.track = 'regC'; // מדמה באג/ערבוב
+  pend.decidedAt = new Date(day + 'T05:00:00.000Z').toISOString();
   await ctx.db.put('track:regB:pending', pend);
   await seedEntry940(ctx.db, day, entryPricesFor(rank));
   const fill = await runTracksFill(ctx, { day });
@@ -165,6 +184,7 @@ test('tracksCompare: מחזיר 5 פריטים + חשבון התרגול + אג�
   const day = '2026-09-17';
   const { rank } = await seedDay(ctx.db, day);
   await runTracksDecide(ctx, { day });
+  await backdateDecisions(ctx.db, day);
   await seedEntry940(ctx.db, day, entryPricesFor(rank));
   await runTracksFill(ctx, { day });
   const cmp = await tracksCompare(ctx.db);
@@ -198,6 +218,7 @@ test('אגרסיבי B: מכירת SPY מקדימה למימון קניות מב
   const afterDecide = await ctx.db.get('track:aggrB:state');
   assert.equal(afterDecide.positions.SPY.qty, 240, 'החלטה בלבד לא צריכה "לבצע" את המכירה המקדימה — היא עדיין רק pending');
   assert.equal(afterDecide.cashIls, 6000, 'החלטה בלבד לא צריכה לשנות את המזומן בפועל');
+  await backdateDecisions(ctx.db, day, ['aggrB']);
   await seedEntry940(ctx.db, day, entryPricesFor(rank, 1)); // jitter=1: מחיר המילוי זהה למחיר ההחלטה, בלי gap
   const fill = await runTracksFill(ctx, { day });
   assert.ok(fill.tracks.aggrB.filled > 0, JSON.stringify(fill.tracks.aggrB));

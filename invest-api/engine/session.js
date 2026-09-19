@@ -1,6 +1,5 @@
 // יום המסחר האחרון שנסגר בניו יורק (ב'–ו', 16:00 ET; חגים לא נלקחים בחשבון — ביום חג הסדרה תתרענן פעם אחת לשווא, לא מזיק).
 // משמש לקבוע אם סדרת מחירים במטמון עדיין מכסה את הסגירה האחרונה: מטמון עם TTL בלבד יכול להיות "טרי" (20 שעות) ועדיין לא לכלול את הסגירה של אתמול.
-import { daysBetween } from './util.js';
 const PARTS = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 export function nyParts(now = new Date()){
@@ -42,19 +41,41 @@ export const NYSE_HOLIDAYS = new Set([
   '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
 ]);
 const isNonTradingDay = (iso) => { const wd = new Date(iso + 'T00:00:00Z').getUTCDay(); return wd === 0 || wd === 6 || NYSE_HOLIDAYS.has(iso); };
+// יום המסחר הבא בפועל אחרי day (לא כולל day עצמו) — מתקדם יום-יום ומדלג על סופי שבוע וחגים מהרשימה למעלה.
+// עצירת בטיחות ב-10 ימים: אין רצף כזה של ימי לא-מסחר בלוח החגים הזה; מגן מפני לולאה אינסופית אם מישהו יזין תאריך שגוי.
+export function nextTradingDay(day){
+  let d = new Date(day + 'T00:00:00Z');
+  for (let i = 0; i < 10; i++){
+    d = new Date(d.getTime() + 86400000);
+    const iso = d.toISOString().slice(0, 10);
+    if (!isNonTradingDay(iso)) return iso;
+  }
+  return null;
+}
 
-// האם fillDay הוא יום מילוי סביר לפקודות שהוחלט עליהן ב-signalDay? ביום מסחר רגיל זה חייב להיות אותו יום בדיוק:
-// הסריקה הלילית (nightly-sp500.mjs) מתייגת לפי today() גולמי (UTC) שרץ אחרי חצות UTC — כך ש-signalDay כבר
-// "היום הבא" מבחינת השעון, ותואם בדיוק ליום המילוי ב-09:40 ניו יורק של אותו יום. אין כאן שום סלחנות לפער בין
+// האם fillDay הוא יום המילוי היחיד שקביל לפקודות שהוחלט עליהן ב-signalDay? ביום מסחר רגיל זה חייב להיות אותו
+// יום בדיוק: הסריקה הלילית (nightly-sp500.mjs) מתייגת לפי today() גולמי (UTC) שרץ אחרי חצות UTC — כך ש-signalDay
+// כבר "היום הבא" מבחינת השעון, ותואם בדיוק ליום המילוי ב-09:40 ניו יורק של אותו יום. אין כאן שום סלחנות בין
 // שני ימי מסחר (זה בדיוק המקרה שאמור עדיין להיחסם כ-stale — למשל pending תקוע מאתמול).
 // חריגה אחת ויחידה מותרת: signalDay עצמו נופל ביום שאין בו מסחר (סוף שבוע, או חג מהרשימה למעלה) — הסריקה
-// שרצה אחרי סגירת יום המסחר הקודם מתויגת בטעות לפי היום הזה, בזמן שמחיר 09:40 האמיתי (entry940, מתויג לפי
-// הבר האמיתי של Yahoo) קיים רק ביום המסחר הבא. אז, ורק אז, מתקבל fillDay מאוחר יותר (עד 4 ימים — מספיק לכל
-// צירוף סוף-שבוע/חג נפוץ) שנופל ביום מסחר בפועל (לא סוף שבוע ולא חג נוסף).
+// שרצה אחרי סגירת יום המסחר הקודם מתויגת בטעות לפי היום הזה, בזמן שמחיר 09:40 האמיתי (entry940) קיים רק ביום
+// המסחר הבא. אז, ורק אז, מתקבל fillDay — אבל **ורק אם הוא בדיוק יום המסחר הבא**, לא כל יום מסחר בטווח קדימה:
+// פקודה משבת חייבת להתמלא בשני (אם שני הוא יום מסחר רגיל), לא ביום שלישי — אחרת ה-preflight היה "סולח" גם
+// למילוי מאוחר מדי, שמחליש את מהימנות המדידה בדיוק כמו מילוי מוקדם מדי.
 export function isExpectedFillDay(signalDay, fillDay){
   if (fillDay === signalDay) return true;
   if (!isNonTradingDay(signalDay)) return false;
-  const gap = daysBetween(signalDay, fillDay);
-  if (!Number.isFinite(gap) || gap <= 0 || gap > 4) return false;
-  return !isNonTradingDay(fillDay);
+  return fillDay === nextTradingDay(signalDay);
+}
+
+// האם ההחלטה (decidedAt, חותמת ISO של הרגע שבו runTracksDecide רץ בפועל) נוצרה *לפני* 09:40 ניו יורק של יום
+// המילוי? המחיר של entry940 הוא הרגע שבו הסימולציה "מבצעת" — אם ההחלטה עצמה נוצרה אחרי אותו רגע (למשל הרצה
+// ידנית/חוזרת שקרתה מאוחר ביום, אחרי שמחיר ה-09:40 כבר היה ציטוט ציבורי ידוע), מילוי בדיעבד באותו מחיר הוא
+// look-ahead: ה"החלטה" הייתה יכולה כבר להכיר את המחיר שאיתו היא "מבוצעת". בלי הבדיקה הזו ריצה ידנית מאוחרת
+// יכולה למלא הזמנות במחיר שכבר לא באמת "עתידי" ביחס לרגע ההחלטה, ולפגוע באמינות המדידה בדיוק כמו מילוי מוקדם מדי.
+export function decidedBeforeFillWindow(decidedAt, fillDay, h = 9, mi = 40){
+  if (!decidedAt) return true; // אין חותמת (למשל pending ישן מלפני התיקון) — לא חוסמים למפרע
+  const decidedMs = Date.parse(decidedAt); const windowMs = Date.parse(nyTimeIso(fillDay, h, mi));
+  if (!Number.isFinite(decidedMs) || !Number.isFinite(windowMs)) return true;
+  return decidedMs < windowMs;
 }

@@ -118,6 +118,36 @@ test('מודל תאריכים (isExpectedFillDay): סוף שבוע וחג — si
   assert.equal(isExpectedFillDay('2026-09-19', '2026-09-25'), false, 'פער של 6 ימים מ-signalDay שהוא סוף שבוע עדיין נחשב stale');
   // fillDay עצמו סוף שבוע/חג — אף פעם לא תקין (אין entry940 אמיתי ליום כזה)
   assert.equal(isExpectedFillDay('2026-09-19', '2026-09-20'), false, 'fillDay עצמו לא יכול להיות סוף שבוע');
+  // רק יום המסחר הבא בפועל — לא כל יום מסחר בטווח: פקודה משבת חייבת להתמלא בשני (יום מסחר רגיל), לא בשלישי,
+  // גם אם שלישי הוא בעצמו יום מסחר תקין. מילוי מאוחר מדי פוגע באמינות המדידה בדיוק כמו מילוי מוקדם מדי.
+  assert.equal(isExpectedFillDay('2026-09-19', '2026-09-22'), false, 'שבת → שלישי לא תקין: שני היה יום מסחר רגיל, זה יום המסחר הבא היחיד שקביל');
+});
+
+test('מודל תאריכים (decidedBeforeFillWindow): החלטה שנוצרה אחרי 09:40 ניו יורק של יום המילוי לא יכולה למלא בדיעבד באותו מחיר', async () => {
+  const { decidedBeforeFillWindow, nyTimeIso } = await import('../engine/session.js');
+  const fillDay = '2026-09-21'; // שני
+  const window940 = nyTimeIso(fillDay, 9, 40);
+  const before = new Date(Date.parse(window940) - 60 * 60000).toISOString(); // שעה לפני 09:40 — תקין
+  const after = new Date(Date.parse(window940) + 60 * 60000).toISOString(); // שעה אחרי 09:40 — לא תקין, המחיר כבר היה ידוע
+  assert.equal(decidedBeforeFillWindow(before, fillDay), true);
+  assert.equal(decidedBeforeFillWindow(after, fillDay), false);
+  assert.equal(decidedBeforeFillWindow(window940, fillDay), false, 'בדיוק ברגע 09:40 — עוד לא לפניו, לא מתקבל');
+  assert.equal(decidedBeforeFillWindow(null, fillDay), true, 'אין חותמת (pending ישן) — לא חוסמים למפרע');
+});
+
+test('preflight ברמת אינטגרציה: החלטה מאוחרת (אחרי 09:40 של יום המילוי) נחסמת; החלטה בזמן עוברת', async () => {
+  const { nyTimeIso } = await import('../engine/session.js');
+  const track = TRACKS.regB;
+  const fillDay = '2026-09-18'; // שישי
+  const priceDoc = { day: fillDay, count: 500, prices: { AAA: 100 } };
+  const lateDecidedAt = new Date(Date.parse(nyTimeIso(fillDay, 9, 40)) + 3600000).toISOString(); // שעה אחרי 09:40
+  const latePending = { track: 'regB', day: fillDay, decidedAt: lateDecidedAt, orders: [{ side: 'buy', symbol: 'AAA', qty: 5, decisionPrice: 100 }] };
+  const rLate = preflight({ track, fillDay, priceDoc, fx: 3.7, pending: latePending, perf: { cashIls: 200000, totalIls: 200000, stocksIls: 0 } });
+  assert.equal(rLate.violations[0].code, 'decided-after-fill-window', JSON.stringify(rLate.violations));
+  const onTimeDecidedAt = new Date(Date.parse(nyTimeIso(fillDay, 9, 40)) - 3600000 * 5).toISOString(); // לילה לפני, כרגיל
+  const onTimePending = { ...latePending, decidedAt: onTimeDecidedAt };
+  const rOnTime = preflight({ track, fillDay, priceDoc, fx: 3.7, pending: onTimePending, perf: { cashIls: 200000, totalIls: 200000, stocksIls: 0 } });
+  assert.equal(rOnTime.violations.some((v) => v.code === 'decided-after-fill-window'), false, JSON.stringify(rOnTime.violations));
 });
 
 test('preflight ברמת אינטגרציה: אותה בדיקה על מסלול אמיתי — שבת→שני מתקבל, חמישי→שישי עדיין נחסם', () => {

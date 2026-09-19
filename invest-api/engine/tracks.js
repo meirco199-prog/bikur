@@ -11,7 +11,7 @@ import { decideOrders, AUTO_RULES } from './autopilot.js';
 import { decideAggressive, applyFills, markToMarket, AGGR_RULES } from './aggressive.js';
 import { RISK_LIMITS } from './risk-limits.js';
 import { commissionIls } from '../lib/broker.js';
-import { isExpectedFillDay } from './session.js';
+import { isExpectedFillDay, decidedBeforeFillWindow } from './session.js';
 
 export const TRACKS_VERSION = 1;
 export const INITIAL_ILS = 200000;
@@ -134,6 +134,9 @@ export function preflight({ track, pending, priceDoc, fillDay, state = null, per
     // חריגה מותרת רק כשsignalDay עצמו סוף שבוע/חג (nightly-sp500.mjs מתייג לפי today() גולמי, בלי לוח חגים) —
     // אז ה-fillDay האמיתי (entry940, שמתויג לפי הבר האמיתי) הוא יום המסחר הבא, לא אותו יום. ראה session.js.
     if (!isExpectedFillDay(pending.day, fillDay)) add('stale-day', `הפקודות ליום ${pending.day}, המילוי ליום ${fillDay}`);
+    // ההחלטה עצמה (decidedAt) חייבת להיות לפני 09:40 ניו יורק של יום המילוי — אחרת המילוי היה "מבצע" במחיר
+    // שכבר היה ציבורי כשההחלטה התקבלה (למשל הרצה ידנית מאוחרת). ראה session.js.
+    else if (!decidedBeforeFillWindow(pending.decidedAt, fillDay)) add('decided-after-fill-window', `ההחלטה נוצרה ב-${pending.decidedAt}, אחרי 09:40 ניו יורק של ${fillDay} — לא ניתן למלא בדיעבד במחיר שכבר היה ידוע`);
     if (alreadyFilled || pending.filled) add('double-execution', `הפקודות ליום ${pending.day} כבר בוצעו`);
   }
   if (!priceDoc || priceDoc.day !== fillDay) add('stale-price', `אין מחירי 09:40 ליום ${fillDay}${priceDoc?.day ? ` (יש ל-${priceDoc.day})` : ''}`);

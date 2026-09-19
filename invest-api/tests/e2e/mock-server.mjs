@@ -22,6 +22,10 @@ if (process.env.SEED !== '0'){
   if (rankForEntry?.table?.length){
     await db.put(`entry940:${decideDay}`, { day: decideDay, count: rankForEntry.table.length, at: '09:40 ET', source: 'seed', prices: Object.fromEntries(rankForEntry.table.filter((x) => x.price > 0).map((x) => [x.symbol, x.price * 1.001])) });
     const dTracks = await runTracksDecide(ctx, { day: decideDay });
+    // decidedAt נרשם לפי השעון האמיתי; preflight חוסם מילוי שההחלטה עליו נוצרה אחרי 09:40 ניו יורק של יום המילוי
+    // (engine/session.js decidedBeforeFillWindow) — כדי שעליית השרת לא תיכשל בתלות בשעה האמיתית שבה היא רצה,
+    // מתקנים כאן את decidedAt לזמן מוקדם באותו יום בדוי, בדיוק כמו שהיה נראה decidedAt של ריצה לילית תקינה.
+    for (const id of ['regB', 'regC', 'aggrB']){ const p = await db.get(`track:${id}:pending`); if (p){ p.decidedAt = new Date(decideDay + 'T05:00:00.000Z').toISOString(); await db.put(`track:${id}:pending`, p); } }
     const fTracks = await runTracksFill(ctx, { day: decideDay });
     console.log('tracks decide', JSON.stringify(Object.fromEntries(Object.entries(dTracks.tracks).map(([k, v]) => [k, v.orders ?? v]))), 'fill', JSON.stringify(Object.fromEntries(Object.entries(fTracks.tracks).map(([k, v]) => [k, v.filled ?? v]))));
   }

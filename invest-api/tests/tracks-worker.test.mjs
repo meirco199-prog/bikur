@@ -11,6 +11,15 @@ function mkEnv(){
   const store = new Map();
   return { store, env: { INVEST: { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }) }, APP_TOKEN: 'secret', CRON_SECRET: 's3', AUTO_ANY_TIME: '1' } };
 }
+// decidedAt נרשם לפי השעון האמיתי (new Date()) — preflight חוסם מילוי אם ההחלטה נוצרה אחרי 09:40 ניו יורק של יום
+// המילוי (engine/session.js decidedBeforeFillWindow). הבדיקות כאן מדמות day='2026-09-17' בדוי, לא קשור לשעון
+// האמיתי; בלי התיקון הזה decidedAt (עכשיו, באמת) היה נופל אחרי 09:40 של אותו יום בדוי וחוסם מילוי לגיטימי.
+function backdateDecisions(store, day, ids = ['regB', 'regC', 'aggrB']){
+  for (const id of ids){
+    const key = `track:${id}:pending`; if (!store.has(key)) continue;
+    const p = JSON.parse(store.get(key)); p.decidedAt = new Date(day + 'T05:00:00.000Z').toISOString(); store.set(key, JSON.stringify(p));
+  }
+}
 const secs = ['Tech', 'Health', 'Fin', 'Energy', 'Industrials'];
 function seedRank(store, day, n = 30){
   const table = [{ symbol: 'SPY', type: 'etf', assetClass: 'equity', role: 'core', price: 500, currency: 'USD', sector: 'רב-ענפי', universe: 'sp500' }, { symbol: 'VTI', type: 'etf', assetClass: 'equity', role: 'core', price: 250, currency: 'USD', sector: 'רב-ענפי' }, { symbol: 'BND', type: 'etf', assetClass: 'bond', role: 'core', price: 70, currency: 'USD', sector: 'אג"ח' }, { symbol: 'GLD', type: 'etf', assetClass: 'gold', role: 'core', price: 190, currency: 'USD', sector: 'סחורות' }];
@@ -46,6 +55,7 @@ test('POST /ingest/entry מפעיל מילוי מסלולים אוטומטית; 
   const day = '2026-09-17'; const table = seedRank(store, day);
   const req = (path, opts = {}) => worker.fetch(new Request('https://api.test' + path, { method: opts.method || (opts.body ? 'POST' : 'GET'), headers: { 'CF-Connecting-IP': '5.5.5.5', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined }), env, { waitUntil(){} });
   await req(`/tracks/run?secret=s3&date=${day}`, { method: 'POST' });
+  backdateDecisions(store, day);
   const prices = Object.fromEntries(table.map((r) => [r.symbol, r.price * 1.002]));
   const ing = await (await req(`/ingest/entry?secret=s3`, { method: 'POST', body: { day, prices, at: '09:40 ET', source: 'test' } })).json();
   assert.ok(ing.tracks, 'תשובת ה-ingest כוללת סיכום מילוי מסלולים');
