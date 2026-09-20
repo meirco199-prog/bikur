@@ -1,5 +1,5 @@
 /* כרטיסים, כפתורים, תגים, טבלאות, מודלים, גרפים */
-.card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:.9rem 1rem;min-width:0;overflow-x:auto}
+.card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:1.1rem 1.3rem;min-width:0;overflow-x:auto}
 .card.tight{padding:.6rem .8rem}
 .card h3{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
 .card h3 .muted{font-weight:400}
