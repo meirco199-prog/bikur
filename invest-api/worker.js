@@ -457,6 +457,14 @@ async function handle(req, env0, ctx){
       const after = await broker.performance(priceOf, fx);
       return json({ ok: true, adjustIls, manualNetIls: bd.bySource?.manual?.netIls ?? null, autopilotNetIls: bd.bySource?.autopilot?.netIls ?? null, before: { baseIls: before.baseIls, pnlIls: before.pnlIls }, after: { baseIls: after.baseIls, pnlIls: after.pnlIls, pnlPct: after.pnlPct }, account: acc });
     }
+    // "רק האוטומט": כל רישום שלא האוטומט יצר מוסר מהחשבון (לארכיון) והחשבון משקף רק את מה שהאוטומט עשה בפועל. ראה broker.purgeManual
+    if (p1 === 'autopilot-only' && req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      const before = await view();
+      const r = await broker.purgeManual();
+      const after = await broker.performance(priceOf, fx);
+      return json({ ok: true, removed: r.removed, cashReturnedIls: r.cashReturnedIls, feesRemovedIls: r.feesRemovedIls, before: { totalIls: before.totalIls, cashIls: before.cashIls, positions: before.positions.length, closed: before.closedCount, baseIls: before.baseIls, pnlIls: before.pnlIls }, after: { totalIls: after.totalIls, cashIls: after.cashIls, positions: after.positions.length, closed: after.closedCount, baseIls: after.baseIls, pnlIls: after.pnlIls, pnlPct: after.pnlPct, commissionsIls: after.commissionsIls }, account: r.account });
+    }
     needAuth();
     if (p1 === 'reset' && req.method === 'POST'){ const st = (await db.get('user:settings')) || {}; const acc = await broker.reset(isNum(body.initialIls) && body.initialIls > 0 ? body.initialIls : (st.portfolioSize || 200000)); return json({ ok: true, account: acc }); }
     if (p1 === 'trade' && req.method === 'DELETE'){ try { const acc = await broker.cancel(q.id || body.id); return json({ ok: true, account: acc }); } catch (e) { return err(e.message); } }

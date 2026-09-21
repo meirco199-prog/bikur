@@ -111,6 +111,11 @@ jobs:
             echo "=== paper rebase"; curl -sS --max-time 60 -X POST "$W/paper/rebase?secret=$SECRET$RB" | head -c 1500 || echo "::warning::paper-rebase נכשל"; echo
             WORKER_URL="$W" node invest-api/scripts/paper-check.mjs || echo "::warning::paper-check נכשל"
           fi
+          # פעולה: paper-autopilot-only <ts> — החשבון משקף רק את האוטומט: רישומים שלא הוא יצר מוסרים (לארכיון), מזומן חוזר, התאמות מתאפסות
+          if [ "$CMD" = "paper-autopilot-only" ]; then
+            echo "=== paper autopilot-only"; curl -sS --max-time 60 -X POST "$W/paper/autopilot-only?secret=$SECRET" | head -c 1500 || echo "::warning::autopilot-only נכשל"; echo
+            WORKER_URL="$W" node invest-api/scripts/paper-check.mjs || echo "::warning::paper-check נכשל"
+          fi
           if [ "$CMD" = "macro-check" ]; then
             echo "=== macro-check"; curl -sS --max-time 30 "$W/macro" | python3 -c 'import json,sys; d=json.load(sys.stdin); [print(k, "rows:", len(v.get("rows",[])), "asOf:", v.get("asOf"), "last:", (v.get("rows") or [[None,None]])[-1], "source:", v.get("source")) for k,v in d.items()]'
           fi
