@@ -5,6 +5,7 @@ import { runAggressive, aggrReport, executeAggressive } from '../lib/aggressive.
 import { installMockFetch } from './mock-providers.mjs';
 import { Budget } from '../lib/budget.js';
 import { DB } from '../lib/db.js';
+import { lastSessionClose } from '../engine/session.js';
 
 const rows = (n = 30, f = () => ({})) => [...Array(n)].map((_, i) => ({ symbol: 'S' + i, sector: ['Tech', 'Health', 'Fin'][i % 3], price: 100 + i, D: 40 + i * 2, actD: i >= n - 6 ? 'STRONG BUY' : i >= n - 10 ? 'BUY' : i < 5 ? 'SELL' : 'HOLD', C: 50, actC: 'HOLD', eligible: true, eligibleD: true, ...f(i) }));
 const bull = { trend: 'Bull Trend', risk: 'Risk On' };
@@ -112,7 +113,7 @@ test('אגרסיבי: היסטוריית חשיפה יומית (מניות/SPY/�
   // חשיפה יומית: יש רשומה ליום עם מניות/SPY/מזומן בפועל (לא רק את השווי הכולל)
   assert.equal(rep.exposureHistory.length, 1);
   const eh = rep.exposureHistory[0];
-  assert.equal(eh.day, '2026-09-17');
+  assert.equal(eh.day, lastSessionClose().date, 'שורת השווי ממופתחת לפי יום הסשן שנסגר לאחרונה (שערי סגירה מאומתים), לא לפי יום העיבוד — AI_COUNCIL#17');
   assert.ok(isNum(eh.stocksShare) && isNum(eh.etfShare) && isNum(eh.cashShare));
   assert.ok(eh.positions === 0, 'ביום ההחלטה עוד לא בוצע מילוי — החשיפה שנרשמה היא לפני המילוי');
   // פוזיציה בודדת: הסבר כניסה (ציון/מודל/גורמים) והסבר יציאה (עצירה/עצירה נגררת/סיגנל)

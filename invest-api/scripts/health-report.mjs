@@ -29,7 +29,8 @@ if (rank.date && entry.count !== undefined && rank.analyzed && entry.count < ran
 const RECON_TOL = 0.05;
 const diff = bd.reconciliation?.diffIls;
 if (typeof diff === 'number' && Math.abs(diff) > RECON_TOL) issues.push(`חשבון התרגול: פער התאמה ${n(diff, 2)} ₪ (צפוי ${n(bd.reconciliation.expectedTotalIls, 2)}, בפועל ${n(bd.reconciliation.actualTotalIls, 2)})`);
-if (paper.asOf && cs.day && paper.asOf < cs.day) issues.push(`שערי חשבון התרגול מ-${paper.asOf}, ישנים מיום הסריקה ${cs.day}`);
+if (paper.stale) issues.push(`חשבון התרגול: שערים חלקיים — ${(paper.staleSymbols || []).join(', ')} עדיין בלי סגירת ${paper.sessionDate} (מוצג לפי ${paper.pricedAsOf})`);
+if (aggr.stale) issues.push(`מסלול אגרסיבי: שערים חלקיים — ${(aggr.staleSymbols || []).join(', ')} עדיין בלי סגירת ${aggr.sessionDate} (מוצג לפי ${aggr.pricedAsOf})`);
 // 6. KV / מכסות
 if (health.kvWriteLimitHit) issues.push(`KV הגיע למכסת הכתיבות (${health.kvWriteLimitHit})`);
 const tight = Object.entries(health.budget || {}).filter(([, b]) => b.limit && b.used / b.limit >= 0.9).map(([k, b]) => `${k} ${b.used}/${b.limit}`);
@@ -45,8 +46,8 @@ lines.push(`| סריקה יומית | יום ${cs.day || '—'} · ${n(cs.done)}
 lines.push(`| דירוג (rank) | תאריך ${rank.date || '—'} · שערי ${rank.barDate || '—'} · נותחו ${n(rank.analyzed)}/${n(rank.universeSize)} (${pct(coverage)}) | ${ok(rank.date === cs.day && coverage >= 0.9)} |`);
 lines.push(`| מודל צל (Shadow) | יום ${shadow.day || '—'} · n=${n(shadow.n)}${shadow.pipeline ? ' · ' + shadow.pipeline : ''} | ${ok(!shadowLag && !shadowThin && !shadow.missing)} |`);
 lines.push(`| מחירי 09:40 | ${rank.date || '—'}: ${n(entry.count)} ניירות${entry.missing ? ' (אין)' : ''} | ${ok(entry.count && rank.analyzed && entry.count >= rank.analyzed * 0.8)} |`);
-lines.push(`| חשבון התרגול | שערי ${paper.asOf || '—'} · שווי ${n(paper.totalIls)} ₪ · מההתחלה ${n(paper.pnlIls)} ₪ (${pct(paper.pnlPct)}) · ${(paper.positions || []).length} פוזיציות · התאמה ${n(diff, 2)} ₪ | ${ok(typeof diff === 'number' && Math.abs(diff) <= RECON_TOL && !(paper.asOf < cs.day))} |`);
-lines.push(`| מסלול אגרסיבי | יום ${aggr.day || '—'} · שווי ${n(aggr.totalIls)} ₪ · תשואה ${pct(aggr.metrics?.totalReturn)} מול SPY ${pct(aggr.metrics?.spyReturn)} · ממתינות ${(aggr.pending?.orders || []).length} | ${ok(!aggr.missing && aggr.day === cs.day)} |`);
+lines.push(`| חשבון התרגול | סגירת ${paper.asOf || '—'}${paper.stale ? ' ⚠️ חלקי' : ''} · שווי ${n(paper.totalIls)} ₪ · מההתחלה ${n(paper.pnlIls)} ₪ (${pct(paper.pnlPct)}) · ${(paper.positions || []).length} פוזיציות · התאמה ${n(diff, 2)} ₪ | ${ok(typeof diff === 'number' && Math.abs(diff) <= RECON_TOL && !paper.stale)} |`);
+lines.push(`| מסלול אגרסיבי | סגירת ${aggr.sessionDate || aggr.day || '—'}${aggr.stale ? ' ⚠️ חלקי' : ''} · שווי ${n(aggr.totalIls)} ₪ · תשואה ${pct(aggr.metrics?.totalReturn)} מול SPY ${pct(aggr.metrics?.spyReturn)} · ממתינות ${(aggr.pending?.orders || []).length} | ${ok(!aggr.missing && !aggr.stale)} |`);
 lines.push(`| KV | ${health.kv || '—'} · מכסת כתיבות: ${health.kvWriteLimitHit ? 'הגיע ' + health.kvWriteLimitHit : 'לא'} | ${ok(health.kv === 'bound' && !health.kvWriteLimitHit)} |`);
 lines.push(`| מכסות ספקים ≥90% | ${tight.length ? tight.join(', ') : 'אין'} | ${tight.length ? '⚠️' : '✅'} |`);
 lines.push(`| שגיאות אחרונות (Worker) | ${errs.length} | ${errs.length ? '⚠️' : '✅'} |`);

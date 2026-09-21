@@ -40,7 +40,7 @@ export function nyTimeIso(day, h = 9, mi = 40){
 export const NYSE_HOLIDAYS = new Set([
   '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
 ]);
-const isNonTradingDay = (iso) => { const wd = new Date(iso + 'T00:00:00Z').getUTCDay(); return wd === 0 || wd === 6 || NYSE_HOLIDAYS.has(iso); };
+export const isNonTradingDay = (iso) => { const wd = new Date(iso + 'T00:00:00Z').getUTCDay(); return wd === 0 || wd === 6 || NYSE_HOLIDAYS.has(iso); };
 // יום המסחר הבא בפועל אחרי day (לא כולל day עצמו) — מתקדם יום-יום ומדלג על סופי שבוע וחגים מהרשימה למעלה.
 // עצירת בטיחות ב-10 ימים: אין רצף כזה של ימי לא-מסחר בלוח החגים הזה; מגן מפני לולאה אינסופית אם מישהו יזין תאריך שגוי.
 export function nextTradingDay(day){
