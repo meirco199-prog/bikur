@@ -23,10 +23,10 @@ const check = async (name, hash, mustHave, action) => {
   await page.screenshot({ path: `/tmp/claude-0/-home-user-bikur/4339afcd-f01b-5f35-b439-92a20b519276/scratchpad/shot-${name}.png`, fullPage: false });
 };
 await check('buy', '#/buy', ['מה יש לי'], async () => { const t0 = await page.textContent('#main'); if (!t0.includes('מה לקנות')) errors.push('[buy] title missing'); const b = await page.$('[data-buy]'); if (b){ await b.click(); await page.waitForTimeout(400); const modals = await page.$$eval('.modal', (a) => a.length); if (modals !== 1) errors.push('[today] modals opened: ' + modals); await page.locator('.modal #ok').last().click(); await page.waitForTimeout(1000); const t = await page.textContent('#main'); if (!t.includes('מה יש לי') || !t.includes('מזומן פנוי')) errors.push('[buy→mine] paper buy not shown'); } });
-await check('today', '#/', ['מצב השוק', 'החשבון שלי', 'האוטומט מנהל', 'מה לעשות היום']);
+await check('today', '#/', ['הכסף שלי', 'חשבון התרגול', 'היום', 'שבוע', 'חודש', 'שנה', 'מההתחלה', 'האחזקות שלי', 'מסלול אגרסיבי', 'תל אביב', 'מצב השוק', 'מה לעשות היום'], async () => { const tiles = await page.$$eval('.ptile', (a) => a.length); if (tiles < 12) errors.push('[today] period tiles: ' + tiles); });
 await check('sell', '#/sell', ['מה למכור']);
-await check('shadow', '#/today', ['מודל צל', 'הישן (A)', 'יחסי-ענף (B)', 'הסכמה בפעולה', 'התפלגות היום', 'אגרסיבי מסונן']);
-await check('aggressive', '#/today', ['מסלול אגרסיבי', 'מול SPY', 'ירידה מקסימלית', 'חמישה מסלולי השקעה']);
+await check('shadow', '#/pro', ['מודל צל', 'הישן (A)', 'יחסי-ענף (B)', 'הסכמה בפעולה', 'התפלגות היום', 'אגרסיבי מסונן']);
+await check('aggressive', '#/pro', ['מסלול אגרסיבי', 'מול SPY', 'ירידה מקסימלית', 'חמישה מסלולי השקעה', 'האוטומט מנהל']);
 await check('explain-shadow', '#/explain', ['מודל הצל', 'מונוטוניות', 'המסלול האגרסיבי', 'S&P 500']);
 await check('mine', '#/mine', ['מה יש לי', 'מה מומלץ לי', 'סה"כ שווי', 'האוטומט מנהל'], async () => { await page.click('[data-prof="conservative"]'); await page.waitForTimeout(600); const t = await page.textContent('#main'); if (!t.includes('בטוח')) errors.push('[mine] profile switch'); await page.click('[data-auto-run]'); await page.waitForTimeout(2500); const t2 = await page.textContent('#main'); if (!t2.includes('ריצה אחרונה')) errors.push('[mine] autopilot run not shown'); await page.click('[data-auto-toggle]'); await page.waitForTimeout(800); const t3 = await page.textContent('#main'); if (!t3.includes('כבוי')) errors.push('[mine] autopilot toggle'); await page.click('[data-auto-toggle]'); await page.waitForTimeout(800); });
 await check('explain-auto', '#/explain', ['מה האוטומט עושה']);

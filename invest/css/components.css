@@ -17,6 +17,21 @@
 .score{display:inline-flex;align-items:center;gap:.4rem;font-weight:700}
 .score .bar{width:64px;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;border:1px solid var(--line)}
 .score .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--neg),var(--warn),var(--pos));border-radius:4px}
+/* מסך הבית בסגנון אפליקציית מסחר: סכום גדול, שינוי לפי תקופות, אחזקות */
+.hero .big{font-size:2.3rem;font-weight:800;letter-spacing:-.02em;line-height:1.1;direction:ltr;unicode-bidi:isolate;text-align:right}
+.hero .sub{font-size:1rem;margin-top:.2rem;font-weight:600}
+.hero .sub small{font-weight:400;color:var(--fg3)}
+.periods{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:.5rem;margin-top:.8rem}
+.ptile{background:var(--bg3);border-radius:10px;padding:.5rem .55rem;text-align:center}
+.ptile .pl{font-size:.74rem;color:var(--fg3);white-space:nowrap}
+.ptile .pv{font-weight:700;font-size:.95rem;direction:ltr;unicode-bidi:isolate;margin-top:.1rem}
+.ptile .pp{font-size:.8rem;direction:ltr;unicode-bidi:isolate}
+.ptile.na .pv,.ptile.na .pp{color:var(--fg3);font-weight:400}
+.hold{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px solid var(--line)}
+.hold:last-child{border-bottom:0}
+a.hold{color:inherit}a.hold:hover{text-decoration:none;background:var(--bg3)}
+.hold .hn{font-weight:600}.hold .hm{font-size:.82rem;color:var(--fg3)}
+.hold .hv{text-align:left;direction:ltr;unicode-bidi:isolate;white-space:nowrap}.hold .hv small{display:block;font-size:.8rem}
 .kpi{display:flex;flex-direction:column;gap:.15rem}
 .kpi .v{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;direction:ltr;text-align:right;unicode-bidi:isolate}
 .kpi .l{font-size:.78rem;color:var(--fg3)}
