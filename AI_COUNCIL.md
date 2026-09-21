@@ -484,3 +484,19 @@ reason "סיגנל …" ולא "אוטומט: …" — לכן סווגו ידנ�
 ההתאמה מ-(1) מתבטלת (הבסיס חוזר ל-200,000) ועקומת השווי מתחילה מחדש. מימוש: `broker.purgeManual`, `POST
 /paper/autopilot-only`, ops `paper-autopilot-only`, בדיקה ב-`tests/worker.test.mjs`.
 **Status:** IMPLEMENTED — (1) בוצע ואומת; (2) קוד + בדיקות, מבוצע בפקודת ops.
+
+### AI_COUNCIL#16: FRED `DEXISUS` HTTP 400 — הסדרה לא קיימת; USD/ILS מגיע מבנק ישראל
+**קטגוריה:** תיקון data-pipeline (מקור מאקרו שבור) — לא שינוי אסטרטגיה
+**Issue:** ChatGPT (בדיקת תקינות 21/9): `fred.macro(DEXISUS) | HTTP 400 The series does not exist` בכל ריצה; "לבדוק מה הסדרה
+הנכונה שהתכוונו לקבל ולא להשאיר מקור מאקרו שבור".
+**Claude position:** הנתון שהתכוונו למדוד הוא שער USD/ILS. ב-FRED אין סדרה כזו — מהדורת H.10 של הפד (שממנה כל סדרות `DEX*`)
+לא כוללת את השקל, ולכן אין "סדרה נכונה" להחליף אליה. הפלטפורמה כבר מקבלת את השער מבנק ישראל (`providers/boi.js`, מפתח
+`fx:USDILS`, נראה ב-`/macro` כ-`USDILS`) — עובד בכל ריצה (budget `boi` 2/200). `DEXISUS` שימש רק כ(א) שורה ברשימת המאקרו
+ו-(ב) גיבוי ב-`getFx` — שניהם הוסרו; כשבנק ישראל לא זמין, `cached()` משאיר את הערך האחרון. `regime.js` משתמש ב-`macro.USDILS`
+בלבד — לא מושפע.
+**ChatGPT position:** לתקן/להחליף אחרי אימות מה הנתון שהתכוונו למדוד.
+**Evidence from code/data:** `engine/universe.js` (`MACRO_SERIES`), `lib/analysis.js` (`getFx`), `engine/regime.js:40`
+(`macro.USDILS`), לוג `/health` recentErrors בריצות 35655407155/35656531862; רשימת המטבעות ב-H.10 (Fed) — ללא ILS.
+**Where we agree:** לא להשאיר מקור שבור. **Where we disagree:** — (אין חלופה ב-FRED; ההסרה היא התיקון).
+**Proposed experiment/fix:** הסרה (בוצע). **Risks:** אין — הערך לא היה מגיע ממילא.
+**Owner decision:** ― **Status:** IMPLEMENTED (PR עם בדיקות עוברות).

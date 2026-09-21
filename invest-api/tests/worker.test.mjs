@@ -279,6 +279,7 @@ test('POST /paper/autopilot-only — החשבון משקף רק את האוטו�
   assert.equal(p1.j.cashIls, Math.round((200000 - a.j.result.trade.costIls) * 100) / 100);
   assert.equal(p1.j.commissionsIls, a.j.result.trade.feeIls);
   assert.equal(p1.j.equity.length, 0, 'עקומת השווי מתחילה מחדש');
+  const bd1 = await get('/paper/breakdown'); assert.equal(bd1.j.reconciliation.diffIls, 0, 'התאמה חשבונאית עד האגורה: ההתחלתי + נטו העסקאות = השווי בפועל'); assert.equal(bd1.j.bySource.manual.trades, 0);
   const keys = [...store.keys()].filter((k) => k.startsWith('paper:archive:manual:')); assert.equal(keys.length, 1); assert.equal(JSON.parse(store.get(keys[0])).trades.length, 2);
   const again = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(again.j.removed, 0, 'אידמפוטנטי'); assert.equal(again.j.cashReturnedIls, 0);
   await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });

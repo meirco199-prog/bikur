@@ -183,11 +183,11 @@ export async function refreshMechanicalUniverse(ctx, { cap = null, reset = false
 }
 export const getMacroSeries = (id, ctx) => cached(ctx.db, `macro:${id}`, TTL.macro, async (ex) => fetchWithFallback('macro', id, { from: ex?.rows?.length ? ex.rows[ex.rows.length - 1][0].slice(0, 4) + '-01-01' : '2000-01-01' }, ctx), { merge: (o, f) => ({ ...f, rows: DB.mergeRows(o.rows, f.rows) }) });
 export const getFx = (ctx) => cached(ctx.db, 'fx:USDILS', TTL.fx, async () => {
+  // מקור: בנק ישראל (שער יציג). אין גיבוי ב-FRED — הסדרה DEXISUS לא קיימת (H.10 לא כולל שקל) והחזירה 400 בכל קריאה;
+  // כשבנק ישראל לא זמין, cached() משאיר את הערך האחרון שנשמר
   const b = await fetchWithFallback('fx', 'USDILS', {}, ctx);
   if (!b.missing) return b;
-  const f = await getMacroSeries('DEXISUS', ctx);
-  if (f?.rows?.length) return { pair: 'USDILS', rate: f.rows[f.rows.length - 1][1], asOf: f.asOf, rows: f.rows, source: 'FRED', quality: 1 };
-  return { missing: true, reason: 'אין שער USD/ILS' };
+  return { missing: true, reason: 'אין שער USD/ILS (בנק ישראל לא זמין)' };
 }, { merge: (o, f) => ({ ...f, rows: DB.mergeRows(o.rows || [], f.rows || []) }) });
 
 export async function getAnalyst(symbol, ctx){
