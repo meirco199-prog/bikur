@@ -1,16 +1,61 @@
 // המסכים הפשוטים: היום · לקנות · למכור · התיק שלי. עברית בלבד, בלי מונחים. כל היתר ב"עוד".
 import { api, invalidate } from '../core/api.js';
 import { settings } from '../core/store.js';
-import { esc, fmt, isNum, cls, toast, modal, SIGNAL_HE, REGIME_HE, nameOf } from '../core/util.js';
+import { esc, fmt, isNum, cls, el, toast, modal, SIGNAL_HE, REGIME_HE, nameOf, today } from '../core/util.js';
 import { loading, errorBox } from '../ui/components.js';
+import { lineChart } from '../ui/chart.js';
 
 let D = null; // נתונים משותפים לכל המסכים הפשוטים (מטמון קצר)
 async function load(){
-  const [regime, rank, watch, paper, reco, auto, shadow, aggr] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null), api('/shadow/report', { ttl: 60000 }).catch(() => null), api('/aggressive/report', { ttl: 60000 }).catch(() => null)]);
+  const yearAgo = new Date(Date.now() - 370 * 86400000).toISOString().slice(0, 10);
+  const [regime, rank, watch, paper, reco, auto, shadow, aggr, ta35] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null), api('/shadow/report', { ttl: 60000 }).catch(() => null), api('/aggressive/report', { ttl: 60000 }).catch(() => null), api('/prices/TA35.TA?from=' + yearAgo, { ttl: 300000 }).catch(() => null)]);
   const table = rank?.table || [];
   const by = new Map(table.map((r) => [r.symbol, r]));
   const usdils = regime?.inputs?.usdils || reco?.usdils || 3.7;
-  return { regime, rank, watch, paper, reco, auto, shadow, aggr, table, by, usdils, size: settings.get().portfolioSize || 200000 };
+  return { regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, table, by, usdils, size: settings.get().portfolioSize || 200000 };
+}
+
+// --- מסך הבית בסגנון אפליקציית מסחר: כמה כסף, מה השתנה לפי תקופות, גרף ---
+const backDays = (day, n) => { const d = new Date(day + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+// rows: [[יום, שווי, ...]] בסדר עולה. תקופה שהסדרה לא מגיעה אליה → na (לא מציגים מספר חלקי כאילו הוא תקופה מלאה)
+const periodsOf = (rows) => {
+  if (!rows?.length) return [];
+  const last = rows[rows.length - 1], first = rows[0];
+  const defs = [['שבוע', backDays(last[0], 7)], ['חודש', backDays(last[0], 30)], ['3 חודשים', backDays(last[0], 91)], ['מתחילת השנה', last[0].slice(0, 4) + '-01-01'], ['שנה', backDays(last[0], 365)]];
+  return defs.map(([label, from]) => { if (first[0] > from) return { label, na: true, since: first[0] }; let r = first; for (const x of rows){ if (x[0] <= from) r = x; else break; } const chg = last[1] - r[1]; return { label, from: r[0], chg, pct: r[1] ? chg / r[1] : null }; });
+};
+const tile = (label, p, { money = true } = {}) => (!p || p.na ? `<div class="ptile na" title="${p?.since ? 'יש נתונים רק מ-' + esc(p.since) : ''}"><div class="pl">${esc(label)}</div><div class="pv">—</div><div class="pp">אין עדיין</div></div>`
+  : `<div class="ptile"><div class="pl">${esc(label)}</div><div class="pv ${cls(p.chg)}">${money ? fmt.ils(p.chg) : fmt.pct(p.pct, 1, true)}</div><div class="pp ${cls(p.chg)}">${money ? fmt.pct(p.pct, 1, true) : (p.chg > 0 ? '+' : '') + fmt.num(p.chg, 0) + ' נק׳'}</div></div>`);
+// סדרת שווי יומית + הנקודה החיה של היום (השווי הנוכחי כולל ציטוט תוך-יומי; שורת equity נכתבת רק בסוף היום)
+const liveRows = (equity, liveDay, liveTotal) => { const rows = (equity || []).map((r) => [r[0], r[1], r[2] ?? null]); if (!isNum(liveTotal) || !liveDay) return rows; const last = rows[rows.length - 1]; if (!last || last[0] < liveDay) rows.push([liveDay, liveTotal, null]); else last[1] = liveTotal; return rows; };
+const dayChange = (rows) => { const l = rows[rows.length - 1], p = rows[rows.length - 2]; return l && p && p[1] ? { chg: l[1] - p[1], pct: l[1] / p[1] - 1, day: l[0] } : { na: true, since: l?.[0] || '' }; };
+const hero = (total, tp, when, unit = 'ils') => `<div class="hero"><div class="big">${unit === 'ils' ? fmt.ils(total) : fmt.num(total, 0)}</div><div class="sub ${cls(tp?.chg)}">${!tp || tp.na ? '<small>אין עדיין שינוי יומי</small>' : `${unit === 'ils' ? fmt.ils(tp.chg) + ' (' + fmt.pct(tp.pct, 1, true) + ')' : fmt.pct(tp.pct, 1, true) + ' (' + (tp.chg > 0 ? '+' : '') + fmt.num(tp.chg, 0) + ' נק׳)'} <small>${esc(when)}</small>`}</div></div>`;
+const eqChart = (rows, label) => {
+  if (!rows || rows.length < 2) return el(`<div class="muted" style="font-size:.85rem">הגרף יתמלא אחרי כמה ימי מסחר (יש ${rows?.length || 0} ימים).</div>`);
+  const series = [{ name: label, values: rows.map((r) => r[1]), color: '#2563eb', area: true }];
+  const s0 = rows.find((r) => isNum(r[2]))?.[2]; if (s0) series.push({ name: 'SPY (מותאם לנקודת ההתחלה)', values: rows.map((r) => (isNum(r[2]) ? r[2] / s0 * rows[0][1] : null)), color: '#94a3b8', dashed: true });
+  return lineChart({ dates: rows.map((r) => r[0]), series, height: 200, yFmt: (v) => fmt.num(v, 0) });
+};
+const taRows = () => (D.ta35?.rows || []).filter((r) => isNum(r[4])).map((r) => [r[0], r[4]]);
+const autoLine = () => { const a = D.auto; if (!a) return ''; const l = a.last; const acts = (l?.orders || []).filter((o) => o.ok); return `<div class="muted" style="font-size:.88rem;margin:-.2rem 0 .8rem">🤖 האוטומט ${a.enabled === false ? 'כבוי' : 'פעיל'}${l ? ` · ריצה אחרונה ${fmt.date(l.day || l.ts)}: ${acts.length ? acts.map((o) => `${o.side === 'buy' ? 'קנה' : 'מכר'} ${esc(nameOf(D.by.get(o.symbol) || { symbol: o.symbol }))}`).join(', ') : 'בלי פעולות'}` : ''} · <a href="#/mine">פרטים</a></div>`; };
+const holdings = () => {
+  const A = acct(); if (!A.rows.length) return sec('האחזקות שלי', '<div class="empty">אין ניירות עדיין. האוטומט קונה בהדרגה, או עבור ל"לקנות".</div>');
+  const rows = A.rows.slice().sort((a, b) => (b.valueIls ?? b.costIls ?? 0) - (a.valueIls ?? a.costIls ?? 0));
+  return sec('האחזקות שלי', rows.map((r) => `<a class="hold" href="#/asset/${esc(r.symbol)}"><div><div class="hn">${esc(nameOf(r))}</div><div class="hm">${r.qty} יח׳ · ${fmt.pct((r.valueIls ?? r.costIls) / (A.total || 1), 0)} מהתיק</div></div><div class="hv"><b>${fmt.ils(r.valueIls ?? r.costIls)}</b><small class="${cls(r.dayPnlIls)}">${isNum(r.dayPnlIls) ? fmt.ils(r.dayPnlIls) + ' היום' : '&nbsp;'}</small><small class="${cls(r.pnlIls)}">${isNum(r.pnlIls) ? fmt.ils(r.pnlIls) + ' (' + fmt.pct(r.pnlPct, 1, true) + ') סה"כ' : ''}</small></div></a>`).join('') + `<div class="row spread" style="margin-top:.6rem"><a class="btn" href="#/mine">ניהול התיק</a><span class="muted" style="font-size:.85rem">מזומן פנוי ${fmt.ils(A.cash)}</span></div>`, `${A.rows.length} ניירות`);
+};
+const taCard = () => {
+  const rows = taRows();
+  const note = '<p class="muted" style="font-size:.85rem;margin-top:.5rem">מניות בודדות בתל אביב (לאומי, טבע, אלביט…) עדיין לא זמינות: ספק הנתונים (EODHD) מחזיר בתוכנית הנוכחית רק מדדים, לא מניות — נבדק על 8 מניות וכולן נכשלו. כדי להוסיף אותן צריך קודם לאמת מול הספק איזו תוכנית כוללת מניות בודדות.</p>';
+  if (!rows.length) return sec('תל אביב', '<div class="empty">אין נתוני מדד ת"א 35 כרגע.</div>' + note, 'מדד ת"א 35');
+  const last = rows[rows.length - 1], tp = dayChange(rows);
+  return sec('תל אביב', hero(last[1], tp, 'ב-' + fmt.date(last[0]), 'pts') + `<div class="periods">${tile('היום', tp, { money: false })}${periodsOf(rows).map((p) => tile(p.label, p, { money: false })).join('')}</div><div id="eq-ta" style="margin-top:.8rem"></div>` + note, 'מדד ת"א 35 · סגירת ' + fmt.date(last[0]));
+};
+function mountCharts(main){
+  const put = (id, node) => { const h = main.querySelector('#' + id); if (h && node) h.appendChild(node); };
+  const p = D.paper || {}, A = acct();
+  put('eq-paper', eqChart(liveRows(p.equity, p.asOf || today(), A.total), 'חשבון התרגול (₪)'));
+  const a = D.aggr; if (a && !a.missing) put('eq-aggr', eqChart(liveRows(a.equity, a.day, a.totalIls), 'מסלול אגרסיבי (₪)'));
+  const ta = taRows(); if (ta.length > 1) put('eq-ta', lineChart({ dates: ta.map((r) => r[0]), series: [{ name: 'ת"א 35', values: ta.map((r) => r[1]), color: '#2563eb', area: true }], height: 180, yFmt: (v) => fmt.num(v, 0) }));
 }
 const ils = (usd) => fmt.ils(usd * (D?.usdils || 3.7));
 const riskWord = (r) => ({ 'נמוך': 'סיכון נמוך', 'בינוני': 'סיכון בינוני', 'גבוה': 'סיכון גבוה' }[r?.riskLevel] || 'סיכון לא ידוע');
@@ -98,15 +143,27 @@ const VIEWS = {
   today(){
     const buys = D.table.filter((r) => ['STRONG BUY', 'BUY'].includes(r.signal)).sort((a, b) => b.score - a.score);
     const h = held(); const sells = D.table.filter((r) => h.has(r.symbol) && ['SELL', 'REDUCE'].includes(r.signal));
-    const A = acct();
-    return `<h1>היום</h1><div class="muted" style="margin-bottom:.8rem">${asOfLine()}</div>
+    const A = acct(); const p = D.paper || {}; const a = D.aggr;
+    const tp = isNum(p.dayPnlIls) && p.asOf ? { chg: p.dayPnlIls, pct: p.dayPnlPct } : { na: true, since: p.asOf || '' };
+    const paperRows = liveRows(p.equity, p.asOf || today(), A.total);
+    const aggrBlock = () => { const m = a.metrics || {}; const rows = liveRows(a.equity, a.day, a.totalIls); const t = dayChange(rows); return sec('מסלול אגרסיבי', hero(a.totalIls, t, t.na ? '' : 'ב-' + fmt.date(t.day)) + `<div class="periods">${tile('היום', t)}${periodsOf(rows).map((x) => tile(x.label, x)).join('')}${tile('מההתחלה', { chg: a.totalIls - a.initialIls, pct: a.initialIls ? (a.totalIls - a.initialIls) / a.initialIls : m.totalReturn })}</div><div id="eq-aggr" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">סימולציה בלבד, לא כסף אמיתי · התחלה ${fmt.ils(a.initialIls)}${m.from ? ' ב-' + fmt.date(m.from) : ''} · מול SPY באותה תקופה: <b class="${cls(m.excess)}">${fmt.pct(m.excess, 1, true)}</b> · <a href="#/pro">פירוט</a></div>`, 'תיק צל, לא סוחר'); };
+    return `<h1>הכסף שלי</h1><div class="muted" style="margin-bottom:.6rem">${asOfLine()}</div>
+    ${sec('חשבון התרגול', hero(A.total, tp, tp.na ? '' : 'בסגירת ' + fmt.date(p.asOf)) + `<div class="periods">${tile('היום', tp)}${periodsOf(paperRows).map((x) => tile(x.label, x)).join('')}${tile('מההתחלה', { chg: A.pnl, pct: A.pnlPct })}</div><div id="eq-paper" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">התחלת עם ${fmt.ils(A.initial)} · מזומן ${fmt.ils(A.cash)} · ניירות ${fmt.ils(A.val)} · השערים מתעדכנים אחרי סגירת ניו יורק</div>`, 'האוטומט מנהל')}
+    ${autoLine()}
+    ${holdings()}
+    ${a && !a.missing ? aggrBlock() : ''}
+    ${taCard()}
     ${sec('מצב השוק', mood())}
-    ${sec('החשבון שלי', `<div class="grid g2"><div class="kpi"><span class="v">${fmt.ils(A.total)}</span><span class="l">סה"כ (מזומן + ניירות)</span></div><div class="kpi"><span class="v ${cls(A.pnl)}">${fmt.ils(A.pnl)} <small>(${fmt.pct(A.pnlPct, 1, true)})</small></span><span class="l">רווח / הפסד מההתחלה</span></div></div>${dayLine(D.paper)}<div class="muted" style="margin-top:.4rem">מזומן פנוי: ${fmt.ils(A.cash)} · ניירות: ${fmt.ils(A.val)}</div><a class="btn" href="#/mine" style="margin-top:.5rem">לתיק המלא</a>`)}
+    ${sec('מה לעשות היום', (sells.length ? sells.map(sellCard).join('') : '') + (buys.length ? buys.slice(0, 3).map((r) => buyCard(r)).join('') + (buys.length > 3 ? `<a class="btn" href="#/buy">עוד ${buys.length - 3} הזדמנויות</a>` : '') : (sells.length ? '' : '<div class="empty">אין היום פעולה מומלצת. לפעמים לא לעשות כלום זו ההחלטה הנכונה.</div>')))}`;
+  },
+  // הפירוט המקצועי שהיה במסך הבית: אוטומט, מודל צל, מסלול אגרסיבי בפירוט, חמשת המסלולים
+  pro(){
+    return `<h1>פירוט המסלולים</h1><div class="muted" style="margin-bottom:.8rem">${asOfLine()}</div>
+    ${sec('מצב השוק', mood())}
     ${autoCard()}
     ${shadowCard()}
     ${aggrCard()}
-    ${sec('חמישה מסלולי השקעה במקביל', '<p>לצד החשבון המאוזן והמסלול האגרסיבי (למעלה) רצות שלוש סימולציות נוספות — <b>רגיל B</b> (80% מניות), <b>רגיל C</b> (80% מניות, פעיל יותר) ו<b>אגרסיבי B</b> (70%–95% לפי מצב שוק, מודל מסונן) — כולן Shadow בלבד, בלי פקודות, נמדדות מול SPY בשקלים באותה נקודת זמן.</p><a class="btn" href="#/tracks">למסך ההשוואה המלא</a>', 'איזו אסטרטגיה מייצרת תשואה עודפת לאורך זמן')}
-    ${sec('מה לעשות היום', (sells.length ? sells.map(sellCard).join('') : '') + (buys.length ? buys.slice(0, 3).map((r) => buyCard(r)).join('') + (buys.length > 3 ? `<a class="btn" href="#/buy">עוד ${buys.length - 3} הזדמנויות</a>` : '') : (sells.length ? '' : '<div class="empty">אין היום פעולה מומלצת. לפעמים לא לעשות כלום זו ההחלטה הנכונה.</div>')))}`;
+    ${sec('חמישה מסלולי השקעה במקביל', '<p>לצד החשבון המאוזן והמסלול האגרסיבי (למעלה) רצות שלוש סימולציות נוספות — <b>רגיל B</b> (80% מניות), <b>רגיל C</b> (80% מניות, פעיל יותר) ו<b>אגרסיבי B</b> (70%–95% לפי מצב שוק, מודל מסונן) — כולן Shadow בלבד, בלי פקודות, נמדדות מול SPY בשקלים באותה נקודת זמן.</p><a class="btn" href="#/tracks">למסך ההשוואה המלא</a>', 'איזו אסטרטגיה מייצרת תשואה עודפת לאורך זמן')}`;
   },
   buy(){
     const buys = D.table.filter((r) => ['STRONG BUY', 'BUY'].includes(r.signal)).sort((a, b) => b.score - a.score);
@@ -149,6 +206,7 @@ export async function render(main, params = {}){
   main.innerHTML = loading('טוען…');
   try { D = await load(); } catch (e) { main.innerHTML = errorBox(e) + '<p class="muted"><a href="#/settings">בדוק את החיבור בהגדרות</a></p>'; return; }
   main.innerHTML = `<div style="max-width:720px;margin:0 auto">${VIEWS[view] ? VIEWS[view]() : VIEWS.today()}<p class="disclaimer">המערכת מנתחת נתונים ומציעה. היא לא יועץ השקעות. ההחלטה שלך.</p></div>`;
+  if (!VIEWS[view] || view === 'today') mountCharts(main);
   if (main.__simpleClick) main.removeEventListener('click', main.__simpleClick);
   main.__simpleClick = async (e) => {
     const b = e.target.closest('[data-buy],[data-sell],[data-watch],[data-cancel],[data-prof],[data-reset],[data-auto-run],[data-auto-toggle]'); if (!b) return;
