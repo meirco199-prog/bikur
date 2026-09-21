@@ -37,6 +37,28 @@ export class PaperBroker {
     await this.db.put(this.key('account'), acc);
     return acc;
   }
+  // "רק האוטומט": מסיר מהחשבון כל רישום שלא האוטומט יצר (reason שלא מתחיל ב"אוטומט:"). פוזיציות פתוחות חוזרות למזומן לפי
+  // עלות, עסקאות סגורות מבוטלות (המזומן חוזר למצב שלפני הקנייה והמכירה), העמלות שלהן יורדות, ההתאמות מתאפסות ועקומת השווי
+  // מתחילה מחדש. הרישומים שהוסרו נשמרים בארכיון. התוצאה: מזומן = ההתחלתי − עלות קניות האוטומט + תמורות המכירות שלו
+  async purgeManual(isAuto = (t) => /^אוטומט:/.test(t.reason || '')){
+    const t = await this.trades(); const acc = await this.account();
+    const manual = t.filter((x) => !isAuto(x));
+    if (!manual.length){ return { removed: 0, cashReturnedIls: 0, feesRemovedIls: 0, account: acc }; }
+    let cash = acc.cashIls, fees = 0; const seen = new Set();
+    for (const x of manual){
+      const k = `${x.symbol}|${x.date}|${x.price}`; // רישום שפוצל במכירה חלקית נושא את עמלת הכניסה בכל חלק — סופרים פעם אחת
+      if (!seen.has(k)){ seen.add(k); fees += x.feeIls || 0; }
+      if (x.exitDate){ cash += (x.costIls || 0) - (x.proceedsIls || 0) + (x.exitFeeIls || 0); fees += x.exitFeeIls || 0; }
+      else cash += x.costIls || 0;
+    }
+    await this.db.put(this.key('archive:manual:') + Date.now(), { removedAt: new Date().toISOString(), trades: manual, adjustments: acc.adjustments || null });
+    await this.save(t.filter((x) => isAuto(x)));
+    const cashReturned = round(cash - acc.cashIls, 2);
+    acc.cashIls = round(cash, 2); acc.commissionsIls = round(Math.max(0, (acc.commissionsIls || 0) - fees), 2); delete acc.adjustments;
+    acc.autopilotOnly = { at: new Date().toISOString(), removed: manual.length, cashReturnedIls: cashReturned, feesRemovedIls: round(fees, 2) };
+    await this.db.put(this.key('account'), acc); await this.db.put(this.key('equity'), []);
+    return { removed: manual.length, cashReturnedIls: cashReturned, feesRemovedIls: round(fees, 2), account: acc };
+  }
   async reset(initialIls){
     const t = await this.trades();
     if (t.length) await this.db.put(this.key('archive:') + Date.now(), t);

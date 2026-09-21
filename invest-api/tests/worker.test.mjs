@@ -262,6 +262,27 @@ test('POST /paper/rebase — רווח "מההתחלה" כולל רק את מה �
   await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
   const p2 = await get('/paper'); assert.equal(p2.j.baseIls, 200000); assert.equal((p2.j.account.adjustments || []).length, 0, 'איפוס מלא מנקה גם התאמות');
 });
+test('POST /paper/autopilot-only — החשבון משקף רק את האוטומט: רישומים ידניים (פתוחים וסגורים) מוסרים לארכיון, המזומן והעמלות חוזרים', async () => {
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+  const m = await get('/paper/order', { body: { symbol: 'AAPL', side: 'buy', qty: 10, reason: 'סיגנל BUY' }, auth: true }); assert.equal(m.status, 200);
+  const a = await get('/paper/order', { body: { symbol: 'MSFT', side: 'buy', qty: 3, reason: 'אוטומט: בדיקה' }, auth: true }); assert.equal(a.status, 200);
+  const s = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 6, price: Math.round(m.j.price * 0.9 * 100) / 100 }, auth: true }); assert.equal(s.status, 200);
+  await get('/paper/rebase', { method: 'POST', auth: true });
+  const p0 = await get('/paper'); assert.equal(p0.j.positions.length, 2); assert.equal(p0.j.closedCount, 1); assert.equal(p0.j.account.adjustments.length, 1);
+  const noAuth = await req('/paper/autopilot-only', { method: 'POST' }); assert.equal(noAuth.status, 401);
+  const r = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(r.status, 200, JSON.stringify(r.j));
+  assert.equal(r.j.removed, 2, 'רישום פתוח + רישום סגור של AAPL');
+  const p1 = await get('/paper');
+  assert.deepEqual(p1.j.positions.map((p) => p.symbol), ['MSFT']); assert.equal(p1.j.closedCount, 0); assert.equal(p1.j.realizedIls, 0);
+  assert.equal(p1.j.baseIls, 200000); assert.equal((p1.j.account.adjustments || []).length, 0);
+  // מזומן = ההתחלתי פחות עלות הקנייה של האוטומט בלבד; עמלות = עמלת האוטומט בלבד
+  assert.equal(p1.j.cashIls, Math.round((200000 - a.j.result.trade.costIls) * 100) / 100);
+  assert.equal(p1.j.commissionsIls, a.j.result.trade.feeIls);
+  assert.equal(p1.j.equity.length, 0, 'עקומת השווי מתחילה מחדש');
+  const keys = [...store.keys()].filter((k) => k.startsWith('paper:archive:manual:')); assert.equal(keys.length, 1); assert.equal(JSON.parse(store.get(keys[0])).trades.length, 2);
+  const again = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(again.j.removed, 0, 'אידמפוטנטי');
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+});
 test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מזומן', async () => {
   const before = (await get('/paper')).j.cashIls;
   const b = await get('/paper/order', { body: { symbol: 'GOOGL', side: 'buy', qty: 2, price: 100 }, auth: true }); const id = b.j.result.trade.id;
