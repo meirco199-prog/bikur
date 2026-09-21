@@ -2,7 +2,13 @@
 // חוזה: snapshots (snap:/rank:/regime:/reco:) נכתבים רק דרך putIfAbsent — לעולם לא נדרסים.
 export let kvWriteLimitHit = null; // חותמת זמן אם KV דחה כתיבה (מכסה יומית)
 export class DB {
-  constructor(kv){ this.kv = kv; this.mem = new Map(); }
+  // secrets: ערכי סוד (מפתחות API, טוקנים) שלעולם לא נכתבים ללוג — ספקים מסוימים מחזירים את המפתח בתוך הודעת השגיאה
+  constructor(kv, { secrets = [] } = {}){ this.kv = kv; this.mem = new Map(); this.secrets = [...new Set(secrets.filter((s) => typeof s === 'string' && s.length >= 8))]; }
+  redact(msg){
+    let m = String(msg ?? '');
+    for (const s of this.secrets) m = m.split(s).join('***');
+    return m.replace(/(api[ _-]?key(?: as|[:=])\s*)[A-Za-z0-9_\-]{8,}/gi, '$1***').replace(/([?&](?:apikey|api_key|token|api_token|secret)=)[^&\s]+/gi, '$1***');
+  }
   async get(key, def = null){
     if (!this.kv) return this.mem.has(key) ? this.mem.get(key) : def;
     const v = await this.kv.get(key, 'json');
@@ -41,10 +47,12 @@ export class DB {
   async logError(where, msg){
     try {
       const log = (await this.get('log:err')) || [];
-      log.push({ ts: new Date().toISOString(), where, msg: String(msg).slice(0, 300) });
+      log.push({ ts: new Date().toISOString(), where, msg: this.redact(msg).slice(0, 300) });
       await this.put('log:err', log.slice(-200));
     } catch { /* לוג לא מפיל את הבקשה */ }
   }
+  // השגיאות האחרונות, מוסתרות גם אם נכתבו לפני שהוגדרה ההסתרה (רשומות ישנות ב-KV)
+  async recentErrors(n = 10){ return ((await this.get('log:err')) || []).slice(-n).map((e) => ({ ...e, msg: this.redact(e.msg) })); }
   async appendDay(key, item, max = 500){
     const arr = (await this.get(key)) || [];
     arr.push(item);

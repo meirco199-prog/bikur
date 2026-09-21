@@ -45,7 +45,8 @@ const validSym = (s) => typeof s === 'string' && SYM_RE.test(s.toUpperCase());
 const validDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d));
 
 async function makeCtx(env0, waitUntil){
-  const db = new DB(env0.INVEST);
+  // כל ערך סודי מהסביבה (מפתחות/טוקנים/סודות) לא נכתב ללוג השגיאות ולא מוצג ב-/health
+  const db = new DB(env0.INVEST, { secrets: Object.entries(env0).filter(([k, v]) => /KEY|TOKEN|SECRET|PASSWORD/i.test(k) && typeof v === 'string').map(([, v]) => v) });
   const env = await resolveEnv(env0, db); // Secrets + מפתחות שהוזנו באפליקציה
   const budget = new Budget(db);
   return { env, db, budget, waitUntil: waitUntil || (() => {}) };
@@ -148,8 +149,8 @@ async function handle(req, env0, ctx){
   if (path === '/' || path === '/health'){
     const budget = await ctx.budget.status();
     const cron = await db.get('cron:state');
-    const errors = (await db.get('log:err')) || [];
-    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : env.APP_TOKEN_SHA256 ? 'token' : 'OPEN (הגדר APP_TOKEN!)', keys: await keysStatus(env0, db), ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', kvWriteLimitHit, alerts: { telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors.slice(-10) });
+    const errors = await db.recentErrors(10);
+    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : env.APP_TOKEN_SHA256 ? 'token' : 'OPEN (הגדר APP_TOKEN!)', keys: await keysStatus(env0, db), ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', kvWriteLimitHit, alerts: { telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors });
   }
   if (r0 === 'keys'){
     needAuth();
