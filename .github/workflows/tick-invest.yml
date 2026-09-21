@@ -100,6 +100,10 @@ jobs:
               curl -sS --max-time 30 "$W/asset/$S" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("missing:", d.get("missing"), d.get("reason","")) if d.get("missing") else (print("priceSource:", d.get("priceSource")), print("analyst:", d.get("analyst")), print("scoreAnalystComponent:", (d.get("score") or {}).get("components",{}).get("analyst")))'
             done
           fi
+          # אבחון: paper-check <ts> — מאיפה מגיע הרווח/הפסד "מההתחלה" בחשבון התרגול (חשבון, פוזיציות, עסקאות, פירוק, יומן אוטומט). קריאה בלבד
+          if [ "$CMD" = "paper-check" ]; then
+            WORKER_URL="$W" node invest-api/scripts/paper-check.mjs || echo "::warning::paper-check נכשל"
+          fi
           if [ "$CMD" = "macro-check" ]; then
             echo "=== macro-check"; curl -sS --max-time 30 "$W/macro" | python3 -c 'import json,sys; d=json.load(sys.stdin); [print(k, "rows:", len(v.get("rows",[])), "asOf:", v.get("asOf"), "last:", (v.get("rows") or [[None,None]])[-1], "source:", v.get("source")) for k,v in d.items()]'
           fi
