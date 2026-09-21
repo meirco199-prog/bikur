@@ -14,6 +14,7 @@ import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
 import { runTracksDecide, runTracksFill, trackReport, tracksCompare } from './lib/tracks.js';
 import { TRACK_IDS } from './engine/tracks.js';
 import { paperBreakdown } from './engine/paper-breakdown.js';
+import { resolveClosePrices, markToClose } from './lib/mark.js';
 import { AUTO_RULES } from './engine/autopilot.js';
 import { PROFILES } from './engine/portfolio.js';
 const sp500Set = async (db) => { const m = await db.get('meta:mechanical'); return m?.symbols?.length ? new Set(m.symbols) : null; };
@@ -112,15 +113,8 @@ export async function cronStep(ctx, { batch = null, force = false } = {}){
     if (finalized){
       try { const reco = await buildRecommendations(ctx, rank); await db.putIfAbsent(`reco:${day}`, reco); } catch (e) { await db.logError('reco', e.message); }
       if (!days.includes(day)){ days.push(day); await db.put('idx:snapdays', days.sort().slice(-3000)); }
-      try {
-        const broker = new PaperBroker(db);
-        const priceOf = (s) => snaps.find((x) => x.symbol === s)?.price ?? null;
-        const fxDoc = await db.get('fx:USDILS');
-        const perf = await broker.performance(priceOf, fxDoc?.rate || null);
-        const spy = snaps.find((x) => x.symbol === 'SPY')?.price ?? null;
-        const eq = perf.equity || [];
-        if (!eq.some((e) => e[0] === day)){ eq.push([day, perf.totalIls, spy]); await db.put('paper:equity', eq.slice(-2000)); }
-      } catch (e) { await db.logError('paper equity', e.message); }
+      // עקומות השווי (תרגול + אגרסיבי) לפי יום הסשן שנסגר ובסגירות מאומתות — לא לפי יום העיבוד ומחירי ה-snapshot (AI_COUNCIL#17)
+      try { await markToClose(ctx); } catch (e) { await db.logError('mark', e.message); }
       // יקום מכני: יומי (ויקיפדיה חינם; הוספה בקצב מוגבל עד שכל הנבחרות ביקום), FMP רק לגודל/הרכב היסטורי
       try { const r = await refreshMechanicalUniverse(ctx); log.push(`universe: ${r.ok ? `${r.source} ${r.selected} (+${r.added}/−${r.removed}, ממתינות ${r.pending})` : r.reason}`); } catch (e) { await db.logError('universe', e.message); }
       log.push(`finalized: ${snaps.length} snapshots (${rank.analyzed} analyzed), ${rank.categories.buySignals.length} buy signals`);
@@ -166,7 +160,7 @@ async function handle(req, env0, ctx){
   }
   // מסלול אגרסיבי (תיק צל, סימולציה בלבד — לא חשבון התרגול): דוח + הרצה
   if (r0 === 'aggressive'){
-    if (p1 === 'report' || !p1) return json(await aggrReport(db));
+    if (p1 === 'report' || !p1) return json(await aggrReport(db, ctx));
     if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runAggressive(ctx, { day: q.date || null, force: q.force === '1', reset: q.reset === '1' })); } catch (e) { await db.logError('aggressive', e.message); return err('מסלול אגרסיבי: ' + e.message, 500); } }
     if (p1 === 'execute' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await executeAggressive(ctx, { force: q.force === '1' && !bySecret })); } catch (e) { await db.logError('aggressive-exec', e.message); return err('ביצוע אגרסיבי: ' + e.message, 500); } }
     return err('not found', 404);
@@ -395,29 +389,23 @@ async function handle(req, env0, ctx){
     const priceOf = (s) => priceCache[s];
     const view = async () => {
       const t = await broker.trades();
-      // מחיר נוכחי: הטרי מבין quote במטמון, snapshot של היום, והסגירה האחרונה בסדרת המחירים (שמתרעננת אחרי כל סגירה בניו יורק).
-      // quote ישן לא גובר על סגירה חדשה — אחרת התיק מוצג לפי שער של שלשום עד שמישהו מבקש quote
+      // שערוך לפי סגירה מאומתת של הסשן האחרון שנסגר בניו יורק (lib/mark.js): לכל נייר תאריך שער; נייר בלי סגירת הסשן מסומן stale.
+      // ציטוט תוך-יומי לא משמש לשווי (הוא היה גובר על סגירה חדשה יותר ומציג "סגירה" שאינה כזו — AI_COUNCIL#17)
       const asOfCache = {};
-      for (const s of new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))){
-        const qt = await db.get(`quote:${s}`); const sn = day ? await getSnap(db, day, s) : null;
-        const px = await getPrices(s, { ...ctx, asset: await assetMeta(db, s) }).catch(() => null);
-        const lastRow = px?.rows?.length ? px.rows[px.rows.length - 1] : null;
-        const cands = [
-          qt?.price > 0 ? { price: qt.price, asOf: qt.asOf ? String(qt.asOf).slice(0, 10) : '', source: 'quote', rank: 2 } : null,
-          sn?.price > 0 ? { price: sn.price, asOf: sn.barDate || sn.date || '', source: 'snapshot', rank: 1 } : null,
-          lastRow?.[4] > 0 ? { price: lastRow[4], asOf: lastRow[0], source: 'close', rank: 0 } : null,
-        ].filter(Boolean).sort((a, b) => (b.asOf.localeCompare(a.asOf)) || (b.rank - a.rank));
-        // שינוי יומי: מול הסגירה שלפני השער שנבחר (מסדרת המחירים); quote תוך-יומי → מול הסגירה האחרונה
-        let prevClose = null;
-        if (cands[0] && px?.rows?.length){ const rows = px.rows; const i = rows.findIndex((r) => r[0] === cands[0].asOf); if (i > 0) prevClose = rows[i - 1][4]; else if (i < 0 && cands[0].asOf > rows[rows.length - 1][0]) prevClose = rows[rows.length - 1][4]; }
-        priceCache[s] = cands[0]?.price ?? null; asOfCache[s] = cands[0] ? { asOf: cands[0].asOf, source: cands[0].source, prevClose: prevClose > 0 ? prevClose : null } : null;
-      }
+      const openSyms = [...new Set(t.filter((x) => !x.exitDate).map((x) => x.symbol))];
+      const res = await resolveClosePrices(ctx, openSyms);
+      for (const s of openSyms){ const p = res.prices[s]; priceCache[s] = p?.price ?? null; asOfCache[s] = p ? { asOf: p.asOf, source: p.source, prevClose: p.prevClose > 0 ? p.prevClose : null, stale: !!p.stale } : null; }
       const perf = await broker.performance(priceOf, fx);
-      perf.positions = perf.positions.map((p) => { const a = asOfCache[p.symbol]; const rate = p.currency === 'ILS' ? 1 : fx; const dayPnlIls = a?.prevClose && isNum(p.current) ? Math.round(p.qty * (p.current - a.prevClose) * rate * 100) / 100 : null; return { ...p, priceAsOf: a?.asOf || null, priceSource: a?.source || null, prevClose: a?.prevClose ?? null, dayChangePct: a?.prevClose && isNum(p.current) ? Math.round((p.current / a.prevClose - 1) * 10000) / 10000 : null, dayPnlIls }; });
+      perf.positions = perf.positions.map((p) => { const a = asOfCache[p.symbol]; const rate = p.currency === 'ILS' ? 1 : fx;
+        // שינוי יומי: יחידות שנקנו ביום השער נמדדות ממחיר הקנייה שלהן ולא מסגירת אתמול (אחרת נספר רווח/הפסד שלא היה)
+        const lotsToday = t.filter((x) => !x.exitDate && x.symbol === p.symbol && (x.date || '').slice(0, 10) === (a?.asOf || '')); const qtyToday = lotsToday.reduce((q, x) => q + x.qty, 0);
+        const dayPnlIls = a?.prevClose && isNum(p.current) ? Math.round(((p.qty - qtyToday) * (p.current - a.prevClose) + lotsToday.reduce((q, x) => q + x.qty * (p.current - x.price), 0)) * rate * 100) / 100 : null;
+        return { ...p, priceAsOf: a?.asOf || null, priceSource: a?.source || null, priceStale: !!a?.stale, prevClose: a?.prevClose ?? null, dayChangePct: a?.prevClose && isNum(p.current) ? Math.round((p.current / a.prevClose - 1) * 10000) / 10000 : null, dayPnlIls }; });
       // ברמת החשבון: סכום השינוי היומי של הפוזיציות, נכון לסגירה האחרונה שיש לה שער (asOf)
       const dayPnlIls = perf.positions.reduce((sum, p) => sum + (p.dayPnlIls || 0), 0);
       perf.dayPnlIls = Math.round(dayPnlIls * 100) / 100; perf.dayPnlPct = perf.totalIls - dayPnlIls > 0 ? Math.round((dayPnlIls / (perf.totalIls - dayPnlIls)) * 10000) / 10000 : null;
-      perf.asOf = perf.positions.map((p) => p.priceAsOf).filter(Boolean).sort().pop() || null;
+      // asOf = התאריך הישן ביותר מבין השערים (לא החדש ביותר): אם נייר אחד עדיין בלי סגירת הסשן, הכותרת לא תטען "סגירת היום"
+      perf.sessionDate = res.session; perf.pricedAsOf = res.pricedAsOf; perf.stale = res.stale; perf.staleSymbols = res.staleSymbols; perf.asOf = res.stale ? res.pricedAsOf : (openSyms.length ? res.session : null);
       const u = await getUniverse(db, env);
       perf.positions = perf.positions.map((p) => ({ ...p, name: u.find((a) => a.symbol === p.symbol)?.name || p.symbol, nameHe: u.find((a) => a.symbol === p.symbol)?.nameHe || null, signal: null }));
       for (const p of perf.positions){ const sn = day ? await getSnap(db, day, p.symbol) : null; p.signal = sn?.signal || null; }
@@ -478,6 +466,8 @@ async function handle(req, env0, ctx){
       catch (e) { return err(e.message); }
     }
   }
+  // שערוך לפי סגירה: כותב את שורת השווי של הסשן האחרון (תרגול + אגרסיבי). נקרא מכל ריצת ops/מתוזמנת; בטוח לקריאה חוזרת
+  if (r0 === 'mark' && p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json({ ok: true, ...(await markToClose(ctx)) }); } catch (e) { return err('mark: ' + e.message, 500); } }
   if (r0 === 'auto'){
     if (p1 === 'status' || !p1) return json(await autoStatus(db));
     if (p1 === 'run' && req.method === 'POST'){

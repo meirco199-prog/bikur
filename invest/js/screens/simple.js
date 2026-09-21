@@ -53,8 +53,8 @@ const taCard = () => {
 function mountCharts(main){
   const put = (id, node) => { const h = main.querySelector('#' + id); if (h && node) h.appendChild(node); };
   const p = D.paper || {}, A = acct();
-  put('eq-paper', eqChart(liveRows(p.equity, p.asOf || today(), A.total), 'חשבון התרגול (₪)'));
-  const a = D.aggr; if (a && !a.missing) put('eq-aggr', eqChart(liveRows(a.equity, a.day, a.totalIls), 'מסלול אגרסיבי (₪)'));
+  put('eq-paper', eqChart(liveRows(p.equity, p.sessionDate || p.asOf || today(), A.total), 'חשבון התרגול (₪)'));
+  const a = D.aggr; if (a && !a.missing) put('eq-aggr', eqChart(liveRows(a.equity, a.sessionDate || a.day, a.totalIls), 'מסלול אגרסיבי (₪)'));
   const ta = taRows(); if (ta.length > 1) put('eq-ta', lineChart({ dates: ta.map((r) => r[0]), series: [{ name: 'ת"א 35', values: ta.map((r) => r[1]), color: '#2563eb', area: true }], height: 180, yFmt: (v) => fmt.num(v, 0) }));
 }
 const ils = (usd) => fmt.ils(usd * (D?.usdils || 3.7));
@@ -74,7 +74,8 @@ const dayLine = (p) => (p && isNum(p.dayPnlIls) && p.asOf ? `<div class="muted" 
 const acct = () => { const p = D.paper || {}; const initial = p.account?.initialIls || D.size; return { rows: p.positions || [], cash: p.cashIls || 0, val: p.valueIls || 0, total: p.totalIls || 0, pnl: p.pnlIls || 0, pnlPct: p.pnlPct || 0, initial, base: p.baseIls || initial, adj: p.adjustmentsIls || 0, adjustments: p.account?.adjustments || [], fees: p.commissionsIls || 0 }; };
 // שעות המסחר בניו יורק (בערך, כולל שני משטרי שעון): בזמן הזה המחיר במסך הוא ציטוט חי ולא סגירה
 const nyOpen = () => { const d = new Date(); const dow = d.getUTCDay(); if (dow === 0 || dow === 6) return false; const m = d.getUTCHours() * 60 + d.getUTCMinutes(); return m >= 13 * 60 + 30 && m < 21 * 60; };
-const priceWhen = (asOf) => (!asOf ? '' : nyOpen() && asOf >= today() ? 'מחיר אחרון · ' + fmt.date(asOf) + ' · השוק פתוח' : 'בסגירת ' + fmt.date(asOf) + ' (23:00 שעון ישראל)');
+// תווית השער: סגירה מאומתת של הסשן האחרון; אם חלק מהניירות עדיין בלי סגירת הסשן — אומרים את זה במפורש (לא "סגירת היום")
+const priceWhen = (p) => { if (!p?.asOf) return ''; if (p.stale) return `⚠️ שערים חלקיים — ${(p.staleSymbols || []).slice(0, 4).join(', ')} עדיין בלי סגירת ${fmt.date(p.sessionDate || p.asOf)} · מוצג לפי ${fmt.date(p.pricedAsOf || p.asOf)}`; return 'בסגירת ' + fmt.date(p.asOf) + ' (23:00 שעון ישראל)'; };
 // הסבר לנקודת ההתחלה כשבוצעה התאמה (רישומים ידניים מלפני האוטומט לא נספרים)
 const baseLine = (A) => (A.adj ? ` · התאמה חד-פעמית ${fmt.ils(A.adj)} (${esc(A.adjustments[0]?.reason || 'רישומים ידניים מלפני האוטומט — לא נספרים')}) · נקודת ההתחלה לחישוב הרווח: ${fmt.ils(A.base)}` : '');
 const buyCard = (r, compact = false) => `<div class="card tight" style="margin-bottom:.5rem"><div class="row spread"><a href="#/asset/${esc(r.symbol)}" style="font-size:1.1rem;font-weight:700">${esc(nameOf(r))}</a><span class="tag ${r.signal === 'STRONG BUY' ? 'fact' : ''}">${esc(SIGNAL_HE[r.signal] || '')}</span></div>
@@ -151,9 +152,9 @@ const VIEWS = {
     const A = acct(); const p = D.paper || {}; const a = D.aggr;
     const tp = isNum(p.dayPnlIls) && p.asOf ? { chg: p.dayPnlIls, pct: p.dayPnlPct } : { na: true, since: p.asOf || '' };
     const paperRows = liveRows(p.equity, p.asOf || today(), A.total);
-    const aggrBlock = () => { const m = a.metrics || {}; const rows = liveRows(a.equity, a.day, a.totalIls); const t = dayChange(rows); return sec('מסלול אגרסיבי', hero(a.totalIls, t, t.na ? '' : 'ב-' + fmt.date(t.day)) + `<div class="periods">${tile('היום', t)}${periodsOf(rows).map((x) => tile(x.label, x)).join('')}${tile('מההתחלה', { chg: a.totalIls - a.initialIls, pct: a.initialIls ? (a.totalIls - a.initialIls) / a.initialIls : m.totalReturn })}</div><div id="eq-aggr" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">סימולציה בלבד, לא כסף אמיתי · התחלה ${fmt.ils(a.initialIls)}${m.from ? ' ב-' + fmt.date(m.from) : ''} · מול SPY באותה תקופה: <b class="${cls(m.excess)}">${fmt.pct(m.excess, 1, true)}</b> · <a href="#/pro">פירוט</a></div>`, 'תיק צל, לא סוחר'); };
+    const aggrBlock = () => { const m = a.metrics || {}; const rows = liveRows(a.equity, a.sessionDate || a.day, a.totalIls); const t = dayChange(rows); return sec('מסלול אגרסיבי', hero(a.totalIls, t, t.na ? '' : priceWhen({ asOf: a.sessionDate || t.day, stale: a.stale, staleSymbols: a.staleSymbols, sessionDate: a.sessionDate, pricedAsOf: a.pricedAsOf })) + `<div class="periods">${tile('היום', t)}${periodsOf(rows).map((x) => tile(x.label, x)).join('')}${tile('מההתחלה', { chg: a.totalIls - a.initialIls, pct: a.initialIls ? (a.totalIls - a.initialIls) / a.initialIls : m.totalReturn })}</div><div id="eq-aggr" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">סימולציה בלבד, לא כסף אמיתי · התחלה ${fmt.ils(a.initialIls)}${m.from ? ' ב-' + fmt.date(m.from) : ''} · מול SPY באותה תקופה: <b class="${cls(m.excess)}">${fmt.pct(m.excess, 1, true)}</b> · <a href="#/pro">פירוט</a></div>`, 'תיק צל, לא סוחר'); };
     return `<h1>הכסף שלי</h1><div class="muted" style="margin-bottom:.6rem">${asOfLine()}</div>
-    ${sec('חשבון התרגול', hero(A.total, tp, tp.na ? '' : priceWhen(p.asOf)) + `<div class="periods">${tile('היום', tp)}${periodsOf(paperRows).map((x) => tile(x.label, x)).join('')}${tile(A.adj ? 'מאז האוטומט' : 'מההתחלה', { chg: A.pnl, pct: A.pnlPct })}</div><div id="eq-paper" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">התחלת עם ${fmt.ils(A.initial)}${baseLine(A)} · מזומן ${fmt.ils(A.cash)} · ניירות ${fmt.ils(A.val)} · השערים מתעדכנים אחרי סגירת ניו יורק</div>`, 'האוטומט מנהל')}
+    ${sec('חשבון התרגול', hero(A.total, tp, tp.na ? '' : priceWhen(p)) + `<div class="periods">${tile('היום', tp)}${periodsOf(paperRows).map((x) => tile(x.label, x)).join('')}${tile(A.adj ? 'מאז האוטומט' : 'מההתחלה', { chg: A.pnl, pct: A.pnlPct })}</div><div id="eq-paper" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">התחלת עם ${fmt.ils(A.initial)}${baseLine(A)} · מזומן ${fmt.ils(A.cash)} · ניירות ${fmt.ils(A.val)} · השערים מתעדכנים אחרי סגירת ניו יורק</div>`, 'האוטומט מנהל')}
     ${autoLine()}
     ${holdings()}
     ${a && !a.missing ? aggrBlock() : ''}
