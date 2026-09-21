@@ -12,6 +12,8 @@ const ymd = (d) => new Date(d).toISOString().slice(0, 10);
 export const finnhub = {
   id: 'finnhub', priority: 1, supports: ['quote', 'profile', 'ratios', 'analyst', 'news', 'insider', 'earnings', 'peers'],
   available: (env) => !!env.FINNHUB_KEY,
+  // התוכנית החינמית = ארה"ב בלבד; על .TA מתקבל 403 שבעבר חסם את האנליסטים לכל היקום (AI_COUNCIL#13). BRK.B נשאר (לא .TA)
+  appliesTo: (symbol) => !symbol || (!symbol.startsWith('^') && !/\.TA$/i.test(symbol)),
   async quote(symbol, _o, ctx){
     const q = await call(ctx, '/quote', { symbol });
     if (!num(q.c)) return { missing: true, reason: 'Finnhub: אין quote' };
