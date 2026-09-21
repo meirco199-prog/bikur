@@ -241,6 +241,27 @@ test('snapshot חסר (תקלת נתונים) מתמלא מחדש; ציון אמ
   const m = JSON.parse(store.get(`snap:${day}:MSFT`)); assert.equal(m.score, 12, 'ציון אמיתי נשמר');
   const r = JSON.parse(store.get(`rank:${day}`)); assert.ok(r.analyzed > 100, 'דירוג ריק הוחלף');
 });
+test('POST /paper/rebase — רווח "מההתחלה" כולל רק את מה שהאוטומט עשה; רישומים ידניים הופכים להתאמה, בלי למחוק כלום', async () => {
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+  const m = await get('/paper/order', { body: { symbol: 'AAPL', side: 'buy', qty: 10, reason: 'סיגנל BUY' }, auth: true }); assert.equal(m.status, 200);
+  const a = await get('/paper/order', { body: { symbol: 'MSFT', side: 'buy', qty: 3, reason: 'אוטומט: בדיקה' }, auth: true }); assert.equal(a.status, 200);
+  // מכירה ידנית בהפסד — כמו המכירות של 17/9 בחשבון האמיתי
+  const s = await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 6, price: Math.round(m.j.price * 0.9 * 100) / 100 }, auth: true }); assert.equal(s.status, 200);
+  const p0 = await get('/paper'); assert.equal(p0.j.baseIls, 200000); assert.equal(p0.j.adjustmentsIls, 0); assert.ok(p0.j.pnlIls < -100, 'ההפסד הידני מופיע לפני ההתאמה');
+  const bd = await get('/paper/breakdown');
+  const noAuth = await req('/paper/rebase', { method: 'POST' }); assert.equal(noAuth.status, 401);
+  const r = await get('/paper/rebase', { method: 'POST', auth: true }); assert.equal(r.status, 200, JSON.stringify(r.j));
+  assert.ok(r.j.adjustIls < 0); assert.equal(r.j.manualNetIls, bd.j.bySource.manual.netIls);
+  const p1 = await get('/paper');
+  assert.equal(p1.j.baseIls, Math.round((200000 + r.j.adjustIls) * 100) / 100);
+  assert.ok(Math.abs(p1.j.pnlIls - bd.j.bySource.autopilot.netIls) < 1, `pnl ${p1.j.pnlIls} vs autopilot ${bd.j.bySource.autopilot.netIls}`);
+  assert.equal(p1.j.positions.length, 2, 'הפוזיציות לא נמחקו'); assert.equal(p1.j.closedCount, 1, 'העסקאות הסגורות לא נמחקו'); assert.equal(p1.j.account.initialIls, 200000);
+  assert.equal(p1.j.account.adjustments.length, 1); assert.ok(/ידניים/.test(p1.j.account.adjustments[0].reason));
+  const again = await get('/paper/rebase', { method: 'POST', auth: true }); assert.equal(again.status, 400, 'בלי force — לא מבצעים פעמיים');
+  const forced = await get('/paper/rebase?force=1', { method: 'POST', auth: true }); assert.equal(forced.status, 200); assert.equal(forced.j.adjustIls, 0, 'הבסיס כבר תואם — אין התאמה נוספת');
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+  const p2 = await get('/paper'); assert.equal(p2.j.baseIls, 200000); assert.equal((p2.j.account.adjustments || []).length, 0, 'איפוס מלא מנקה גם התאמות');
+});
 test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מזומן', async () => {
   const before = (await get('/paper')).j.cashIls;
   const b = await get('/paper/order', { body: { symbol: 'GOOGL', side: 'buy', qty: 2, price: 100 }, auth: true }); const id = b.j.result.trade.id;

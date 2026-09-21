@@ -438,6 +438,24 @@ async function handle(req, env0, ctx){
       return json(paperBreakdown({ trades, account, priceOf, fx, table, nameOf, journal, currentVersion: AUTO_RULES.version, targets: PROFILES[profile]?.sleeves || null }));
     }
     if (req.method === 'GET') return json(await view());
+    // איפוס נקודת ההתחלה (לא של החשבון): רווח/הפסד "מההתחלה" יכלול רק את מה שהאוטומט עשה בפועל. רישומים ידניים מלפני שהאוטומט
+    // קיבל את הניהול (כולל המכירות שלהם והעמלות עליהן) הופכים להתאמה חד-פעמית שנרשמת בחשבון — הפוזיציות, העסקאות ועקומת השווי
+    // לא נמחקים ולא משתנים. מותר גם עם הסוד של ה-cron (הפעלה מ-GitHub ops), אחרת טוקן
+    if (p1 === 'rebase' && req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      const before = await view();
+      if ((before.account.adjustments || []).length && q.force !== '1') return err('כבר בוצעה התאמה לנקודת ההתחלה — force=1 לביצוע נוסף');
+      const rank = day ? await db.get(`rank:${day}`) : null;
+      const journal = (await db.get('auto:journal')) || [];
+      const bd = paperBreakdown({ trades: await broker.trades(), account: before.account, priceOf, fx, table: rank?.table || [], journal, currentVersion: AUTO_RULES.version });
+      // יעד: total − רווח האוטומט = נקודת ההתחלה; ההפרש מול הנקודה הנוכחית הוא ההתאמה (בקריאה ראשונה = נטו הרישומים הידניים כולל עמלות היציאה)
+      const targetBase = round(before.totalIls - (bd.bySource?.autopilot?.netIls || 0), 2);
+      const adjustIls = round(targetBase - before.baseIls, 2);
+      if (Math.abs(adjustIls) < 1) return json({ ok: true, adjustIls: 0, note: 'נקודת ההתחלה כבר תואמת לרווח האוטומט — אין מה להתאים', before: { baseIls: before.baseIls, pnlIls: before.pnlIls } });
+      const acc = await broker.adjust({ ils: adjustIls, day: day || today(), reason: `רישומים ידניים מלפני שהאוטומט קיבל את הניהול (${bd.bySource?.manual?.trades || 0} רישומים, כולל עמלות) — לא נספרים ברווח/הפסד`, meta: { manualNetIls: bd.bySource?.manual?.netIls ?? null, autopilotNetIls: bd.bySource?.autopilot?.netIls ?? null, reconciliationDiffIls: bd.reconciliation?.diffIls ?? null, totalIls: before.totalIls } });
+      const after = await broker.performance(priceOf, fx);
+      return json({ ok: true, adjustIls, manualNetIls: bd.bySource?.manual?.netIls ?? null, autopilotNetIls: bd.bySource?.autopilot?.netIls ?? null, before: { baseIls: before.baseIls, pnlIls: before.pnlIls }, after: { baseIls: after.baseIls, pnlIls: after.pnlIls, pnlPct: after.pnlPct }, account: acc });
+    }
     needAuth();
     if (p1 === 'reset' && req.method === 'POST'){ const st = (await db.get('user:settings')) || {}; const acc = await broker.reset(isNum(body.initialIls) && body.initialIls > 0 ? body.initialIls : (st.portfolioSize || 200000)); return json({ ok: true, account: acc }); }
     if (p1 === 'trade' && req.method === 'DELETE'){ try { const acc = await broker.cancel(q.id || body.id); return json({ ok: true, account: acc }); } catch (e) { return err(e.message); } }

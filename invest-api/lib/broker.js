@@ -28,6 +28,15 @@ export class PaperBroker {
     }
     return a;
   }
+  // נקודת ההתחלה לחישוב רווח/הפסד: הסכום ההתחלתי + התאמות חד-פעמיות (למשל רישומים ידניים מלפני שהאוטומט קיבל את הניהול — לא נספרים)
+  static baseIls(acc){ return round((acc?.initialIls || 0) + (acc?.adjustments || []).reduce((s, a) => s + (a.ils || 0), 0), 2); }
+  async adjust({ ils, reason, day = null, meta = null }){
+    if (!isNum(ils)) throw new Error('סכום התאמה חסר');
+    const acc = await this.account();
+    acc.adjustments = [...(acc.adjustments || []), { at: new Date().toISOString(), day, ils: round(ils, 2), reason: String(reason || '').slice(0, 300), ...(meta ? { meta } : {}) }];
+    await this.db.put(this.key('account'), acc);
+    return acc;
+  }
   async reset(initialIls){
     const t = await this.trades();
     if (t.length) await this.db.put(this.key('archive:') + Date.now(), t);
@@ -91,7 +100,8 @@ export class PaperBroker {
     const totalIls = round(acc.cashIls + valueIls, 2);
     const realizedIls = round(closed.reduce((s, x) => s + (x.pnlIls || 0), 0), 2);
     const wins = closed.filter((x) => (x.pnlIls ?? x.pnl) > 0).length;
-    return { account: acc, positions, cashIls: acc.cashIls, valueIls, totalIls, pnlIls: round(totalIls - acc.initialIls, 2), pnlPct: acc.initialIls ? round(totalIls / acc.initialIls - 1, 4) : null, realizedIls, commissionsIls: acc.commissionsIls || 0,
+    const baseIls = PaperBroker.baseIls(acc);
+    return { account: acc, positions, cashIls: acc.cashIls, valueIls, totalIls, baseIls, adjustmentsIls: round(baseIls - acc.initialIls, 2), pnlIls: round(totalIls - baseIls, 2), pnlPct: baseIls ? round(totalIls / baseIls - 1, 4) : null, realizedIls, commissionsIls: acc.commissionsIls || 0,
       open: open, closed: closed.sort((a, b) => b.exitDate.localeCompare(a.exitDate)), trades: t.length, closedCount: closed.length, winRate: closed.length ? round(wins / closed.length, 3) : null, equity: (await this.db.get(this.key('equity'))) || [], fx: fxNow };
   }
 }
