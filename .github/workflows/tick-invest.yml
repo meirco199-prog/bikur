@@ -93,6 +93,16 @@ jobs:
           if [ "$CMD" = "dump" ]; then
             for P in $(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3-); do echo "=== dump $P"; curl -sS --max-time 60 "$W/$P" | head -c 8000; echo; done
           fi
+          # אבחון: analyst-check <ts> <SYM> [<SYM>...] — שדה analyst (קונצנזוס+טרגטים) ורכיב הציון, לכל סימבול (השדה מגיע מאוחר ב-/asset אז לא נראה ב-dump הרגיל שנחתך ב-8000 תווים)
+          if [ "$CMD" = "analyst-check" ]; then
+            for S in $(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3-); do
+              echo "=== analyst-check $S"
+              curl -sS --max-time 30 "$W/asset/$S" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("missing:", d.get("missing"), d.get("reason","")) if d.get("missing") else (print("priceSource:", d.get("priceSource")), print("analyst:", d.get("analyst")), print("scoreAnalystComponent:", (d.get("score") or {}).get("components",{}).get("analyst")))'
+            done
+          fi
+          if [ "$CMD" = "macro-check" ]; then
+            echo "=== macro-check"; curl -sS --max-time 30 "$W/macro" | python3 -c 'import json,sys; d=json.load(sys.stdin); [print(k, "rows:", len(v.get("rows",[])), "asOf:", v.get("asOf"), "last:", (v.get("rows") or [[None,None]])[-1], "source:", v.get("source")) for k,v in d.items()]'
+          fi
           if [ "$CMD" = "aggressive-reset" ]; then
             echo "=== aggressive reset (מתחיל מחדש עם הציון האגרסיבי)"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET&reset=1" | head -c 800; echo
           fi
