@@ -17,7 +17,8 @@ export const alphavantage = {
   id: 'alphavantage', priority: 3, supports: ['prices', 'profile', 'ratios', 'analyst', 'news', 'insider', 'etf', 'earnings', 'movers'],
   available: (env) => !!env.ALPHAVANTAGE_KEY,
   async prices(symbol, { from } = {}, ctx){
-    const r = await call(ctx, { function: 'TIME_SERIES_DAILY', symbol, outputsize: from && from > '2020' ? 'compact' : 'full' });
+    // outputsize=full הוא premium בלבד בתוכנית החינמית (כל קריאה כזו נכשלה, AI_COUNCIL#13) — compact = ~100 סשנים אחרונים
+    const r = await call(ctx, { function: 'TIME_SERIES_DAILY', symbol, outputsize: 'compact' });
     const ts = r['Time Series (Daily)'];
     if (!ts) return { missing: true, reason: 'AV: אין סדרה' };
     const rows = Object.entries(ts).map(([d, v]) => [d, num(v['1. open']), num(v['2. high']), num(v['3. low']), num(v['4. close']), num(v['5. volume']) ?? 0]).filter((x) => !from || x[0] >= from).sort((a, b) => a[0].localeCompare(b[0]));

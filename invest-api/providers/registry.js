@@ -25,14 +25,16 @@ export async function fetchWithFallback(cap, symbol, opts, ctx, { only } = {}){
   if (!list.length) return { missing: true, reason: `אין ספק זמין ל-${cap} (חסר מפתח?)`, tried };
   for (const p of list){
     try {
-      if (await ctx.budget.blocked(p.id, cap)){ tried.push({ provider: p.id, error: 'לא כלול בתוכנית (נבדק היום)' }); continue; }
+      if (await ctx.budget.blocked(p.id, cap, symbol)){ tried.push({ provider: p.id, error: 'לא כלול בתוכנית (נבדק היום)' }); continue; }
       if (!(await ctx.budget.canSpend(p.id))){ tried.push({ provider: p.id, error: 'תקציב יומי נגמר' }); continue; }
       const r = await p[cap](symbol, opts || {}, ctx);
       if (r && !r.missing) return { ...r, provider: p.id, tried };
       tried.push({ provider: p.id, error: r?.reason || 'missing' });
     } catch (e) {
       tried.push({ provider: p.id, error: e.message, kind: e.kind });
-      if (e.kind === 'paid' || e.kind === 'auth'){ await ctx.budget.block(p.id, cap); await ctx.db.logError(`${p.id}.${cap}`, `${e.message} — נחסם להיום (לא נקרא שוב לניירות אחרים)`); }
+      // 402 = ה-endpoint עצמו בתשלום → חסימה לכל נייר. 401/403 = יכול להיות גם "הסימבול הזה לא בתוכנית" → חסימה לנייר בלבד
+      if (e.kind === 'paid'){ await ctx.budget.block(p.id, cap); await ctx.db.logError(`${p.id}.${cap}`, `${e.message} — נחסם להיום (לא נקרא שוב לניירות אחרים)`); }
+      else if (e.kind === 'auth'){ await ctx.budget.block(p.id, cap, symbol); await ctx.db.logError(`${p.id}.${cap}(${symbol})`, `${e.message} — נחסם להיום לנייר הזה בלבד`); }
       else await ctx.db.logError(`${p.id}.${cap}(${symbol})`, e.message);
     }
   }

@@ -111,4 +111,5 @@ test('תקציב: endpoint שהתוכנית לא כוללת נחסם להיום 
   await b.block('fmp', 'earnings'); await b.flush();
   assert.equal(await new Budget(db).blocked('fmp', 'earnings'), true, 'נשמר עם התקציב היומי');
   assert.equal(await b.blocked('fmp', 'profile'), false);
+  assert.equal(await b.blocked('fmp', 'earnings', 'AAPL'), true, 'חסימה גלובלית חלה גם כששואלים על נייר ספציפי');
 });

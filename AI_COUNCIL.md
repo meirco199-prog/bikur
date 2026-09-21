@@ -383,9 +383,16 @@ capability:symbol` או פר-`provider:capability` **רק** כשהשגיאה ה�
 לספק כשהוא כבר במצב שגיאה) ולא רק תוצר לוואי לא-מכוון של קוד משותף בין `paid` ל-`auth` — יש לשקול תיקון
 יותר ממוקד (רק סוג שגיאה אחד חוסם).
 **What would change ChatGPT's mind:** לא ידוע עדיין — טרם הועבר.
-**Owner decision:** ―
-**Status:** OPEN — ממצאים אומתו בנתונים חיים; אין רכישה/שינוי subscription; תיקון #1 (הבאג האמיתי) ממתין
-להחלטת בעל הריפו לפני מימוש.
+**Owner decision:** "תתקן" (2026-09-21) — אישור לתקן את הבאג. אין רכישה.
+**Status:** TESTING → מומש (PR הבא אחרי #17): (1) `lib/budget.js` + `providers/registry.js` — 402 (`paid`)
+עדיין חוסם `provider:capability` לכל נייר; 401/403 (`auth`) חוסם עכשיו רק `provider:capability:symbol`.
+(1b) `providers/finnhub.js` — `appliesTo` מדלג על `.TA` ו-`^` (התוכנית החינמית = ארה"ב בלבד), כך שהטריגר
+שנצפה בפועל לא מגיע בכלל ל-Finnhub; `BRK.B` נשאר (נקודה ≠ בורסה זרה — נבדק במבחן). (2)
+`providers/alphavantage.js` — `outputsize: 'compact'` תמיד. (3) **לא מומש** — העשרת טרגט מ-AV כש-Finnhub
+הצליח היא הרחבת נתונים ולא תיקון באג; נשאר פתוח להחלטה נפרדת. מבחנים: `tests/registry-block.test.mjs`
+(5 חדשים; 4 מהם נכשלים על הקוד הישן ועוברים אחרי התיקון — אומת ע"י stash זמני) + הרחבת מבחן התקציב
+הקיים; 165/165 עוברים. עלות תיקון #1 במקרה של מפתח שגוי באמת: קריאה כושלת אחת לכל נייר ליום במקום אחת
+בסך הכל — חסום ע"י התקציב היומי וגלוי ב-recentErrors; `appliesTo` מונע את המקרה הנפוץ (`.TA`) מראש.
 
 ### AI_COUNCIL#14: Israel market track — EODHD coverage audit
 **קטגוריה:** שינוי מבוסס-נתונים (data-pipeline) + החלטת ארכיטקטורה (מסלול ישראלי נפרד)
