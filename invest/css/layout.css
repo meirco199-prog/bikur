@@ -16,9 +16,9 @@
 .sidenav a:hover{background:var(--bg3);text-decoration:none;color:var(--fg)}
 .sidenav a.active{background:var(--accent);color:#fff}
 .sidenav .sep{margin:.5rem .4rem .2rem;font-size:.72rem;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em}
-main{padding:1rem 1.2rem 3rem;min-width:0;max-width:100%}
-.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
-.grid{display:grid;gap:1rem}
+main{padding:1.3rem 1.5rem 3rem;min-width:0;max-width:100%}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap}
+.grid{display:grid;gap:1.2rem}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .g-2-1{grid-template-columns:2fr 1fr}.g-1-2{grid-template-columns:1fr 2fr}
 .span2{grid-column:span 2}

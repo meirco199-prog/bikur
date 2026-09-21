@@ -1,6 +1,6 @@
 // הגדרות מקומיות (localStorage) + מטמון bundles (IndexedDB) לחישובים בדפדפן.
 const KEY = 'invest.settings.v1';
-const DEFAULTS = { apiUrl: 'https://invest-api.meirco199.workers.dev', token: '', computeMode: 'auto', theme: 'dark', portfolioSize: 200000, notifications: false, lastAlertSeen: '' };
+const DEFAULTS = { apiUrl: 'https://invest-api.meirco199.workers.dev', token: '', computeMode: 'auto', theme: 'light', portfolioSize: 200000, notifications: false, lastAlertSeen: '' };
 let cache = null;
 export const settings = {
   get(){ if (!cache){ try { cache = { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) || '{}')) }; } catch { cache = { ...DEFAULTS }; } } return cache; },
