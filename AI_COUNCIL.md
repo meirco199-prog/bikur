@@ -278,3 +278,55 @@ status check, בלי bypass, force-push/מחיקת ענף חסומים). ה-PR �
 **What would change ChatGPT's mind:** לא רלוונטי, מאותה סיבה.
 **Owner decision:** אושר על ידי בעל הריפו (זו הבקשה המקורית) — מיושם.
 **Status:** RESOLVED (תוקן ישירות בקובץ הזה; #9 עודכן בעקבות זה).
+
+### AI_COUNCIL#12: כיסוי מודל הצל נשאר n=100 אחרי סריקה מלאה של 503/503 — rank לא נוצר כשלא היה קיים
+**קטגוריה:** באג מוכח
+**Issue:** בבדיקה יומית (2026-09-21) התברר שהריצות המתוזמנות של GitHub Actions לא הופעלו כלל מאז
+2026-09-19 (פער של יומיים). הפעלה ידנית (`auto-run` דרך `.github/invest-ops/command`) הצליחה, אבל דוח
+מודל הצל הראה `day: 2026-09-20, pipeline: worker, n: 100` — למרות `entry940` שהצליח ל-2026-09-21. הפעלת
+`sp500-run` במפורש (PR #9) הריצה סריקה מלאה שדיווחה בעצמה `503/503 עם ציון, EDGAR 503/503, 0 שגיאות,
+ingest: written 503`, **אבל** מיד אחר כך `shadow/run?force=1` עדיין החזיר `day: 2026-09-20, n: 100,
+pipeline: worker, uniformCount: 0`.
+**Claude position:** מסכים לגמרי — זה באג מוכח, לא סינון מכוון, ואימתתי אותו בקריאת קוד ישירה (לא רק
+מהלוג), עד שני רבדים: (1) `worker.js`, handler של `POST /ingest/snapshots` עם `finalize=1` — הקוד היה
+`if (exRank){ ... }` בלי `else` ליצירת `rank:{day}` כשהוא לא קיים עדיין. זה שונה מ-`cronStep` באותו קובץ
+שכבר מטפל נכון במקרה `!exRank` (דרך `putIfAbsent`). (2) `lib/shadow.js`, `runShadow`: `day = day ||
+(await latestRankDay(db))` — כש-`rank:2026-09-21` מעולם לא נוצר, `latestRankDay()` המשיך להצביע על
+2026-09-20; `runShadow` טען את ה-rank הישן (עם `rank.table` בגודל ~100), ו-`listShardSnaps(db,
+'2026-09-20')` (המפתח `snaps:2026-09-20:*`, לא `2026-09-21`) לא מצא את ה-shards שנכתבו תחת היום החדש
+→ `uniformCount: 0` → נופל חזרה ל-`pipeline: 'worker'` עם `table = rank.table` הישן (n=100). כלומר ה-100
+לא נבע מסינון איכות (DF) אלא מקריאת היום/הדירוג הלא-נכון מלכתחילה — `eligible: 96` מתוך ה-`n: 100` הזה
+מחזק את זה (לא "503 → סינון → 100" אלא "100 מההתחלה").
+**ChatGPT position:** אותו אבחון בדיוק (התקבל מבעל הריפו): הבאג ב-`finalize` שמטפל רק ב-`if (exRank)`;
+הציע 5 תיקונים — (1) ליצור/לעדכן rank גם כש-`exRank` לא קיים, (2)+(3) regression tests לשני המקרים (אין
+rank קיים; יש rank חלקי ומוחלף ע"י סריקה מלאה), (4) ב-workflow לקרוא ל-shadow עם `date=$TODAY&force=1`
+מפורש במקום להסתמך על latest day, (5) post-condition ב-workflow: אחרי סריקה מלאה shadow.day חייב להיות
+היום ו-uniformCount קרוב ליקום המלא — אחרת להתריע, לא לדווח הצלחה שקטה.
+**Evidence from code/data:** `worker.js` שורות 310–314 (לפני התיקון); `lib/shadow.js` שורות 8–13
+(`runShadow`); `lib/snapstore.js` (`listShardSnaps`/`shardKey` — מפתח `snaps:${day}:${i}`, תלוי-יום);
+לוג ריצה 35614120878 (PR #9): `ingest: written 503, skipped 0, rerank false, shards 3` ואז מיד אחריו
+`shadow re-run (force)` עם `day: 2026-09-20`.
+**Where we agree:** האבחון זהה לחלוטין בין שתי הבדיקות העצמאיות (קוד + לוג בפועל); זה data-pipeline בלבד
+— לא נוגע במשקלים, thresholds, או לוגיקת החלטה של אף מודל.
+**Where we disagree:** תיקון #4 של ChatGPT (להעביר `date=$TODAY` מפורש מה-workflow ל-`shadow/run`) —
+לדעתי מיותר לאחר תיקון #1: ברגע ש-`rank:{day}` נוצר כראוי, `latestRankDay()` יחזיר את היום הנכון ממילא,
+ו-`runShadow` בלי פרמטר `day` יפתור אותו נכון. נעילת תאריך מפורש בworkflow יכולה גם להסתיר תרחיש שונה
+(שבו דווקא rank של אתמול שלם יותר מהיום החלקי) מאחורי override שמכריח "תמיד היום". לא הוספתי את זה
+בכוונה — אם יתגלה עוד מקרה שבו `latestRankDay()` לא מספיק, אפשר לחזור לזה כתיקון נפרד עם נימוק משלו.
+**Proposed experiment/fix:** (1) `worker.js`: השורה `if (exRank){ ... }` הוחלפה ב-`if (!exRank ||
+overwrite || rank.analyzed > (exRank.analyzed || 0)){ ... }` — מחשב `rank` תמיד ויוצר אותו כשהוא חסר,
+באותו דפוס כמו `cronStep`. (2)+(3) שני מבחני רגרסיה חדשים ב-`worker.test.mjs`: אין rank קיים + finalize
+→ נוצר; rank חלקי (analyzed=2) + finalize עם סריקה מלאה (8) → מוחלף. (5) `tick-invest.yml`: אחרי
+`shadow/run?force=1` בבלוק ה-sp500-nightly, בדיקת שפיות ב-Python — אם `day` שהוחזר שונה מ-`$TODAY` או
+`uniformCount < 300`, מדפיס `::warning::` גלוי ב-Actions (לא נכשל את השלב, כדי לא לחסום entry940/autopilot
+שאחריו). (4) לא יושם — ראה "Where we disagree".
+**Risks:** תיקון #1 קורא ל-`rankSnapshots` תמיד (גם כש-`exRank` קיים ולא משתפר) — עלות חישובית זניחה
+(אגרגציה טהורה על snapshots שכבר נטענו, בלי קריאות API נוספות). אין שינוי בסף/משקל/החלטת קנייה-מכירה.
+**What would change Claude's mind:** אם יתברר ש-`exRank` ריק במתכוון במקרים מסוימים (לדוגמה placeholder
+שנוצר על ידי תהליך אחר לפני שה-snapshots מוכנים) והתיקון גורם ל-rank חלקי/מוקדם מדי להיכתב — זה יצריך
+בדיקת `analyzed`/`universeSize` נוספת לפני היצירה, לא רק `!exRank`.
+**What would change ChatGPT's mind:** לא ידוע — לא הועבר נימוק נגדי לגבי "Where we disagree" (#4); זה
+עדיין פתוח לדיון אם בעל הריפו חושב שנעילת תאריך מפורש כן נחוצה.
+**Owner decision:** ―
+**Status:** TESTING — תוקן ונבדק (160/160 בדיקות invest-api עוברות, כולל 2 הבדיקות החדשות), ממתין ל-PR
+ולריצה אמיתית נוספת של הסריקה הלילית כדי לוודא `day`/`uniformCount` תקינים מקצה-לקצה.
