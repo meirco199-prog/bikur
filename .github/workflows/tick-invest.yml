@@ -18,6 +18,11 @@ on:
       - '.github/invest-ops/command'
   workflow_dispatch:
 
+# issues: write — פרסום דוח התקינות היומי כתגובה ב-Issue הקבוע של AI Council (#25). אין הרשאת כתיבה לקוד
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   tick:
     runs-on: ubuntu-latest
@@ -138,3 +143,21 @@ jobs:
           echo "=== aggressive"; curl -sS --max-time 30 "$W/aggressive/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("day:", d.get("day"), "model:", d.get("model"), d.get("variant"), "total:", d.get("totalIls"), "spyRef:", d.get("spyRef"), "missing:", d.get("missing")); print("exposure:", d.get("exposure")); p=d.get("pending") or {}; print("pending:", p.get("day"), [(o["side"], o["qty"], o["symbol"], o.get("filled")) for o in p.get("orders", [])]); print("sectors:", [(x["sector"], x["share"]) for x in (d.get("sectors") or [])[:6]]); print("metrics:", d.get("metrics")); print("stats:", d.get("stats")); print("positions:", [(p["symbol"], p["valueIls"], p.get("pnlPct")) for p in (d.get("positions") or [])]); [print("  ", t["day"], t["side"], t["qty"], "x", t["symbol"], "@", t["price"], "|", t.get("reason")) for t in (d.get("trades") or [])[:8]]'
           echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo
           echo "=== rank"; curl -sS --max-time 30 "$W/rank" | head -c 500; echo
+      # דוח תקינות יומי → תגובה ב-Issue #25 (AI Council). פעם ביום (לפי סמן <!-- health-report YYYY-MM-DD --> בתגובה האחרונה),
+      # או בכוח בפקודת ops "health-report". קריאה בלבד מה-API הציבורי; בלי סודות; בלי מודל
+      - name: Daily health report → AI Council issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          W=https://invest-api.meirco199.workers.dev
+          ISSUE=25
+          CMD=$(cat .github/invest-ops/command 2>/dev/null | head -1 | cut -d" " -f1 || echo cron-run)
+          [ "${{ github.event_name }}" = "push" ] || CMD=cron-run
+          TODAY=$(date -u +%F)
+          LAST=$(gh api "repos/${{ github.repository }}/issues/$ISSUE/comments?per_page=100" --jq '[.[] | select(.body | startswith("<!-- health-report"))] | last | .body' 2>/dev/null | head -1 || true)
+          if [ "$CMD" != "health-report" ] && echo "$LAST" | grep -q "health-report $TODAY"; then echo "דוח התקינות של $TODAY כבר פורסם — מדלג"; exit 0; fi
+          WORKER_URL="$W" RUN_URL="$RUN_URL" node invest-api/scripts/health-report.mjs > /tmp/health.md || { echo "::warning::health-report נכשל"; exit 0; }
+          cat /tmp/health.md
+          gh api "repos/${{ github.repository }}/issues/$ISSUE/comments" -f body="$(cat /tmp/health.md)" --silent && echo "פורסם ב-Issue #$ISSUE" || echo "::warning::פרסום הדוח ל-Issue נכשל (הרשאות?)"

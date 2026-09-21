@@ -1,4 +1,4 @@
-// בנק ישראל — שער יציג. גיבוי: FRED DEXISUS.
+// בנק ישראל — שער יציג (המקור היחיד ל-USD/ILS; ל-FRED אין סדרת שקל).
 import { getJSON, num } from '../lib/http.js';
 export const boi = {
   id: 'boi', priority: 1, supports: ['fx'],

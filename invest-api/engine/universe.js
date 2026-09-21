@@ -71,7 +71,7 @@ export const INDICES = [
 export const MACRO_SERIES = [
   { id: 'VIXCLS', title: 'VIX', units: 'index' }, { id: 'DGS10', title: 'תשואת אג"ח 10 שנים', units: '%' }, { id: 'DGS2', title: 'תשואת אג"ח 2 שנים', units: '%' },
   { id: 'T10Y2Y', title: 'עקום 10y−2y', units: '%' }, { id: 'DGS3MO', title: 'תשואה 3 חודשים', units: '%' }, { id: 'FEDFUNDS', title: 'ריבית הפד', units: '%' },
-  { id: 'CPIAUCSL', title: 'CPI ארה"ב', units: 'index' }, { id: 'BAMLH0A0HYM2', title: 'מרווח High Yield', units: '%' }, { id: 'DEXISUS', title: 'USD/ILS (FRED)', units: 'ILS' },
+  { id: 'CPIAUCSL', title: 'CPI ארה"ב', units: 'index' }, { id: 'BAMLH0A0HYM2', title: 'מרווח High Yield', units: '%' }, // USD/ILS לא כאן: ל-FRED אין סדרת שקל (H.10) — מגיע מבנק ישראל דרך getFx (fx:USDILS)
   { id: 'DCOILWTICO', title: 'נפט WTI', units: '$' }, { id: 'UNRATE', title: 'אבטלה ארה"ב', units: '%' }, { id: 'DTWEXBGS', title: 'מדד הדולר', units: 'index' },
 ];
 
