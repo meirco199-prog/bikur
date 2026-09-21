@@ -280,7 +280,27 @@ test('POST /paper/autopilot-only — החשבון משקף רק את האוטו�
   assert.equal(p1.j.commissionsIls, a.j.result.trade.feeIls);
   assert.equal(p1.j.equity.length, 0, 'עקומת השווי מתחילה מחדש');
   const keys = [...store.keys()].filter((k) => k.startsWith('paper:archive:manual:')); assert.equal(keys.length, 1); assert.equal(JSON.parse(store.get(keys[0])).trades.length, 2);
-  const again = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(again.j.removed, 0, 'אידמפוטנטי');
+  const again = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(again.j.removed, 0, 'אידמפוטנטי'); assert.equal(again.j.cashReturnedIls, 0);
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+});
+test('POST /paper/autopilot-only — רישום ידני ישן שנסגר בלי exitFeeIls: עמלת היציאה משוחזרת, וגם בארכיון שכבר הוסר (פעם אחת)', async () => {
+  await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
+  const m = await get('/paper/order', { body: { symbol: 'AAPL', side: 'buy', qty: 10, reason: 'סיגנל BUY' }, auth: true });
+  const a = await get('/paper/order', { body: { symbol: 'MSFT', side: 'buy', qty: 3, reason: 'אוטומט: בדיקה' }, auth: true });
+  await get('/paper/order', { body: { symbol: 'AAPL', side: 'sell', qty: 10, price: Math.round(m.j.price * 0.9 * 100) / 100 }, auth: true });
+  // מדמים רישום ישן: מוחקים את exitFeeIls מהרישום הסגור
+  const tr = JSON.parse(store.get('paper:trades')); for (const x of tr) if (x.exitDate) delete x.exitFeeIls; store.set('paper:trades', JSON.stringify(tr));
+  const r = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(r.j.removed, 1, 'מכירה של כל הלוט — רישום סגור אחד');
+  const p1 = await get('/paper');
+  assert.equal(p1.j.cashIls, Math.round((200000 - a.j.result.trade.costIls) * 100) / 100, 'המזומן חזר במלואו כולל עמלת היציאה המשוחזרת');
+  assert.equal(p1.j.commissionsIls, a.j.result.trade.feeIls);
+  // ארכיון שהוסר בגרסה קודמת בלי החזר עמלת יציאה — מושלם בקריאה הבאה, ורק פעם אחת
+  const key = [...store.keys()].filter((k) => k.startsWith('paper:archive:manual:')).sort().pop(); /* הארכיון האחרון (בדיקות קודמות השאירו ארכיונים משלהן) */ const arc = JSON.parse(store.get(key)); delete arc.exitFeesReconciled; delete arc.exitFeesReconciledIls;
+  store.set(key, JSON.stringify(arc));
+  const cashBefore = p1.j.cashIls;
+  const r2 = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(r2.j.removed, 0); assert.ok(r2.j.exitFeesReconciledIls > 0, JSON.stringify(r2.j));
+  const p2 = await get('/paper'); assert.equal(p2.j.cashIls, Math.round((cashBefore + r2.j.exitFeesReconciledIls) * 100) / 100);
+  const r3 = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(r3.j.cashReturnedIls, 0, 'לא מוחזר פעמיים');
   await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
 });
 test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מזומן', async () => {

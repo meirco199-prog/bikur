@@ -43,21 +43,32 @@ export class PaperBroker {
   async purgeManual(isAuto = (t) => /^אוטומט:/.test(t.reason || '')){
     const t = await this.trades(); const acc = await this.account();
     const manual = t.filter((x) => !isAuto(x));
-    if (!manual.length){ return { removed: 0, cashReturnedIls: 0, feesRemovedIls: 0, account: acc }; }
     let cash = acc.cashIls, fees = 0; const seen = new Set();
+    // עמלת יציאה: נרשמת פעם אחת למכירה (על הרישום הראשון שנסגר); רישומים ישנים (לפני שהשדה exitFeeIls נוסף) לא נושאים אותה —
+    // אז משחזרים אותה מאותה נוסחת עמלה שהמכירה שילמה, פעם אחת לכל מכירה (symbol+exitDate)
+    const exitFeeOf = (rows) => { const g = new Map(); for (const x of rows) if (x.exitDate){ const k = `${x.symbol}|${x.exitDate}`; (g.get(k) || g.set(k, []).get(k)).push(x); } let sum = 0; for (const grp of g.values()){ const known = grp.find((x) => isNum(x.exitFeeIls)); sum += known ? known.exitFeeIls : commissionIls(grp.reduce((s, x) => s + x.qty, 0), grp[0].exitPrice, grp[0].exitFx || grp[0].fx || 3.7, grp[0].currency || 'USD'); } return round(sum, 2); };
     for (const x of manual){
       const k = `${x.symbol}|${x.date}|${x.price}`; // רישום שפוצל במכירה חלקית נושא את עמלת הכניסה בכל חלק — סופרים פעם אחת
       if (!seen.has(k)){ seen.add(k); fees += x.feeIls || 0; }
-      if (x.exitDate){ cash += (x.costIls || 0) - (x.proceedsIls || 0) + (x.exitFeeIls || 0); fees += x.exitFeeIls || 0; }
-      else cash += x.costIls || 0;
+      cash += x.exitDate ? (x.costIls || 0) - (x.proceedsIls || 0) : (x.costIls || 0);
     }
-    await this.db.put(this.key('archive:manual:') + Date.now(), { removedAt: new Date().toISOString(), trades: manual, adjustments: acc.adjustments || null });
-    await this.save(t.filter((x) => isAuto(x)));
+    const exitFees = exitFeeOf(manual); cash += exitFees; fees += exitFees;
+    // ארכיונים קודמים שהוסרו בלי שעמלות היציאה שלהם הוחזרו (רישומים ישנים ללא exitFeeIls) — משלימים פעם אחת
+    let reconciled = 0;
+    for (const key of await this.db.list(this.key('archive:manual:'))){
+      const a = await this.db.get(key); if (!a || a.exitFeesReconciled) continue;
+      const missing = (a.trades || []).filter((x) => x.exitDate && !isNum(x.exitFeeIls));
+      const owed = missing.length ? exitFeeOf(missing) : 0;
+      if (owed){ cash += owed; fees += owed; reconciled += owed; }
+      await this.db.put(key, { ...a, exitFeesReconciled: true, exitFeesReconciledIls: owed });
+    }
+    if (!manual.length && !reconciled){ return { removed: 0, cashReturnedIls: 0, feesRemovedIls: 0, account: acc }; }
+    if (manual.length){ await this.db.put(this.key('archive:manual:') + Date.now(), { removedAt: new Date().toISOString(), trades: manual, adjustments: acc.adjustments || null, exitFeesReconciled: true, exitFeesReconciledIls: 0 }); await this.save(t.filter((x) => isAuto(x))); }
     const cashReturned = round(cash - acc.cashIls, 2);
     acc.cashIls = round(cash, 2); acc.commissionsIls = round(Math.max(0, (acc.commissionsIls || 0) - fees), 2); delete acc.adjustments;
-    acc.autopilotOnly = { at: new Date().toISOString(), removed: manual.length, cashReturnedIls: cashReturned, feesRemovedIls: round(fees, 2) };
-    await this.db.put(this.key('account'), acc); await this.db.put(this.key('equity'), []);
-    return { removed: manual.length, cashReturnedIls: cashReturned, feesRemovedIls: round(fees, 2), account: acc };
+    acc.autopilotOnly = { at: new Date().toISOString(), removed: manual.length, cashReturnedIls: round((acc.autopilotOnly?.cashReturnedIls || 0) + cashReturned, 2), feesRemovedIls: round((acc.autopilotOnly?.feesRemovedIls || 0) + fees, 2) };
+    await this.db.put(this.key('account'), acc); if (manual.length) await this.db.put(this.key('equity'), []);
+    return { removed: manual.length, cashReturnedIls: cashReturned, feesRemovedIls: round(fees, 2), exitFeesReconciledIls: round(reconciled, 2), account: acc };
   }
   async reset(initialIls){
     const t = await this.trades();
