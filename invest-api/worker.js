@@ -463,7 +463,7 @@ async function handle(req, env0, ctx){
       const before = await view();
       const r = await broker.purgeManual();
       const after = await broker.performance(priceOf, fx);
-      return json({ ok: true, removed: r.removed, cashReturnedIls: r.cashReturnedIls, feesRemovedIls: r.feesRemovedIls, before: { totalIls: before.totalIls, cashIls: before.cashIls, positions: before.positions.length, closed: before.closedCount, baseIls: before.baseIls, pnlIls: before.pnlIls }, after: { totalIls: after.totalIls, cashIls: after.cashIls, positions: after.positions.length, closed: after.closedCount, baseIls: after.baseIls, pnlIls: after.pnlIls, pnlPct: after.pnlPct, commissionsIls: after.commissionsIls }, account: r.account });
+      return json({ ok: true, removed: r.removed, cashReturnedIls: r.cashReturnedIls, feesRemovedIls: r.feesRemovedIls, exitFeesReconciledIls: r.exitFeesReconciledIls || 0, before: { totalIls: before.totalIls, cashIls: before.cashIls, positions: before.positions.length, closed: before.closedCount, baseIls: before.baseIls, pnlIls: before.pnlIls }, after: { totalIls: after.totalIls, cashIls: after.cashIls, positions: after.positions.length, closed: after.closedCount, baseIls: after.baseIls, pnlIls: after.pnlIls, pnlPct: after.pnlPct, commissionsIls: after.commissionsIls }, account: r.account });
     }
     needAuth();
     if (p1 === 'reset' && req.method === 'POST'){ const st = (await db.get('user:settings')) || {}; const acc = await broker.reset(isNum(body.initialIls) && body.initialIls > 0 ? body.initialIls : (st.portfolioSize || 200000)); return json({ ok: true, account: acc }); }
