@@ -310,7 +310,9 @@ async function handle(req, env0, ctx){
     let rerank = false;
     if (body.finalize === true || q.finalize === '1'){
       const exRank = await db.get(`rank:${day}`);
-      if (exRank){ const rank = rankSnapshots(await listSnaps(db, day), { sp500: await sp500Set(db) }); if (overwrite || rank.analyzed > (exRank.analyzed || 0)){ await db.put(`rank:${day}`, { ...rank, mergedBy: 'ingest' }); await db.delete(`reco:${day}`); rerank = true; } }
+      const rank = rankSnapshots(await listSnaps(db, day), { sp500: await sp500Set(db) });
+      // אין דירוג קיים ליום הזה עדיין (למשל אחרי שה-cron המתוזמן פספס יומיים) — צריך ליצור אחד, לא רק לעדכן קיים
+      if (!exRank || overwrite || rank.analyzed > (exRank.analyzed || 0)){ await db.put(`rank:${day}`, { ...rank, mergedBy: 'ingest' }); await db.delete(`reco:${day}`); rerank = true; }
     }
     return json({ ok: true, day, received: snaps.length, ...r, alerts, rerank });
   }

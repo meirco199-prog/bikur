@@ -59,7 +59,12 @@ jobs:
             FORCE500=""; [ "$CMD" = "sp500-run" ] && FORCE500=1
             rm -f .sp500-ran
             echo "=== sp500 nightly"; CRON_SECRET="$SECRET" WORKER_URL="$W" EDGAR_UA="$EDGAR_UA_CFG" SP500_FORCE="$FORCE500" TWELVEDATA_KEY="${{ secrets.TWELVEDATA_KEY }}" SP500_PRICE_SOURCE="${{ vars.SP500_PRICE_SOURCE }}" SP500_LIMIT="$(cat .github/invest-ops/command 2>/dev/null | cut -d' ' -f3)" node invest-api/scripts/nightly-sp500.mjs || echo "::warning::sp500 nightly failed"
-            echo "=== shadow re-run (force)"; curl -sS --max-time 120 -X POST "$W/shadow/run?secret=$SECRET&force=1" | head -c 400; echo
+            echo "=== shadow re-run (force)"
+            SHADOW_RESP=$(curl -sS --max-time 120 -X POST "$W/shadow/run?secret=$SECRET&force=1")
+            echo "$SHADOW_RESP" | head -c 400; echo
+            # בדיקת שפיות: אחרי סריקה מלאה מודל הצל אמור לרוץ על היום ועל כיסוי כמעט-מלא (~500); אם לא — התרעה גלויה
+            # במקום דיווח הצלחה שקטה (ראה AI_COUNCIL: תיקון "rank לא נוצר כשלא היה קיים ליום הזה")
+            echo "$SHADOW_RESP" | TODAY="$TODAY" python3 -c 'import json,os,sys; d=json.load(sys.stdin); day=d.get("day"); uc=d.get("uniformCount",0); t=os.environ["TODAY"]; print(f"::warning::מודל הצל רץ על {day} ולא על היום ({t}) — כנראה שה-rank של היום עדיין לא נוצר") if day!=t else (print(f"::warning::כיסוי מודל הצל נמוך: uniformCount={uc} על יום {day} — פחות מהמצופה לסריקת S&P 500 מלאה") if uc<300 else None)' || true
             # אם הסריקה רצה עכשיו (ולא דילגה) — ההחלטה הלילית של המסלול האגרסיבי מתקבלת מחדש על מודל הצל המעודכן (פקודות שטרם בוצעו מתבטלות)
             FORCEAGG=""; [ -f .sp500-ran ] && FORCEAGG="&force=1"
             echo "=== aggressive decide"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET$FORCEAGG" | head -c 600; echo

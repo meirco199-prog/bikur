@@ -200,6 +200,33 @@ test('POST /ingest/prices — הזרמת CSV מ-GitHub Actions, מיזוג ול�
   assert.equal(r2.j.items[0].rows, 3);
   const p = await get('/prices/ZZZ'); assert.equal(p.j.rows.length, 3); assert.equal(p.j.source, 'stooq-via-github');
 });
+test('POST /ingest/snapshots finalize — יוצר rank חדש כשאין קיים (לא רק מעדכן קיים)', async () => {
+  // רגרסיה: אם ה-cron המתוזמן פספס ימים, אין עדיין rank:day כשה-GitHub Action מריץ finalize=1 בפעם הראשונה
+  const env5 = { ...env, CRON_SECRET: 'tick2' };
+  const call = (path, body) => worker.fetch(new Request('https://api.test' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '5.5.5.5' }, body: JSON.stringify(body) }), env5, { waitUntil(){} }).then(async (r) => ({ status: r.status, j: await r.json() }));
+  const day = '2020-01-05';
+  for (const k of [...store.keys()]) if (k.startsWith(`snap:${day}:`) || k.startsWith(`snaps:${day}:`) || k.startsWith(`rank:${day}`) || k.startsWith(`reco:${day}`)) store.delete(k);
+  assert.equal(store.has(`rank:${day}`), false, 'אין rank קיים ליום הזה לפני הבדיקה');
+  const snaps = Array.from({ length: 5 }, (_, i) => ({ symbol: 'SYM' + i, score: 50 + i, missing: false, signal: 'HOLD', type: 'stock' }));
+  const r = await call('/ingest/snapshots?secret=tick2&finalize=1', { date: day, snapshots: snaps });
+  assert.equal(r.status, 200, JSON.stringify(r.j));
+  assert.equal(r.j.rerank, true, 'rerank צריך להיות true גם כשלא היה rank קודם');
+  const rank = store.get(`rank:${day}`);
+  assert.ok(rank, 'rank:day היה צריך להיווצר גם בלי rank קודם');
+  assert.equal(JSON.parse(rank).analyzed, 5);
+});
+test('POST /ingest/snapshots finalize — דירוג עם ניתוח חלקי מוחלף אחרי סריקה מלאה', async () => {
+  const env5 = { ...env, CRON_SECRET: 'tick2' };
+  const call = (path, body) => worker.fetch(new Request('https://api.test' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '5.5.5.6' }, body: JSON.stringify(body) }), env5, { waitUntil(){} }).then(async (r) => ({ status: r.status, j: await r.json() }));
+  const day = '2020-01-06';
+  for (const k of [...store.keys()]) if (k.startsWith(`snap:${day}:`) || k.startsWith(`snaps:${day}:`) || k.startsWith(`rank:${day}`) || k.startsWith(`reco:${day}`)) store.delete(k);
+  store.set(`rank:${day}`, JSON.stringify({ date: day, analyzed: 2, table: [], categories: {} }));
+  const snaps = Array.from({ length: 8 }, (_, i) => ({ symbol: 'FUL' + i, score: 40 + i, missing: false, signal: 'HOLD', type: 'stock' }));
+  const r = await call('/ingest/snapshots?secret=tick2&finalize=1', { date: day, snapshots: snaps });
+  assert.equal(r.status, 200, JSON.stringify(r.j));
+  assert.equal(r.j.rerank, true);
+  assert.equal(JSON.parse(store.get(`rank:${day}`)).analyzed, 8, 'דירוג חלקי (2) הוחלף בסריקה המלאה (8)');
+});
 test('snapshot חסר (תקלת נתונים) מתמלא מחדש; ציון אמיתי לא נדרס; דירוג ריק מוחלף', async () => {
   const { DB } = await import('../lib/db.js'); const { Budget } = await import('../lib/budget.js');
   const mk = () => { const db = new DB(env.INVEST); return { env, db, budget: new Budget(db) }; };
