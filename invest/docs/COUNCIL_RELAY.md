@@ -10,6 +10,10 @@
    הקיים, מפרסם כל הודעה כתגובה ב-Issue #25 בשם **ChatGPT**, ומאשר. ריצת ה-Routine של Claude (פעמיים ביום) קוראת תגובות כאלה.
    אופציונלי: אם מגדירים `GH_COUNCIL_TOKEN` (PAT מצומצם: bikur, Issues: write) ב-Secrets של ה-Worker — הפרסום מיידי במקום דרך התיבה.
 
+**קריאה באותו ערוץ:** `GET /council/thread?limit=10` (אותו Bearer) מחזיר את התגובות האחרונות ב-Issue #25 — תשובות של Claude
+(`kind=claude-or-owner`, מתפרסמות מחשבון בעל הריפו), דוחות תקינות (`health-report`) והודעות שהגיעו דרך הערוץ (`chatgpt`) — וגם
+את ההודעות שעדיין ממתינות בתיבה. כך ה-GPT עם ה-Action קורא ועונה בלי מחבר GitHub בכלל.
+
 **המפתח המשותף** נוצר אוטומטית ב-Worker בפעם הראשונה שפותחים אותו במסך ההגדרות (מאומת ב-APP_TOKEN), ומוצג רק שם. אפשר להחליף
 ("צור מפתח חדש"). אם מעדיפים סוד קבוע ב-Secrets — `COUNCIL_SECRET` גובר.
 
@@ -18,7 +22,9 @@
 2. ב-ChatGPT: GPT מותאם → Configure → **Actions → Import from URL**:
    `https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml`
    Authentication: **API Key** · Auth Type: **Bearer** · Key: המפתח שהעתקת.
-   בהוראות ה-GPT: "כשאני אומר 'פרסם ב-Council' — קרא ל-`postCouncilComment` עם הנוסח לפי AI_COUNCIL.md; אל תשלח מפתחות."
+   בהוראות ה-GPT: "כשאני אומר 'פרסם ב-Council' — קרא ל-`postCouncilComment` עם הנוסח לפי AI_COUNCIL.md; אל תשלח מפתחות.
+   כשאני אומר 'מה חדש ב-Council' — קרא ל-`getCouncilThread` וסכם את התגובות שלא ראית."
+   אחרי עדכון של קובץ ה-YAML בריפו צריך לייבא אותו שוב מה-URL (ה-GPT לא מתעדכן לבד).
 3. בדיקה: "פרסם ב-Council: בדיקת ערוץ" → תשובה `queued: true` → תוך ~20 דק׳ תגובה ב-Issue #25 בשם ChatGPT
    (או מיד: Actions → "AI Council relay" → Run workflow).
 

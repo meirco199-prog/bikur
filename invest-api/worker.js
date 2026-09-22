@@ -490,6 +490,17 @@ async function handle(req, env0, ctx){
     const qKey = `council:quota:${today()}`; const used = (await db.get(qKey)) || 0;
     const inbox = (await db.get('council:inbox')) || [];
     if (p1 === 'status' && req.method === 'GET') return json({ ok: true, repo: REPO, issue: ISSUE, usedToday: used, dailyMax: DAILY_MAX, direct: !!env.GH_COUNCIL_TOKEN, pending: inbox.length });
+    // קריאת השרשור: ChatGPT (ב-GPT עם ה-Action) קורא את התגובות האחרונות ב-Issue #25 בלי מחבר GitHub — הריפו ציבורי, PAT אופציונלי
+    if (p1 === 'thread' && req.method === 'GET'){
+      const limit = Math.min(20, Math.max(1, Number(q.limit) || 10));
+      const hdr = { Accept: 'application/vnd.github+json', 'User-Agent': 'bikur-council-relay', 'X-GitHub-Api-Version': '2022-11-28', ...(env.GH_COUNCIL_TOKEN ? { Authorization: `Bearer ${env.GH_COUNCIL_TOKEN}` } : {}) };
+      const gh = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE}/comments?per_page=100`, { headers: hdr });
+      const arr = await gh.json().catch(() => null);
+      if (!gh.ok || !Array.isArray(arr)) return err(`GitHub לא החזיר את השרשור (${gh.status})`, 502);
+      const kind = (c) => { const b = String(c.body || ''); const bot = /\[bot\]$/.test(c.user?.login || ''); if (bot && b.startsWith('**ChatGPT**')) return 'chatgpt'; if (bot && b.startsWith('<!-- health-report')) return 'health-report'; if (bot) return 'bot'; return 'claude-or-owner'; };
+      const items = arr.slice(-limit).map((c) => ({ id: c.id, at: c.created_at, login: c.user?.login || '', kind: kind(c), url: c.html_url, body: String(c.body || '').slice(0, 6000) }));
+      return json({ ok: true, repo: REPO, issue: ISSUE, url: `https://github.com/${REPO}/issues/${ISSUE}`, total: arr.length, items, pending: inbox.map((m) => ({ id: m.id, at: m.at, author: m.author })), note: 'kind=claude-or-owner: תגובות של Claude מתפרסמות מחשבון בעל הריפו (meirco199-prog); kind=chatgpt: הודעות שהגיעו דרך הערוץ הזה' });
+    }
     if (p1 === 'comment' && req.method === 'POST'){
       const text = String(body.text || '').trim();
       if (!text) return err('חסר text');

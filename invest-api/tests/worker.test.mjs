@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { installMockFetch, calls, githubPosts } from './mock-providers.mjs';
+import { installMockFetch, calls, githubPosts, githubReads } from './mock-providers.mjs';
 import worker, { cronStep } from '../worker.js';
 
 installMockFetch();
@@ -338,6 +338,10 @@ test('ערוץ ה-Council (ברירת מחדל, בלי PAT ובלי סוד ב-Se
   assert.equal((await call('/council/inbox')).status, 401);
   const inbox = await (await call('/council/inbox?secret=cron-secret-for-tests')).json(); assert.equal(inbox.items.length, 1); assert.equal(inbox.issue, 25); assert.match(inbox.items[0].body, /^\*\*ChatGPT\*\*/); assert.ok(inbox.items[0].body.includes('התאמה 0.00'));
   const st = await (await call('/council/status', { bearer: s1.secret })).json(); assert.equal(st.pending, 1); assert.equal(st.usedToday, 1);
+  assert.equal((await call('/council/thread')).status, 401);
+  const th = await (await call('/council/thread?limit=2', { bearer: s1.secret })).json(); assert.equal(th.ok, true); assert.equal(th.total, 3); assert.equal(th.items.length, 2, 'limit');
+  assert.deepEqual(th.items.map((c) => c.kind), ['claude-or-owner', 'chatgpt']); assert.equal(th.items[1].body.includes('בדיקת ערוץ'), true); assert.equal(th.pending.length, 1, 'הודעה שממתינה בתיבה מדווחת');
+  assert.equal(githubReads[githubReads.length - 1].auth, '', 'בלי PAT הקריאה מ-GitHub אנונימית (ריפו ציבורי)');
   const ack = await (await call('/council/ack?secret=cron-secret-for-tests', { method: 'POST', body: { ids: [inbox.items[0].id] } })).json(); assert.equal(ack.left, 0);
   // החלפת מפתח: הישן נפסל
   const s2 = await (await call('/council/secret?rotate=1', { method: 'POST', body: { rotate: true }, auth: true })).json(); assert.notEqual(s2.secret, s1.secret);
