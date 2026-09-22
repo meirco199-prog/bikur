@@ -7,7 +7,7 @@ installMockFetch();
 const env = { INVEST: null, FINNHUB_KEY: 'x', FRED_KEY: 'x', APP_TOKEN: 'secret', AUTO_ANY_TIME: '1', CRON_BATCH: '200', STOOQ_ENABLED: '1', COUNCIL_SECRET: 'council-shared-secret-1234', GH_COUNCIL_TOKEN: 'ghp_TESTTOKEN000000000001' };
 // KV מדומה בזיכרון משותף לכל הבקשות
 const store = new Map();
-env.INVEST = { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }) };
+env.INVEST = { get: async (k, type) => (type === 'text' ? (store.has(k) ? store.get(k) : null) : (store.has(k) ? JSON.parse(store.get(k)) : null)), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }) };
 const req = (path, opts = {}) => worker.fetch(new Request('https://api.test' + path, { headers: { 'CF-Connecting-IP': '1.1.1.1', ...(opts.auth ? { Authorization: 'Bearer secret' } : {}), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) }, method: opts.method || (opts.body ? 'POST' : 'GET'), body: opts.body ? JSON.stringify(opts.body) : undefined }), env, { waitUntil(){} });
 const get = async (path, opts) => { const r = await req(path, opts); const j = await r.json(); return { status: r.status, j }; };
 
@@ -343,6 +343,10 @@ test('ערוץ ה-Council (ברירת מחדל, בלי PAT ובלי סוד ב-Se
   const s2 = await (await call('/council/secret?rotate=1', { method: 'POST', body: { rotate: true }, auth: true })).json(); assert.notEqual(s2.secret, s1.secret);
   assert.equal((await call('/council/comment', { method: 'POST', body: { text: 'x' }, bearer: s1.secret })).status, 401);
   assert.equal((await call('/council/comment', { method: 'POST', body: { text: 'x' }, bearer: s2.secret })).status, 200);
+  // ערך שהוזן ידנית בדשבורד של Cloudflare, בלי מרכאות JSON — מתקבל כמו שהוא
+  store.set('council:secret', 'manual-secret-typed-in-dashboard-0123456789');
+  assert.equal((await call('/council/comment', { method: 'POST', body: { text: 'x' }, bearer: 'manual-secret-typed-in-dashboard-0123456789' })).status, 200);
+  assert.equal((await call('/council/secret', { auth: true })).status, 200);
   store.delete('council:secret'); store.delete('council:inbox'); store.delete(`council:quota:${new Date().toISOString().slice(0, 10)}`);
 });
 test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מזומן', async () => {
