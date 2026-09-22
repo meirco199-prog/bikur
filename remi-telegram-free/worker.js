@@ -843,9 +843,11 @@ async function loadStore(env, opts = {}) {
   if (opts.history === false) {
     merged.history = [];
   } else {
-    const h = await env.DATA.get('hist');
-    if (h) merged.history = JSON.parse(h);
-    // אין מפתח hist? נשארים עם מה שבתוך store (הגירה חד-פעמית מהמבנה הישן)
+    try {
+      const h = await env.DATA.get('hist');
+      if (h) merged.history = JSON.parse(h);
+      // אין מפתח hist? נשארים עם מה שבתוך store (הגירה חד-פעמית מהמבנה הישן)
+    } catch { merged.history = merged.history || []; } // hist פגום לא מפיל את הבוט
   }
   return merged;
 }
@@ -2575,7 +2577,8 @@ export default {
         out.kvRuns = (C.runs || []).map(t => hhmm(t));
         out.isolateTicks = cronTicks.slice(-12).map(t => fmtTime(t));
         out.lastCrash = lastCronCrash ? { agoMin: Math.round((Date.now() - lastCronCrash.ts) / 60000), msg: lastCronCrash.msg } : null;
-        out.lastWebhookError = lastWebhookError ? { agoMin: Math.round((Date.now() - lastWebhookError.ts) / 60000), msg: lastWebhookError.msg.slice(0, 200) } : null;
+        const webErrRaw = lastWebhookError || JSON.parse((await env.DATA.get('weberr')) || 'null');
+        out.lastWebhookError = webErrRaw ? { agoMin: Math.round((Date.now() - webErrRaw.ts) / 60000), msg: String(webErrRaw.msg || '').slice(0, 200) } : null;
         // מה טלגרם אומר על ה-webhook: כמה עדכונים ממתינים ומה השגיאה האחרונה במסירה
         try {
           const wi = await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getWebhookInfo`)).json();
@@ -2612,6 +2615,7 @@ export default {
       try { await handleWebhook(env, update); }
       catch (e) {
         lastWebhookError = { ts: Date.now(), msg: e.message + ' @ ' + ((e.stack || '').split('\n')[1] || '').trim() };
+        try { await env.DATA.put('weberr', JSON.stringify(lastWebhookError)); } catch {}
       }
       return new Response('ok');
     }
