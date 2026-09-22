@@ -849,12 +849,14 @@ async function loadStore(env, opts = {}) {
       // אין מפתח hist? נשארים עם מה שבתוך store (הגירה חד-פעמית מהמבנה הישן)
     } catch { merged.history = merged.history || []; } // hist פגום לא מפיל את הבוט
   }
+  // מסמנים אם ההיסטוריה נטענה — כדי ששמירה בלי טעינה לא תמחק אותה בטעות
+  Object.defineProperty(merged, 'histLoaded', { value: opts.history !== false, enumerable: false });
   return merged;
 }
 async function saveStore(env, s) {
   const { history, ...rest } = s;
   await env.DATA.put('store', JSON.stringify(rest));
-  await env.DATA.put('hist', JSON.stringify(history || []));
+  if (s.histLoaded !== false) await env.DATA.put('hist', JSON.stringify(history || []));
 }
 
 // מצב הקרון נשמר במפתח נפרד ('cron') שרק הקרון כותב אליו — כך שליחת תזכורת
@@ -2079,7 +2081,8 @@ async function handleMedia(env, S, msg, chatId, now) {
 // לחיצה על כפתור ברשימת המשימות: ✅ בוצעה / ↩️ לא בוצעה / ❌ ביטול
 async function handleCallback(env, q) {
   const chatId = q.message?.chat?.id;
-  const S = await loadStore(env);
+  // כפתורים לא נוגעים בהיסטוריית ההתכתבות — לא טוענים אותה (חוסך CPU בכל לחיצה)
+  const S = await loadStore(env, { history: false });
   if (!chatId || chatId !== S.ownerChatId) {
     await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id });
     return;
@@ -2184,7 +2187,7 @@ async function handleWebhook(env, update) {
   if (!text) return;
 
   // יומן התכתבות — כדי שאפשר יהיה לחפש אחורה
-  S.history = [...(S.history || []), { ts: now.getTime(), text, mid: msg.message_id }].slice(-500);
+  S.history = [...(S.history || []), { ts: now.getTime(), text: text.slice(0, 250), mid: msg.message_id }].slice(-200);
 
   // תגובה (reply) על הודעה קודמת — ההודעה המצוטטת היא הקשר חיוני להבנה
   const rt = msg.reply_to_message;
@@ -2197,7 +2200,7 @@ async function handleWebhook(env, update) {
   const answer = await handleMessage(S, text, now, env, !!voicePrefix, replyCtx);
   // גם התשובה של הבוט נשמרת בהיסטוריה — כדי שהמוח יבין המשכי שיחה ("כן", "ח.פ")
   const answerText = typeof answer === 'string' ? answer : (answer && answer.text) || '';
-  if (answerText) S.history = [...(S.history || []), { ts: now.getTime(), text: answerText.slice(0, 300), bot: true }].slice(-500);
+  if (answerText) S.history = [...(S.history || []), { ts: now.getTime(), text: answerText.slice(0, 250), bot: true }].slice(-200);
   await saveStore(env, S);
   if (typeof answer === 'object' && answer.doc) {
     await tgSendDoc(env, chatId, answer.doc, answer.text, answer.replyTo);
@@ -2591,6 +2594,7 @@ export default {
         } catch (e) { out.webhook = { err: e.message }; }
         out.counts = { reminders: S.reminders.length, openTasks: S.tasks.filter(t => !t.done).length,
           events: S.events.length, docs: S.docs.length, notes: S.notes.length };
+        out.histBytes = ((await env.DATA.get('hist')) || '').length;
         out.reminders = S.reminders.map(r => {
           const d = new Date(r.at);
           const sched = r.recurringDaily ? 'daily'
