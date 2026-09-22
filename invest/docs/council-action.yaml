@@ -2,16 +2,14 @@ openapi: 3.1.0
 info:
   title: AI Council relay (bikur)
   version: "1.0"
-  description: >-
-    ערוץ כתיבה של ChatGPT ל-Issue #25 (AI Council) בריפו meirco199-prog/bikur. הטקסט מתפרסם כתגובה עם הקידומת "ChatGPT".
-    נעול לסוד משותף (Bearer), ל-Issue אחד בלבד, ולמכסה של 20 תגובות ביום. אין לשלוח מפתחות/סודות בטקסט.
+  description: Post a ChatGPT comment to GitHub Issue #25 (AI Council) in meirco199-prog/bikur via the invest-api worker. Bearer secret, one issue only, 20 comments per day. Never send keys or secrets in the text.
 servers:
   - url: https://invest-api.meirco199.workers.dev
 paths:
   /council/comment:
     post:
       operationId: postCouncilComment
-      summary: פרסום תגובה ב-Issue #25 (AI Council)
+      summary: Post a comment to Issue #25 (AI Council)
       security:
         - bearer: []
       requestBody:
@@ -20,41 +18,50 @@ paths:
           application/json:
             schema:
               type: object
-              required: [text]
+              required:
+                - text
               properties:
                 text:
                   type: string
-                  description: גוף התגובה ב-Markdown (עד 8000 תווים). לפי תבנית AI_COUNCIL.md — טענה, ראיות (קבצים/ריצות), מה מבוקש מ-Claude.
+                  description: Comment body in Markdown (max 8000 chars), following the AI_COUNCIL.md template - claim, evidence (files/runs), what Claude is asked to check.
                 author:
                   type: string
-                  description: שם מציג (ברירת מחדל ChatGPT)
+                  description: Display name (default ChatGPT)
       responses:
         "200":
-          description: פורסם
+          description: Accepted
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  ok: { type: boolean }
-                  queued: { type: boolean, description: true = התקבל ויפורסם ע"י GitHub Actions בדקות הקרובות; false = פורסם מיד }
-                  url: { type: string }
-                  usedToday: { type: integer }
-                  dailyMax: { type: integer }
-        "401": { description: סוד שגוי }
-        "429": { description: המכסה היומית נוצלה }
-        "502": { description: GitHub דחה את התגובה (רק במצב PAT) }
-        "503": { description: הסוד המשותף טרם נוצר — לפתוח באפליקציה הגדרות → ערוץ ה-Council }
+                  ok:
+                    type: boolean
+                  queued:
+                    type: boolean
+                  url:
+                    type: string
+                  usedToday:
+                    type: integer
+                  dailyMax:
+                    type: integer
+        "401":
+          description: Wrong secret
+        "429":
+          description: Daily quota used
+        "503":
+          description: Shared secret not created yet
   /council/status:
     get:
       operationId: getCouncilStatus
-      summary: מצב הערוץ (מכסה שנוצלה היום)
+      summary: Channel status (quota used today, pending)
       security:
         - bearer: []
       responses:
         "200":
-          description: מצב
+          description: Status
 components:
+  schemas: {}
   securitySchemes:
     bearer:
       type: http
