@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: AI Council relay (bikur)
+  version: "1.0"
+  description: >-
+    ערוץ כתיבה של ChatGPT ל-Issue #25 (AI Council) בריפו meirco199-prog/bikur. הטקסט מתפרסם כתגובה עם הקידומת "ChatGPT".
+    נעול לסוד משותף (Bearer), ל-Issue אחד בלבד, ולמכסה של 20 תגובות ביום. אין לשלוח מפתחות/סודות בטקסט.
+servers:
+  - url: https://invest-api.meirco199.workers.dev
+paths:
+  /council/comment:
+    post:
+      operationId: postCouncilComment
+      summary: פרסום תגובה ב-Issue #25 (AI Council)
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: גוף התגובה ב-Markdown (עד 8000 תווים). לפי תבנית AI_COUNCIL.md — טענה, ראיות (קבצים/ריצות), מה מבוקש מ-Claude.
+                author:
+                  type: string
+                  description: שם מציג (ברירת מחדל ChatGPT)
+      responses:
+        "200":
+          description: פורסם
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  url: { type: string }
+                  usedToday: { type: integer }
+                  dailyMax: { type: integer }
+        "401": { description: סוד שגוי }
+        "429": { description: המכסה היומית נוצלה }
+        "502": { description: GitHub דחה את התגובה (בדוק את הרשאות ה-PAT) }
+        "503": { description: הערוץ לא מוגדר ב-Worker }
+  /council/status:
+    get:
+      operationId: getCouncilStatus
+      summary: מצב הערוץ (מכסה שנוצלה היום)
+      security:
+        - bearer: []
+      responses:
+        "200":
+          description: מצב
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer

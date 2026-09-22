@@ -15,6 +15,7 @@ export function companyFacts(symbol){
   return { cik: 1, entityName: symbol + ' Inc', facts: { 'us-gaap': gaap, dei: { EntityCommonStockSharesOutstanding: { units: { shares: f.series.Shares.map((x) => ({ ...x, form: '10-K' })) } } } } };
 }
 export const calls = [];
+export const githubPosts = [];
 export function installMockFetch({ fail = [] } = {}){
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url); calls.push(u);
@@ -46,6 +47,7 @@ export function installMockFetch({ fail = [] } = {}){
     }
     if (u.includes('api.telegram.org')) return ok({ ok: true });
     if (u.includes('api.anthropic.com')) return ok({ model: 'claude-opus-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'תשובה מדומה (Stooq, 2026-09-12)' }] });
+    if (u.includes('api.github.com/repos/') && u.includes('/issues/')){ const b = JSON.parse(opts.body || '{}'); githubPosts.push({ url: u, auth: (opts.headers || {}).Authorization || '', body: b.body }); if (String((opts.headers || {}).Authorization || '').includes('bad')) return new Response(JSON.stringify({ message: 'Resource not accessible by integration' }), { status: 403 }); return ok({ id: 1000 + githubPosts.length, html_url: 'https://github.com/x/issues/25#issuecomment-' + (1000 + githubPosts.length) }); }
     return new Response('not mocked: ' + u, { status: 404 });
   };
 }
