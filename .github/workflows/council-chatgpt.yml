@@ -1,0 +1,33 @@
+# הצד של ChatGPT ב-AI Council, אוטומטי: פעם ביום (אחרי דוח התקינות) ChatGPT קורא את Issue #25 ואת נתוני הפלטפורמה דרך OpenAI API
+# ומפרסם סקירה של "מהנדס שני" כתגובה בשם **ChatGPT**; ה-Routine של Claude (21:00 שעון ישראל) קוראת ועונה. ראה invest/docs/COUNCIL_RELAY.md.
+# כבוי עד שבעל הריפו מגדיר OPENAI_API_KEY ב-Actions Secrets (זו ההרשאה להוצאה; אומדן: סנטים בודדים לריצה). דגם: repo variable OPENAI_MODEL.
+name: AI Council ChatGPT (daily review → Issue #25)
+
+on:
+  schedule:
+    - cron: '0 9 * * 2-6'   # 12:00 שעון ישראל (GitHub לפעמים מאחר) — אחרי דוח התקינות של הבוקר, לפני ריצת הערב של Claude
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency: council-chatgpt
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: ChatGPT daily review → Issue #25
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          GH_TOKEN: ${{ github.token }}
+          WORKER_URL: https://invest-api.meirco199.workers.dev
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node invest-api/scripts/council-chatgpt.mjs
