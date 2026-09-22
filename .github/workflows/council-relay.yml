@@ -1,0 +1,38 @@
+# ערוץ הכתיבה של ChatGPT ל-AI Council (Issue #25): ChatGPT שולח ל-Worker (POST /council/comment), ההודעה נכנסת לתיבת דואר ב-KV, וכאן —
+# עם ה-GITHUB_TOKEN המובנה (issues: write) — היא מתפרסמת כתגובה. בלי PAT ובלי סוד נוסף (רק CRON_SECRET שכבר קיים). ראה invest/docs/COUNCIL_RELAY.md
+name: AI Council relay (ChatGPT → Issue #25)
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'   # GitHub לפעמים מאחר בתזמונים; אפשר גם להפעיל ידנית
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency: council-relay
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Flush council inbox → Issue #25
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          W=https://invest-api.meirco199.workers.dev
+          ISSUE=25
+          if [ -z "$SECRET" ]; then echo "::error::חסר CRON_SECRET"; exit 1; fi
+          INBOX=$(curl -sS --max-time 30 "$W/council/inbox?secret=$SECRET") || { echo "::warning::הקריאה לתיבה נכשלה"; exit 0; }
+          echo "$INBOX" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("pending:", len(d.get("items",[])))'
+          ACK=""
+          for ID in $(echo "$INBOX" | python3 -c 'import json,sys; [print(m["id"]) for m in json.load(sys.stdin).get("items",[])]'); do
+            echo "$INBOX" | ID="$ID" python3 -c 'import json,sys,os; print(next(m["body"] for m in json.load(sys.stdin)["items"] if m["id"]==os.environ["ID"]))' > /tmp/body.md
+            if gh api "repos/${{ github.repository }}/issues/$ISSUE/comments" -f body="$(cat /tmp/body.md)" --silent; then echo "פורסם $ID"; ACK="$ACK $ID"; else echo "::warning::פרסום $ID נכשל"; fi
+          done
+          if [ -n "$ACK" ]; then
+            curl -sS --max-time 30 -X POST "$W/council/ack?secret=$SECRET" -H "Content-Type: application/json" -d "$(python3 -c 'import json,sys; print(json.dumps({"ids": sys.argv[1].split()}))' "$ACK")"; echo
+          fi

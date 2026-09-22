@@ -1,29 +1,28 @@
 # ערוץ הכתיבה של ChatGPT ל-AI Council (Issue #25)
 
-**למה:** מחבר ה-GitHub של ChatGPT הוא קריאה בלבד (`403 Resource not accessible by integration` בכתיבה) — את סט ההרשאות של
-אפליקציה קובע מי שבנה אותה, לא מי שמתקין אותה. במקום זה: ChatGPT שולח טקסט ל-Worker, וה-Worker מפרסם אותו ב-Issue #25.
+**למה:** מחבר ה-GitHub של ChatGPT הוא קריאה בלבד (`403 Resource not accessible by integration` בכתיבה); את הרשאות האפליקציה
+קובע מי שבנה אותה, לא מי שמתקין אותה.
 
-**מה זה עושה:** `POST /council/comment` עם `Authorization: Bearer <COUNCIL_SECRET>` ו-`{"text": "..."}` → תגובה ב-Issue #25
-בשם **ChatGPT** (דרך החשבון שה-PAT שייך לו, עם קידומת שמבהירה שזה ChatGPT). נעול ל-Issue אחד, מכסה 20 תגובות ביום, טקסט עד
-8000 תווים, ערכי סוד מוסתרים לפני הפרסום. אין כאן שום יכולת אחרת ב-GitHub (לא קוד, לא PR, לא Issues אחרים).
+**איך זה עובד (בלי PAT, בלי סודות חדשים):**
+1. ChatGPT (Action) שולח `POST /council/comment` עם `Authorization: Bearer <מפתח>` ו-`{"text": "..."}`.
+2. ה-Worker מכניס את ההודעה לתיבת דואר (KV), אחרי הסתרת ערכי סוד. מכסה: 20 ביום, עד 8000 תווים, Issue #25 בלבד.
+3. ה-workflow `council-relay.yml` (כל ~20 דק׳, עם `GITHUB_TOKEN` המובנה שכבר מורשה `issues: write`) קורא את התיבה עם `CRON_SECRET`
+   הקיים, מפרסם כל הודעה כתגובה ב-Issue #25 בשם **ChatGPT**, ומאשר. ריצת ה-Routine של Claude (פעמיים ביום) קוראת תגובות כאלה.
+   אופציונלי: אם מגדירים `GH_COUNCIL_TOKEN` (PAT מצומצם: bikur, Issues: write) ב-Secrets של ה-Worker — הפרסום מיידי במקום דרך התיבה.
 
-## הגדרה (פעם אחת, ידנית — לא בקוד ולא בצ'אט)
+**המפתח המשותף** נוצר אוטומטית ב-Worker בפעם הראשונה שפותחים אותו במסך ההגדרות (מאומת ב-APP_TOKEN), ומוצג רק שם. אפשר להחליף
+("צור מפתח חדש"). אם מעדיפים סוד קבוע ב-Secrets — `COUNCIL_SECRET` גובר.
 
-1. **PAT מצומצם ב-GitHub:** Settings → Developer settings → Personal access tokens → **Fine-grained** → Generate:
-   Repository access: **Only select repositories → bikur**; Permissions → Repository → **Issues: Read and write** (ותו לא).
-   תוקף: 90 יום (לחדש). את הערך מזינים **רק** ב-Cloudflare.
-2. **סוד משותף:** מחרוזת אקראית ארוכה (למשל 32 תווים).
-3. **Cloudflare:** Workers & Pages → `invest-api` → Settings → Variables and Secrets → Add (Secret):
-   `GH_COUNCIL_TOKEN` = ה-PAT, `COUNCIL_SECRET` = הסוד המשותף. הפריסה שומרת secrets קיימים (`keep_bindings: secret_text`).
-   `/health` יראה את שניהם כ-`set` (מסכה בלבד).
-4. **ChatGPT:** GPT מותאם → Configure → Actions → Import from file/URL → `invest/docs/council-action.yaml`
-   (או להדביק את תוכנו). Authentication: **API Key**, Auth Type: **Bearer**, Key = הסוד המשותף.
-   בהוראות ה-GPT: "כשאני אומר 'פרסם ב-Council' — קרא ל-postCouncilComment עם הנוסח, לפי תבנית AI_COUNCIL.md; אל תשלח מפתחות."
-   לחלופין (Pro/Business): מחבר MCP מותאם שמצביע לאותו נתיב.
+## מה צריך לעשות (פעם אחת)
+1. באפליקציה: **הגדרות → ערוץ ה-Council → "הצג מפתח" → "העתק"**.
+2. ב-ChatGPT: GPT מותאם → Configure → **Actions → Import from URL**:
+   `https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml`
+   Authentication: **API Key** · Auth Type: **Bearer** · Key: המפתח שהעתקת.
+   בהוראות ה-GPT: "כשאני אומר 'פרסם ב-Council' — קרא ל-`postCouncilComment` עם הנוסח לפי AI_COUNCIL.md; אל תשלח מפתחות."
+3. בדיקה: "פרסם ב-Council: בדיקת ערוץ" → תשובה `queued: true` → תוך ~20 דק׳ תגובה ב-Issue #25 בשם ChatGPT
+   (או מיד: Actions → "AI Council relay" → Run workflow).
 
-## בדיקה
-`curl -sS -X POST https://invest-api.meirco199.workers.dev/council/comment -H "Authorization: Bearer <COUNCIL_SECRET>" -H "Content-Type: application/json" -d '{"text":"בדיקת ערוץ"}'`
-→ `{"ok":true,"url":"…issuecomment-…"}`. תשובות: 401 סוד שגוי · 429 מכסה · 502 GitHub דחה (הרשאות PAT) · 503 לא מוגדר.
+תשובות: 401 מפתח שגוי · 429 מכסה/תיבה מלאה · 503 המפתח טרם נוצר (לפתוח את מסך ההגדרות) · 502 GitHub דחה (רק במצב PAT).
 
 ## מה זה לא פותר
-תזמון: ChatGPT מגיב רק כשהוא מופעל; הבדיקה המתוזמנת של Claude (פעמיים ביום) קוראת את מה שפורסם.
+תזמון בצד של ChatGPT: הוא מגיב רק כשהוא מופעל. ה-Action עובד גם מ-GPT מותאם וגם ממחבר MCP מותאם.
