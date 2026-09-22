@@ -70,5 +70,7 @@ jobs:
       - name: Health snapshot
         run: |
           sleep 10
+          # חיבור מחדש של ה-webhook לטלגרם — מרפא עצמית למצבים תקועים
+          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/setup?secret=remi-meir-2026" || true
           # ping=1 — בדיקת שליחה חיה: שולח לבעלים הודעת בדיקה ומדווח אם הצליחה
           curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026&ping=1" || true

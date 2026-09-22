@@ -2587,13 +2587,16 @@ export default {
         out.kvRuns = (C.runs || []).map(t => hhmm(t));
         out.isolateTicks = cronTicks.slice(-12).map(t => fmtTime(t));
         out.lastCrash = lastCronCrash ? { agoMin: Math.round((Date.now() - lastCronCrash.ts) / 60000), msg: lastCronCrash.msg } : null;
+        const lastUpd = JSON.parse((await env.DATA.get('lastupd')) || 'null');
+        out.lastUpdate = lastUpd ? { agoMin: Math.round((Date.now() - lastUpd.ts) / 60000), kind: lastUpd.kind, len: lastUpd.len } : null;
         const webErrRaw = lastWebhookError || JSON.parse((await env.DATA.get('weberr')) || 'null');
         out.lastWebhookError = webErrRaw ? { agoMin: Math.round((Date.now() - webErrRaw.ts) / 60000), msg: String(webErrRaw.msg || '').slice(0, 200) } : null;
         // מה טלגרם אומר על ה-webhook: כמה עדכונים ממתינים ומה השגיאה האחרונה במסירה
         try {
           const wi = await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getWebhookInfo`)).json();
           if (wi && wi.result) out.webhook = {
-            urlOk: (wi.result.url || '').startsWith('https://remi.') && (wi.result.url || '').includes('/webhook/'),
+            // השוואה מדויקת לכתובת הצפויה — בלי להדפיס אותה (היא מכילה את הסוד)
+            urlOk: wi.result.url === `${url.origin}/webhook/${env.SECRET}`,
             pending: wi.result.pending_update_count || 0,
             lastErrAt: wi.result.last_error_date ? new Date(wi.result.last_error_date * 1000).toISOString().slice(5, 16) : null,
             lastErr: (wi.result.last_error_message || '').slice(0, 160) || null,
@@ -2626,6 +2629,13 @@ export default {
 
     if (url.pathname === `/webhook/${env.SECRET}` && request.method === 'POST') {
       const update = await request.json();
+      // רישום הגעה — עוד לפני כל טיפול: מוכיח אם עדכונים בכלל מגיעים מטלגרם
+      try {
+        const kind = update.message ? 'msg' : update.callback_query ? 'callback'
+          : Object.keys(update).filter(k => k !== 'update_id')[0] || '?';
+        await env.DATA.put('lastupd', JSON.stringify({ ts: Date.now(), kind,
+          len: (update.message?.text || update.message?.caption || '').length }));
+      } catch {}
       // קריסה בטיפול לא מפילה את ה-webhook: עונים 200 כדי שטלגרם לא יצבור תור,
       // והשגיאה האמיתית נלכדת ומוצגת ב-/health לאבחון מרחוק
       try { await handleWebhook(env, update); }
