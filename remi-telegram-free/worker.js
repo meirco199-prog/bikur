@@ -2213,6 +2213,8 @@ async function handleWebhook(env, update) {
 const cronTicks = [];
 // הקריסה האחרונה של השעון (אם הייתה) — מוצגת ב-/health לאבחון מרחוק
 let lastCronCrash = null;
+// השגיאה האחרונה בטיפול בהודעה נכנסת (webhook) — לאבחון "הבוט לא עונה"
+let lastWebhookError = null;
 
 // שריון בזיכרון מפני שליחה כפולה: אם האחסון החזיר לרגע גרסה ישנה של רישום
 // "מה כבר נשלח", האיזולט זוכר בעצמו מה נשלח לאחרונה ולא שולח שוב
@@ -2573,6 +2575,17 @@ export default {
         out.kvRuns = (C.runs || []).map(t => hhmm(t));
         out.isolateTicks = cronTicks.slice(-12).map(t => fmtTime(t));
         out.lastCrash = lastCronCrash ? { agoMin: Math.round((Date.now() - lastCronCrash.ts) / 60000), msg: lastCronCrash.msg } : null;
+        out.lastWebhookError = lastWebhookError ? { agoMin: Math.round((Date.now() - lastWebhookError.ts) / 60000), msg: lastWebhookError.msg.slice(0, 200) } : null;
+        // מה טלגרם אומר על ה-webhook: כמה עדכונים ממתינים ומה השגיאה האחרונה במסירה
+        try {
+          const wi = await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getWebhookInfo`)).json();
+          if (wi && wi.result) out.webhook = {
+            urlOk: (wi.result.url || '').startsWith('https://remi.') && (wi.result.url || '').includes('/webhook/'),
+            pending: wi.result.pending_update_count || 0,
+            lastErrAt: wi.result.last_error_date ? new Date(wi.result.last_error_date * 1000).toISOString().slice(5, 16) : null,
+            lastErr: (wi.result.last_error_message || '').slice(0, 160) || null,
+          };
+        } catch (e) { out.webhook = { err: e.message }; }
         out.counts = { reminders: S.reminders.length, openTasks: S.tasks.filter(t => !t.done).length,
           events: S.events.length, docs: S.docs.length, notes: S.notes.length };
         out.reminders = S.reminders.map(r => {
@@ -2594,7 +2607,12 @@ export default {
 
     if (url.pathname === `/webhook/${env.SECRET}` && request.method === 'POST') {
       const update = await request.json();
-      await handleWebhook(env, update);
+      // קריסה בטיפול לא מפילה את ה-webhook: עונים 200 כדי שטלגרם לא יצבור תור,
+      // והשגיאה האמיתית נלכדת ומוצגת ב-/health לאבחון מרחוק
+      try { await handleWebhook(env, update); }
+      catch (e) {
+        lastWebhookError = { ts: Date.now(), msg: e.message + ' @ ' + ((e.stack || '').split('\n')[1] || '').trim() };
+      }
       return new Response('ok');
     }
 
