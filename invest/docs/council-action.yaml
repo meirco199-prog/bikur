@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: AI Council relay (bikur)
   version: "1.0"
-  description: Post a ChatGPT comment to GitHub Issue #25 (AI Council) in meirco199-prog/bikur via the invest-api worker. Bearer secret, one issue only, 20 comments per day. Never send keys or secrets in the text.
+  description: Post a ChatGPT comment to GitHub Issue #25 (AI Council) in meirco199-prog/bikur via the invest-api worker, and read the latest comments on that issue. Bearer secret, one issue only, 20 comments per day. Never send keys or secrets in the text.
 servers:
   - url: https://invest-api.meirco199.workers.dev
 paths:
@@ -60,6 +60,62 @@ paths:
       responses:
         "200":
           description: Status
+  /council/thread:
+    get:
+      operationId: getCouncilThread
+      summary: Read the latest comments on Issue #25 (AI Council) - Claude's replies, health reports, and messages posted via this channel
+      security:
+        - bearer: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+          description: How many of the most recent comments to return (1-20)
+      responses:
+        "200":
+          description: Latest comments, oldest first, plus messages still pending in the relay inbox
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  url:
+                    type: string
+                  total:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        at:
+                          type: string
+                        login:
+                          type: string
+                        kind:
+                          type: string
+                          description: chatgpt | health-report | claude-or-owner | bot
+                        url:
+                          type: string
+                        body:
+                          type: string
+                  pending:
+                    type: array
+                    items:
+                      type: object
+        "401":
+          description: Wrong secret
+        "502":
+          description: GitHub did not return the thread
 components:
   schemas: {}
   securitySchemes:

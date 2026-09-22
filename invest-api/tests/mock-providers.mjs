@@ -16,6 +16,7 @@ export function companyFacts(symbol){
 }
 export const calls = [];
 export const githubPosts = [];
+export const githubReads = [];
 export function installMockFetch({ fail = [] } = {}){
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url); calls.push(u);
@@ -47,6 +48,7 @@ export function installMockFetch({ fail = [] } = {}){
     }
     if (u.includes('api.telegram.org')) return ok({ ok: true });
     if (u.includes('api.anthropic.com')) return ok({ model: 'claude-opus-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'תשובה מדומה (Stooq, 2026-09-12)' }] });
+    if (u.includes('api.github.com/repos/') && u.includes('/issues/') && (opts.method || 'GET') !== 'POST'){ githubReads.push({ url: u, auth: (opts.headers || {}).Authorization || '' }); return ok([{ id: 1, created_at: '2026-09-22T06:16:30Z', user: { login: 'github-actions[bot]' }, html_url: 'https://github.com/x/issues/25#issuecomment-1', body: '<!-- health-report 2026-09-22 -->\n## דוח תקינות' }, { id: 2, created_at: '2026-09-22T12:19:41Z', user: { login: 'meirco199-prog' }, html_url: 'https://github.com/x/issues/25#issuecomment-2', body: 'תשובה של Claude' }, { id: 3, created_at: '2026-09-22T12:49:43Z', user: { login: 'github-actions[bot]' }, html_url: 'https://github.com/x/issues/25#issuecomment-3', body: '**ChatGPT** (דרך ערוץ ה-Council):\n\nבדיקת ערוץ' }]); }
     if (u.includes('api.github.com/repos/') && u.includes('/issues/')){ const b = JSON.parse(opts.body || '{}'); githubPosts.push({ url: u, auth: (opts.headers || {}).Authorization || '', body: b.body }); if (String((opts.headers || {}).Authorization || '').includes('bad')) return new Response(JSON.stringify({ message: 'Resource not accessible by integration' }), { status: 403 }); return ok({ id: 1000 + githubPosts.length, html_url: 'https://github.com/x/issues/25#issuecomment-' + (1000 + githubPosts.length) }); }
     return new Response('not mocked: ' + u, { status: 404 });
   };
