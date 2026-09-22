@@ -466,29 +466,46 @@ async function handle(req, env0, ctx){
       catch (e) { return err(e.message); }
     }
   }
-  // ערוץ הכתיבה של ChatGPT ל-AI Council (invest/docs/COUNCIL_RELAY.md): ChatGPT (Action/MCP) שולח טקסט עם סוד משותף, וה-Worker מפרסם אותו
-  // כתגובה ב-Issue #25 עם PAT מצומצם (Issues: write על bikur בלבד). נעול לסוד, ל-Issue אחד, ולמכסה יומית — דליפת הסוד לא מאפשרת יותר מזה
+  // ערוץ הכתיבה של ChatGPT ל-AI Council (invest/docs/COUNCIL_RELAY.md): ChatGPT (Action) שולח טקסט עם סוד משותף; ההודעה נכנסת לתיבת
+  // דואר ב-KV, ו-GitHub Actions (שכבר מורשה לכתוב ב-Issues) מפרסם אותה ב-Issue #25 — בלי PAT ובלי סוד נוסף. אם GH_COUNCIL_TOKEN מוגדר,
+  // הפרסום מיידי. הסוד המשותף נוצר אוטומטית (KV) ומוצג רק במסך ההגדרות המאומת, או מגיע מ-Secrets (COUNCIL_SECRET) אם הוגדר.
+  // נעול ל-Issue אחד ולמכסה יומית — דליפת הסוד לא מאפשרת יותר מזה
   if (r0 === 'council'){
-    const REPO = 'meirco199-prog/bikur', ISSUE = 25, DAILY_MAX = 20, MAX_LEN = 8000;
+    const REPO = 'meirco199-prog/bikur', ISSUE = 25, DAILY_MAX = 20, MAX_LEN = 8000, INBOX_MAX = 50;
+    const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET);
+    const newSecret = async () => { const b = new Uint8Array(32); crypto.getRandomValues(b); const s = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); await db.put('council:secret', s); return s; };
+    // המפתח למסך ההגדרות (מאומת בלבד): נוצר בפעם הראשונה, rotate מחליף
+    if (p1 === 'secret'){ needAuth(); let s = env.COUNCIL_SECRET || (await db.get('council:secret')); if (!env.COUNCIL_SECRET && (!s || (req.method === 'POST' && (body.rotate || q.rotate === '1')))) s = await newSecret(); return json({ ok: true, secret: s, source: env.COUNCIL_SECRET ? 'secret' : 'kv', importUrl: 'https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml', endpoint: `${url.origin}/council/comment`, direct: !!env.GH_COUNCIL_TOKEN, pending: ((await db.get('council:inbox')) || []).length }); }
+    // צד GitHub Actions (סוד ה-cron): קריאת התיבה ואישור פרסום
+    if (p1 === 'inbox' && req.method === 'GET'){ if (!bySecret) needAuth(); return json({ ok: true, issue: ISSUE, items: (await db.get('council:inbox')) || [] }); }
+    if (p1 === 'ack' && req.method === 'POST'){ if (!bySecret) needAuth(); const ids = new Set(Array.isArray(body.ids) ? body.ids : []); const left = ((await db.get('council:inbox')) || []).filter((m) => !ids.has(m.id)); await db.put('council:inbox', left); return json({ ok: true, left: left.length }); }
+    // צד ChatGPT: Bearer = הסוד המשותף
+    const want = env.COUNCIL_SECRET || (await db.get('council:secret')) || '';
+    if (!want) return err('ערוץ ה-Council טרם הופעל: פתח באפליקציה הגדרות → ערוץ ה-Council → "הצג מפתח" (יוצר את הסוד המשותף)', 503);
     const given = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '') || req.headers.get('X-Council-Key') || '';
-    const want = env.COUNCIL_SECRET || '';
-    const same = (a, b) => { if (!a || !b || a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
-    if (!want || !env.GH_COUNCIL_TOKEN) return err('ערוץ ה-Council לא מוגדר: חסרים COUNCIL_SECRET ו/או GH_COUNCIL_TOKEN ב-Secrets של ה-Worker', 503);
+    const same = (x, y) => { if (!x || !y || x.length !== y.length) return false; let d = 0; for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i); return d === 0; };
     if (!same(given, want)) return err('unauthorized', 401);
     const qKey = `council:quota:${today()}`; const used = (await db.get(qKey)) || 0;
-    if (p1 === 'status' && req.method === 'GET') return json({ ok: true, repo: REPO, issue: ISSUE, usedToday: used, dailyMax: DAILY_MAX });
+    const inbox = (await db.get('council:inbox')) || [];
+    if (p1 === 'status' && req.method === 'GET') return json({ ok: true, repo: REPO, issue: ISSUE, usedToday: used, dailyMax: DAILY_MAX, direct: !!env.GH_COUNCIL_TOKEN, pending: inbox.length });
     if (p1 === 'comment' && req.method === 'POST'){
       const text = String(body.text || '').trim();
       if (!text) return err('חסר text');
       if (text.length > MAX_LEN) return err(`הטקסט ארוך מדי (${text.length} > ${MAX_LEN})`);
       if (used >= DAILY_MAX) return err(`מכסת התגובות היומית (${DAILY_MAX}) נוצלה`, 429);
-      const author = String(body.author || 'ChatGPT').slice(0, 40).replace(/[^\p{L}\p{N} _.-]/gu, '');
+      const author = String(body.author || 'ChatGPT').slice(0, 40).replace(/[^\p{L}\p{N} _.-]/gu, '') || 'ChatGPT';
       const md = `**${author}** (דרך ערוץ ה-Council, לא ישירות מהחשבון):\n\n${db.redact(text)}\n\n---\n_Posted via council relay (\`POST /council/comment\`)_`;
-      const gh = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE}/comments`, { method: 'POST', headers: { Authorization: `Bearer ${env.GH_COUNCIL_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'bikur-council-relay', 'X-GitHub-Api-Version': '2022-11-28' }, body: JSON.stringify({ body: md }) });
-      const gj = await gh.json().catch(() => ({}));
-      if (!gh.ok){ await db.logError('council', `GitHub ${gh.status}: ${String(gj.message || '').slice(0, 120)}`); return err(`GitHub דחה את התגובה (${gh.status}): ${String(gj.message || '').slice(0, 160)}`, 502); }
-      await db.put(qKey, used + 1, { ttl: 2 * 86400 });
-      return json({ ok: true, url: gj.html_url || null, id: gj.id || null, usedToday: used + 1, dailyMax: DAILY_MAX });
+      if (env.GH_COUNCIL_TOKEN){ // פרסום מיידי עם PAT מצומצם (אופציונלי)
+        const gh = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE}/comments`, { method: 'POST', headers: { Authorization: `Bearer ${env.GH_COUNCIL_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'bikur-council-relay', 'X-GitHub-Api-Version': '2022-11-28' }, body: JSON.stringify({ body: md }) });
+        const gj = await gh.json().catch(() => ({}));
+        if (!gh.ok){ await db.logError('council', `GitHub ${gh.status}: ${String(gj.message || '').slice(0, 120)}`); return err(`GitHub דחה את התגובה (${gh.status}): ${String(gj.message || '').slice(0, 160)}`, 502); }
+        await db.put(qKey, used + 1, { ttl: 2 * 86400 });
+        return json({ ok: true, queued: false, url: gj.html_url || null, id: gj.id || null, usedToday: used + 1, dailyMax: DAILY_MAX });
+      }
+      if (inbox.length >= INBOX_MAX) return err('תיבת הדואר מלאה — ההודעות הקודמות טרם פורסמו', 429);
+      const id = uid('cm_'); inbox.push({ id, at: new Date().toISOString(), author, body: md });
+      await db.put('council:inbox', inbox); await db.put(qKey, used + 1, { ttl: 2 * 86400 });
+      return json({ ok: true, queued: true, id, usedToday: used + 1, dailyMax: DAILY_MAX, note: 'התקבל; יפורסם ב-Issue #25 בריצת GitHub Actions הבאה (בדרך כלל עד ~20–30 דק׳; GitHub לפעמים מאחר יותר)' });
     }
     return err('נתיב לא מוכר בערוץ ה-Council', 404);
   }

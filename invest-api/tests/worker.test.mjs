@@ -304,28 +304,46 @@ test('POST /paper/autopilot-only — רישום ידני ישן שנסגר בל�
   const r3 = await get('/paper/autopilot-only', { method: 'POST', auth: true }); assert.equal(r3.j.cashReturnedIls, 0, 'לא מוחזר פעמיים');
   await get('/paper/reset', { body: { initialIls: 200000 }, auth: true });
 });
-test('ערוץ ה-Council: POST /council/comment מפרסם ב-Issue #25 עם PAT, נעול לסוד ולמכסה יומית, לא חושף סודות', async () => {
-  const post = (text, key = 'council-shared-secret-1234', extra = {}) => worker.fetch(new Request('https://api.test/council/comment', { method: 'POST', headers: { 'CF-Connecting-IP': '1.1.1.1', 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) }, body: JSON.stringify({ text, ...extra }) }), env, { waitUntil(){} });
+test('ערוץ ה-Council (מצב PAT): POST /council/comment מפרסם ישירות ב-Issue #25, נעול לסוד ולמכסה, לא חושף סודות', async () => {
+  const post = (text, key = 'council-shared-secret-1234', e = env) => worker.fetch(new Request('https://api.test/council/comment', { method: 'POST', headers: { 'CF-Connecting-IP': '1.1.1.1', 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) }, body: JSON.stringify({ text }) }), e, { waitUntil(){} });
   assert.equal((await post('שלום', null)).status, 401);
   assert.equal((await post('שלום', 'wrong-secret-0000000000')).status, 401);
-  assert.equal((await post('', 'council-shared-secret-1234')).status, 400);
+  assert.equal((await post('')).status, 400);
   const n0 = githubPosts.length;
   const r = await post('בדקתי את ה-shadow: n=500 ✅. מפתח בדיקה: ghp_TESTTOKEN000000000001'); const j = await r.json();
-  assert.equal(r.status, 200, JSON.stringify(j)); assert.ok(j.url); assert.equal(j.usedToday, 1);
-  assert.equal(githubPosts.length, n0 + 1); const gp = githubPosts[githubPosts.length - 1];
+  assert.equal(r.status, 200, JSON.stringify(j)); assert.equal(j.queued, false); assert.ok(j.url); assert.equal(j.usedToday, 1);
+  const gp = githubPosts[githubPosts.length - 1]; assert.equal(githubPosts.length, n0 + 1);
   assert.ok(gp.url.endsWith('/repos/meirco199-prog/bikur/issues/25/comments'), gp.url); assert.equal(gp.auth, 'Bearer ghp_TESTTOKEN000000000001');
   assert.match(gp.body, /^\*\*ChatGPT\*\*/); assert.ok(gp.body.includes('n=500')); assert.ok(!gp.body.includes('ghp_TESTTOKEN000000000001'), 'ערך סוד בטקסט מוסתר לפני הפרסום');
-  const st = await worker.fetch(new Request('https://api.test/council/status', { headers: { 'CF-Connecting-IP': '1.1.1.1', Authorization: 'Bearer council-shared-secret-1234' } }), env, { waitUntil(){} }); const sj = await st.json(); assert.equal(sj.usedToday, 1); assert.equal(sj.issue, 25);
-  // מכסה יומית
   const today = new Date().toISOString().slice(0, 10); store.set(`council:quota:${today}`, JSON.stringify(20));
   assert.equal((await post('עוד אחת')).status, 429);
   store.set(`council:quota:${today}`, JSON.stringify(0));
-  // GitHub דוחה (PAT בלי הרשאה) → 502 עם הודעה, בלי לספור במכסה
-  const bad = await worker.fetch(new Request('https://api.test/council/comment', { method: 'POST', headers: { 'CF-Connecting-IP': '1.1.1.1', 'Content-Type': 'application/json', Authorization: 'Bearer council-shared-secret-1234' }, body: JSON.stringify({ text: 'x' }) }), { ...env, GH_COUNCIL_TOKEN: 'ghp_badtoken0000000000' }, { waitUntil(){} });
-  assert.equal(bad.status, 502); assert.match((await bad.json()).error, /GitHub דחה/);
-  // לא מוגדר → 503 ברור
-  const off = await worker.fetch(new Request('https://api.test/council/comment', { method: 'POST', headers: { 'CF-Connecting-IP': '1.1.1.1', 'Content-Type': 'application/json', Authorization: 'Bearer council-shared-secret-1234' }, body: JSON.stringify({ text: 'x' }) }), { ...env, COUNCIL_SECRET: undefined }, { waitUntil(){} });
-  assert.equal(off.status, 503);
+  const bad = await post('x', 'council-shared-secret-1234', { ...env, GH_COUNCIL_TOKEN: 'ghp_badtoken0000000000' }); assert.equal(bad.status, 502); assert.match((await bad.json()).error, /GitHub דחה/);
+});
+test('ערוץ ה-Council (ברירת מחדל, בלי PAT ובלי סוד ב-Secrets): מפתח נוצר במסך ההגדרות, הודעות נכנסות לתיבה, GitHub Actions קורא ומאשר עם סוד ה-cron', async () => {
+  const e = { ...env, COUNCIL_SECRET: undefined, GH_COUNCIL_TOKEN: undefined, CRON_SECRET: 'cron-secret-for-tests' };
+  const call = (path, { method = 'GET', body, bearer, auth } = {}) => worker.fetch(new Request('https://api.test' + path, { method, headers: { 'CF-Connecting-IP': '1.1.1.1', 'Content-Type': 'application/json', ...(bearer ? { Authorization: 'Bearer ' + bearer } : {}), ...(auth ? { Authorization: 'Bearer secret' } : {}) }, body: body ? JSON.stringify(body) : undefined }), e, { waitUntil(){} });
+  store.delete('council:secret'); store.delete('council:inbox');
+  // לפני שנוצר סוד: 503 עם הסבר; יצירת הסוד דורשת אימות של האפליקציה
+  assert.equal((await call('/council/comment', { method: 'POST', body: { text: 'x' }, bearer: 'anything-anything-anything' })).status, 503);
+  assert.equal((await call('/council/secret')).status, 401);
+  const s1 = await (await call('/council/secret', { auth: true })).json(); assert.ok(s1.secret && s1.secret.length >= 40, 'סוד אקראי ארוך'); assert.equal(s1.source, 'kv'); assert.equal(s1.direct, false); assert.match(s1.importUrl, /council-action\.yaml$/);
+  const s1b = await (await call('/council/secret', { auth: true })).json(); assert.equal(s1b.secret, s1.secret, 'קריאה חוזרת לא מחליפה את הסוד');
+  // ChatGPT שולח → נכנס לתיבה (לא ל-GitHub)
+  const n0 = githubPosts.length;
+  const r = await call('/council/comment', { method: 'POST', body: { text: 'ממצא: התאמה 0.00 ₪ ✅', author: 'ChatGPT' }, bearer: s1.secret }); const j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j)); assert.equal(j.queued, true); assert.ok(j.id); assert.equal(githubPosts.length, n0, 'בלי PAT לא פונים ל-GitHub מה-Worker');
+  assert.equal((await call('/council/comment', { method: 'POST', body: { text: 'x' }, bearer: 'wrong-' + s1.secret })).status, 401);
+  // GitHub Actions: קורא עם סוד ה-cron, מפרסם, מאשר
+  assert.equal((await call('/council/inbox')).status, 401);
+  const inbox = await (await call('/council/inbox?secret=cron-secret-for-tests')).json(); assert.equal(inbox.items.length, 1); assert.equal(inbox.issue, 25); assert.match(inbox.items[0].body, /^\*\*ChatGPT\*\*/); assert.ok(inbox.items[0].body.includes('התאמה 0.00'));
+  const st = await (await call('/council/status', { bearer: s1.secret })).json(); assert.equal(st.pending, 1); assert.equal(st.usedToday, 1);
+  const ack = await (await call('/council/ack?secret=cron-secret-for-tests', { method: 'POST', body: { ids: [inbox.items[0].id] } })).json(); assert.equal(ack.left, 0);
+  // החלפת מפתח: הישן נפסל
+  const s2 = await (await call('/council/secret?rotate=1', { method: 'POST', body: { rotate: true }, auth: true })).json(); assert.notEqual(s2.secret, s1.secret);
+  assert.equal((await call('/council/comment', { method: 'POST', body: { text: 'x' }, bearer: s1.secret })).status, 401);
+  assert.equal((await call('/council/comment', { method: 'POST', body: { text: 'x' }, bearer: s2.secret })).status, 200);
+  store.delete('council:secret'); store.delete('council:inbox'); store.delete(`council:quota:${new Date().toISOString().slice(0, 10)}`);
 });
 test('DELETE /paper/trade מוחק רישום פתוח בלבד ומחזיר מזומן', async () => {
   const before = (await get('/paper')).j.cashIls;

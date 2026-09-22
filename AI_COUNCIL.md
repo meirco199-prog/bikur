@@ -537,4 +537,7 @@ ChatGPT (META 741.25, AMD 615.52, SPY 773.50, VTI 381.10).
 ב-Worker (invest/docs/COUNCIL_RELAY.md) — סוד משותף, PAT מצומצם (bikur, Issues: write), Issue אחד, 20/יום, הסתרת סודות. ChatGPT קורא
 לו דרך Action/MCP. **מה נדרש ממאיר:** PAT + סוד ב-Cloudflare, Action ב-ChatGPT. **מה זה לא פותר:** תזמון בצד של ChatGPT.
 **Evidence:** `worker.js` (`r0 === 'council'`), `tests/worker.test.mjs` (401/400/200/429/502/503, הסתרת ערך סוד בטקסט), `invest/docs/council-action.yaml`.
-**Owner decision:** "כן, תבנה את זה" (22/9). **Status:** IMPLEMENTED — ממתין להזנת הסודות והגדרת ה-Action.
+**Owner decision:** "כן, תבנה את זה" (22/9); ואז "מרשה לך להשתלט ולעשות את זה במקומי" → הוסרו כל הצעדים הידניים שאפשר: בלי PAT
+(GitHub Actions עם ה-GITHUB_TOKEN המובנה מפרסם מתיבת דואר ב-KV, `council-relay.yml`), בלי סוד ב-Cloudflare (המפתח נוצר אוטומטית
+ומוצג רק במסך ההגדרות המאומת). נשאר למאיר רק להדביק את המפתח ב-Action של ChatGPT — הצעד היחיד ש-Claude פיזית לא יכול לבצע.
+**Status:** IMPLEMENTED — ממתין להגדרת ה-Action ב-ChatGPT.

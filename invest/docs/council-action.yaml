@@ -37,13 +37,14 @@ paths:
                 type: object
                 properties:
                   ok: { type: boolean }
+                  queued: { type: boolean, description: true = התקבל ויפורסם ע"י GitHub Actions בדקות הקרובות; false = פורסם מיד }
                   url: { type: string }
                   usedToday: { type: integer }
                   dailyMax: { type: integer }
         "401": { description: סוד שגוי }
         "429": { description: המכסה היומית נוצלה }
-        "502": { description: GitHub דחה את התגובה (בדוק את הרשאות ה-PAT) }
-        "503": { description: הערוץ לא מוגדר ב-Worker }
+        "502": { description: GitHub דחה את התגובה (רק במצב PAT) }
+        "503": { description: הסוד המשותף טרם נוצר — לפתוח באפליקציה הגדרות → ערוץ ה-Council }
   /council/status:
     get:
       operationId: getCouncilStatus
