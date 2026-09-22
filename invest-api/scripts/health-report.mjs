@@ -1,5 +1,6 @@
 // דוח תקינות יומי (Markdown) לפלטפורמת ההשקעות — נבנה מה-API הציבורי של ה-Worker, בלי מודל ובלי סודות.
 // מודפס ל-stdout; ה-workflow מפרסם אותו כתגובה ב-Issue הקבוע של AI Council. שימוש: WORKER_URL=https://... node invest-api/scripts/health-report.mjs
+import { lastSessionClose } from '../engine/session.js';
 const W = (process.env.WORKER_URL || '').replace(/\/$/, '');
 if (!W){ console.error('WORKER_URL חסר'); process.exit(1); }
 const get = async (p) => { try { const r = await fetch(`${W}/${p}`); const t = await r.text(); try { return JSON.parse(t); } catch { return { _error: `HTTP ${r.status}` }; } } catch (e) { return { _error: e.message }; } };
@@ -17,7 +18,10 @@ if ((cs.errors || []).length) issues.push(`שגיאות בסריקה: ${cs.error
 // 2. הדירוג הוא של היום שנסרק, וכיסוי הניתוח כמעט מלא
 const coverage = rank.universeSize ? rank.analyzed / rank.universeSize : null;
 const finalizedAgoMin = cs.at ? (Date.now() - Date.parse(cs.at)) / 60000 : Infinity;
-if (rank.date && cs.day && rank.date !== cs.day && finalizedAgoMin > 15) issues.push(`הדירוג (${rank.date}) לא תואם ליום הסריקה (${cs.day})`);
+// cs.day הוא יום העיבוד (UTC) — הסריקה הלילית רצה אחרי חצות UTC, לכן הדירוג צריך להתאים לסשן האחרון שנסגר לפני הסריקה, לא ליום העיבוד
+const expectedRankDate = cs.at ? lastSessionClose(new Date(cs.at)).date : cs.day;
+const rankDayOk = !rank.date || !expectedRankDate || rank.date === expectedRankDate || finalizedAgoMin <= 15;
+if (!rankDayOk) issues.push(`הדירוג (${rank.date}) לא תואם לסשן האחרון לפני הסריקה (${expectedRankDate}, סריקה ${cs.day})`);
 if (coverage !== null && coverage < 0.9) issues.push(`כיסוי ניתוח נמוך: ${rank.analyzed}/${rank.universeSize}`);
 // 3. התקלה הישנה: נסרקו ~500 אבל מודל הצל נשאר על יום קודם / n=100 (AI_COUNCIL#12)
 const shadowLag = !!(rank.date && shadow.day && shadow.day < rank.date);
@@ -44,7 +48,7 @@ if (runUrl) lines.push(`ריצה: ${runUrl}`);
 lines.push('');
 lines.push('| בדיקה | ערך | סטטוס |', '|---|---|---|');
 lines.push(`| סריקה יומית | יום ${cs.day || '—'} · ${n(cs.done)} נכסים · finalized=${!!cs.finalized} · שגיאות ${(cs.errors || []).length} · ${cs.at || ''} | ${ok(cs.finalized && !(cs.errors || []).length)} |`);
-lines.push(`| דירוג (rank) | תאריך ${rank.date || '—'} · שערי ${rank.barDate || '—'} · נותחו ${n(rank.analyzed)}/${n(rank.universeSize)} (${pct(coverage)}) | ${ok((rank.date === cs.day || finalizedAgoMin <= 15) && coverage >= 0.9)} |`);
+lines.push(`| דירוג (rank) | תאריך ${rank.date || '—'} · שערי ${rank.barDate || '—'} · נותחו ${n(rank.analyzed)}/${n(rank.universeSize)} (${pct(coverage)}) | ${ok(rankDayOk && coverage >= 0.9)} |`);
 lines.push(`| מודל צל (Shadow) | יום ${shadow.day || '—'} · n=${n(shadow.n)}${shadow.pipeline ? ' · ' + shadow.pipeline : ''} | ${ok(!shadowLag && !shadowThin && !shadow.missing)} |`);
 lines.push(`| מחירי 09:40 | ${rank.date || '—'}: ${n(entry.count)} ניירות${entry.missing ? ' (אין)' : ''} | ${ok(entry.count && rank.analyzed && entry.count >= rank.analyzed * 0.8)} |`);
 lines.push(`| חשבון התרגול | סגירת ${paper.asOf || '—'}${paper.stale ? ' ⚠️ חלקי' : ''} · שווי ${n(paper.totalIls)} ₪ · מההתחלה ${n(paper.pnlIls)} ₪ (${pct(paper.pnlPct)}) · ${(paper.positions || []).length} פוזיציות · התאמה ${n(diff, 2)} ₪ | ${ok(typeof diff === 'number' && Math.abs(diff) <= RECON_TOL && !paper.stale)} |`);
