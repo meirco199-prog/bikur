@@ -473,14 +473,16 @@ async function handle(req, env0, ctx){
   if (r0 === 'council'){
     const REPO = 'meirco199-prog/bikur', ISSUE = 25, DAILY_MAX = 20, MAX_LEN = 8000, INBOX_MAX = 50;
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET);
+    // קריאת הסוד מ-KV סלחנית: ערך שהוזן ידנית בדשבורד של Cloudflare (בלי מרכאות JSON) מתקבל כמו שהוא
+    const readSecret = async () => { if (!db.kv) return db.get('council:secret'); const t = await db.kv.get('council:secret', 'text'); if (!t) return null; try { const j = JSON.parse(t); return typeof j === 'string' ? j : String(t).trim(); } catch { return String(t).trim(); } };
     const newSecret = async () => { const b = new Uint8Array(32); crypto.getRandomValues(b); const s = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); await db.put('council:secret', s); return s; };
     // המפתח למסך ההגדרות (מאומת בלבד): נוצר בפעם הראשונה, rotate מחליף
-    if (p1 === 'secret'){ needAuth(); let s = env.COUNCIL_SECRET || (await db.get('council:secret')); if (!env.COUNCIL_SECRET && (!s || (req.method === 'POST' && (body.rotate || q.rotate === '1')))) s = await newSecret(); return json({ ok: true, secret: s, source: env.COUNCIL_SECRET ? 'secret' : 'kv', importUrl: 'https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml', endpoint: `${url.origin}/council/comment`, direct: !!env.GH_COUNCIL_TOKEN, pending: ((await db.get('council:inbox')) || []).length }); }
+    if (p1 === 'secret'){ needAuth(); let s = env.COUNCIL_SECRET || (await readSecret()); if (!env.COUNCIL_SECRET && (!s || (req.method === 'POST' && (body.rotate || q.rotate === '1')))) s = await newSecret(); return json({ ok: true, secret: s, source: env.COUNCIL_SECRET ? 'secret' : 'kv', importUrl: 'https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml', endpoint: `${url.origin}/council/comment`, direct: !!env.GH_COUNCIL_TOKEN, pending: ((await db.get('council:inbox')) || []).length }); }
     // צד GitHub Actions (סוד ה-cron): קריאת התיבה ואישור פרסום
     if (p1 === 'inbox' && req.method === 'GET'){ if (!bySecret) needAuth(); return json({ ok: true, issue: ISSUE, items: (await db.get('council:inbox')) || [] }); }
     if (p1 === 'ack' && req.method === 'POST'){ if (!bySecret) needAuth(); const ids = new Set(Array.isArray(body.ids) ? body.ids : []); const left = ((await db.get('council:inbox')) || []).filter((m) => !ids.has(m.id)); await db.put('council:inbox', left); return json({ ok: true, left: left.length }); }
     // צד ChatGPT: Bearer = הסוד המשותף
-    const want = env.COUNCIL_SECRET || (await db.get('council:secret')) || '';
+    const want = env.COUNCIL_SECRET || (await readSecret()) || '';
     if (!want) return err('ערוץ ה-Council טרם הופעל: פתח באפליקציה הגדרות → ערוץ ה-Council → "הצג מפתח" (יוצר את הסוד המשותף)', 503);
     const given = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '') || req.headers.get('X-Council-Key') || '';
     const same = (x, y) => { if (!x || !y || x.length !== y.length) return false; let d = 0; for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i); return d === 0; };
