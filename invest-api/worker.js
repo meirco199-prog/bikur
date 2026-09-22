@@ -466,6 +466,32 @@ async function handle(req, env0, ctx){
       catch (e) { return err(e.message); }
     }
   }
+  // ערוץ הכתיבה של ChatGPT ל-AI Council (invest/docs/COUNCIL_RELAY.md): ChatGPT (Action/MCP) שולח טקסט עם סוד משותף, וה-Worker מפרסם אותו
+  // כתגובה ב-Issue #25 עם PAT מצומצם (Issues: write על bikur בלבד). נעול לסוד, ל-Issue אחד, ולמכסה יומית — דליפת הסוד לא מאפשרת יותר מזה
+  if (r0 === 'council'){
+    const REPO = 'meirco199-prog/bikur', ISSUE = 25, DAILY_MAX = 20, MAX_LEN = 8000;
+    const given = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '') || req.headers.get('X-Council-Key') || '';
+    const want = env.COUNCIL_SECRET || '';
+    const same = (a, b) => { if (!a || !b || a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+    if (!want || !env.GH_COUNCIL_TOKEN) return err('ערוץ ה-Council לא מוגדר: חסרים COUNCIL_SECRET ו/או GH_COUNCIL_TOKEN ב-Secrets של ה-Worker', 503);
+    if (!same(given, want)) return err('unauthorized', 401);
+    const qKey = `council:quota:${today()}`; const used = (await db.get(qKey)) || 0;
+    if (p1 === 'status' && req.method === 'GET') return json({ ok: true, repo: REPO, issue: ISSUE, usedToday: used, dailyMax: DAILY_MAX });
+    if (p1 === 'comment' && req.method === 'POST'){
+      const text = String(body.text || '').trim();
+      if (!text) return err('חסר text');
+      if (text.length > MAX_LEN) return err(`הטקסט ארוך מדי (${text.length} > ${MAX_LEN})`);
+      if (used >= DAILY_MAX) return err(`מכסת התגובות היומית (${DAILY_MAX}) נוצלה`, 429);
+      const author = String(body.author || 'ChatGPT').slice(0, 40).replace(/[^\p{L}\p{N} _.-]/gu, '');
+      const md = `**${author}** (דרך ערוץ ה-Council, לא ישירות מהחשבון):\n\n${db.redact(text)}\n\n---\n_Posted via council relay (\`POST /council/comment\`)_`;
+      const gh = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE}/comments`, { method: 'POST', headers: { Authorization: `Bearer ${env.GH_COUNCIL_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'bikur-council-relay', 'X-GitHub-Api-Version': '2022-11-28' }, body: JSON.stringify({ body: md }) });
+      const gj = await gh.json().catch(() => ({}));
+      if (!gh.ok){ await db.logError('council', `GitHub ${gh.status}: ${String(gj.message || '').slice(0, 120)}`); return err(`GitHub דחה את התגובה (${gh.status}): ${String(gj.message || '').slice(0, 160)}`, 502); }
+      await db.put(qKey, used + 1, { ttl: 2 * 86400 });
+      return json({ ok: true, url: gj.html_url || null, id: gj.id || null, usedToday: used + 1, dailyMax: DAILY_MAX });
+    }
+    return err('נתיב לא מוכר בערוץ ה-Council', 404);
+  }
   // שערוך לפי סגירה: כותב את שורת השווי של הסשן האחרון (תרגול + אגרסיבי). נקרא מכל ריצת ops/מתוזמנת; בטוח לקריאה חוזרת
   if (r0 === 'mark' && p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json({ ok: true, ...(await markToClose(ctx)) }); } catch (e) { return err('mark: ' + e.message, 500); } }
   if (r0 === 'auto'){

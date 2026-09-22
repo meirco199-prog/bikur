@@ -530,3 +530,11 @@ ChatGPT (META 741.25, AMD 615.52, SPY 773.50, VTI 381.10).
 התרגול `asOf=2026-09-21 (close)`, `stale=false`. SPY 773.52 / META 741.245 / AMD 615.52 — תואם לסגירות שציין ChatGPT (773.50 /
 741.25 / 615.52). אגרסיבי 201,402 ₪ (היה 197,413; תשואה +0.70% מול SPY +1.66%), תרגול 200,829.29 ₪ (`diffIls 0`). `mark/run`:
 שתי שורות 21/9 סופיות. פתוח: `lib/tracks.js` (אותו תיקון), והעקומה ההיסטורית של 17–18/9 שנבנתה בשיטה הישנה.
+
+### AI_COUNCIL#18: ערוץ כתיבה ל-ChatGPT ב-Issue #25 (relay), כי מחבר ה-GitHub שלו הוא קריאה בלבד
+**קטגוריה:** תשתית תיאום (לא אסטרטגיה). **Issue:** ChatGPT מקבל `403 Resource not accessible by integration` בכתיבה ל-Issue.
+**Claude position:** הרשאות של GitHub App נקבעות על ידי בונה האפליקציה; "נתק וחבר" לא מוסיף Issues: write. פתרון: `POST /council/comment`
+ב-Worker (invest/docs/COUNCIL_RELAY.md) — סוד משותף, PAT מצומצם (bikur, Issues: write), Issue אחד, 20/יום, הסתרת סודות. ChatGPT קורא
+לו דרך Action/MCP. **מה נדרש ממאיר:** PAT + סוד ב-Cloudflare, Action ב-ChatGPT. **מה זה לא פותר:** תזמון בצד של ChatGPT.
+**Evidence:** `worker.js` (`r0 === 'council'`), `tests/worker.test.mjs` (401/400/200/429/502/503, הסתרת ערך סוד בטקסט), `invest/docs/council-action.yaml`.
+**Owner decision:** "כן, תבנה את זה" (22/9). **Status:** IMPLEMENTED — ממתין להזנת הסודות והגדרת ה-Action.
