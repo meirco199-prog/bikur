@@ -70,4 +70,5 @@ jobs:
       - name: Health snapshot
         run: |
           sleep 10
-          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026" || true
+          # ping=1 — בדיקת שליחה חיה: שולח לבעלים הודעת בדיקה ומדווח אם הצליחה
+          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026&ping=1" || true

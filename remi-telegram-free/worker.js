@@ -2202,15 +2202,22 @@ async function handleWebhook(env, update) {
   const answerText = typeof answer === 'string' ? answer : (answer && answer.text) || '';
   if (answerText) S.history = [...(S.history || []), { ts: now.getTime(), text: answerText.slice(0, 250), bot: true }].slice(-200);
   await saveStore(env, S);
+  let sentOk = true;
   if (typeof answer === 'object' && answer.doc) {
-    await tgSendDoc(env, chatId, answer.doc, answer.text, answer.replyTo);
+    sentOk = await tgSendDoc(env, chatId, answer.doc, answer.text, answer.replyTo);
   } else if (typeof answer === 'object' && answer.cards) {
-    if (answer.text) await tgSend(env, chatId, voicePrefix + answer.text);
-    for (const card of answer.cards) await tgSend(env, chatId, card.text, card.buttons);
+    if (answer.text) sentOk = await tgSend(env, chatId, voicePrefix + answer.text);
+    for (const card of answer.cards) sentOk = (await tgSend(env, chatId, card.text, card.buttons)) && sentOk;
   } else if (typeof answer === 'object') {
-    await tgSend(env, chatId, voicePrefix + answer.text, answer.buttons, answer.replyTo);
+    sentOk = await tgSend(env, chatId, voicePrefix + answer.text, answer.buttons, answer.replyTo);
   } else {
-    await tgSend(env, chatId, voicePrefix + answer);
+    sentOk = await tgSend(env, chatId, voicePrefix + answer);
+  }
+  // כישלון שליחת תשובה — הרובד האחרון שלא היה מנוטר: נרשם לאבחון מרחוק
+  if (!sentOk) {
+    try {
+      await env.DATA.put('weberr', JSON.stringify({ ts: Date.now(), msg: 'reply send failed: ' + (lastTgError || 'unknown') }));
+    } catch {}
   }
 }
 
@@ -2607,6 +2614,11 @@ export default {
         });
         out.recentFires = (C.stats.fired || []).slice(-15).map(t => hhmm(t));
         out.errors = (C.errors || []).map(e => ({ at: hhmm(e.ts), msg: String(e.msg || '').slice(0, 140) }));
+        // בדיקת שליחה חיה: /health?...&ping=1 שולח הודעת בדיקה לבעלים ומדווח מה קרה
+        if (url.searchParams.get('ping') === '1' && S.ownerChatId) {
+          const pingOk = await tgSend(env, S.ownerChatId, '🔧 בדיקת תקשורת מרמי — אם אתה רואה את זה, השליחה תקינה 🙂');
+          out.pingSend = pingOk ? 'ok' : ('failed: ' + (lastTgError || 'unknown'));
+        }
         out.flags = { briefOff: !!S.briefOff, summaryOff: !!S.summaryOff, pingMin: S.meetingPingMin };
       } catch (e) { out.ok = false; out.err = e.message; }
       return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
