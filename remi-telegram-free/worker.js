@@ -2431,8 +2431,10 @@ export default {
     if (url.pathname === '/setup') {
       if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });
       const hookUrl = `${url.origin}/webhook/${env.SECRET}`;
+      // ניתוק מלא ואז חיבור נקי — מאלץ את טלגרם לרענן רישום תקוע ("already set")
+      const del = await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/deleteWebhook`)).text();
       const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/setWebhook?url=${encodeURIComponent(hookUrl)}`);
-      const body = await res.text();
+      const body = 'נותק: ' + del + '\nחובר: ' + await res.text();
       return new Response(`חיבור לטלגרם: ${body}\n\nעכשיו פתח את הבוט בטלגרם ושלח לו /start`, {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
