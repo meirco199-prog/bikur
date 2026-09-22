@@ -121,6 +121,26 @@ jobs:
             echo "=== paper autopilot-only"; curl -sS --max-time 60 -X POST "$W/paper/autopilot-only?secret=$SECRET" | head -c 1500 || echo "::warning::autopilot-only נכשל"; echo
             WORKER_URL="$W" node invest-api/scripts/paper-check.mjs || echo "::warning::paper-check נכשל"
           fi
+          # אבחון: kv-usage <ts> — כמה כתיבות/קריאות KV נעשו היום, לפי namespace (מכסת התוכנית החינמית: 1,000 כתיבות/יום לכל החשבון).
+          # GraphQL Analytics של Cloudflare עם CF_API_TOKEN; מדפיס מספרים בלבד, בלי ערכי סוד
+          if [ "$CMD" = "kv-usage" ]; then
+            echo "=== kv-usage $(date -u +%F)"
+            ACCT="${{ secrets.CF_ACCOUNT_ID }}"; [ -n "$ACCT" ] || ACCT=$(curl -sS -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" "https://api.cloudflare.com/client/v4/accounts?per_page=1" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"][0]["id"])')
+            NS=$(curl -sS -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" "https://api.cloudflare.com/client/v4/accounts/$ACCT/storage/kv/namespaces?per_page=100" | python3 -c 'import json,sys; print(json.dumps({n["id"]: n["title"] for n in json.load(sys.stdin)["result"]}))')
+            echo "namespaces: $(echo "$NS" | python3 -c 'import json,sys; print(sorted(json.load(sys.stdin).values()))')"
+            for D in $(date -u +%F) $(date -u -d yesterday +%F); do
+              Q=$(python3 -c 'import json,sys; a,d=sys.argv[1:]; print(json.dumps({"query":"query($a:String!,$d:Date!){viewer{accounts(filter:{accountTag:$a}){kvOperationsAdaptiveGroups(limit:200,filter:{date:$d}){sum{requests} dimensions{namespaceId actionType}}}}}","variables":{"a":a,"d":d}}))' "$ACCT" "$D")
+              curl -sS -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" -H "Content-Type: application/json" https://api.cloudflare.com/client/v4/graphql -d "$Q" | NS="$NS" D="$D" python3 -c '
+          import json,sys,os
+          ns=json.loads(os.environ["NS"]); d=json.load(sys.stdin)
+          if d.get("errors"): print(os.environ["D"], "errors:", [e.get("message") for e in d["errors"]][:3]); sys.exit(0)
+          rows=d["data"]["viewer"]["accounts"][0]["kvOperationsAdaptiveGroups"]
+          agg={}
+          for r in rows: k=(ns.get(r["dimensions"]["namespaceId"], r["dimensions"]["namespaceId"][:8]), r["dimensions"]["actionType"]); agg[k]=agg.get(k,0)+r["sum"]["requests"]
+          print(os.environ["D"] + ":"); [print("  ", k[0], k[1], v) for k,v in sorted(agg.items())]
+          print("   total writes:", sum(v for k,v in agg.items() if k[1]=="write"))'
+            done
+          fi
           if [ "$CMD" = "macro-check" ]; then
             echo "=== macro-check"; curl -sS --max-time 30 "$W/macro" | python3 -c 'import json,sys; d=json.load(sys.stdin); [print(k, "rows:", len(v.get("rows",[])), "asOf:", v.get("asOf"), "last:", (v.get("rows") or [[None,None]])[-1], "source:", v.get("source")) for k,v in d.items()]'
           fi
