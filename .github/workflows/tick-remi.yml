@@ -16,13 +16,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wake the worker
+        env:
+          REMI_SECRET: ${{ secrets.REMI_SECRET }}
         run: |
+          if [ -z "$REMI_SECRET" ]; then echo "::error::חסר הסוד REMI_SECRET בהגדרות הריפו (Settings → Secrets and variables → Actions)"; exit 1; fi
           sleep $((RANDOM % 20 + 25))
-          resp=$(curl -sS --max-time 45 "https://remi.meirco199.workers.dev/tick?secret=remi-meir-2026")
+          resp=$(curl -sS --max-time 45 "https://remi.meirco199.workers.dev/tick?secret=$REMI_SECRET")
           echo "$resp"
           echo "$resp" | grep -q 'tick ok'
 
       # תמונת מצב טכנית ליומן הריצה — שעות, מזהים ושגיאות בלבד, בלי שום תוכן אישי
       - name: Health snapshot
+        env:
+          REMI_SECRET: ${{ secrets.REMI_SECRET }}
         run: |
-          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026" || true
+          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=$REMI_SECRET" || true
