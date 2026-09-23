@@ -59,6 +59,25 @@ jobs:
           echo "$sched"
           echo "$sched" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
 
+      # הסוד של רמי (SECRET: נתיב ה-webhook, /tick, /setup, /health, גשר היומן) נשלח ל-Cloudflare מ-GitHub Secrets (REMI_SECRET) —
+      # לא כתוב בשום קובץ בריפו (הערך הקודם היה גלוי כאן ובריפו הציבורי; ראה remi-telegram-free/README.md → רוטציה)
+      - name: Set SECRET as a Cloudflare secret (not in the repo)
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          REMI_SECRET: ${{ secrets.REMI_SECRET }}
+        run: |
+          set -e
+          if [ -z "$REMI_SECRET" ]; then echo "::error::חסר הסוד REMI_SECRET בהגדרות הריפו (Settings → Secrets and variables → Actions)"; exit 1; fi
+          ACCOUNT_ID="$CF_ACCOUNT_ID"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" -H "Authorization: Bearer $CF_API_TOKEN" | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          resp=$(curl -sS -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/remi/secrets" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+            --data "$(python3 -c 'import json,os; print(json.dumps({"name":"SECRET","text":os.environ["REMI_SECRET"],"type":"secret_text"}))')")
+          echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("secret set:", d.get("success")); sys.exit(0 if d.get("success") else 1)'
+
       - name: Verify worker answers
         run: |
           code=$(curl -sS -o /dev/null -w "%{http_code}" https://remi.meirco199.workers.dev/)
@@ -68,9 +87,11 @@ jobs:
       # תמונת מצב טכנית של השעון והתזכורות (שעות ומזהים בלבד, בלי תוכן אישי).
       # ההמתנה — כדי שהקוד שהועלה הרגע יספיק להתפשט ברשת של Cloudflare
       - name: Health snapshot
+        env:
+          REMI_SECRET: ${{ secrets.REMI_SECRET }}
         run: |
           sleep 10
-          # חיבור מחדש של ה-webhook לטלגרם — מרפא עצמית למצבים תקועים
-          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/setup?secret=remi-meir-2026" || true
+          # חיבור מחדש של ה-webhook לטלגרם — מרפא עצמית למצבים תקועים (ומחיל סוד חדש אחרי רוטציה)
+          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/setup?secret=$REMI_SECRET" || true
           # ping=1 — בדיקת שליחה חיה: שולח לבעלים הודעת בדיקה ומדווח אם הצליחה
-          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=remi-meir-2026&ping=1" || true
+          curl -sS --max-time 30 "https://remi.meirco199.workers.dev/health?secret=$REMI_SECRET&ping=1" || true
