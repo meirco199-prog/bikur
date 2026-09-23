@@ -8,11 +8,11 @@ import { lineChart } from '../ui/chart.js';
 let D = null; // נתונים משותפים לכל המסכים הפשוטים (מטמון קצר)
 async function load(){
   const yearAgo = new Date(Date.now() - 370 * 86400000).toISOString().slice(0, 10);
-  const [regime, rank, watch, paper, reco, auto, shadow, aggr, ta35] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null), api('/shadow/report', { ttl: 60000 }).catch(() => null), api('/aggressive/report', { ttl: 60000 }).catch(() => null), api('/prices/TA35.TA?from=' + yearAgo, { ttl: 300000 }).catch(() => null)]);
+  const [regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, agent] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null), api('/shadow/report', { ttl: 60000 }).catch(() => null), api('/aggressive/report', { ttl: 60000 }).catch(() => null), api('/prices/TA35.TA?from=' + yearAgo, { ttl: 300000 }).catch(() => null), api('/agent/report', { ttl: 30000 }).catch(() => null)]);
   const table = rank?.table || [];
   const by = new Map(table.map((r) => [r.symbol, r]));
   const usdils = regime?.inputs?.usdils || reco?.usdils || 3.7;
-  return { regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, table, by, usdils, size: settings.get().portfolioSize || 200000 };
+  return { regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, agent, table, by, usdils, size: settings.get().portfolioSize || 200000 };
 }
 
 // --- מסך הבית בסגנון אפליקציית מסחר: כמה כסף, מה השתנה לפי תקופות, גרף ---
@@ -54,10 +54,21 @@ function mountCharts(main){
   const put = (id, node) => { const h = main.querySelector('#' + id); if (h && node) h.appendChild(node); };
   const p = D.paper || {}, A = acct();
   put('eq-paper', eqChart(liveRows(p.equity, p.sessionDate || p.asOf || today(), A.total), 'חשבון התרגול (₪)'));
+  const g = D.agent; if (g && !g.missing) put('eq-agent', eqChart((g.equity || []).map((r) => [r[0], r[1], r[2] ?? null]), 'הסוכן (₪)'));
   const a = D.aggr; if (a && !a.missing) put('eq-aggr', eqChart(liveRows(a.equity, a.sessionDate || a.day, a.totalIls), 'מסלול אגרסיבי (₪)'));
   const ta = taRows(); if (ta.length > 1) put('eq-ta', lineChart({ dates: ta.map((r) => r[0]), series: [{ name: 'ת"א 35', values: ta.map((r) => r[1]), color: '#2563eb', area: true }], height: 180, yFmt: (v) => fmt.num(v, 0) }));
 }
 const ils = (usd) => fmt.ils(usd * (D?.usdils || 3.7));
+// הסוכן האוטונומי (סימולציית IBKR) — הכרטיס הראשון בבית: הון, היום, מינוף, פוזיציות, פקודות למחר
+const agentBlock = () => {
+  const g = D.agent; if (!g) return '';
+  if (g.missing) return sec('🤖 הסוכן האוטונומי — סימולציית IBKR', `<div class="empty">הסוכן עוד לא רץ. הריצה הראשונה אחרי סגירת ניו יורק. <a href="#/agent">מה הוא יעשה</a></div>`, 'חדש');
+  const rows = (g.equity || []).map((r) => [r[0], r[1], r[2] ?? null]); const t = dayChange(rows);
+  const pend = g.pending?.orders || []; const pos = g.positions || [];
+  const badge = g.policy?.killSwitch ? '<span class="tag missing">⛔ נעצר</span>' : g.halted ? '<span class="tag stale">⏸ עצירה</span>' : '';
+  return sec('🤖 הסוכן האוטונומי — סימולציית IBKR', hero(g.totalIls, t, t.na ? '' : 'בסגירת ' + fmt.date(g.day)) + `<div class="periods">${tile('היום', t)}${periodsOf(rows).map((x) => tile(x.label, x)).join('')}${tile('מההתחלה', { chg: g.pnlIls, pct: g.pnlPct })}</div><div id="eq-agent" style="margin-top:.8rem"></div>
+    <div class="muted" style="font-size:.85rem;margin-top:.5rem">${badge} מינוף ×${fmt.num(g.leverage ?? 0, 2)} · ${pos.length} פוזיציות (${pos.filter((p) => p.side === 'short').length} שורט) · חשיפה: ${Object.entries(g.exposure?.byClass || {}).map(([k, v]) => `${({ stock: 'מניות', etf: 'ETF', crypto: 'קריפטו', fx: 'מט"ח', future: 'חוזים' })[k] || k} ${fmt.pct(v / (g.equityUsd || 1), 0)}`).join(' · ') || 'מזומן בלבד'} · ${pend.length} פקודות למחר${pend.length ? ': ' + pend.slice(0, 4).map((o) => `${o.side === 'short' ? 'שורט' : 'קנייה'} ${o.symbol}`).join(', ') : ''} · <a href="#/agent">הכול על הסוכן</a></div>`, 'לונג/שורט/מינוף · סימולציה');
+};
 const riskWord = (r) => ({ 'נמוך': 'סיכון נמוך', 'בינוני': 'סיכון בינוני', 'גבוה': 'סיכון גבוה' }[r?.riskLevel] || 'סיכון לא ידוע');
 const why = (r) => { // משפט אחד בעברית פשוטה
   const c = r.components || {}; const good = [], bad = [];
@@ -154,6 +165,7 @@ const VIEWS = {
     const paperRows = liveRows(p.equity, p.asOf || today(), A.total);
     const aggrBlock = () => { const m = a.metrics || {}; const rows = liveRows(a.equity, a.sessionDate || a.day, a.totalIls); const t = dayChange(rows); return sec('מסלול אגרסיבי', hero(a.totalIls, t, t.na ? '' : priceWhen({ asOf: a.sessionDate || t.day, stale: a.stale, staleSymbols: a.staleSymbols, sessionDate: a.sessionDate, pricedAsOf: a.pricedAsOf })) + `<div class="periods">${tile('היום', t)}${periodsOf(rows).map((x) => tile(x.label, x)).join('')}${tile('מההתחלה', { chg: a.totalIls - a.initialIls, pct: a.initialIls ? (a.totalIls - a.initialIls) / a.initialIls : m.totalReturn })}</div><div id="eq-aggr" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">סימולציה בלבד, לא כסף אמיתי · התחלה ${fmt.ils(a.initialIls)}${m.from ? ' ב-' + fmt.date(m.from) : ''} · מול SPY באותה תקופה: <b class="${cls(m.excess)}">${fmt.pct(m.excess, 1, true)}</b> · <a href="#/pro">פירוט</a></div>`, 'תיק צל, לא סוחר'); };
     return `<h1>הכסף שלי</h1><div class="muted" style="margin-bottom:.6rem">${asOfLine()}</div>
+    ${agentBlock()}
     ${sec('חשבון התרגול', hero(A.total, tp, tp.na ? '' : priceWhen(p)) + `<div class="periods">${tile('היום', tp)}${periodsOf(paperRows).map((x) => tile(x.label, x)).join('')}${tile(A.adj ? 'מאז האוטומט' : 'מההתחלה', { chg: A.pnl, pct: A.pnlPct })}</div><div id="eq-paper" style="margin-top:.8rem"></div><div class="muted" style="font-size:.85rem;margin-top:.5rem">התחלת עם ${fmt.ils(A.initial)}${baseLine(A)} · מזומן ${fmt.ils(A.cash)} · ניירות ${fmt.ils(A.val)} · השערים מתעדכנים אחרי סגירת ניו יורק</div>`, 'האוטומט מנהל')}
     ${autoLine()}
     ${holdings()}

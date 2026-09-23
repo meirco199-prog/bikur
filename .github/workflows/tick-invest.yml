@@ -46,6 +46,8 @@ jobs:
           if [ -z "$SECRET" ]; then echo "::error::חסר הסוד CRON_SECRET בהגדרות הריפו (Settings → Secrets and variables → Actions) — ראה invest/docs/SECURITY.md"; exit 1; fi
           BATCH=$(python3 -c 'import json; print(json.load(open("invest-api/config.json")).get("CRON_BATCH","2"))')
           CMD=$(cat .github/invest-ops/command 2>/dev/null | head -1 | cut -d" " -f1 || echo cron-run)
+          # הסוכן האוטונומי (סימולציית IBKR): תמחור בבאצ'ים (מכסת Twelve Data ~7/דקה) ואז החלטה; קריאה חוזרת ממשיכה מאותה נקודה
+          agent_loop(){ EXTRA="$1"; for i in $(seq 1 14); do r=$(curl -sS --max-time 120 -X POST "$W/agent/run?secret=$SECRET&batch=6$EXTRA" || echo '{"error":"curl failed"}'); echo "$i: $(echo "$r" | head -c 900)"; EXTRA=""; echo "$r" | grep -q '"phase":"pricing"' || break; sleep 50; done; }
           [ "${{ github.event_name }}" = "push" ] && { echo "ממתין לפריסת ה-Worker…"; sleep 75; }
           [ "${{ github.event_name }}" = "push" ] || CMD=cron-run
           echo "command: $CMD"
@@ -73,6 +75,11 @@ jobs:
             # אם הסריקה רצה עכשיו (ולא דילגה) — ההחלטה הלילית של המסלול האגרסיבי מתקבלת מחדש על מודל הצל המעודכן (פקודות שטרם בוצעו מתבטלות)
             FORCEAGG=""; [ -f .sp500-ran ] && FORCEAGG="&force=1"
             echo "=== aggressive decide"; curl -sS --max-time 120 -X POST "$W/aggressive/run?secret=$SECRET$FORCEAGG" | head -c 600; echo
+            echo "=== agent (סוכן רב-נכסי, סימולציית IBKR)"; agent_loop ""
+          fi
+          if [ "$CMD" = "agent-run" ] || [ "$CMD" = "agent-reset" ]; then
+            RS="&force=1"; [ "$CMD" = "agent-reset" ] && RS="&reset=1&force=1"
+            echo "=== agent ($CMD)"; agent_loop "$RS"
           fi
           FORCE=""; [ "$CMD" = "cron-run-force" ] && { CMD=cron-run; FORCE="&force=1"; }
           if [ "$CMD" = "cron-run" ]; then
@@ -167,6 +174,7 @@ jobs:
           echo "=== auto status (last run)"; curl -sS --max-time 30 "$W/auto/status" | python3 -c 'import json,sys; d=json.load(sys.stdin); l=d.get("last") or {}; print("enabled:", d.get("enabled"), "profile:", d.get("profile"), "runs:", len(d.get("journal",[]))); print("last:", l.get("ts"), l.get("day"), l.get("trigger"), "rules v", l.get("rulesVersion")); print("regime:", (l.get("regime") or {}).get("summary")); print("before:", l.get("before"), "after:", l.get("after")); [print("  ", o["side"], o["qty"], "x", o["symbol"], o.get("name"), "@", o.get("price"), "ok" if o.get("ok") else "ERR " + str(o.get("error")), "|", o.get("reason")) for o in l.get("orders",[])]; print("notes:", l.get("notes")); [print("  skip", s["symbol"], "|", s["reason"]) for s in l.get("skipped",[])]'
           echo "=== shadow"; curl -sS --max-time 30 "$W/shadow/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("day:", d.get("day"), "n:", d.get("n"), "missing:", d.get("missing"), d.get("reason","")); print("agreement:", d.get("agreement")); print("actions:", {m: (d.get("models") or {}).get(m,{}).get("actions") for m in "ABC"}); print("top:", d.get("top")); print("revisions:", d.get("revisionsAvailable"), "used:", d.get("revisionsUsed"), "histDays:", d.get("revisionHistoryDays")); print("dupes:", (d.get("corr") or {}).get("dupes")); st=(d.get("stats") or {}).get("horizons") or {}; [print("  h", h, "days", v.get("days"), {m: {"n": x.get("n"), "ic": x.get("ic"), "mono": x.get("monotonic"), "buy": (x.get("actions") or {}).get("BUY"), "sell": (x.get("actions") or {}).get("SELL")} for m, x in (v.get("models") or {}).items()}) for h, v in st.items()]'
           echo "=== aggressive"; curl -sS --max-time 30 "$W/aggressive/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("day:", d.get("day"), "model:", d.get("model"), d.get("variant"), "total:", d.get("totalIls"), "spyRef:", d.get("spyRef"), "missing:", d.get("missing")); print("exposure:", d.get("exposure")); p=d.get("pending") or {}; print("pending:", p.get("day"), [(o["side"], o["qty"], o["symbol"], o.get("filled")) for o in p.get("orders", [])]); print("sectors:", [(x["sector"], x["share"]) for x in (d.get("sectors") or [])[:6]]); print("metrics:", d.get("metrics")); print("stats:", d.get("stats")); print("positions:", [(p["symbol"], p["valueIls"], p.get("pnlPct")) for p in (d.get("positions") or [])]); [print("  ", t["day"], t["side"], t["qty"], "x", t["symbol"], "@", t["price"], "|", t.get("reason")) for t in (d.get("trades") or [])[:8]]'
+          echo "=== agent"; curl -sS --max-time 30 "$W/agent/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("missing:", d.get("reason")) if d.get("missing") else (print("day:", d.get("day"), "equity:", d.get("totalIls"), "₪ (", d.get("equityUsd"), "$) pnl:", d.get("pnlPct"), "day:", d.get("dayPnlUsd"), "$ leverage:", d.get("leverage"), "positions:", len(d.get("positions") or []), "kill:", d.get("policy",{}).get("killSwitch"), "halted:", d.get("halted")), print("exposure:", d.get("exposure",{}).get("byClass")), [print("  ", p["side"], p["qty"], "x", p["symbol"], "@", p["avg"], "→", p["price"], "pnl", p["pnlUsd"], "|", p["strategy"]) for p in (d.get("positions") or [])[:12]], print("pending:", [(o["side"], o["qty"], o["symbol"], o["strategy"]) for o in (d.get("pending") or {}).get("orders", [])]), print("opps:", (d.get("opportunities") or {}).get("summary"), "rejections:", len((d.get("opportunities") or {}).get("gateLog") or [])))' || echo "::warning::agent report failed"
           echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo
           echo "=== rank"; curl -sS --max-time 30 "$W/rank" | head -c 500; echo
       # דוח תקינות יומי → תגובה ב-Issue #25 (AI Council). פעם ביום (לפי סמן <!-- health-report YYYY-MM-DD --> בתגובה האחרונה),
