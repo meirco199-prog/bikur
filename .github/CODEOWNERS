@@ -10,3 +10,6 @@
 /invest-api/engine/aggressive.js             @meirco199-prog
 /invest-api/engine/autopilot.js              @meirco199-prog
 /invest-api/tests/risk-limits-lock.test.mjs  @meirco199-prog
+/invest-api/engine/trading-policy.js         @meirco199-prog
+/invest-api/engine/order-gate.js             @meirco199-prog
+/invest-api/tests/order-gate.test.mjs        @meirco199-prog
