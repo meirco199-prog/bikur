@@ -10,7 +10,9 @@ const ok = (c) => (c ? '✅' : '❌');
 const today = new Date().toISOString().slice(0, 10);
 const [health, cron, rank, shadow, paper, bd, aggr] = await Promise.all([get('health'), get('cron/status'), get('rank'), get('shadow/report'), get('paper'), get('paper/breakdown'), get('aggressive/report')]);
 const cs = cron.state || cron.last || {};
-const entry = rank.date ? await get(`entry/${rank.date}`) : {};
+// הסשן שהדירוג מתומחר בו (barDate); rank.date הוא לעיתים יום העיבוד (UTC) ולעיתים יום הסשן — לא להשוות אליו
+const rankSession = rank.barDate || rank.date || null;
+const entry = rankSession ? await get(`entry/${rankSession}`) : {};
 const issues = [];
 // 1. הסריקה סיימה
 if (!cs.finalized) issues.push(`הסריקה של ${cs.day || '?'} לא הסתיימה (done ${cs.done}, queueLeft ${cs.queueLeft})`);
@@ -20,8 +22,8 @@ const coverage = rank.universeSize ? rank.analyzed / rank.universeSize : null;
 const finalizedAgoMin = cs.at ? (Date.now() - Date.parse(cs.at)) / 60000 : Infinity;
 // cs.day הוא יום העיבוד (UTC) — הסריקה הלילית רצה אחרי חצות UTC, לכן הדירוג צריך להתאים לסשן האחרון שנסגר לפני הסריקה, לא ליום העיבוד
 const expectedRankDate = cs.at ? lastSessionClose(new Date(cs.at)).date : cs.day;
-const rankDayOk = !rank.date || !expectedRankDate || rank.date === expectedRankDate || finalizedAgoMin <= 15;
-if (!rankDayOk) issues.push(`הדירוג (${rank.date}) לא תואם לסשן האחרון לפני הסריקה (${expectedRankDate}, סריקה ${cs.day})`);
+const rankDayOk = !rankSession || !expectedRankDate || rankSession === expectedRankDate || finalizedAgoMin <= 15;
+if (!rankDayOk) issues.push(`שערי הדירוג (${rankSession}) לא תואמים לסשן האחרון לפני הסריקה (${expectedRankDate}, סריקה ${cs.day})`);
 if (coverage !== null && coverage < 0.9) issues.push(`כיסוי ניתוח נמוך: ${rank.analyzed}/${rank.universeSize}`);
 // 3. התקלה הישנה: נסרקו ~500 אבל מודל הצל נשאר על יום קודם / n=100 (AI_COUNCIL#12)
 const shadowLag = !!(rank.date && shadow.day && shadow.day < rank.date);
@@ -29,7 +31,7 @@ const shadowThin = (rank.analyzed || 0) >= 300 && (shadow.n || 0) < 300;
 if (shadowLag) issues.push(`מודל הצל על ${shadow.day} בעוד הדירוג על ${rank.date} — התקלה מ-AI_COUNCIL#12 חזרה`);
 if (shadowThin) issues.push(`מודל הצל על ${shadow.n} ניירות בלבד בעוד נותחו ${rank.analyzed} — התקלה מ-AI_COUNCIL#12 חזרה`);
 // 4. מחירי 09:40
-if (rank.date && entry.count !== undefined && rank.analyzed && entry.count < rank.analyzed * 0.8) issues.push(`מחירי 09:40 ל-${rank.date}: ${entry.count} מתוך ${rank.analyzed}`);
+if (rankSession && entry.count !== undefined && rank.analyzed && entry.count < rank.analyzed * 0.8) issues.push(`מחירי 09:40 ל-${rankSession}: ${entry.count} מתוך ${rank.analyzed}`);
 // 5. חשבון התרגול: התאמה חשבונאית (סובלנות 5 אגורות: proceedsIls ברוטו מעוגל בנפרד מהמזומן נטו בכל מכירה → עד אגורה למכירה), ושערים עדכניים
 const RECON_TOL = 0.05;
 const diff = bd.reconciliation?.diffIls;
@@ -50,7 +52,7 @@ lines.push('| בדיקה | ערך | סטטוס |', '|---|---|---|');
 lines.push(`| סריקה יומית | יום ${cs.day || '—'} · ${n(cs.done)} נכסים · finalized=${!!cs.finalized} · שגיאות ${(cs.errors || []).length} · ${cs.at || ''} | ${ok(cs.finalized && !(cs.errors || []).length)} |`);
 lines.push(`| דירוג (rank) | תאריך ${rank.date || '—'} · שערי ${rank.barDate || '—'} · נותחו ${n(rank.analyzed)}/${n(rank.universeSize)} (${pct(coverage)}) | ${ok(rankDayOk && coverage >= 0.9)} |`);
 lines.push(`| מודל צל (Shadow) | יום ${shadow.day || '—'} · n=${n(shadow.n)}${shadow.pipeline ? ' · ' + shadow.pipeline : ''} | ${ok(!shadowLag && !shadowThin && !shadow.missing)} |`);
-lines.push(`| מחירי 09:40 | ${rank.date || '—'}: ${n(entry.count)} ניירות${entry.missing ? ' (אין)' : ''} | ${ok(entry.count && rank.analyzed && entry.count >= rank.analyzed * 0.8)} |`);
+lines.push(`| מחירי 09:40 | ${rankSession || '—'}: ${n(entry.count)} ניירות${entry.missing ? ' (אין)' : ''} | ${ok(entry.count && rank.analyzed && entry.count >= rank.analyzed * 0.8)} |`);
 lines.push(`| חשבון התרגול | סגירת ${paper.asOf || '—'}${paper.stale ? ' ⚠️ חלקי' : ''} · שווי ${n(paper.totalIls)} ₪ · מההתחלה ${n(paper.pnlIls)} ₪ (${pct(paper.pnlPct)}) · ${(paper.positions || []).length} פוזיציות · התאמה ${n(diff, 2)} ₪ | ${ok(typeof diff === 'number' && Math.abs(diff) <= RECON_TOL && !paper.stale)} |`);
 lines.push(`| מסלול אגרסיבי | סגירת ${aggr.sessionDate || aggr.day || '—'}${aggr.stale ? ' ⚠️ חלקי' : ''} · שווי ${n(aggr.totalIls)} ₪ · תשואה ${pct(aggr.metrics?.totalReturn)} מול SPY ${pct(aggr.metrics?.spyReturn)} · ממתינות ${(aggr.pending?.orders || []).length} | ${ok(!aggr.missing && !aggr.stale)} |`);
 lines.push(`| KV | ${health.kv || '—'} · מכסת כתיבות: ${health.kvWriteLimitHit ? 'הגיע ' + health.kvWriteLimitHit : 'לא'} | ${ok(health.kv === 'bound' && !health.kvWriteLimitHit)} |`);
