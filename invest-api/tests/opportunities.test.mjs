@@ -54,6 +54,9 @@ test('גודל לפי סיכון + שער הפקודות במדיניות הסי
   assert.equal(fut.allowed, false, 'חוזה אחד = 46% מההון > 10% לפקודה'); assert.match(fut.reasons.join(), /10%/);
   const btc = gateOrder({ ...base, order: { symbol: 'BTC-USD', class: 'crypto', side: 'buy', qty: 0.05, priceRef: 60000, notionalIls: 3000 * fx, strategy: 'xmom', sector: 'crypto', exposureMultiplier: 1, worstCaseLossIls: 3000 * fx, day: '2026-09-23', quoteAsOf: '2026-09-23', marketOpen: true }, positions: [{ symbol: 'ETH-USD', class: 'crypto', sector: 'crypto', strategy: 'xmom', qty: 1, valueIls: 6000 * fx, pnlIls: 0 }] });
   assert.equal(btc.allowed, false); assert.match(btc.reasons.join(), /סוג crypto/);
+  const sqqq = gateOrder({ ...base, capabilities: { tradable: new Set(['SQQQ']), classes: new Set(['etf']), exchanges: null }, order: { symbol: 'SQQQ', class: 'etf', side: 'short', qty: 60, priceRef: 20, notionalIls: 1200 * fx, strategy: 'trend', sector: 'index', exposureMultiplier: 3, leveraged: true, worstCaseLossIls: null, day: '2026-09-23', quoteAsOf: '2026-09-23', marketOpen: true } });
+  assert.equal(sqqq.allowed, false); assert.match(sqqq.reasons.join(), /ממונף\/הפוך/);
+  assert.equal(AGENT_SIM_POLICY.shortLeveraged, false); assert.equal(AGENT_SIM_POLICY.maxSectorShare, 0.30);
   assert.equal(AGENT_SIM_POLICY.mode, 'simulation'); assert.equal(AGENT_SIM_POLICY.approval, null); assert.ok(policyHash(AGENT_SIM_POLICY).length > 8);
   assert.ok(Object.keys(STRATEGIES).length >= 4);
 });

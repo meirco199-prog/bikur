@@ -88,6 +88,8 @@ export function gateOrder({ order = {}, policy = TRADING_POLICY, account = {}, p
   if (!policy.allowedClasses.includes(order.class)) fail('class', `סוג מכשיר לא מאושר: ${order.class || '?'}`); else pass('class');
   if (policy.allowedExchanges && order.exchange && !policy.allowedExchanges.includes(order.exchange)) fail('exchange', `בורסה לא מאושרת: ${order.exchange}`); else pass('exchange');
   if ((order.side === 'short') && !policy.shorting) fail('shorting', 'שורט לא מאושר במדיניות'); else pass('shorting');
+  // שורט על מכשיר ממונף/הפוך (SQQQ, SOXS, UVXY…): squeeze + borrow fee גבוה; החלופה — לונג על המכשיר הלא-ממונף בכיוון ההפוך (AI_COUNCIL#21, הצעת ChatGPT)
+  if (order.side === 'short' && order.leveraged && policy.shortLeveraged !== true) fail('shortLeveraged', `שורט על מכשיר ממונף/הפוך (${order.symbol}) לא מאושר — לונג על המכשיר הלא-ממונף במקום`); else pass('shortLeveraged');
   if (!reducing && order.worstCaseLossIls === null && !policy.unboundedLoss) fail('unboundedLoss', 'הפסד בלתי מוגבל (worstCaseLossIls=null) לא מאושר במדיניות'); else pass('unboundedLoss');
 
   // 6. נתונים ושעות מסחר (לפתיחת סיכון)

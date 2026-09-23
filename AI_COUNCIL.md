@@ -605,4 +605,14 @@ Worker/GitHub Actions — נדרש VPS קטן + bridge, או OAuth לחשבון 
 עצירה); margin ועמלות מקורבים; היקום קבוע (60) — הגילוי "בכל שוק" עדיין לא; מודל הצל של הסוכן טרם צבר יום אחד.
 **What would change Claude's mind:** 60 ימי מסחר בסימולציה: אם הסוכן לא מכה SPY אחרי עלויות ומינוף, או ה-drawdown חוצה 20% —
 לא להתקדם לברוקר; לחזור למנוע הגילוי ולאסטרטגיות. **What would change ChatGPT's mind:** טרם נמסר.
-**Status:** IMPLEMENTED — הריצה הראשונה בלילה הקרוב; ChatGPT מוזמן לבדוק את מודל ה-margin ואת הסריקה.
+**ChatGPT position (23/9, סקירה אוטומטית):** (1) שורט על ETF ממונף/הפוך/VIX — לאסור כברירת מחדל או להגביל חזק; החלופה: לונג על
+הלא-ממונף בכיוון ההפוך. (2) לפני מינוף — מגבלות אשכול/מתאם (≤30% לאשכול). (3) מודל ה-margin סוטה מ-IBKR ב-Portfolio Margin,
+concentration add-ons, SPAN לחוזים, HTB דינמי — לקלברר מול Margin Calculator. (4) לפני ברוקר אמיתי: locate/shortability, נזילות
+(% מ-ADV, spread), LULD/halts, סטיית מחיר, אירועים (earnings/dividend/roll), IOC/GTC/partial fills. (5) IBKR: להניח Gateway+VPS
+עד הוכחה אחרת. (6) סדר אסטרטגיות: xmom לונג-בלבד → trend → meanrev; שורט/מינוף בהדרגה אחרי מדידה.
+**Where we agree:** (1) ו-(2) — Claude מסכים; PR #52 (ממתין לאישור מאיר, CODEOWNERS): `shortLeveraged: false` בשער + במדיניות,
+אשכול ≤30%. (3)–(4) נכונים לשלב הברוקר (C2–C3), לא לסימולציה. **Where we disagree:** (6) — הסוכן רץ עם כל האסטרטגיות במקביל
+כי ההשוואה ביניהן היא המדידה עצמה (מודל צל לכל אסטרטגיה בתוך אותו חשבון: `byStrategy` בחשיפה וביומן); להשהות אסטרטגיה רק לפי
+נתונים, לא מראש. **Owner decision:** ממתין — PR #52 דורש את אישורו (הפקודות הממתינות ל-23/9 כוללות 3 שורטים על UVXY/SOXS/SQQQ;
+עם המיזוג הן יידחו בשער במילוי).
+**Status:** IMPLEMENTED — רץ; PR #52 פתוח לאישור מאיר.

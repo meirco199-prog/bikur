@@ -16,7 +16,7 @@ const gate = (o = {}, extra = {}) => gateOrder({ order: order(o), policy: TRADIN
 test('המדיניות המאושרת קפואה: סימולציה בלבד, בלי מינוף/שורט/נגזרים', () => {
   assert.equal(TRADING_POLICY.mode, 'simulation'); assert.equal(TRADING_POLICY.approval, null);
   assert.deepStrictEqual([...TRADING_POLICY.allowedClasses], ['stock', 'etf']);
-  assert.equal(TRADING_POLICY.shorting, false); assert.equal(TRADING_POLICY.unboundedLoss, false);
+  assert.equal(TRADING_POLICY.shorting, false); assert.equal(TRADING_POLICY.shortLeveraged, false); assert.equal(TRADING_POLICY.unboundedLoss, false);
   assert.equal(TRADING_POLICY.leverage.total, 1.0); assert.equal(TRADING_POLICY.maxDailyLoss, 0.02); assert.equal(TRADING_POLICY.maxDrawdown, 0.10);
   assert.equal(TRADING_POLICY.liquidityReserve, 0.10); assert.equal(TRADING_POLICY.killSwitch, false); assert.equal(TRADING_POLICY.noAveragingDown, true);
   assert.ok(Object.isFrozen(TRADING_POLICY));
@@ -66,6 +66,9 @@ test('סוג מכשיר, שורט, הפסד בלתי מוגבל — לפי המ�
   assert.match(gate({ symbol: 'AAPL', class: 'stock', side: 'short', notionalIls: 5000 }).reasons.join(), /שורט לא מאושר/);
   assert.match(gate({ worstCaseLossIls: null }).reasons.join(), /בלתי מוגבל/);
   const wide = { ...TRADING_POLICY, allowedClasses: ['stock', 'etf', 'future'], unboundedLoss: true, leverage: { total: 3, byClass: { future: 3, stock: 1, etf: 1 } }, maxTradeShare: 0.5, maxAssetShare: 0.5, maxSectorShare: 0.5, maxStrategyShare: 0.5, maxClassShare: { future: 0.5 } };
+  const shortPol = { ...wide, shorting: true };
+  assert.match(gate({ symbol: 'SPY', side: 'short', notionalIls: 5000, exposureMultiplier: 3, leveraged: true, worstCaseLossIls: null }, { policy: shortPol }).reasons.join(), /ממונף\/הפוך/, 'שורט על ממונף נחסם כברירת מחדל');
+  assert.equal(gate({ symbol: 'SPY', side: 'short', notionalIls: 5000, exposureMultiplier: 3, leveraged: true, worstCaseLossIls: null }, { policy: { ...shortPol, shortLeveraged: true } }).allowed, true, 'מותר רק בהיתר מפורש');
   const fut = gate({ symbol: 'ESZ6', class: 'future', exchange: 'CME', notionalIls: 20000, exposureMultiplier: 5, worstCaseLossIls: null }, { policy: wide });
   assert.equal(fut.allowed, true, JSON.stringify(fut.reasons)); assert.equal(fut.notionalIls, 100000, 'חשיפה = notional × מכפיל');
 });

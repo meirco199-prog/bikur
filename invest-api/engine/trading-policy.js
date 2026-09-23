@@ -9,6 +9,7 @@ export const TRADING_POLICY = Object.freeze({
   allowedClasses: Object.freeze(['stock', 'etf']),   // stock | etf | bond | fx | future | option | crypto | cfd
   allowedExchanges: null,             // null = כל בורסה שמופיעה במפת היכולות
   shorting: false,
+  shortLeveraged: false,
   unboundedLoss: false,               // מכשירים שההפסד בהם עלול לעלות על ההון שהוקצה (שורט, futures, אופציות שנמכרו, CFD)
   leverage: Object.freeze({ total: 1.0, byClass: Object.freeze({ stock: 1.0, etf: 1.0, bond: 1.0, fx: 1.0, future: 1.0, option: 1.0, crypto: 1.0, cfd: 1.0 }) }), // חשיפה ברוטו ÷ הון
   maxTradeShare: 0.05,                // שווי פקודה אחת ÷ הון

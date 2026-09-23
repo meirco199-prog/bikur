@@ -12,11 +12,12 @@ export const AGENT_SIM_POLICY = Object.freeze({
   allowedClasses: Object.freeze(['stock', 'etf', 'crypto', 'fx', 'future']),
   allowedExchanges: null,
   shorting: true,
+  shortLeveraged: false,              // אין שורט על ETF ממונף/הפוך/VIX (squeeze, borrow 3%+); לונג על הלא-ממונף בכיוון ההפוך במקום (AI_COUNCIL#21)
   unboundedLoss: true,                // שורט, חוזים ו-ETF ממונפים — ההפסד עלול לעלות על הסכום שהוקצה; מוגן ע"י עצירות וחיסול margin
   leverage: Object.freeze({ total: 3.0, byClass: Object.freeze({ stock: 2.0, etf: 3.0, bond: 3.0, fx: 5.0, future: 5.0, option: 1.0, crypto: 1.0, cfd: 1.0 }) }), // חשיפה אפקטיבית (כולל מינוף פנימי של ETF ממונף) ÷ הון
   maxTradeShare: 0.10,                // פקודה אחת ≤ 10% מההון (בחשיפה אפקטיבית)
   maxAssetShare: 0.15,
-  maxSectorShare: 0.35,
+  maxSectorShare: 0.30,               // אשכול (tech/energy/metals/index…) ≤ 30% — מגבלת מתאם גסה לפני מינוף (AI_COUNCIL#21)
   maxStrategyShare: 0.45,
   maxClassShare: Object.freeze({ crypto: 0.15, fx: 0.30, future: 0.50, etf: 1.5, stock: 1.0 }),
   maxDailyLoss: 0.04,                 // 4% ביום → אין סיכון חדש עד מחר
