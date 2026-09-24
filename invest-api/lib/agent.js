@@ -7,7 +7,7 @@ import { newAccount, fill, valuation, markToMarket, accrue, liquidateIfNeeded, s
 import { scanOpportunities, sizeByRisk, STRATEGIES } from '../engine/opportunities.js';
 import { AGENT_SIM_POLICY } from '../engine/agent-sim-policy.js';
 import { gateOrder, policyHash, haltState } from '../engine/order-gate.js';
-import { lastSessionClose, isNonTradingDay } from '../engine/session.js';
+import { lastSessionClose, isNonTradingDay, pricesCoverLastSession } from '../engine/session.js';
 import { fetchWithFallback } from '../providers/registry.js';
 import { cached, TTL } from './cache.js';
 import { DB } from './db.js';
@@ -18,6 +18,9 @@ const dayOf = (rows, day) => { let r = null; for (const x of rows){ if (x[0] <= 
 const nextDayRow = (rows, day) => rows.find((x) => x[0] > day) || null;
 
 // מחירים למכשיר: אותו מטמון px: כמו שאר המערכת; קריפטו/מט"ח — רק Twelve Data (סימבול ממופה). מחזיר {rows, stale, missing}
+// כמו getPrices ב-analysis.js: מטמון "טרי" (20 שעות) שעדיין לא כולל את הסגירה האחרונה פוקע (ניסיון חוזר כל 30 דקות) — אחרת
+// סדרה שמישהו אחר במערכת רענן לפני הסגירה חוסמת את המכשיר בשער (requireFreshData) ליום שלם (USO/BNO, 23/9).
+const PRICES_RETRY_SEC = 30 * 60;
 export async function agentPrices(inst, ctx){
   const sym = priceSymbolOf(inst), base = instrumentOf(sym) || inst;
   const asset = { symbol: sym, currency: 'USD', type: base.class === 'crypto' ? 'crypto' : base.class === 'fx' ? 'fx' : 'etf', twelvedata: base.twelvedata || sym };
@@ -25,7 +28,7 @@ export async function agentPrices(inst, ctx){
   return cached(ctx.db, `px:${sym}`, TTL.prices, async (ex) => {
     const from = ex?.rows?.length ? ex.rows[ex.rows.length - 1][0].slice(0, 4) + '-01-01' : undefined;
     return fetchWithFallback('prices', sym, { from }, c, base.providersOnly ? { only: base.providersOnly } : {});
-  }, { merge: (old, fresh) => ({ ...fresh, rows: DB.mergeRows(old.rows, fresh.rows) }) });
+  }, { merge: (old, fresh) => ({ ...fresh, rows: DB.mergeRows(old.rows, fresh.rows) }), staleIf: (ex, age) => age > PRICES_RETRY_SEC && !pricesCoverLastSession(ex.rows, ex.fetchedAt, ctx.now || new Date()) });
 }
 
 export async function agentPolicy(db){
@@ -61,7 +64,7 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
     if (scan.done[sym] || scan.missing[sym]) continue;
     const inst = instrumentOf(sym);
     const before = (await db.get(`px:${sym}`))?.fetchedAt || null;   // קריאה לספק נספרת רק אם המטמון באמת התרענן (מכסת דקה של Twelve Data)
-    const r = await agentPrices(inst, ctx);
+    const r = await agentPrices(inst, { ...ctx, now });
     if (!r || r.missing || !r.rows?.length){ scan.missing[sym] = r?.reason || 'אין נתונים'; continue; }
     scan.done[sym] = r.rows[r.rows.length - 1][0]; // ייתכן שאין עדיין בר של היום אצל הספק — ממשיכים עם מה שיש; הסגירה החסרה נאכפת בשער (requireFreshData)
     if (r.fetchedAt !== before) fetched++;
@@ -96,7 +99,7 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   const sentToday = [];
   for (const o of pending.orders || []){
     const inst = instrumentOf(o.symbol); const px = openOf(o.symbol);
-    if (!inst || !isNum(px)){ rejected.push({ ...o, reasons: ['אין מחיר פתיחה ליום המילוי'] }); continue; }
+    if (!inst || !isNum(px)){ const reasons = [`אין מחיר פתיחה ל-${day} (הסדרה מגיעה עד ${freshOf(o.symbol) || '—'})`]; rejected.push({ ...o, reasons }); log({ kind: 'reject', symbol: o.symbol, side: o.side, strategy: o.strategy, reasons, stage: 'fill' }); continue; }
     const v = valuation(state, priceOf, instrumentOf);
     const g = gateOrder({ order: toGateOrder(o, inst, px, fx, day), policy, account: toGateAccount(state, v, fx, day, equityBefore), positions: toGatePositions(v, fx), capabilities: capabilities(), journal: sentToday, now });
     if (!g.allowed){ rejected.push({ ...o, reasons: g.reasons }); log({ kind: 'reject', symbol: o.symbol, side: o.side, strategy: o.strategy, reasons: g.reasons, stage: 'fill' }); continue; }
