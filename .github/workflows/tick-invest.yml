@@ -112,6 +112,10 @@ jobs:
               curl -sS --max-time 30 "$W/asset/$S" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("missing:", d.get("missing"), d.get("reason","")) if d.get("missing") else (print("priceSource:", d.get("priceSource")), print("analyst:", d.get("analyst")), print("scoreAnalystComponent:", (d.get("score") or {}).get("components",{}).get("analyst")))'
             done
           fi
+          # אבחון: agent-check <ts> — למה הסוכן האוטונומי דחה פקודות (יומן דחיות במילוי + שער ההזדמנויות של הסשן האחרון). קריאה בלבד
+          if [ "$CMD" = "agent-check" ]; then
+            echo "=== agent-check"; curl -sS --max-time 30 "$W/agent/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("day:", d.get("day"), "equity:", d.get("totalIls"), "leverage:", d.get("leverage"), "halted:", d.get("halted")); print("--- journal (last 40)"); [print("  ", j.get("day"), j.get("kind"), j.get("side",""), j.get("qty",""), j.get("symbol",""), j.get("strategy",""), j.get("stage",""), j.get("reasons") or j.get("price") or "") for j in (d.get("journal") or [])[:40]]; o=d.get("opportunities") or {}; print("--- gateLog", o.get("day")); [print("  ", g.get("side"), g.get("symbol"), g.get("strategy"), g.get("score"), g.get("reasons")) for g in (o.get("gateLog") or [])]; print("--- candidates"); [print("  ", c.get("side"), c.get("symbol"), c.get("strategy"), c.get("score"), "stop", c.get("stopPct"), "research" if c.get("needsResearch") else "", "conflict" if c.get("conflict") else "") for c in (o.get("candidates") or [])[:20]]' || echo "::warning::agent-check נכשל"
+          fi
           # אבחון: paper-check <ts> — מאיפה מגיע הרווח/הפסד "מההתחלה" בחשבון התרגול (חשבון, פוזיציות, עסקאות, פירוק, יומן אוטומט). קריאה בלבד
           if [ "$CMD" = "paper-check" ]; then
             WORKER_URL="$W" node invest-api/scripts/paper-check.mjs || echo "::warning::paper-check נכשל"
