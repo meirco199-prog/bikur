@@ -4,7 +4,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { installMockFetch } from './mock-providers.mjs';
 import worker from '../worker.js';
-import { AGENT_INSTRUMENTS, priceSymbolOf } from '../engine/instruments.js';
+import { AGENT_INSTRUMENTS, priceSymbolOf, instrumentOf } from '../engine/instruments.js';
+import { agentPrices } from '../lib/agent.js';
+import { lastSessionClose } from '../engine/session.js';
+import { DB } from '../lib/db.js';
+import { Budget } from '../lib/budget.js';
 
 installMockFetch();
 const store = new Map();
@@ -68,4 +72,19 @@ test('סוכן: kill switch עוצר פקודות חדשות (גם סגירות)
   const rep = await call('/agent/report'); assert.equal(rep.j.policy.killSwitch, true); assert.ok(rep.j.journal.some((j) => j.kind === 'reject' && /kill switch/.test(j.reasons.join())));
   const off = await call('/agent/kill?on=0', { method: 'POST', auth: true }); assert.equal(off.j.killSwitch, false);
   assert.equal((await call('/agent/report')).j.policy.killSwitch, false);
+});
+
+// USO/BNO 23/9: מישהו אחר במערכת רענן את px:USO לפני הסגירה → המטמון "טרי" (20 שעות) בלי הסגירה של אתמול → הסוכן נחסם בשער ליום שלם.
+// עכשיו: סדרה שלא מכסה את הסשן האחרון פוקעת אחרי 30 דקות (כמו getPrices); מטמון צעיר מ-30 דקות לא נמשך שוב (מכסת הספק)
+test('סוכן: מטמון מחירים בלי הסגירה האחרונה מתרענן אחרי 30 דקות, לא לפני', async () => {
+  const db = new DB(null); const ctx = { db, env: { STOOQ_ENABLED: '1' }, budget: new Budget(db) };
+  const last = lastSessionClose().date;
+  const stale = tradingDays(60, last).slice(0, -2).map((d, i) => [d, 100 + i, 101 + i, 99 + i, 100.5 + i, 1e6]); // נגמרת שני סשנים לפני הסגירה האחרונה
+  await db.put('px:USO', { symbol: 'USO', currency: 'USD', source: 'seed', rows: stale, fetchedAt: new Date(Date.now() - 5 * 60000).toISOString() });
+  const young = await agentPrices(instrumentOf('USO'), ctx);
+  assert.equal(young.rows[young.rows.length - 1][0], stale[stale.length - 1][0], 'מטמון בן 5 דקות לא נמשך שוב');
+  await db.put('px:USO', { ...(await db.get('px:USO')), fetchedAt: new Date(Date.now() - 2 * 3600000).toISOString() });
+  const fresh = await agentPrices(instrumentOf('USO'), ctx);
+  assert.ok(fresh.rows[fresh.rows.length - 1][0] >= last, `אחרי שעתיים הסדרה נמשכה שוב ומכסה את ${last}: ${fresh.rows[fresh.rows.length - 1][0]}`);
+  assert.ok(fresh.rows.length > stale.length, 'השורות הישנות נשמרו (merge) ונוספו חדשות');
 });
