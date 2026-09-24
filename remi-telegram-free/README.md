@@ -56,7 +56,7 @@
 4. חזור למסך ה-Worker → **Settings**:
    - **Variables and Secrets** → **Add**:
      - שם: `BOT_TOKEN`, סוג: **Secret**, ערך: הטוקן מ-BotFather
-     - שם: `SECRET`, סוג: Secret, ערך: מחרוזת שאתה ממציא (למשל `remi-meir-2026`)
+     - שם: `SECRET`, סוג: Secret, ערך: מחרוזת אקראית ארוכה שאתה ממציא. **אותו ערך** נשמר גם ב-GitHub → Settings → Secrets and variables → Actions בשם `REMI_SECRET` (ה-workflows משתמשים בו, והפריסה מעדכנת ממנו את Cloudflare) וגם בקובץ `calendar-bridge.gs` ב-Apps Script. **לעולם לא לכתוב את הערך בקבצי הריפו** (הריפו ציבורי).
 5. יצירת אחסון: בתפריט הראשי **Storage & Databases** → **KV** → **Create namespace** → שם: `remi-data`
 6. חזרה ל-Worker → **Settings** → **Bindings** → **Add** → **KV namespace**:
    - Variable name: `DATA` (בדיוק ככה, באותיות גדולות)
@@ -132,3 +132,10 @@ node test/test-worker.mjs
 
 - 100,000 בקשות ביום (שימוש אישי: כמה עשרות)
 - 1,000 כתיבות אחסון ביום (כל הודעה שלך = כתיבה אחת)
+
+
+## רוטציה של הסוד (SECRET)
+הסוד הקודם היה כתוב בגלוי בקבצי ה-workflow ובגשר היומן בריפו הציבורי — לכן הוחלף. כדי להחליף שוב בעתיד:
+1. GitHub → Settings → Secrets and variables → Actions → `REMI_SECRET` → ערך חדש.
+2. הפעל את workflow "Deploy remi" (או דחוף שינוי ב-`remi-telegram-free/`): הפריסה מעדכנת את `SECRET` ב-Cloudflare וקוראת ל-`/setup` שרושם את ה-webhook בנתיב החדש.
+3. ב-Apps Script (calendar-bridge.gs): עדכן את `const SECRET` לאותו ערך → Deploy → New version.
