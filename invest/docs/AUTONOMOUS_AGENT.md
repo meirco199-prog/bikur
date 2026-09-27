@@ -145,6 +145,10 @@ Node קטן ("execution bridge") שמדבר עם ה-Worker ב-HTTPS מאומת; 
 
 מה נשאר לשלב ג המקורי: C2 מפת יכולות (IBKR אמיתי), C3 `IbkrBroker`, מניות בודדות בסריקה, אירועים/חדשות (S4), אופציות (נתונים בתשלום).
 
+**עדכון 27/9 — C3 במצב מראה נבנה** (`invest/docs/IBKR_BRIDGE.md`): `engine/ibkr-map.js` (חוזים/פקודות/השוואה, טהור), `lib/ibkr-client.js`
+(Client Portal Gateway), `lib/agent-broker.js` + מסלולי `/agent/broker[/pending|/fills]` ב-Worker, `scripts/ibkr-bridge.mjs` (רץ ליד ה-Gateway).
+הסימולציה נשארת מקור האמת; הדמה של IBKR ממלא את אותן פקודות והדוח משווה החלקה/מילויים. ממתין: מחשב שדולק (שרת/בית) ו-`BRIDGE_SECRET` — החלטת מאיר.
+
 ## שלב ג — פיתוח ובדיקות (מה שאפשר בלי מסחר אמיתי)
 
 סדר, כל פריט = PR + בדיקות + סקירת Council:
