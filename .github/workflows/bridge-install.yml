@@ -13,7 +13,7 @@ on:
         required: true
         default: 'check'
         type: choice
-        options: [install, check, restart, stop, logs, secrets]
+        options: [install, check, restart, stop, logs, debug, secrets]
 
 permissions:
   contents: read
@@ -53,6 +53,7 @@ jobs:
             check)   $SSH 'echo "host: $(hostname) · $(uptime -p)"; systemctl is-active bikur-bridge 2>/dev/null | sed "s/^/bridge service: /"; docker ps --filter name=ibeam --format "ibeam: {{.Status}}" 2>/dev/null; curl -sk -X POST https://localhost:5000/v1/api/iserver/auth/status 2>/dev/null | head -c 300; echo; journalctl -u bikur-bridge -n 8 --no-pager 2>/dev/null; true' ;;
             restart) $SSH 'docker restart ibeam >/dev/null && systemctl restart bikur-bridge && echo restarted' ;;
             stop)    $SSH 'docker stop ibeam >/dev/null; systemctl stop bikur-bridge; echo "stopped: ibeam + bridge"' ;;
+            debug)   $SSH 'rm -rf /tmp/ibo; docker cp ibeam:/srv/outputs /tmp/ibo 2>/dev/null || echo "no outputs dir"; ls -la /tmp/ibo 2>/dev/null | tail -20; for f in $(ls -t /tmp/ibo/*.html 2>/dev/null | head -3); do echo "== $f"; grep -oiE "<title>[^<]{0,120}</title>|(error|invalid|incorrect|expired|denied|paper|two.?factor|notification|timeout|maintenance|unavailable)[^<]{0,140}" "$f" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | sort -u | head -40; done; echo "--- ibeam log (login lines)"; docker logs ibeam 2>&1 | grep -iE "login|authenticat|2fa|two|notification|paper|status|error" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | tail -60' ;;
             logs)    $SSH 'journalctl -u bikur-bridge -n 60 --no-pager; echo "--- ibeam"; docker logs --tail 40 ibeam 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
             install)
               # הסודות עוברים בערוץ ה-SSH המוצפן כשורת export בתחילת הסקריפט (stdin) — לא בשורת פקודה ולא בלוג
