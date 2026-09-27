@@ -142,6 +142,25 @@ jobs:
             --data "$(python3 -c 'import json,os; print(json.dumps({"name":"CRON_SECRET","text":os.environ["CRON_SECRET"],"type":"secret_text"}))')")
           echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("secret set:", d.get("success")); sys.exit(0 if d.get("success") else 1)'
 
+      - name: Set BRIDGE_SECRET as a Cloudflare secret (optional; IBKR paper bridge)
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          BRIDGE_SECRET: ${{ secrets.BRIDGE_SECRET }}
+        run: |
+          set -e
+          # הסוד המשותף בין הגשר (invest-api/scripts/ibkr-bridge.mjs, על שרת בעל הריפו) ל-Worker — ראה invest/docs/IBKR_BRIDGE.md.
+          # לא חובה: בלי הסוד מסלולי /agent/broker/pending|fills מקבלים רק את סוד ה-cron או טוקן האפליקציה.
+          if [ -z "$BRIDGE_SECRET" ]; then echo "BRIDGE_SECRET לא מוגדר ב-Actions Secrets — מדלג (הגשר ל-IBKR כבוי)"; exit 0; fi
+          ACCOUNT_ID="$CF_ACCOUNT_ID"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" -H "Authorization: Bearer $CF_API_TOKEN" | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          resp=$(curl -sS -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/invest-api/secrets" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+            --data "$(python3 -c 'import json,os; print(json.dumps({"name":"BRIDGE_SECRET","text":os.environ["BRIDGE_SECRET"],"type":"secret_text"}))')")
+          echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("BRIDGE_SECRET set:", d.get("success")); sys.exit(0 if d.get("success") else 1)'
+
       - name: Verify worker answers
         run: |
           sleep 8
