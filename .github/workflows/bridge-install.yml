@@ -52,7 +52,7 @@ jobs:
           case "$ACTION" in
             check)   $SSH 'echo "host: $(hostname) · $(uptime -p)"; systemctl is-active bikur-bridge 2>/dev/null | sed "s/^/bridge service: /"; docker ps --filter name=ibeam --format "ibeam: {{.Status}}" 2>/dev/null; curl -sk -X POST https://localhost:5000/v1/api/iserver/auth/status 2>/dev/null | head -c 300; echo; journalctl -u bikur-bridge -n 8 --no-pager 2>/dev/null; true' ;;
             restart) $SSH 'docker restart ibeam >/dev/null && systemctl restart bikur-bridge && echo restarted' ;;
-            stop)    $SSH 'docker stop ibeam >/dev/null; systemctl stop bikur-bridge; echo stopped (ibeam + bridge)' ;;
+            stop)    $SSH 'docker stop ibeam >/dev/null; systemctl stop bikur-bridge; echo "stopped: ibeam + bridge"' ;;
             logs)    $SSH 'journalctl -u bikur-bridge -n 60 --no-pager; echo "--- ibeam"; docker logs --tail 40 ibeam 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
             install)
               # הסודות עוברים בערוץ ה-SSH המוצפן כשורת export בתחילת הסקריפט (stdin) — לא בשורת פקודה ולא בלוג
