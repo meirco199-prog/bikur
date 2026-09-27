@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'install (התקנה/עדכון מלא) | check (סטטוס) | restart | logs | secrets (אילו סודות מוגדרים)'
+        description: 'install (התקנה/עדכון מלא) | check (סטטוס) | restart | stop (עצירת החיבור) | logs | secrets (אילו סודות מוגדרים)'
         required: true
         default: 'check'
         type: choice
-        options: [install, check, restart, logs, secrets]
+        options: [install, check, restart, stop, logs, secrets]
 
 permissions:
   contents: read
@@ -52,6 +52,7 @@ jobs:
           case "$ACTION" in
             check)   $SSH 'echo "host: $(hostname) · $(uptime -p)"; systemctl is-active bikur-bridge 2>/dev/null | sed "s/^/bridge service: /"; docker ps --filter name=ibeam --format "ibeam: {{.Status}}" 2>/dev/null; curl -sk -X POST https://localhost:5000/v1/api/iserver/auth/status 2>/dev/null | head -c 300; echo; journalctl -u bikur-bridge -n 8 --no-pager 2>/dev/null; true' ;;
             restart) $SSH 'docker restart ibeam >/dev/null && systemctl restart bikur-bridge && echo restarted' ;;
+            stop)    $SSH 'docker stop ibeam >/dev/null; systemctl stop bikur-bridge; echo "stopped: ibeam + bridge"' ;;
             logs)    $SSH 'journalctl -u bikur-bridge -n 60 --no-pager; echo "--- ibeam"; docker logs --tail 40 ibeam 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
             install)
               # הסודות עוברים בערוץ ה-SSH המוצפן כשורת export בתחילת הסקריפט (stdin) — לא בשורת פקודה ולא בלוג
