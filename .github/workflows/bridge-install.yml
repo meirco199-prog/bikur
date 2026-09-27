@@ -59,7 +59,7 @@ jobs:
         run: |
           # מה באמת מוצג בדף הכניסה (הוא נבנה ב-JavaScript): מתג Live/Paper? שדות? — הבסיס לאוטומציית כניסה משלנו במקום IBeam
           mkdir -p /tmp/probe && cd /tmp/probe && npm init -y >/dev/null && npm i -s playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
-          node "$GITHUB_WORKSPACE/.github/bridge/probe-login.mjs"
+          cp "$GITHUB_WORKSPACE/.github/bridge/probe-login.mjs" /tmp/probe/ && node /tmp/probe/probe-login.mjs
       - name: Run on server
         if: inputs.action != 'secrets' && inputs.action != 'page' && inputs.action != 'probe'
         run: |
