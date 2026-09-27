@@ -1,0 +1,59 @@
+# התקנה/בדיקה מרחוק של הגשר לחשבון הדמה של IBKR על השרת של בעל הריפו (החלטת מאיר 27/9: "תתקין לבד"; הרשאות ב-.claude/settings.json).
+# מתחבר ב-SSH לשרת (Ubuntu/Debian חדש) עם פרטי גישה מ-Actions Secrets ומריץ .github/bridge/remote-install.sh:
+# Docker+Node+git, IBeam (Client Portal Gateway עם התחברות אוטומטית לחשבון הדמה), הגשר כשירות. ראה invest/docs/IBKR_BRIDGE.md.
+# Secrets (Settings → Secrets and variables → Actions): SERVER_HOST (כתובת IP), SERVER_ROOT_PASSWORD, IBKR_PAPER_USER, IBKR_PAPER_PASSWORD, BRIDGE_SECRET.
+# שום ערך לא נכתב לריפו או ללוג; סיסמאות נשמרות רק על השרת (קבצים 600). check/restart/logs לא צריכים את סודות IBKR.
+name: IBKR bridge — install on owner's server
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'install (התקנה/עדכון מלא) | check (סטטוס) | restart | logs | secrets (אילו סודות מוגדרים)'
+        required: true
+        default: 'check'
+        type: choice
+        options: [install, check, restart, logs, secrets]
+
+permissions:
+  contents: read
+
+concurrency: bridge-install
+
+jobs:
+  remote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SSHPASS: ${{ secrets.SERVER_ROOT_PASSWORD }}
+      IBKR_PAPER_USER: ${{ secrets.IBKR_PAPER_USER }}
+      IBKR_PAPER_PASSWORD: ${{ secrets.IBKR_PAPER_PASSWORD }}
+      BRIDGE_SECRET: ${{ secrets.BRIDGE_SECRET }}
+      WORKER_URL: https://invest-api.meirco199.workers.dev
+      ACTION: ${{ inputs.action }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Which secrets are set (names only)
+        run: |
+          for v in SERVER_HOST SSHPASS IBKR_PAPER_USER IBKR_PAPER_PASSWORD BRIDGE_SECRET; do n="$v"; [ "$v" = SSHPASS ] && n=SERVER_ROOT_PASSWORD; if [ -n "${!v}" ]; then echo "✅ $n מוגדר"; else echo "❌ $n חסר"; fi; done
+          [ "$ACTION" != "secrets" ] || exit 0
+          miss=""
+          for v in SERVER_HOST SSHPASS; do [ -n "${!v}" ] || miss="$miss $v"; done
+          if [ "$ACTION" = "install" ]; then for v in IBKR_PAPER_USER IBKR_PAPER_PASSWORD BRIDGE_SECRET; do [ -n "${!v}" ] || miss="$miss $v"; done; fi
+          if [ -n "$miss" ]; then echo "::error::חסרים Secrets:$miss (Settings → Secrets and variables → Actions)"; exit 1; fi
+          [ -z "$IBKR_PAPER_USER" ] || echo "::add-mask::$IBKR_PAPER_USER"
+          sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq sshpass >/dev/null
+      - name: Run on server
+        if: inputs.action != 'secrets'
+        run: |
+          set -e
+          SSH="sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 root@$SERVER_HOST"
+          case "$ACTION" in
+            check)   $SSH 'echo "host: $(hostname) · $(uptime -p)"; systemctl is-active bikur-bridge 2>/dev/null | sed "s/^/bridge service: /"; docker ps --filter name=ibeam --format "ibeam: {{.Status}}" 2>/dev/null; curl -sk -X POST https://localhost:5000/v1/api/iserver/auth/status 2>/dev/null | head -c 300; echo; journalctl -u bikur-bridge -n 8 --no-pager 2>/dev/null; true' ;;
+            restart) $SSH 'docker restart ibeam >/dev/null && systemctl restart bikur-bridge && echo restarted' ;;
+            logs)    $SSH 'journalctl -u bikur-bridge -n 60 --no-pager; echo "--- ibeam"; docker logs --tail 40 ibeam 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
+            install)
+              # הסודות עוברים בערוץ ה-SSH המוצפן כשורת export בתחילת הסקריפט (stdin) — לא בשורת פקודה ולא בלוג
+              { printf 'export IB_USER=%q IB_PASS=%q BRIDGE_SECRET=%q WORKER_URL=%q\n' "$IBKR_PAPER_USER" "$IBKR_PAPER_PASSWORD" "$BRIDGE_SECRET" "$WORKER_URL"; cat .github/bridge/remote-install.sh; } | $SSH 'bash -s' ;;
+          esac
