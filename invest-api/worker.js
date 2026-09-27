@@ -11,6 +11,7 @@ import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
 import { runAggressive, aggrReport, executeAggressive } from './lib/aggressive.js';
 import { runAgent, agentReport, setKill } from './lib/agent.js';
+import { brokerPending, recordBroker, brokerReport } from './lib/agent-broker.js';
 import { AGENT_SIM_POLICY } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
@@ -173,6 +174,15 @@ async function handle(req, env0, ctx){
     if (p1 === 'report' || !p1) return json(await agentReport(db));
     if (p1 === 'policy') return json({ policy: AGENT_SIM_POLICY, hash: policyHash(AGENT_SIM_POLICY), kill: (await db.get('agent:kill')) || null });
     if (p1 === 'opportunities'){ const day = validDate(q.date) ? q.date : (await db.get('agent:state'))?.lastDay; return json((day && (await db.get(`agent:opps:${day}`))) || { missing: true, day: day || null }); }
+    // חיבור לחשבון הדמה של IBKR במצב מראה (invest/docs/IBKR_BRIDGE.md): דוח ציבורי; pending/fills לגשר עם BRIDGE_SECRET (או סוד ה-cron/טוקן)
+    if (p1 === 'broker'){
+      if (!p2) return json(await brokerReport(db));
+      const byBridge = !!(q.secret && ((env.BRIDGE_SECRET && q.secret === env.BRIDGE_SECRET) || (env.CRON_SECRET && q.secret === env.CRON_SECRET)));
+      if (!byBridge) needAuth();
+      if (p2 === 'pending') return json(await brokerPending(db));
+      if (p2 === 'fills' && req.method === 'POST'){ try { return json(await recordBroker(db, body)); } catch (e) { await db.logError('agent-broker', e.message); return err('גשר IBKR: ' + e.message, 500); } }
+      return err('not found', 404);
+    }
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET);
     if (p1 === 'run' && req.method === 'POST'){ if (!bySecret) needAuth(); try { return json(await runAgent(ctx, { day: validDate(q.date) ? q.date : null, force: q.force === '1', reset: q.reset === '1', batch: Math.min(12, Math.max(1, Number(q.batch) || 6)) })); } catch (e) { await db.logError('agent', e.message); return err('סוכן: ' + e.message, 500); } }
     if (p1 === 'kill' && req.method === 'POST'){ if (!bySecret) needAuth(); return json(await setKill(db, { on: !(q.on === '0' || body.on === false), reason: body.reason || q.reason || null })); }
