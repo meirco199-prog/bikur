@@ -13,7 +13,7 @@ on:
         required: true
         default: 'check'
         type: choice
-        options: [install, check, restart, stop, logs, debug, secrets]
+        options: [install, check, restart, stop, logs, debug, page, secrets]
 
 permissions:
   contents: read
@@ -44,8 +44,18 @@ jobs:
           if [ -n "$miss" ]; then echo "::error::חסרים Secrets:$miss (Settings → Secrets and variables → Actions)"; exit 1; fi
           [ -z "$IBKR_PAPER_USER" ] || echo "::add-mask::$IBKR_PAPER_USER"
           sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq sshpass >/dev/null
+      - name: Inspect IBKR login page (runner only, no server)
+        if: inputs.action == 'page'
+        run: |
+          # האם דף הכניסה של IBKR (זה שה-Gateway מגיש) כולל מתג Live/Paper? שדות הטופס? — כדי לדעת אם צריך ללחוץ "Paper" בכניסה עם המשתמש האמיתי
+          curl -sS -L -A "Mozilla/5.0" -o /tmp/login.html -w "HTTP %{http_code} → %{url_effective}\n" "https://www.interactivebrokers.com/sso/Login?forwardTo=22&RL=1&ip2loc=on" || true
+          wc -c /tmp/login.html
+          echo "--- title/inputs/paper"
+          grep -oiE "<title>[^<]{0,120}</title>|<input[^>]{0,200}>|paper[^\"<>]{0,100}|live[^\"<>]{0,60}trading[^\"<>]{0,60}|id=\"[^\"]*(paper|live|toggle|switch)[^\"]*\"|class=\"[^\"]*(paper|toggle|switch)[^\"]*\"" /tmp/login.html | sort -u | head -60
+          echo "--- scripts"
+          grep -oiE "src=\"[^\"]*\.js[^\"]*\"" /tmp/login.html | sort -u | head -20
       - name: Run on server
-        if: inputs.action != 'secrets'
+        if: inputs.action != 'secrets' && inputs.action != 'page'
         run: |
           set -e
           SSH="sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 root@$SERVER_HOST"
