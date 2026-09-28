@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'install (התקנה/עדכון מלא) | check (סטטוס) | restart | stop (עצירת החיבור) | logs | secrets (אילו סודות מוגדרים)'
+        description: 'install (התקנה/עדכון מלא) | check (סטטוס) | restart | stop (עצירת החיבור) | logs | diag (למה ה-Gateway לא עולה) | secrets (אילו סודות מוגדרים)'
         required: true
         default: 'check'
         type: choice
-        options: [install, check, restart, stop, logs, debug, page, probe, secrets]
+        options: [install, check, restart, stop, logs, debug, diag, page, probe, secrets]
 
 permissions:
   contents: read
@@ -71,6 +71,21 @@ jobs:
             stop)    $SSH 'docker stop ibeam >/dev/null; systemctl stop bikur-bridge; echo "stopped: ibeam + bridge"' ;;
             debug)   $SSH 'rm -rf /tmp/ibo; docker cp ibeam:/srv/outputs /tmp/ibo 2>/dev/null || echo "no outputs dir"; ls -la /tmp/ibo 2>/dev/null | tail -20; for f in $(ls -t /tmp/ibo/*.html 2>/dev/null | head -3); do echo "== $f"; grep -oiE "<title>[^<]{0,120}</title>|(error|invalid|incorrect|expired|denied|paper|two.?factor|notification|timeout|maintenance|unavailable)[^<]{0,140}" "$f" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | sort -u | head -40; done; echo "--- ibeam log (login lines)"; docker logs ibeam 2>&1 | grep -iE "login|authenticat|2fa|two|notification|paper|status|error" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | tail -60' ;;
             logs)    $SSH 'journalctl -u bikur-bridge -n 60 --no-pager; echo "--- ibeam"; docker logs --tail 40 ibeam 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
+            # IBeam נכשל ב-ERR_CONNECTION_REFUSED מול https://localhost:5000 שבתוך הקונטיינר — כלומר ה-Gateway
+            # (ה-Java של IBKR) לא הקשיב בכלל, והכניסה ל-IBKR לא התחילה. כאן מסתכלים על *עליית* ה-Gateway:
+            # תחילת הלוג (ולא הזנב), מצב הקונטיינר, זיכרון פנוי ו-OOM — שרת 2GB מריץ Java+Chrome במקביל.
+            diag)    $SSH 'set +e
+              echo "=== מצב הקונטיינר"; docker inspect ibeam --format "status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} started={{.State.StartedAt}}" 2>&1
+              echo "=== זיכרון"; free -m
+              sw=$(swapon --show 2>/dev/null); echo "--- swap: ${sw:-(אין swap)}"
+              oom=$( (dmesg -T 2>/dev/null || journalctl -k --no-pager 2>/dev/null) | grep -iE "out of memory|oom.kill|killed process" | tail -15 )
+              echo "=== OOM kills: ${oom:-(אין)}"
+              echo "=== דיסק"; df -h / | tail -1
+              echo "=== 120 השורות הראשונות של IBeam (עליית ה-Gateway)"
+              docker logs ibeam 2>&1 | head -120 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"
+              echo "=== שורות Gateway/Java/port מכל הלוג"
+              docker logs ibeam 2>&1 | grep -iE "gateway|java|port|listen|conf\\.yaml|refus|memory|heap|version" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | tail -40
+              true' ;;
             install)
               # הסודות עוברים בערוץ ה-SSH המוצפן כשורת export בתחילת הסקריפט (stdin) — לא בשורת פקודה ולא בלוג
               { printf 'export IB_USER=%q IB_PASS=%q BRIDGE_SECRET=%q WORKER_URL=%q\n' "$IBKR_PAPER_USER" "$IBKR_PAPER_PASSWORD" "$BRIDGE_SECRET" "$WORKER_URL"; cat .github/bridge/remote-install.sh; } | $SSH 'bash -s' ;;
