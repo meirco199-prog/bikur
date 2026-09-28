@@ -14,6 +14,11 @@ on:
         default: 'check'
         type: choice
         options: [install, check, restart, stop, logs, debug, diag, page, probe, secrets]
+      paper_user:
+        description: 'שם משתמש הדמה (Paper Trading Username) — אם ניתן, עוקף את הסוד IBKR_PAPER_USER בהתקנה. לא סוד (הסיסמה נשארת מהסוד)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -32,6 +37,7 @@ jobs:
       BRIDGE_SECRET: ${{ secrets.BRIDGE_SECRET }}
       WORKER_URL: https://invest-api.meirco199.workers.dev
       ACTION: ${{ inputs.action }}
+      PAPER_USER_OVERRIDE: ${{ inputs.paper_user }}
     steps:
       - uses: actions/checkout@v4
       - name: Which secrets are set (names only)
@@ -43,6 +49,7 @@ jobs:
           if [ "$ACTION" = "install" ]; then for v in IBKR_PAPER_USER IBKR_PAPER_PASSWORD BRIDGE_SECRET; do [ -n "${!v}" ] || miss="$miss $v"; done; fi
           if [ -n "$miss" ]; then echo "::error::חסרים Secrets:$miss (Settings → Secrets and variables → Actions)"; exit 1; fi
           [ -z "$IBKR_PAPER_USER" ] || echo "::add-mask::$IBKR_PAPER_USER"
+          [ -z "$PAPER_USER_OVERRIDE" ] || echo "משתמש הדמה מהקלט של ההרצה יחליף את הסוד IBKR_PAPER_USER בהתקנה הזו"
           sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq sshpass >/dev/null
       - name: Inspect IBKR login page (runner only, no server)
         if: inputs.action == 'page'
@@ -88,5 +95,5 @@ jobs:
               true' ;;
             install)
               # הסודות עוברים בערוץ ה-SSH המוצפן כשורת export בתחילת הסקריפט (stdin) — לא בשורת פקודה ולא בלוג
-              { printf 'export IB_USER=%q IB_PASS=%q BRIDGE_SECRET=%q WORKER_URL=%q\n' "$IBKR_PAPER_USER" "$IBKR_PAPER_PASSWORD" "$BRIDGE_SECRET" "$WORKER_URL"; cat .github/bridge/remote-install.sh; } | $SSH 'bash -s' ;;
+              { printf 'export IB_USER=%q IB_PASS=%q BRIDGE_SECRET=%q WORKER_URL=%q\n' "${PAPER_USER_OVERRIDE:-$IBKR_PAPER_USER}" "$IBKR_PAPER_PASSWORD" "$BRIDGE_SECRET" "$WORKER_URL"; cat .github/bridge/remote-install.sh; } | $SSH 'bash -s' ;;
           esac
