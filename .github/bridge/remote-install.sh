@@ -14,9 +14,14 @@ if ! command -v node >/dev/null || [ "$(node -v | cut -c2-3)" -lt 22 ]; then cur
 id bridge >/dev/null 2>&1 || useradd -m -s /bin/bash bridge
 H=$(getent passwd bridge | cut -d: -f6)
 
+say "זיכרון: swap של 2GB (שרת 2GB מריץ Java + Chrome של IBeam במקביל)"
+if ! swapon --show 2>/dev/null | grep -q .; then fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile && grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab; fi
+free -m | sed -n 2,3p
+
 say "קבצי הגדרה (הרשאות 600, רק על השרת הזה)"
 mkdir -p /etc/bikur-bridge && chmod 700 /etc/bikur-bridge
-printf 'IBEAM_ACCOUNT=%s\nIBEAM_PASSWORD=%s\nIBEAM_GATEWAY_BASE_URL=https://localhost:5000\nIBEAM_LOG_LEVEL=INFO\n' "$IB_USER" "$IB_PASS" > /etc/bikur-bridge/ibeam.env
+# IBEAM_GATEWAY_STARTUP: כמה שניות לחכות לעליית ה-Gateway (ברירת מחדל 20 — קצר מדי לשרת קטן; נראה כ-ERR_CONNECTION_REFUSED בלוג)
+printf 'IBEAM_ACCOUNT=%s\nIBEAM_PASSWORD=%s\nIBEAM_GATEWAY_BASE_URL=https://localhost:5000\nIBEAM_GATEWAY_STARTUP=90\nIBEAM_LOG_LEVEL=INFO\n' "$IB_USER" "$IB_PASS" > /etc/bikur-bridge/ibeam.env
 chmod 600 /etc/bikur-bridge/ibeam.env
 printf 'WORKER_URL=%s\nBRIDGE_SECRET=%s\nIBKR_GATEWAY=https://localhost:5000/v1/api\nINTERVAL_SEC=60\n' "$WORKER_URL" "$BRIDGE_SECRET" > /etc/bikur-bridge/bridge.env
 chmod 640 /etc/bikur-bridge/bridge.env; chown root:bridge /etc/bikur-bridge/bridge.env
