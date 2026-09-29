@@ -1,0 +1,83 @@
+# פריסת ה-Worker של השיעור החי (OpenAI Realtime) ל-Cloudflare — אוטומטית בכל דחיפה ל-main.
+# משתמש באותם Secrets כמו שאר ה-Workers (CF_API_TOKEN, ואופציונלית CF_ACCOUNT_ID).
+#
+# המפתח של OpenAI: מוסיפים פעם אחת סוד בשם OPENAI_API_KEY ב-Settings → Secrets → Actions.
+# ה-workflow מעלה אותו ל-Worker כ-secret אמיתי (הוא לא נכתב לשום קובץ ולא מודפס ללוג).
+# בלי הסוד — ה-Worker נפרס "רדום" ומחזיר not_configured, והאפליקציה נופלת לזרימה הרגילה.
+# אפשר גם להזין את הסוד ישירות בדשבורד של Cloudflare (Worker → Settings → Variables) — אותו שם.
+
+name: Deploy english-live to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'english-live/worker.js'
+      - '.github/workflows/deploy-english-live.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy worker (keeps existing secrets)
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -e
+          if [ -z "$CF_API_TOKEN" ]; then
+            echo "::error::חסר הסוד CF_API_TOKEN בהגדרות הריפו (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          ACCOUNT_ID="$CF_ACCOUNT_ID"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer $CF_API_TOKEN" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "::error::לא הצלחתי לגלות את מזהה החשבון מהטוקן — בדוק שהטוקן נוצר מתבנית Edit Cloudflare Workers"
+            exit 1
+          fi
+          echo "account: ${ACCOUNT_ID:0:6}..."
+          export ACCOUNT_ID   # נדרש לפייתון שמעלה את הסוד (os.environ)
+
+          # keep_bindings: פריסה חוזרת לא מוחקת secrets שכבר הוזנו (מכאן או מהדשבורד)
+          resp=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/english-live" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -F 'metadata={"main_module":"worker.js","compatibility_date":"2025-01-01","bindings":[],"keep_bindings":["secret_text"]};type=application/json' \
+            -F 'worker.js=@english-live/worker.js;type=application/javascript+module')
+          echo "$resp"
+          echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("success") else 1)'
+
+          # הסוד של OpenAI — רק אם הוגדר ב-Actions Secrets. הערך לא מודפס.
+          if [ -n "$OPENAI_API_KEY" ]; then
+            sec=$(python3 - <<'PY'
+          import json, os, urllib.request
+          acct = os.environ["ACCOUNT_ID"]; tok = os.environ["CF_API_TOKEN"]
+          req = urllib.request.Request(
+            f"https://api.cloudflare.com/client/v4/accounts/{acct}/workers/scripts/english-live/secrets",
+            data=json.dumps({"name": "OPENAI_API_KEY", "text": os.environ["OPENAI_API_KEY"], "type": "secret_text"}).encode(),
+            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}, method="PUT")
+          try:
+            with urllib.request.urlopen(req) as r: d = json.load(r)
+          except Exception as e:
+            d = {"success": False, "errors": [str(e)]}
+          print("ok" if d.get("success") else "fail: " + json.dumps(d.get("errors"))[:300])
+          PY
+          )
+            echo "secret OPENAI_API_KEY: $sec"
+            [ "$sec" = "ok" ] || exit 1
+          else
+            echo "::notice::OPENAI_API_KEY לא הוגדר ב-Actions Secrets — ה-Worker נפרס רדום (not_configured). האפליקציה משתמשת בזרימה הרגילה עד שיוזן."
+          fi
+
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/english-live/subdomain" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+            --data '{"enabled": true, "previews_enabled": false}' || true

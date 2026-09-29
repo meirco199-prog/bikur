@@ -50,6 +50,8 @@ function defaults(){
       notifs: false,
       voiceRate: 1,
       bargeIn: true,          // קטיעה של המורה באמצע דיבור (שיעור חי)
+      liveUrl: "https://english-live.meirco199.workers.dev", // שרת ה-realtime (OpenAI) — רדום בלי מפתח
+      realtime: true,         // לנסות realtime כשזמין; אחרת הזרימה הרגילה
     },
   };
 }

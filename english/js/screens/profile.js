@@ -255,6 +255,13 @@ function renderSettings(main){
     settingRow("כתובת שרת תזכורות", el("input", {class: "input inline", dir: "ltr",
       value: s.pushUrl || "", onchange: e => { s.pushUrl = e.target.value.trim(); save(); toast("נשמר — כבה והפעל את התזכורת כדי להירשם מחדש"); }})),
 
+    settingRow("שיעור חי: קול realtime (כשזמין)", el("button", {class: "btn ghost small", onclick: () => {
+      s.realtime = s.realtime === false; save(); renderProfile(main);
+    }}, s.realtime !== false ? "פעיל — כבה" : "כבוי — הפעל")),
+
+    settingRow("כתובת שרת realtime", el("input", {class: "input inline", dir: "ltr",
+      value: s.liveUrl || "", onchange: e => { s.liveUrl = e.target.value.trim(); save(); toast("נשמר"); }})),
+
     el("hr", {}),
     el("button", {class: "btn ghost small danger", onclick: () => {
       if (confirm("לאפס את כל הנתונים? כל ההתקדמות תימחק לצמיתות.")){
