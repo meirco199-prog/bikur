@@ -2,7 +2,7 @@
 // מסלולי ה-Worker (pending/fills/report) והשוואת מילויי הסימולציה למילויי הברוקר. בלי רשת.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ibkrContractSpec, toIbkrOrder, ibkrQty, pickFrontMonth, reconcileFills, normalizeBrokerOrder, needsConfirm } from '../engine/ibkr-map.js';
+import { ibkrContractSpec, toIbkrOrder, ibkrQty, pickFrontMonth, reconcileFills, normalizeBrokerOrder, needsConfirm, clipExitToHeld } from '../engine/ibkr-map.js';
 import { IbkrClient } from '../lib/ibkr-client.js';
 import { brokerPending, recordBroker, brokerReport } from '../lib/agent-broker.js';
 import { DB } from '../lib/db.js';
@@ -88,4 +88,16 @@ test('Worker: /agent/broker — pending לגשר, רישום מילויים וה
   // ישירות (בלי Worker): DB בזיכרון
   const db = new DB(null); await db.put('agent:pending', { day: null, orders: [] }); const bp = await brokerPending(db); assert.equal(bp.orders.length, 0); assert.equal((await brokerReport(db)).missing, true);
   const rr = await recordBroker(db, { day: '2026-09-29', fills: [] }); assert.equal(rr.ok, true);
+});
+
+test('יציאה מול מה שהדמה מחזיק: אין פוזיציה → דילוג (לא פותחים שורט), פוזיציה קטנה → חיתוך, כניסה לא נבדקת', () => {
+  const stopLong = { kind: 'stop', symbol: 'ARKK', side: 'sell', qty: 70 };
+  assert.equal(clipExitToHeld(stopLong, 0).ok, false, 'הדמה לא מחזיק ARKK — מכירה הייתה פותחת שורט');
+  assert.equal(clipExitToHeld(stopLong, -70).ok, false, 'שורט בדמה לא נסגר ב-sell');
+  assert.deepEqual(clipExitToHeld(stopLong, 70), { ok: true, qty: 70, reason: undefined });
+  assert.equal(clipExitToHeld(stopLong, 30).qty, 30, 'הדמה מחזיק פחות — חותכים לכמות המוחזקת');
+  const coverShort = { kind: 'liquidation', symbol: 'UVXY', side: 'cover', qty: 260 };
+  assert.equal(clipExitToHeld(coverShort, 0).ok, false); assert.equal(clipExitToHeld(coverShort, 100).ok, false, 'לונג בדמה לא נסגר ב-cover');
+  assert.equal(clipExitToHeld(coverShort, -260).qty, 260); assert.equal(clipExitToHeld(coverShort, -100).qty, 100);
+  assert.deepEqual(clipExitToHeld({ kind: 'entry', symbol: 'SMH', side: 'buy', qty: 10 }, 0), { ok: true, qty: 10 }, 'כניסה חדשה לא תלויה בפוזיציה');
 });
