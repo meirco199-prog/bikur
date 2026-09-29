@@ -19,6 +19,8 @@
 
 const SUBJECT = 'mailto:meirco199@gmail.com';
 const WINDOW_MIN = 150;   // עד כמה דקות אחרי שעת התזכורת עוד מותר לשלוח (אם ה-cron פספס)
+const LESSON_LEAD_MIN = 10;  // תזכורת לשיעור חי: כמה דקות לפני המועד
+const LESSON_WINDOW_MIN = 20; // ועד כמה אחריו עוד שולחים
 const TTL = 86400;
 
 // ---------- עזרי קידוד ----------
@@ -92,6 +94,9 @@ function cleanRecord(prev, body){
     metGoal: body.metGoal || prev?.metGoal || null,
     due: Number(body.due) || 0,
     streak: Number(body.streak) || 0,
+    // השיעור החי שנקבע {weekday 0-6, time "HH:MM", title}; שליחת null מבטלת
+    lesson: body.lesson === undefined ? (prev?.lesson ?? null) : validLesson(body.lesson),
+    lessonNotifiedOn: prev?.lessonNotifiedOn || null,
     notifiedOn: prev?.notifiedOn || null,
     lastPush: prev?.lastPush || null,
     lastStatus: prev?.lastStatus || null,
@@ -103,13 +108,31 @@ function cleanRecord(prev, body){
   return rec;
 }
 
+function validLesson(l){
+  if (!l || typeof l !== 'object') return null;
+  const weekday = Number(l.weekday);
+  if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !/^\d{1,2}:\d{2}$/.test(l.time || '')) return null;
+  return {weekday, time: l.time, title: String(l.title || '').slice(0, 120)};
+}
+
 // ---------- החלטה: האם להתריע עכשיו ----------
 
-function localNow(tz){
+function localNow(tz, at = Date.now()){
   // tz = getTimezoneOffset() של הלקוח (דקות, חיובי ממערב ל-UTC). ישראל בקיץ: -180.
-  const d = new Date(Date.now() - tz * 60000);
+  const d = new Date(at - tz * 60000);
   const day = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
-  return {day, mins: d.getUTCHours() * 60 + d.getUTCMinutes()};
+  return {day, mins: d.getUTCHours() * 60 + d.getUTCMinutes(), weekday: d.getUTCDay()};
+}
+
+// תזכורת לשיעור החי: ביום שנקבע, מ-LEAD דקות לפני ועד WINDOW אחרי, פעם אחת ביום
+export function lessonDue(rec, at = Date.now()){
+  if (!rec || !rec.endpoint || !rec.enabled || !rec.lesson) return false;
+  const {day, mins, weekday} = localNow(rec.tz, at);
+  if (weekday !== rec.lesson.weekday) return false;
+  if (rec.lessonNotifiedOn === day) return false;
+  const p = String(rec.lesson.time).split(':');
+  const target = (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+  return mins >= target - LESSON_LEAD_MIN && mins <= target + LESSON_WINDOW_MIN;
 }
 
 function shouldRemind(rec){
@@ -155,6 +178,7 @@ export default {
         lastLesson: rec.lastLesson, notifiedOn: rec.notifiedOn,
         lastPush: rec.lastPush, lastStatus: rec.lastStatus, updatedAt: rec.updatedAt,
         wouldRemindNow: shouldRemind(rec),
+        lesson: rec.lesson || null, lessonNotifiedOn: rec.lessonNotifiedOn || null, lessonDueNow: lessonDue(rec),
       });
     }
 
@@ -209,7 +233,9 @@ async function runReminders(env){
     for (const k of page.keys){
       const rec = await env.PUSH.get(k.name, 'json');
       if (!rec) continue;
-      if (!shouldRemind(rec)) continue;
+      // שיעור חי שנקבע לעכשיו קודם לתזכורת היומית; ה-SW במכשיר מרכיב את הנוסח לפי המצב המקומי
+      const kind = lessonDue(rec) ? 'lesson' : shouldRemind(rec) ? 'daily' : null;
+      if (!kind) continue;
       let status = 0;
       try { status = await sendPush(env, rec.endpoint); } catch { status = 0; }
       if (status === 404 || status === 410 || status === 403){
@@ -218,7 +244,10 @@ async function runReminders(env){
       }
       rec.lastPush = new Date().toISOString();
       rec.lastStatus = status;
-      if (status >= 200 && status < 300) rec.notifiedOn = localNow(rec.tz).day;
+      if (status >= 200 && status < 300){
+        if (kind === 'lesson') rec.lessonNotifiedOn = localNow(rec.tz).day;
+        else rec.notifiedOn = localNow(rec.tz).day;
+      }
       await env.PUSH.put(k.name, JSON.stringify(rec));
     }
   } while (cursor);
