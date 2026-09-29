@@ -68,7 +68,7 @@ export function renderClassroom(main, tab = "course"){
   let body;
   if (tab === "course"){
     body = [
-      lessonCard(plan),
+      lessonCard(plan, () => startCall(main, {teacher, focus: null, selfCam, plan})),
       el("h3", {}, "מתי השיעור?"),
       scheduleEditor(main),
       el("h3", {}, "המורה שלך"),
@@ -112,7 +112,7 @@ export function renderClassroom(main, tab = "course"){
 }
 
 // כרטיס השיעור המוכן: מה נלמד, אילו שקפים מחכים, מי מלמד וכמה זמן
-function lessonCard(plan){
+function lessonCard(plan, onStart){
   const slideKinds = {review: "חזרה", vocab: "מילים חדשות", story: "סיפור לקריאה", questions: "שיחה", grammar: "דקדוק", challenge: "אתגר", quiz: "תרגילים קצרים", prompt: "משימות דיבור"};
   const parts = [...new Set(plan.slides.map(s => slideKinds[s.type]).filter(Boolean))];
   const t = teacherById(plan.teacherId);
@@ -126,7 +126,10 @@ function lessonCard(plan){
     el("ul", {class: "today-list"}, plan.goals.map(g => el("li", {class: "nostrike"}, el("span", {class: "t-icon"}, "🎯"), g))),
     el("div", {class: "muted small-text"}, `${plan.slides.length} שקפים: ${parts.join(" · ")}`),
     plan.reviewWords?.length ? el("div", {class: "muted small-text", dir: "ltr"}, "Review: " + plan.reviewWords.join(", ")) : null,
-    el("div", {class: "muted small-text"}, `${t.name} · ${plan.durationMin} דקות · הוכן ${plan.createdAt}`));
+    el("div", {class: "muted small-text"}, `${t.name} · ${plan.durationMin} דקות · הוכן ${plan.createdAt}`),
+    // השיעור מוכן — אפשר להתחיל מיד, בלי לחכות למועד שנקבע
+    el("button", {class: "nl-cta nl-now", onclick: onStart}, "🎥 התחל שיעור עכשיו"),
+    el("div", {class: "small-text nl-hint"}, "לא צריך לחכות למועד — המורה מוכנה"));
 }
 
 function saveSchedule(patch){
