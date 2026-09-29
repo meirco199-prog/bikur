@@ -1,6 +1,6 @@
 // פרופיל: התקדמות, דוח שבועי, הישגים, מטרות והגדרות.
 import { el, toast, fmtMinutes, todayStr } from "../util.js";
-import { S, save, resetAll, weekSummary } from "../store.js";
+import { S, save, resetAll, weekSummary, memorySummary } from "../store.js";
 import { levelInfo, ACHIEVEMENTS, LEVELS } from "../gamify.js";
 import { srsCounts } from "../srs.js";
 import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminder, syncReminderState,
@@ -8,8 +8,33 @@ import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminde
 import { pushSupported, pushStatus, testPush } from "../push.js";
 import { cefrDesc } from "./onboarding.js";
 import { renderPlacement } from "./placement.js";
+import { course, progressionStats, isPlacementDone, SKILLS as COURSE_SKILLS } from "../curriculum.js";
 
-const SKILL_HE = {vocab: "אוצר מילים", grammar: "דקדוק", listening: "שמיעה", reading: "קריאה", speaking: "דיבור", writing: "כתיבה"};
+const SKILL_HE = {vocab: "אוצר מילים", grammar: "דקדוק", listening: "שמיעה", reading: "קריאה", speaking: "דיבור", writing: "כתיבה", pronunciation: "הגייה"};
+
+// הפרופיל לפי מיומנות מהקורס (CEFR לכל מיומנות — רק מה שנמדד), והתקדמות לאורך השיעורים החיים
+function renderCourseCard(){
+  const c = course();
+  const skills = [...COURSE_SKILLS, "pronunciation"];
+  const prog = progressionStats();
+  const checks = c.done.filter(d => d.kind === "check" || d.kind === "placement");
+  return el("div", {class: "card"},
+    el("h3", {}, "🎓 הקורס שלך"),
+    isPlacementDone()
+      ? el("div", {class: "skills-grid"}, skills.map(k => el("div", {class: "skill-box" + (c.skills[k] ? "" : " na")},
+          el("div", {class: "lv"}, c.skills[k] || "—"),
+          el("div", {class: "lb"}, SKILL_HE[k]),
+          c.skills[k] ? null : el("div", {class: "lb"}, "לא נמדד"))))
+      : el("p", {class: "muted small-text"}, "הרמה לכל מיומנות תיקבע בשיעור 1 (שיעור היכרות ואבחון) — מדידה, לא ניחוש."),
+    el("div", {class: "muted small-text", style: "margin-top:8px"},
+      `${c.done.length} שיעורים הושלמו${checks.length ? ` · ${checks.length} בדיקות רמה` : ""}${c.next ? ` · הבא: Lesson ${c.next.n} — ${c.next.title}` : ""}`),
+    prog ? el("ul", {class: "metrics-list", style: "margin-top:8px"},
+      el("li", {}, el("span", {class: "muted"}, "רצף דיבור הכי ארוך"), el("span", {}, `${Math.round(prog.longestFirst / 1000)} → ${Math.round(prog.longestLast / 1000)} שנ'`)),
+      prog.studentPctFirst != null && prog.studentPctLast != null ? el("li", {}, el("span", {class: "muted"}, "חלקך בשיחה"), el("span", {}, `${prog.studentPctFirst}% → ${prog.studentPctLast}%`)) : null,
+      prog.hebrewFirst != null ? el("li", {}, el("span", {class: "muted"}, "עברית בדברי המורה"), el("span", {}, `${prog.hebrewFirst}% → ${prog.hebrewLast}%`)) : null)
+      : el("p", {class: "muted small-text"}, "השוואה לאורך זמן (רצף דיבור, חלקך בשיחה, כמה עברית המורה צריך) תופיע אחרי שני שיעורים חיים עם מיקרופון."),
+    el("button", {class: "btn ghost small", onclick: () => { location.hash = "#/live"; }}, "לשיעור הבא"));
+}
 
 export function renderProfile(main){
   const p = S.profile;
@@ -51,6 +76,9 @@ export function renderProfile(main){
           }}, L))),
       el("div", {class: "muted small-text"}, cefrDesc(p.level))),
 
+    // הקורס: פרופיל לפי מיומנות והתקדמות נמדדת
+    renderCourseCard(),
+
     // דוח שבועי
     el("div", {class: "card"},
       el("h3", {}, "📊 הדוח השבועי שלך"),
@@ -89,6 +117,9 @@ export function renderProfile(main){
         ACHIEVEMENTS.map(a => el("div", {class: "badge" + (S.game.achievements.includes(a.id) ? " got" : "")},
           el("div", {class: "badge-icon"}, a.icon),
           el("div", {class: "badge-name"}, a.name))))),
+
+    // מה המורה זוכר — שקיפות על הזיכרון ארוך-הטווח שמזין את השיעורים
+    renderMemoryCard(),
 
     // מילים
     el("div", {class: "card"},
@@ -255,6 +286,13 @@ function renderSettings(main){
     settingRow("כתובת שרת תזכורות", el("input", {class: "input inline", dir: "ltr",
       value: s.pushUrl || "", onchange: e => { s.pushUrl = e.target.value.trim(); save(); toast("נשמר — כבה והפעל את התזכורת כדי להירשם מחדש"); }})),
 
+    settingRow("שיעור חי: קול realtime (כשזמין)", el("button", {class: "btn ghost small", onclick: () => {
+      s.realtime = s.realtime === false; save(); renderProfile(main);
+    }}, s.realtime !== false ? "פעיל — כבה" : "כבוי — הפעל")),
+
+    settingRow("כתובת שרת realtime", el("input", {class: "input inline", dir: "ltr",
+      value: s.liveUrl || "", onchange: e => { s.liveUrl = e.target.value.trim(); save(); toast("נשמר"); }})),
+
     el("hr", {}),
     el("button", {class: "btn ghost small danger", onclick: () => {
       if (confirm("לאפס את כל הנתונים? כל ההתקדמות תימחק לצמיתות.")){
@@ -266,6 +304,26 @@ function renderSettings(main){
 function settingRow(label, control){
   return el("div", {class: "setting-row"},
     el("span", {class: "setting-label"}, label), control);
+}
+
+function renderMemoryCard(){
+  const mem = memorySummary();
+  const empty = !mem.recurring.length && !mem.once.length && !mem.resolved.length && !mem.reinforcing.length && !mem.pronunciation.length;
+  const line = (en, he) => el("li", {}, el("span", {dir: "ltr"}, en), he ? el("span", {class: "muted small-text"}, he) : null);
+  return el("div", {class: "card"},
+    el("h3", {}, "🧠 מה המורה זוכר עליך"),
+    empty ? el("p", {class: "muted small-text"}, "עדיין ריק — אחרי השיעור החי הראשון המורה יתחיל לזכור טעויות, מילים שלימד ומה כבר נלמד.") : null,
+    mem.lastLesson ? el("p", {class: "muted small-text"}, `שיעור אחרון: ${mem.lastLesson.date}${mem.lastLesson.topic ? " · " + mem.lastLesson.topic : ""}`) : null,
+    mem.recurring.length ? el("div", {}, el("strong", {}, "טעויות שחוזרות"),
+      el("ul", {class: "metrics-list"}, mem.recurring.map(e => line(`${e.original} → ${e.corrected}`, `×${e.count}`)))) : null,
+    mem.once.length ? el("div", {}, el("strong", {}, "תוקנו לאחרונה (נעקוב אם יחזרו)"),
+      el("ul", {class: "metrics-list"}, mem.once.map(e => line(`${e.original} → ${e.corrected}`)))) : null,
+    mem.resolved.length ? el("div", {}, el("strong", {}, "כבר נלמדו ✓ (המורה לא יציק)"),
+      el("ul", {class: "metrics-list"}, mem.resolved.map(e => line(e.corrected)))) : null,
+    mem.reinforcing.length ? el("div", {}, el("strong", {}, "מילים שהמורה לימד ובחיזוק"),
+      el("ul", {class: "metrics-list"}, mem.reinforcing.map(w => line(w.word, `שימוש נכון ${w.reusedOk}${w.reusedBad ? " · שגוי " + w.reusedBad : ""}`)))) : null,
+    mem.pronunciation.length ? el("div", {}, el("strong", {}, "הגייה שנשמעה בשיעורי קול"),
+      el("ul", {class: "metrics-list"}, mem.pronunciation.map(p => line(`${p.word}: ${p.issue}`, p.improved ? `השתפר ×${p.improved}` : "")))) : null);
 }
 
 // מבחן רמה מחדש מתוך הפרופיל, ועדכון הרמה בסיום

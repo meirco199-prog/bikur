@@ -11,6 +11,7 @@ export const BANK = {
     {type:"grammar",  q:"They ___ football every Sunday.", opts:["plays","play","playing","is play"], a:1},
     {type:"sentence", q:"I ___ up at seven o'clock.", opts:["get","gets","getting","got"], a:0},
     {type:"listen",   say:"The shop opens at nine in the morning.", q:"מתי נפתחת החנות?", opts:["בשבע","בתשע","באחת עשרה","בשמונה"], a:1},
+    {type:"read",     text:"Ben has a dog. The dog is black and white. Every morning Ben and the dog walk in the park.", q:"What color is the dog?", opts:["Brown","Black and white","White","Grey"], a:1},
   ],
   A2: [
     {type:"grammar",  q:"Yesterday we ___ to the beach.", opts:["go","went","gone","goes"], a:1},
@@ -27,6 +28,7 @@ export const BANK = {
     {type:"grammar",  q:"If it rains tomorrow, we ___ at home.", opts:["stay","will stay","would stay","stayed"], a:1},
     {type:"vocab",    q:"מה הפירוש של 'available'?", opts:["עסוק","זמין","יקר","חסר"], a:1},
     {type:"read",     text:"Tom had never enjoyed running. But after his doctor warned him about his health, he started jogging every morning. Six months later, he finished his first 10-kilometer race.", q:"Why did Tom start running?", opts:["He always loved it","His doctor warned him about his health","He wanted to win money","His friends made him"], a:1},
+    {type:"listen",   say:"I was going to call you last night, but my phone died before I could find your number.", q:"למה הדובר לא התקשר?", opts:["הוא שכח","הטלפון שלו נכבה","היה מאוחר מדי","הוא לא רצה"], a:1},
   ],
   B2: [
     {type:"grammar",  q:"If I had known, I ___ you.", opts:["will help","would help","would have helped","helped"], a:2},
@@ -35,6 +37,7 @@ export const BANK = {
     {type:"grammar",  q:"By the time we arrived, the film ___.", opts:["already started","has already started","had already started","was already start"], a:2},
     {type:"vocab",    q:"מה הפירוש של 'overwhelmed'?", opts:["משועמם","מוצף (רגשית)","נלהב","אדיש"], a:1},
     {type:"read",     text:"Although the new policy was meant to save money, many employees felt it actually made their work slower. Managers, however, insisted the savings were worth the inconvenience.", q:"What does the passage suggest about the policy?", opts:["Everyone agreed it succeeded","It clearly failed completely","Its value was disputed","It was cancelled quickly"], a:2},
+    {type:"listen",   say:"If the meeting had started on time, we would have finished before lunch instead of rushing through the last two points.", q:"What actually happened?", opts:["The meeting finished before lunch","The meeting started late","They skipped lunch","They cancelled two points"], a:1},
   ],
   C1: [
     {type:"vocab",    q:"מה הפירוש של 'feasible'?", opts:["מסוכן","בר ביצוע","זמני","יוצא דופן"], a:1},
@@ -43,6 +46,7 @@ export const BANK = {
     {type:"vocab",    q:"מה הפירוש של 'compelling' (a compelling argument)?", opts:["חלש","משכנע","מבלבל","ארוך"], a:1},
     {type:"sentence", q:"___ his experience, he was not offered the job.", opts:["Despite","Although","However","Because"], a:0},
     {type:"read",     text:"The author's tone throughout the essay is one of measured skepticism: she neither dismisses the new technology outright nor embraces the sweeping promises made on its behalf, preferring instead to ask who ultimately benefits.", q:"How does the author feel about the technology?", opts:["Enthusiastic and hopeful","Completely dismissive","Cautious and questioning","Uninformed and confused"], a:2},
+    {type:"listen",   say:"Despite the board's reservations, the proposal was approved on the condition that costs be reviewed quarterly.", q:"What was the outcome?", opts:["The proposal was rejected","It was approved without conditions","It was approved with a condition","It was postponed for a quarter"], a:2},
   ],
   C2: [
     {type:"vocab",    q:"מה הפירוש של 'ubiquitous'?", opts:["נדיר","נמצא בכל מקום","מיושן","סודי"], a:1},
@@ -51,6 +55,7 @@ export const BANK = {
     {type:"sentence", q:"The committee's decision, ___ controversial, was ultimately upheld.", opts:["while","despite","however","because"], a:0},
     {type:"read",     text:"Her prose has a deceptive simplicity; what reads at first as plain reportage reveals, on closer inspection, a carefully layered irony that quietly undercuts its own certainties.", q:"What is implied about her writing?", opts:["It is simple and direct","It only appears simple but is subtly complex","It is careless and unclear","It is heavily decorated"], a:1},
     {type:"read",     text:"Far from being a neutral tool, the algorithm encodes the priorities of those who build it — a fact its designers are often the last to acknowledge.", q:"What is the main point?", opts:["Algorithms are fully objective","Algorithms reflect their makers' choices","Designers understand their tools best","The tool is simply broken"], a:1},
+    {type:"listen",   say:"Far from settling the matter, the report merely reframed the question in terms nobody had asked for.", q:"What does the speaker think of the report?", opts:["It resolved the issue","It answered the right question","It did not settle anything","It was widely welcomed"], a:2},
   ],
 };
 

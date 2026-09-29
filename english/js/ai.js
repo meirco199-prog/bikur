@@ -1,6 +1,6 @@
 // לקוח לשכבת ה-AI — Cloudflare Worker נפרד (english-ai). אין מפתחות בצד הלקוח.
 // כל בקשה מצרפת "פרופיל לומד" מסוכם במקום לשלוח את כל ההיסטוריה.
-import { S } from "./store.js";
+import { S, memorySummary } from "./store.js";
 import { hardWords } from "./srs.js";
 
 export class AIError extends Error {}
@@ -16,10 +16,13 @@ export function learnerProfile(){
   const recentMistakes = S.mistakes.slice(-6).map(m => m.text);
   const weak = Object.entries(S.skills).sort((a, b) => a[1] - b[1]).slice(0, 2).map(e => e[0]);
   // מילים שנלמדו לאחרונה (לא בשליטה מלאה) — שהמורה ישזור בשיחה לחיזוק (spaced repetition)
-  const reuseWords = Object.entries(S.srs)
+  const srsReuse = Object.entries(S.srs)
     .filter(([, e]) => (e.ok + e.fail) > 0 && e.status !== "mastered")
     .sort((a, b) => (b[1].due || "").localeCompare(a[1].due || ""))
     .slice(0, 8).map(([k]) => k);
+  // הזיכרון המובנה: טעויות חוזרות (עם ספירה), מה שכבר נלמד (לא להציק), הגייה, recap
+  const mem = memorySummary();
+  const ll = mem.lastLesson;
   return {
     level: S.profile.level || "A2",
     goals: S.profile.goals,
@@ -28,7 +31,13 @@ export function learnerProfile(){
     hardWords: hard,
     weakSkills: weak,
     recentMistakes,
-    reuseWords,
+    recurringErrors: mem.recurring.map(e => `${e.original} → ${e.corrected} (x${e.count})`),
+    resolvedErrors: mem.resolved.map(e => `${e.original} → ${e.corrected}`),
+    pronunciationIssues: mem.pronunciation.map(p => `${p.word}: ${p.issue}`),
+    // קודם מילים שהמורה לימד ועוד לא הוטמעו, אחר כך מילים מהאימונים
+    reuseWords: [...new Set([...mem.reinforcing.map(m => m.word), ...srsReuse])].slice(0, 8),
+    lastLessonRecap: ll ? `${ll.topic ? "topic: " + ll.topic + ". " : ""}${ll.recap || ""}`.trim() : "",
+    fillerRate: ll && ll.minutes ? +(ll.fillers / ll.minutes).toFixed(1) : null,
     englishOnly: !!S.profile.englishOnly,
   };
 }
