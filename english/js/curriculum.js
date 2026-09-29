@@ -214,6 +214,7 @@ export function completeLesson(plan, {quizAnswers = [], teacherSkills = null, se
   S.course.next = null;
   save();
   ensureNextLesson(); // המורה מכינה את השיעור הבא מיד
+  syncReminderState(); // התזכורת (SW + שרת push) מדברת כבר על Lesson N+1, גם אם סוגרים במסך הסיכום
   return {measured, skills: {...S.course.skills}, before};
 }
 

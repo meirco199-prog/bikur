@@ -193,6 +193,10 @@ export function nextLessonReminderAt(now = new Date()){
 export function scheduleLesson(){
   clearTimeout(lessonTimer);
   if (!notifSupported() || Notification.permission !== "granted" || !S.settings.notifs) return false;
+  const l = lessonSchedule();
+  if (!l) return false;
+  // נקבע שיעור להיום פחות מ-LEAD דקות לפני המועד (או כבר בתוך החלון)? מתריעים עכשיו, לא בשבוע הבא
+  if (lessonDueNow({enabled: true, lesson: l})) remindLessonIfDue();
   const at = nextLessonReminderAt();
   if (!at) return false;
   const delay = Math.min(at - new Date(), 2 ** 31 - 1);

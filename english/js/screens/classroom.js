@@ -201,6 +201,8 @@ function startCall(main, {teacher, focus, selfCam, plan = null}){
   const capUser = el("div", {class: "cap-user", dir: "ltr"});
   const statusEl = el("div", {class: "call-status"}, "מתחבר…");
   const timerEl = el("span", {class: "call-timer"}, "0:00");
+  // תג מצב אמיתי: realtime מחובר (השרת דיבר אלינו) או זרימה רגילה — לא מציגים realtime כשהוא לא עובד
+  const modeBadge = el("span", {class: "mode-badge connecting", title: "מצב החיבור"}, "מתחבר…");
   const ring = el("div", {class: "speaking-ring"});
 
   const teacherTile = el("div", {class: "tile teacher-tile"},
@@ -236,7 +238,7 @@ function startCall(main, {teacher, focus, selfCam, plan = null}){
 
   main.replaceChildren(el("div", {class: "call" + (plan ? " with-slides" : "")},
     el("div", {class: "call-top"},
-      el("div", {class: "call-who"}, plan ? `${teacher.name} · Lesson ${plan.n}` : `${teacher.name} · המורה שלך`, el("span", {class: "live-dot"}), timerEl),
+      el("div", {class: "call-who"}, plan ? `${teacher.name} · Lesson ${plan.n}` : `${teacher.name} · המורה שלך`, el("span", {class: "live-dot"}), timerEl, modeBadge),
       statusEl),
     el("div", {class: "call-stage"}, teacherTile, selfTile),
     slides,
@@ -244,7 +246,7 @@ function startCall(main, {teacher, focus, selfCam, plan = null}){
     typedRow,
     controls));
 
-  session.ui = {capTeacher, capUser, statusEl, ring, micBtn, bargeBtn, teacherTile, input, typedRow, slides};
+  session.ui = {capTeacher, capUser, statusEl, ring, micBtn, bargeBtn, teacherTile, input, typedRow, slides, modeBadge};
 
   // טיימר
   session.timerInt = setInterval(() => {
@@ -474,9 +476,11 @@ async function startLesson(focus){
       if (!session || session.destroyed){ live?.close(); return; }
       if (live){
         session.live = live; session.mode = "realtime";
+        setModeBadge("realtime", live.model);
         // בקטיעה מובנית (VAD בשרת) אין צורך בצופה של הזרימה הרגילה
         session.ui.bargeBtn && (session.ui.bargeBtn.style.display = "none");
-        setStatus(`${session.teacher.name} מתחבר…`, "speaking");
+        // אם השרת כבר התחיל לדבר בזמן ההתחברות — לא דורסים את הסטטוס האמיתי
+        if (!live.state.teacherSpeaking) setStatus(`${session.teacher.name} מתחבר…`, "speaking");
         startMouthLive();
         paintSlide();
         return;
@@ -488,7 +492,16 @@ async function startLesson(focus){
       else toast("קול realtime לא זמין כרגע — ממשיכים בזרימה הרגילה");
     }
   }
+  setModeBadge("fallback");
   runLesson(focus);
+}
+
+// realtime = החיבור ל-OpenAI התקבל בפועל (אירוע session.created); fallback = STT/TTS של הדפדפן
+function setModeBadge(mode, model = null){
+  const b = session?.ui?.modeBadge; if (!b) return;
+  b.className = "mode-badge " + mode;
+  b.textContent = mode === "realtime" ? `🟢 Realtime${model ? " · " + model : ""}` : "🟡 זרימה רגילה (STT/TTS)";
+  b.title = mode === "realtime" ? "קול realtime מחובר ל-OpenAI" : "realtime לא זמין — דיבור/הקראה של הדפדפן";
 }
 
 // אירועים מה-realtime → מסך, אווטאר, זיכרון. נבנה לפני החיבור, סוגר על ה-session.

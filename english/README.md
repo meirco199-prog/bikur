@@ -28,13 +28,16 @@
    ה-workflow מקים לבד את מרחב ה-KV (`english-push`) ואת שעון ה-cron, ומפתחות ה-VAPID
    נוצרים לבד בקריאה הראשונה ונשמרים ב-KV — אין שום סוד להזין ואין הגדרה ידנית בדשבורד.
 4. **שרת ה-realtime לשיעור החי** (אופציונלי, בתשלום) — `english-live/worker.js`, בכתובת
-   `https://english-live.meirco199.workers.dev`. מנפיק session זמני ל-OpenAI Realtime; הדפדפן
-   מתחבר ב-WebRTC **ישירות** ל-OpenAI (האודיו לא עובר דרך ה-Worker). כדי להפעיל: להוסיף פעם
-   אחת את הסוד `OPENAI_API_KEY` ב-Settings → Secrets → Actions (ה-workflow מעלה אותו ל-Worker),
-   או להזין אותו בדשבורד של Cloudflare תחת אותו שם. **בלי המפתח** ה-Worker מחזיר `not_configured`
-   והשיעור החי רץ בזרימה הרגילה (STT/TTS של הדפדפן, עם קטיעה). עלות משוערת:
-   ‎~$0.30–0.70 לשיעור של 15–20 דק' ב-`gpt-4o-mini-realtime` (ברירת המחדל; אפשר להחליף עם
-   המשתנה `REALTIME_MODEL` ב-Worker).
+   `https://english-live.meirco199.workers.dev`. עובד מול **OpenAI Realtime GA**: מנפיק client secret זמני
+   (`POST /v1/realtime/client_secrets`, `session.type = "realtime"`, אודיו תחת `session.audio`, VAD בשרת עם
+   `interrupt_response`, תמלול `gpt-4o-mini-transcribe`, כלים במבנה GA), והדפדפן שולח את ה-SDP ל-
+   `POST /v1/realtime/calls` ומדבר ב-WebRTC ישירות עם OpenAI. מודל: `env.REALTIME_MODEL` או ברירת המחדל
+   `gpt-realtime-2.1-mini`; אם המודל לא זמין בחשבון — ה-Worker מנסה `gpt-realtime-mini` ואז `gpt-realtime`
+   (התשובה מחזירה `model` בפועל ו-`tried`). מוסיפים פעם אחת את הסוד `OPENAI_API_KEY` ב-Settings → Secrets →
+   Actions (ה-workflow מעלה אותו ל-Worker), ומריצים "Deploy english-live". בלי הסוד — ה-Worker רדום
+   (`503 not_configured`) והאפליקציה עוברת לזרימה הרגילה. **התג במסך השיחה** אומר את האמת: "🟢 Realtime · <model>"
+   רק אחרי שהשרת שלח `session.created`; אחרת "🟡 זרימה רגילה (STT/TTS)". `GET /health` מראה אם מוגדר ואילו
+   מודלים ינוסו (בלי סודות). בדיקת smoke אמיתית (בתשלום, שניות): Actions → "Realtime smoke (OpenAI GA)" → Run.
 
 ## מבנה
 
@@ -51,7 +54,11 @@ english/
   js/ai.js              לקוח ל-Worker + פרופיל לומד מסוכם
   js/notify.js          ניהול התזכורת היומית (הרשאות, תזמון, אבחון)
   js/push.js            רישום Web Push וסנכרון המצב לשרת התזכורות
-  js/live.js            מנוע realtime לשיעור החי (WebRTC ל-OpenAI, session מה-Worker)
+  js/live.js            מנוע realtime לשיעור החי (WebRTC ל-OpenAI Realtime GA, client secret מה-Worker; מטפל אירועים מיוצא לבדיקות)
+  js/adaptive.js        מנוע האבחון האדפטיבי A1→C2 (טהור, נבדק ב-node)
+  tests/unit/           בדיקות node (node --test english/tests/unit): adaptive, אירועי Realtime GA, תזכורת (SW+שרת), curriculum
+  tests/browser/        בדיקות Playwright מול mock (english/tests/browser/run.sh): קורס, C1/C2, תזכורת, fallback, realtime
+  tests/smoke/          smoke אמיתי מול OpenAI (ידני, בתשלום) — דרך ה-workflow "Realtime smoke"
   js/avatar.js          דמות המורה (SVG) עם לק-סינק
   js/curriculum.js      מנוע הקורס: שיעור אבחון, פרופיל CEFR לכל מיומנות, השיעור הבא מוכן מראש, שקפים, תזמון
   js/data/course.js     תוכן הקורס: נושאים, מילים עם עברית, דקדוק, סיפור ב-3 רמות, שאלות
@@ -60,7 +67,7 @@ english/
   js/screens/           המסכים: בית, לימוד, דיבור, מילים, מורה, פרופיל, onboarding
 english-ai/worker.js    שכבת ה-AI (Cloudflare Worker + Workers AI)
 english-push/worker.js  שרת התזכורות (Cloudflare Worker + KV + cron)
-english-live/worker.js  session זמני ל-OpenAI Realtime לשיעור החי (רדום בלי OPENAI_API_KEY)
+english-live/worker.js  client secret זמני ל-OpenAI Realtime GA לשיעור החי (רדום בלי OPENAI_API_KEY)
 ```
 
 ## הקורס המובנה (שיעור חי)
