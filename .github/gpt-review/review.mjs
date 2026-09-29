@@ -103,12 +103,19 @@ export function parseFrontMatter(text){
   }
   return { meta, body: String(text).slice(m[0].length) };
 }
-export function findPolicies(root = '.'){
+export const POLICY_DEPTH = 3; // גם פרויקטים מקוננים (apps/foo/bar/.ai/REVIEW.md) בריפוזיטוריז אחרים; מוגבל כדי לא לסרוק עץ שלם
+export function findPolicies(root = '.', depth = POLICY_DEPTH){
   const out = [];
   const add = (dir) => { const p = join(root, dir, '.ai', 'REVIEW.md'); if (existsSync(p)) { const { meta, body } = parseFrontMatter(readFileSync(p, 'utf8')); out.push({ dir: dir === '.' ? '' : dir.replace(/\/?$/, '/'), path: p.replace(/^\.\//, ''), meta, body }); } };
-  add('.');
-  for (const e of readdirSync(root, { withFileTypes: true })) if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules') add(e.name);
-  return out;
+  const walk = (dir, level) => {
+    for (const e of readdirSync(join(root, dir), { withFileTypes: true })){
+      if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const sub = dir === '.' ? e.name : `${dir}/${e.name}`; add(sub);
+      if (level < depth) walk(sub, level + 1);
+    }
+  };
+  add('.'); walk('.', 1);
+  return out.sort((a, b) => a.dir.localeCompare(b.dir));
 }
 /** אילו מדיניויות חלות על קבצי השינוי: השורש תמיד; פרויקט — אם קובץ נמצא בתיקייתו או ב-applies_to שלו */
 export function matchPolicies(policies, files){
