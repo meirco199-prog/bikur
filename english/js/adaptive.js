@@ -1,9 +1,11 @@
 // אבחון אדפטיבי לכל מיומנות (A1→C2), טהור — בלי DOM ובלי store, כדי שאפשר לבדוק אותו ב-node.
 // הרעיון: מדרגות. תשובה נכונה → פריט ברמה שמעל; שגויה → ברמה שמתחת. רמה נקבעת רק
 // עם ביסוס: לפחות שתי תשובות נכונות ברמה הזו או מעליה (ואחת מהן ברמה עצמה), כך
-// שתשובה מקרית אחת — נכונה או שגויה — לא מזיזה לבדה רמה שלמה. 3–6 פריטים למיומנות.
+// שתשובה מקרית אחת — נכונה או שגויה — לא מזיזה לבדה רמה שלמה. 3–7 פריטים למיומנות.
+// MAX_ITEMS=7: המסלול המלא A1→C2 (A1 A2 B1 B2 C1 C2 + אישור שני ב-C2) הוא בדיוק 7 פריטים,
+// וכך גם C2→A1. אם אחרי המכסה הרמה עדיין לא מבוססת — פריט אחד נוסף לאישור.
 export const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
-export const MAX_ITEMS = 6;
+export const MAX_ITEMS = 7;
 const idx = l => Math.max(0, LEVELS.indexOf(l));
 const at = i => LEVELS[Math.max(0, Math.min(LEVELS.length - 1, i))];
 
@@ -39,7 +41,7 @@ export function nextLevel(answers, start){
 // האם הגבול מבוסס מספיק כדי לעצור: שני נכונים ברמה ושני שגויים ברמה שמעל,
 // או תקרה (C2 פעמיים נכון) / רצפה (A1 פעמיים שגוי), או מכסת הפריטים.
 export function isDone(answers, max = MAX_ITEMS){
-  if (answers.length >= max) return true;
+  if (answers.length >= max) return estimateLevel(answers).confident || answers.length >= max + 1;
   const {c, w} = counts(answers);
   if (c("C2") >= 2) return true;
   if (w("A1") >= 2) return true;

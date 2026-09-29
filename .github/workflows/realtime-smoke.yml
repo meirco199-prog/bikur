@@ -1,0 +1,28 @@
+# בדיקת smoke אמיתית מול OpenAI Realtime (GA) — ידנית בלבד (workflow_dispatch), כי היא עולה כסף (שניות בודדות).
+# לא צריך סוד ב-Actions: ה-Worker english-live מנפיק client secret זמני מהמפתח שחי אצלו.
+# מה נבדק: /health → /session (client_secrets GA) → WebSocket ל-OpenAI עם ה-client secret →
+# session.created (הוכחת חיבור) → תגובה טקסטואלית קצרה → POST /v1/realtime/calls (אימות ה-endpoint של WebRTC).
+name: Realtime smoke (OpenAI GA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      live_url:
+        description: 'כתובת ה-Worker english-live'
+        default: 'https://english-live.meirco199.workers.dev'
+        required: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm i --no-save ws@8
+      - name: Smoke test against OpenAI Realtime via the Worker
+        env:
+          LIVE_URL: ${{ inputs.live_url }}
+        run: node english/tests/smoke/realtime-smoke.mjs

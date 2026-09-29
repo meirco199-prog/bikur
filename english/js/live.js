@@ -1,7 +1,10 @@
-// מנוע Realtime לשיעור החי: WebRTC ישירות ל-OpenAI Realtime עם session זמני מה-Worker
+// מנוע Realtime לשיעור החי: WebRTC ישירות ל-OpenAI Realtime (GA) עם client secret זמני מה-Worker
 // english-live. speech-to-speech אמיתי — latency נמוך, קטיעה מובנית (VAD בשרת), המורה
-// שומע את ההגייה. אין מפתח בלקוח: רק client_secret קצר-חיים.
-// אם ה-Worker לא מוגדר / WebRTC נכשל — זורק, ו-classroom.js נופל לזרימה הרגילה.
+// שומע את ההגייה. אין מפתח בלקוח: רק client_secret קצר-חיים (ek_...).
+// זרימה (GA): POST /session ל-Worker → {client_secret, webrtc_url: /v1/realtime/calls} →
+// SDP offer ל-webrtc_url עם Bearer → answer → ערוץ נתונים "oai-events" → אירועי GA.
+// "מחובר" נחשב רק אחרי שהשרת דיבר אלינו (session.created / כל אירוע ראשון) — לא אחרי fetch מוצלח.
+// אם ה-Worker לא מוגדר / WebRTC נכשל — מחזיר null או זורק, ו-classroom.js נופל לזרימה הרגילה.
 import { S } from "./store.js";
 import { learnerProfile } from "./ai.js";
 
@@ -13,7 +16,7 @@ export function realtimeSupported(){
 
 function liveBase(){ return (S.settings.liveUrl || "").replace(/\/+$/, ""); }
 
-// מבקש session זמני. מחזיר null אם ה-Worker לא מוגדר (fallback שקט), זורק על שגיאה אחרת.
+// מבקש client secret זמני. מחזיר null אם ה-Worker לא מוגדר (fallback שקט), זורק על שגיאה אחרת.
 async function fetchSession({ teacher, topic, lessonPlan }){
   if (!liveBase()) return null;
   let res;
@@ -31,12 +34,100 @@ async function fetchSession({ teacher, topic, lessonPlan }){
   if (res.status === 429) throw new LiveError("rate");
   if (!res.ok) throw new LiveError("server");
   const d = await res.json();
-  if (!d.client_secret) return null;
+  if (!d.client_secret || !d.webrtc_url) return null;
   return d;
 }
 
+export function newLiveState(){
+  return {
+    connected: false, sessionModel: null, callId: null,
+    teacherSpeaking: false, userSpeaking: false,
+    teacherText: "", teacherTextByResponse: new Map(),
+    transcript: [],                       // [{role, content}] — לזיכרון ולמשוב
+    metrics: { studentMs: 0, teacherMs: 0, longestMs: 0, latencies: [], interruptions: 0 },
+    _userStart: 0, _teacherStart: 0, _teacherStop: 0,
+    lessonSummary: null, phase: "opening", closed: false, lastError: null,
+  };
+}
+
+// מטפל באירועי השרת (GA). טהור — מקבל state/handlers/send, כדי שאפשר לבדוק ב-node.
+// שמות GA: response.output_audio_transcript.delta/done, conversation.item.input_audio_transcription.completed,
+// input_audio_buffer.speech_started/stopped, output_audio_buffer.started/stopped/cleared (WebRTC),
+// response.function_call_arguments.done, session.created/updated, error. שמות ה-beta הישנים
+// (response.audio_transcript.*) עדיין מתקבלים — לא מזיק, ומגן מפני מעבר הדרגתי.
+export function createEventHandler({ state, handlers: h, send, now = () => Date.now() }){
+  const markConnected = (e) => {
+    if (!state.connected){ state.connected = true; h.onConnected?.(state.sessionModel); }
+    if (e?.session?.model) state.sessionModel = e.session.model;
+  };
+  return function handle(e){
+    if (!e || typeof e.type !== "string") return;
+    // כל אירוע מהשרת = החיבור חי באמת (לא רק ש-fetch הצליח)
+    if (e.type === "session.created" || e.type === "session.updated"){ if (e.session?.model) state.sessionModel = e.session.model; markConnected(e); return; }
+    markConnected();
+    switch (e.type){
+      // --- התלמיד מדבר (VAD בשרת) ---
+      case "input_audio_buffer.speech_started": {
+        state.userSpeaking = true; state._userStart = now();
+        if (state.teacherSpeaking) state.metrics.interruptions++;   // קטיעה אמיתית
+        if (state._teacherStop){ const lat = state._userStart - state._teacherStop; if (lat > 0 && lat < 30000) state.metrics.latencies.push(lat); state._teacherStop = 0; }
+        h.onUserSpeaking?.(true); break;
+      }
+      case "input_audio_buffer.speech_stopped": {
+        state.userSpeaking = false;
+        if (state._userStart){ const d = now() - state._userStart; state.metrics.studentMs += d; state.metrics.longestMs = Math.max(state.metrics.longestMs, d); state._userStart = 0; }
+        h.onUserSpeaking?.(false); break;
+      }
+      case "conversation.item.input_audio_transcription.completed": {
+        const t = (e.transcript || "").trim();
+        if (t){ state.transcript.push({ role: "user", content: t }); h.onUserText?.(t); }
+        break;
+      }
+      // --- המורה מדבר (WebRTC מדווח על תחילת/סוף נגינה) ---
+      case "output_audio_buffer.started":
+        state.teacherSpeaking = true; state._teacherStart = now(); h.onTeacherSpeaking?.(true); break;
+      case "output_audio_buffer.stopped":
+      case "output_audio_buffer.cleared": {
+        state.teacherSpeaking = false;
+        if (state._teacherStart){ state.metrics.teacherMs += now() - state._teacherStart; state._teacherStart = 0; }
+        state._teacherStop = now();
+        h.onTeacherSpeaking?.(false); break;
+      }
+      case "response.output_audio_transcript.delta":
+      case "response.audio_transcript.delta": {
+        const cur = (state.teacherTextByResponse.get(e.response_id) || "") + (e.delta || "");
+        state.teacherTextByResponse.set(e.response_id, cur);
+        h.onTeacherText?.(cur, false); break;
+      }
+      case "response.output_audio_transcript.done":
+      case "response.audio_transcript.done": {
+        const t = (e.transcript || state.teacherTextByResponse.get(e.response_id) || "").trim();
+        state.teacherTextByResponse.delete(e.response_id);
+        if (t){ state.transcript.push({ role: "assistant", content: t }); h.onTeacherText?.(t, true); }
+        break;
+      }
+      // --- כלים: המורה מדווח תיקונים/מילים/הגייה/שלב/שקף — הלקוח שומר ומחזיר תוצאה ---
+      case "response.function_call_arguments.done": {
+        let args = {}; try { args = JSON.parse(e.arguments || "{}"); } catch {}
+        let result = { ok: true };
+        try { result = h.onTool?.(e.name, args) ?? result; } catch {}
+        if (e.name === "lesson_phase" && args.phase) state.phase = args.phase;
+        if (e.name === "end_lesson_summary") state.lessonSummary = args;
+        send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: e.call_id, output: JSON.stringify(result) } });
+        send({ type: "response.create" });
+        break;
+      }
+      case "error": {
+        const msg = e.error?.message || "realtime error";
+        state.lastError = msg;
+        h.onError?.(msg, e.error); break;
+      }
+    }
+  };
+}
+
 // מתחיל שיחת realtime. handlers: onTeacherText(text, done), onUserText(text),
-// onTeacherSpeaking(bool), onUserSpeaking(bool), onTool(name, args) -> result, onError(msg)
+// onTeacherSpeaking(bool), onUserSpeaking(bool), onTool(name, args) -> result, onError(msg), onConnected(model)
 export async function startLive({ teacher, topic, lessonPlan = null, handlers }){
   if (!realtimeSupported()) return null;
   const sess = await fetchSession({ teacher, topic, lessonPlan });
@@ -69,80 +160,18 @@ export async function startLive({ teacher, topic, lessonPlan = null, handlers })
   mic.getTracks().forEach(t => pc.addTrack(t, mic));
 
   const dc = pc.createDataChannel("oai-events");
-  const state = {
-    teacherSpeaking: false, userSpeaking: false,
-    teacherText: "", teacherTextByResponse: new Map(),
-    transcript: [],                       // [{role, content}] — לזיכרון ולמשוב
-    metrics: { studentMs: 0, teacherMs: 0, longestMs: 0, latencies: [], interruptions: 0 },
-    _userStart: 0, _teacherStart: 0, _teacherStop: 0,
-    lessonSummary: null, phase: "opening", closed: false,
-  };
+  const state = newLiveState();
+  state.sessionModel = sess.model || null;
   const send = (obj) => { if (dc.readyState === "open") dc.send(JSON.stringify(obj)); };
+  const handle = createEventHandler({ state, handlers, send });
 
   dc.onopen = () => {
-    // המורה פותח את השיעור מיד — בלי לחכות שהתלמיד ידבר ראשון
-    send({ type: "response.create", instructions: "Greet the student warmly by name if you know it, in one or two short sentences. If your instructions mention a last lesson, connect to it in one short sentence. Then ask one easy opening question." });
+    // המורה פותח את השיעור מיד — בלי לחכות שהתלמיד ידבר ראשון (מבנה GA: response.{instructions})
+    send({ type: "response.create", response: { instructions: "Greet the student warmly by name if you know it, in one or two short sentences. If your instructions mention a last lesson, connect to it in one short sentence. Then ask one easy opening question." } });
   };
+  dc.onmessage = (ev) => { let e; try { e = JSON.parse(ev.data); } catch { return; } handle(e); };
 
-  dc.onmessage = (ev) => {
-    let e; try { e = JSON.parse(ev.data); } catch { return; }
-    const h = handlers;
-    switch (e.type){
-      // --- התלמיד מדבר (VAD בשרת) ---
-      case "input_audio_buffer.speech_started": {
-        state.userSpeaking = true; state._userStart = Date.now();
-        if (state.teacherSpeaking) state.metrics.interruptions++;   // קטיעה אמיתית
-        if (state._teacherStop) { const lat = state._userStart - state._teacherStop; if (lat > 0 && lat < 30000) state.metrics.latencies.push(lat); state._teacherStop = 0; }
-        h.onUserSpeaking?.(true); break;
-      }
-      case "input_audio_buffer.speech_stopped": {
-        state.userSpeaking = false;
-        if (state._userStart){ const d = Date.now() - state._userStart; state.metrics.studentMs += d; state.metrics.longestMs = Math.max(state.metrics.longestMs, d); state._userStart = 0; }
-        h.onUserSpeaking?.(false); break;
-      }
-      case "conversation.item.input_audio_transcription.completed": {
-        const t = (e.transcript || "").trim();
-        if (t){ state.transcript.push({ role: "user", content: t }); h.onUserText?.(t); }
-        break;
-      }
-      // --- המורה מדבר (WebRTC מדווח על תחילת/סוף נגינה) ---
-      case "output_audio_buffer.started":
-        state.teacherSpeaking = true; state._teacherStart = Date.now(); h.onTeacherSpeaking?.(true); break;
-      case "output_audio_buffer.stopped":
-      case "output_audio_buffer.cleared": {
-        state.teacherSpeaking = false;
-        if (state._teacherStart){ state.metrics.teacherMs += Date.now() - state._teacherStart; state._teacherStart = 0; }
-        state._teacherStop = Date.now();
-        h.onTeacherSpeaking?.(false); break;
-      }
-      case "response.audio_transcript.delta": {
-        const cur = (state.teacherTextByResponse.get(e.response_id) || "") + (e.delta || "");
-        state.teacherTextByResponse.set(e.response_id, cur);
-        h.onTeacherText?.(cur, false); break;
-      }
-      case "response.audio_transcript.done": {
-        const t = (e.transcript || state.teacherTextByResponse.get(e.response_id) || "").trim();
-        state.teacherTextByResponse.delete(e.response_id);
-        if (t){ state.transcript.push({ role: "assistant", content: t }); h.onTeacherText?.(t, true); }
-        break;
-      }
-      // --- כלים: המורה מדווח תיקונים/מילים/הגייה/שלב — הלקוח שומר ומחזיר תוצאה ---
-      case "response.function_call_arguments.done": {
-        let args = {}; try { args = JSON.parse(e.arguments || "{}"); } catch {}
-        let result = { ok: true };
-        try { result = h.onTool?.(e.name, args) ?? result; } catch {}
-        if (e.name === "lesson_phase" && args.phase) state.phase = args.phase;
-        if (e.name === "end_lesson_summary") state.lessonSummary = args;
-        send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: e.call_id, output: JSON.stringify(result) } });
-        send({ type: "response.create" });
-        break;
-      }
-      case "error":
-        h.onError?.(e.error?.message || "realtime error"); break;
-    }
-  };
-
-  // SDP: הצעה מהדפדפן → OpenAI (עם ה-client_secret הזמני) → תשובה
+  // SDP: הצעה מהדפדפן → POST /v1/realtime/calls (עם ה-client_secret הזמני) → תשובה
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   let sdpRes;
@@ -154,20 +183,24 @@ export async function startLive({ teacher, topic, lessonPlan = null, handlers })
     });
   } catch { cleanup(); throw new LiveError("webrtc"); }
   if (!sdpRes.ok){ cleanup(); throw new LiveError("webrtc"); }
+  // מזהה השיחה (GA מחזיר Location: /v1/realtime/calls/{id}) — לאבחון
+  try { const loc = sdpRes.headers.get("Location") || ""; state.callId = loc.split("/").pop() || null; } catch {}
   await pc.setRemoteDescription({ type: "answer", sdp: await sdpRes.text() });
 
-  // המתנה שהערוץ ייפתח (עד 8 שניות), אחרת נופלים
+  // המתנה שהערוץ ייפתח ושהשרת ידבר אלינו (עד 10 שניות) — אחרת זה לא "מחובר", נופלים
   await new Promise((res, rej) => {
-    if (dc.readyState === "open") return res();
-    const t = setTimeout(() => rej(new LiveError("webrtc")), 8000);
-    dc.addEventListener("open", () => { clearTimeout(t); res(); }, { once: true });
+    const t = setTimeout(() => rej(new LiveError("webrtc")), 10000);
+    const check = () => { if (state.connected){ clearTimeout(t); res(); } };
+    const origOnConnected = handlers.onConnected;
+    handlers.onConnected = (m) => { origOnConnected?.(m); check(); };
     pc.addEventListener("connectionstatechange", () => {
       if (pc.connectionState === "failed"){ clearTimeout(t); rej(new LiveError("webrtc")); }
     });
+    check();
   }).catch(err => { cleanup(); throw err; });
 
   function cleanup(){
-    if (state.closed) return; state.closed = true;
+    if (state.closed) return; state.closed = true; state.connected = false;
     try { dc.close(); } catch {}
     try { pc.close(); } catch {}
     mic?.getTracks().forEach(t => t.stop());
@@ -177,7 +210,8 @@ export async function startLive({ teacher, topic, lessonPlan = null, handlers })
 
   return {
     state,
-    model: sess.model,
+    model: state.sessionModel || sess.model,
+    transport: "webrtc",
     // עוצמת קול המורה 0..1 — ללק-סינק
     level(){
       if (!analyser) return state.teacherSpeaking ? 0.5 : 0;
@@ -200,7 +234,7 @@ export async function startLive({ teacher, topic, lessonPlan = null, handlers })
     interrupt(){ send({ type: "response.cancel" }); send({ type: "output_audio_buffer.clear" }); },
     mute(on){ mic.getAudioTracks().forEach(t => t.enabled = !on); },
     // בקשה מפורשת לסיכום השיעור מהמורה (לפני הסיום)
-    askSummary(){ send({ type: "response.create", instructions: "Give your short end-of-lesson summary now: what improved, what is still weak, what we will practice next time. Then call end_lesson_summary." }); },
+    askSummary(){ send({ type: "response.create", response: { instructions: "Give your short end-of-lesson summary now: what improved, what is still weak, what we will practice next time. Then call end_lesson_summary." } }); },
     close: cleanup,
   };
 }
