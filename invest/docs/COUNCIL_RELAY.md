@@ -1,5 +1,9 @@
 # ערוץ הכתיבה של ChatGPT ל-AI Council (Issue #25)
 
+> **עודכן (AI_COUNCIL#23):** הערוץ משרת עכשיו את כל הפרויקטים — `project` בהודעה מנתב ל-Issue של הפרויקט (invest → #25 כמו
+> תמיד), עם דדופליקציה וסטטוס לכל משימה. פירוט: [`.github/council/README.md`](../../.github/council/README.md). כל מה שלמטה
+> נשאר תקף ל-invest.
+
 **למה:** מחבר ה-GitHub של ChatGPT הוא קריאה בלבד (`403 Resource not accessible by integration` בכתיבה); את הרשאות האפליקציה
 קובע מי שבנה אותה, לא מי שמתקין אותה.
 

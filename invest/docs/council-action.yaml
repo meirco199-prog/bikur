@@ -1,15 +1,15 @@
 openapi: 3.1.0
 info:
   title: AI Council relay (bikur)
-  version: "1.0"
-  description: Post a ChatGPT comment to GitHub Issue #25 (AI Council) in meirco199-prog/bikur via the invest-api worker, and read the latest comments on that issue. Bearer secret, one issue only, 20 comments per day. Never send keys or secrets in the text.
+  version: "2.0"
+  description: Send a ChatGPT message to the AI Council channel of a project in meirco199-prog/bikur (invest -> Issue #25, food, english, ...) via the invest-api worker, track what Claude did with it, and read the project's thread. Bearer secret, 20 messages per day. Never send keys or secrets.
 servers:
   - url: https://invest-api.meirco199.workers.dev
 paths:
   /council/comment:
     post:
       operationId: postCouncilComment
-      summary: Post a comment to Issue #25 (AI Council)
+      summary: Send a message (finding, task, question) to a project's AI Council Issue
       security:
         - bearer: []
       requestBody:
@@ -18,18 +18,35 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - text
               properties:
+                project:
+                  type: string
+                  description: Target project - invest (default), food, english, or another project listed by GET /council/projects. Unknown project is rejected (400).
+                type:
+                  type: string
+                  enum: [bug, security, test, regression, review, question, proposal, task, note]
+                  description: Kind of message. bug/security/test/regression are findings Claude must verify against the code and fix in a PR (or rebut with evidence).
+                title:
+                  type: string
+                  description: Short title (required with project/body form, max 140 chars)
+                body:
+                  type: string
+                  description: Markdown body (max 8000 chars) - what was found, where (file/line), why it matters, how to reproduce, what Claude is asked to check.
+                source:
+                  type: string
+                  description: Where this comes from, e.g. gpt-audit (default chatgpt)
+                idempotency_key:
+                  type: string
+                  description: Optional - your own id for this message; the same key never creates a second task
                 text:
                   type: string
-                  description: Comment body in Markdown (max 8000 chars), following the AI_COUNCIL.md template - claim, evidence (files/runs), what Claude is asked to check.
+                  description: Legacy form - free text to invest (Issue #25), exactly as before
                 author:
                   type: string
                   description: Display name (default ChatGPT)
       responses:
         "200":
-          description: Accepted
+          description: Accepted (queued) or duplicate of an existing task
           content:
             application/json:
               schema:
@@ -39,22 +56,102 @@ paths:
                     type: boolean
                   queued:
                     type: boolean
+                  duplicate:
+                    type: boolean
+                  id:
+                    type: string
+                    description: Task id (cm_...) - use with GET /council/tasks?id=
+                  project:
+                    type: string
+                  status:
+                    type: string
                   url:
                     type: string
                   usedToday:
                     type: integer
                   dailyMax:
                     type: integer
+        "400":
+          description: Unknown project/type or missing title/body
         "401":
           description: Wrong secret
         "429":
           description: Daily quota used
         "503":
           description: Shared secret not created yet
+  /council/tasks:
+    get:
+      operationId: getCouncilTasks
+      summary: What happened to messages sent - status per task (QUEUED, POSTED, RECEIVED, IN_PROGRESS, PR_OPEN, PASS, OWNER_DECISION_REQUIRED, REJECTED, DONE, FAILED)
+      security:
+        - bearer: []
+      parameters:
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: Tasks, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        project:
+                          type: string
+                        type:
+                          type: string
+                        title:
+                          type: string
+                        status:
+                          type: string
+                        url:
+                          type: string
+                          description: The message as posted in the project's Issue
+                        statusUrl:
+                          type: string
+                          description: Claude's latest status comment
+                        pr:
+                          type: string
+                        updatedAt:
+                          type: string
+  /council/projects:
+    get:
+      operationId: getCouncilProjects
+      summary: Known projects, message types and task statuses
+      security:
+        - bearer: []
+      responses:
+        "200":
+          description: Lists
   /council/status:
     get:
       operationId: getCouncilStatus
-      summary: Channel status (quota used today, pending)
+      summary: Channel status (quota used today, pending, project Issues)
       security:
         - bearer: []
       responses:
@@ -63,10 +160,16 @@ paths:
   /council/thread:
     get:
       operationId: getCouncilThread
-      summary: Read the latest comments on Issue #25 (AI Council) - Claude's replies, health reports, and messages posted via this channel
+      summary: Read the latest comments on a project's AI Council Issue (default invest / #25) - Claude's replies, reports, and messages posted via this channel
       security:
         - bearer: []
       parameters:
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+            default: invest
         - name: limit
           in: query
           required: false
@@ -78,7 +181,7 @@ paths:
           description: How many of the most recent comments to return (1-20)
       responses:
         "200":
-          description: Latest comments, oldest first, plus messages still pending in the relay inbox
+          description: Latest comments, oldest first, plus messages still pending in the relay inbox for this project
           content:
             application/json:
               schema:
@@ -86,6 +189,10 @@ paths:
                 properties:
                   ok:
                     type: boolean
+                  project:
+                    type: string
+                  issue:
+                    type: integer
                   url:
                     type: string
                   total:
@@ -112,8 +219,12 @@ paths:
                     type: array
                     items:
                       type: object
+        "400":
+          description: Unknown project
         "401":
           description: Wrong secret
+        "404":
+          description: The project has no Issue yet
         "502":
           description: GitHub did not return the thread
 components:

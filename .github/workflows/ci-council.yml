@@ -1,0 +1,20 @@
+# בדיקות היחידה של ה-relay של AI Council (ניתוב הודעות ChatGPT ל-Issues של הפרויקטים) — רצות רק כשנוגעים בו.
+name: CI (council relay)
+
+on:
+  pull_request:
+    paths:
+      - '.github/council/**'
+      - '.github/workflows/council-relay.yml'
+      - '.github/workflows/ci-council.yml'
+
+jobs:
+  test:
+    name: council relay tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test .github/council/relay.test.mjs

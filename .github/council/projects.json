@@ -1,0 +1,42 @@
+{
+  "_doc": "רישום הפרויקטים של AI Council — מקור האמת היחיד לניתוב. הוספת פרויקט = ערך חדש כאן (+ merge ל-main: הפריסה מזריקה את הרשימה ל-Worker כ-COUNCIL_PROJECTS, וה-relay פותח לו Issue אוטומטית אם 'issue' חסר). ראה .github/council/README.md",
+  "projects": {
+    "invest": {
+      "issue": 25,
+      "paths": [
+        "invest/",
+        "invest-api/"
+      ],
+      "docs": [
+        "AI_COUNCIL.md",
+        "invest/docs/COUNCIL_RELAY.md"
+      ],
+      "handled_by": "legacy-routine",
+      "owner_rules": "תקופת ניסוי קפואה: אין שינוי משקלים/ספים/מגבלות סיכון/אסטרטגיה בלי נימוק מתועד ב-AI_COUNCIL.md ואישור בעל הריפו. כסף אמיתי, מינוף, מנויים — רק מאיר."
+    },
+    "food": {
+      "issue": 98,
+      "paths": [
+        "food/"
+      ],
+      "docs": [
+        "food/.ai/REVIEW.md"
+      ],
+      "owner_rules": "החלטת בעל הריפו (29/9): כל חוקי התזונה הנוכחיים של התזונאית (food/worker.js, הפרומפט) נשארים כפי שהם. אין לשנות אותם בעקבות ביקורת GPT אלא אם מאיר מבקש זאת במפורש — ממצא כזה מסומן OWNER_DECISION_REQUIRED."
+    },
+    "english": {
+      "issue": 99,
+      "paths": [
+        "english/",
+        "english-ai/",
+        "english-live/",
+        "english-push/"
+      ],
+      "docs": [
+        "english/.ai/REVIEW.md",
+        "english/README.md"
+      ],
+      "owner_rules": "אין fake metrics; realtime ו-fallback נשארים; אין סודות בצד הלקוח (english/.ai/REVIEW.md)."
+    }
+  }
+}
