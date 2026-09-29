@@ -54,12 +54,14 @@ test('gpt-review: מדיניות .ai/REVIEW.md — front-matter, התאמה לפ
   assert.deepEqual(meta.applies_to, ['english-ai/', 'english-live/']); assert.equal(meta.test, 'node --test x'); assert.deepEqual(meta.docs, ['a.md']); assert.match(body, /^# כללים/);
   assert.deepEqual(parseFrontMatter('# בלי front matter').meta, {});
   const root = mkdtempSync(join(tmpdir(), 'gr-'));
-  for (const d of ['.ai', 'english/.ai', 'food/.ai']) mkdirSync(join(root, d), { recursive: true });
+  for (const d of ['.ai', 'english/.ai', 'food/.ai', 'apps/deep/proj/.ai', 'a/b/c/d/.ai']) mkdirSync(join(root, d), { recursive: true });
+  writeFileSync(join(root, 'apps/deep/proj/.ai/REVIEW.md'), '# עומק 3'); writeFileSync(join(root, 'a/b/c/d/.ai/REVIEW.md'), '# עומק 4 — מחוץ לסריקה');
   writeFileSync(join(root, '.ai/REVIEW.md'), '# כללי');
   writeFileSync(join(root, 'english/.ai/REVIEW.md'), '---\napplies_to: [english-ai/]\n---\n# אנגלית');
   writeFileSync(join(root, 'food/.ai/REVIEW.md'), '# אוכל');
   const all = findPolicies(root);
-  assert.deepEqual(all.map((p) => p.dir), ['', 'english/', 'food/']);
+  assert.deepEqual(all.map((p) => p.dir), ['', 'apps/deep/proj/', 'english/', 'food/'], 'עומק עד 3 נסרק, עומק 4 לא');
+  assert.deepEqual(matchPolicies(all, [f('apps/deep/proj/x.js')]).map((p) => p.dir), ['', 'apps/deep/proj/']);
   assert.deepEqual(matchPolicies(all, [f('english-ai/worker.js')]).map((p) => p.dir), ['', 'english/'], 'applies_to תופס');
   assert.deepEqual(matchPolicies(all, [f('remi/x.js')]).map((p) => p.dir), [''], 'בלי מדיניות פרויקט — רק הכללי');
   assert.deepEqual(matchPolicies(all, [f('food/index.html'), f('english/js/a.js')]).map((p) => p.dir), ['', 'english/', 'food/']);
