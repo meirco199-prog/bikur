@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 export const REPO = process.env.REPO || 'meirco199-prog/bikur';
 export const ISSUE = Number(process.env.ISSUE || 25);
 export const MARKER = 'council-chatgpt';
+export const DEMO_HEADER = '### עסקאות הדמה — דעת ChatGPT';
 // דגמי reasoning (gpt-5) מוציאים טוקני חשיבה מאותו תקציב פלט — תקציב קטן מחזיר תוכן ריק; לכן תקציב גדול ומאמץ חשיבה נמוך כברירת מחדל
 const MAX_COMMENTS = 20, MAX_COMMENT_CHARS = 3000, MAX_DATA_CHARS = 6000, MAX_OUT_TOKENS = 8000;
 
@@ -17,6 +18,14 @@ export function shouldSkip(comments, today = todayIso()){
   if (idx >= 0 && String(comments[idx].body).includes(`<!-- ${MARKER} ${today} -->`)) return 'כבר פורסמה סקירה היום';
   if (idx >= 0 && idx === comments.length - 1) return 'אין תגובה חדשה מאז הסקירה הקודמת';
   return null;
+}
+/** חשבון הדמה (GET /agent/broker) בלי שדות רעש: יתרה, פוזיציות, מילויים והשוואה לסימולציה, מצב הסנכרון */
+export function slimBroker(b){
+  if (!b || typeof b !== 'object' || b.missing) return b;
+  return { day: b.day, authenticated: b.authenticated, account: b.account, broker: b.broker, sizeRatio: b.sizeRatio, sync: b.sync,
+    positions: (b.positions || []).map((p) => ({ symbol: p.symbol, qty: p.qty, avgPrice: p.avgPrice, marketPrice: p.marketPrice, unrealizedUsd: p.unrealizedUsd })),
+    fills: (b.fills || []).map((f) => ({ symbol: f.symbol, side: f.side, qty: f.filledQty, avgPrice: f.avgPrice, status: f.status, at: f.at, id: f.clientOrderId })),
+    reconcile: b.reconcile ? { summary: b.reconcile.summary, rows: b.reconcile.rows } : null, errors: (b.errors || []).slice(-3) };
 }
 export function buildMessages({ comments, data, rules, today = todayIso() }){
   const system = [
@@ -33,6 +42,12 @@ export function buildMessages({ comments, data, rules, today = todayIso() }){
     '- דברים שרק מאיר מחליט (כסף, מנויים, מינוף, אסטרטגיה): ציין "ממתין להחלטת מאיר" ואל תבקש מ-Claude לבצע.',
     '- אסור לכלול מפתחות, טוקנים או סודות, גם לא כדוגמה.',
     '- אם אחרי בדיקה אין לך ממצא חדש: כתוב שורה אחת "אין ממצאים חדשים היום" ושורה אחת מה בדקת. אל תמציא ממצא כדי למלא מקום.',
+    '', '## חובה בכל ריצה: חוות דעת על עסקאות חשבון הדמה של IBKR (בקשת מאיר 29/9 — הוא רוצה ש-ChatGPT יהיה מעורב בכל עסקה):',
+    `- פתח את התגובה בכותרת "${DEMO_HEADER}" ורק אחריה את שאר הסקירה. הכותרת הזו נקראת אוטומטית ומועברת למאיר.`,
+    '- הנתונים: `agent/report.pending.orders` = פקודות שהסוכן החליט ושהגשר ישלח לדמה בפתיחת המסחר הבא (לכל אחת: strategy, score, reason, evidence, stop). `agent/broker` = מה שכבר בוצע בדמה (fills, positions עם unrealizedUsd, reconcile.rows עם slipPct).',
+    '- לכל פקודה ממתינה: שורה אחת — **מסכים / לא מסכים / מסכים עם הסתייגות**, ולמה, לפי הראיות (evidence) והמצב (regime, חשיפה, ריכוז). אם אין פקודות ממתינות — כתוב "אין פקודות חדשות לדמה".',
+    '- לכל פוזיציה פתוחה בדמה: אם יש משהו שמדאיג (הפסד שמתקרב לעצירה, ריכוז, מכשיר ממונף/הפוך, החלקה חריגה) — שורה אחת. אם הכול בסדר — שורה אחת כללית.',
+    '- בעברית פשוטה, בלי מונחים שמאיר לא מכיר (הסבר "שורט", "ממונף" בחצי משפט). זו דעה שנייה בלבד: היא לא עוצרת פקודות ולא משנה מדיניות; מחלוקת אמיתית — הצע ניסוי, מאיר מכריע.',
   ].join('\n');
   const thread = comments.slice(-MAX_COMMENTS).map((c) => `### ${String(c.created_at || '').slice(0, 16).replace('T', ' ')} · ${kindOf(c)}\n${String(c.body || '').slice(0, MAX_COMMENT_CHARS)}${String(c.body || '').length > MAX_COMMENT_CHARS ? '\n…(קוצר)' : ''}`).join('\n\n');
   const dataTxt = Object.entries(data).map(([k, v]) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return `### ${k}\n${s.slice(0, MAX_DATA_CHARS)}${s.length > MAX_DATA_CHARS ? '…(קוצר)' : ''}`; }).join('\n\n');
@@ -54,13 +69,14 @@ if (isMain){
   const ghHdr = { Authorization: `Bearer ${GH}`, Accept: 'application/vnd.github+json', 'User-Agent': 'bikur-council-chatgpt', 'X-GitHub-Api-Version': '2022-11-28' };
   const comments = await (await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE}/comments?per_page=100`, { headers: ghHdr })).json();
   if (!Array.isArray(comments)){ console.error('GitHub לא החזיר תגובות:', JSON.stringify(comments).slice(0, 200)); process.exit(1); }
-  const skip = shouldSkip(comments); if (skip && process.env.COUNCIL_FORCE !== '1'){ console.log(`מדלג: ${skip}`); process.exit(0); }
+  const skip = shouldSkip(comments); if (skip && process.env.COUNCIL_FORCE !== '1' && !/אין תגובה חדשה/.test(skip)){ console.log(`מדלג: ${skip}`); process.exit(0); }
+  // "אין תגובה חדשה" לא מספיק כדי לדלג: גם בלי דיון חדש מאיר מצפה לחוות דעת יומית על עסקאות הדמה
   if (skip) console.log(`COUNCIL_FORCE=1 — מריץ למרות: ${skip}`);
   const get = async (p) => { try { const r = await fetch(`${W}/${p}`); const t = await r.text(); try { return JSON.parse(t); } catch { return `HTTP ${r.status}`; } } catch (e) { return `error: ${e.message}`; } };
-  const [health, cron, rank, shadow, paper, aggr, agent] = await Promise.all([get('health'), get('cron/status'), get('rank'), get('shadow/report'), get('paper'), get('aggressive/report'), get('agent/report')]);
+  const [health, cron, rank, shadow, paper, aggr, agent, broker] = await Promise.all([get('health'), get('cron/status'), get('rank'), get('shadow/report'), get('paper'), get('aggressive/report'), get('agent/report'), get('agent/broker')]);
   // הסוכן הרב-נכסי (AI_COUNCIL#21): מצב, פוזיציות, פקודות ממתינות, הזדמנויות ודחיות השער — בלי היומן והסדרה (גדולים)
   const agentSlim = agent && !agent.missing ? { ...agent, journal: (agent.journal || []).slice(0, 8), equity: (agent.equity || []).slice(-5), opportunities: agent.opportunities ? { ...agent.opportunities, candidates: (agent.opportunities.candidates || []).slice(0, 12), gateLog: (agent.opportunities.gateLog || []).slice(0, 10), skipped: undefined } : null } : agent;
-  const data = { health, 'cron/status': cron, rank, 'shadow/report': shadow, paper, 'aggressive/report': aggr, 'agent/report': agentSlim };
+  const data = { 'agent/broker': slimBroker(broker), 'agent/report': agentSlim, health, 'cron/status': cron, rank, 'shadow/report': shadow, paper, 'aggressive/report': aggr };
   let rules = ''; try { rules = readFileSync(new URL('../../AI_COUNCIL.md', import.meta.url), 'utf8').split('\n## יומן הנושאים')[0].slice(0, 9000); } catch { rules = '(AI_COUNCIL.md לא נמצא — פעל לפי הכללים שבהודעה זו)'; }
   const messages = buildMessages({ comments, data, rules });
   const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: MODEL, messages, max_completion_tokens: MAX_OUT_TOKENS, ...(/^(gpt-5|o\d)/.test(MODEL) ? { reasoning_effort: EFFORT } : {}) }) });
