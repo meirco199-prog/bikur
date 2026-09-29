@@ -22,6 +22,8 @@
 ("צור מפתח חדש"). אם מעדיפים סוד קבוע ב-Secrets — `COUNCIL_SECRET` גובר.
 
 ## מה צריך לעשות (פעם אחת)
+> מדריך מעודכן לסכימה v2 (project/type/title/body, getCouncilTasks): [`.github/council/CHATGPT_SETUP.md`](../../.github/council/CHATGPT_SETUP.md).
+
 1. באפליקציה: **הגדרות → ערוץ ה-Council → "הצג מפתח" → "העתק"**.
 2. ב-ChatGPT: GPT מותאם → Configure → **Actions → Import from URL**:
    `https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml`
