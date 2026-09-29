@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ibkrContractSpec, toIbkrOrder, ibkrQty, pickFrontMonth, reconcileFills, normalizeBrokerOrder, needsConfirm, clipExitToHeld } from '../engine/ibkr-map.js';
 import { IbkrClient } from '../lib/ibkr-client.js';
-import { brokerPending, recordBroker, brokerReport } from '../lib/agent-broker.js';
+import { brokerPending, recordBroker, brokerReport, requestBrokerSync } from '../lib/agent-broker.js';
 import { DB } from '../lib/db.js';
 import worker from '../worker.js';
 
@@ -100,4 +100,23 @@ test('יציאה מול מה שהדמה מחזיק: אין פוזיציה → ד
   assert.equal(clipExitToHeld(coverShort, 0).ok, false); assert.equal(clipExitToHeld(coverShort, 100).ok, false, 'לונג בדמה לא נסגר ב-cover');
   assert.equal(clipExitToHeld(coverShort, -260).qty, 260); assert.equal(clipExitToHeld(coverShort, -100).qty, 100);
   assert.deepEqual(clipExitToHeld({ kind: 'entry', symbol: 'SMH', side: 'buy', qty: 10 }, 0), { ok: true, qty: 10 }, 'כניסה חדשה לא תלויה בפוזיציה');
+});
+
+test('סנכרון חד-פעמי לדמה: פוזיציות קיימות → פקודות sync (רק עם סוד ה-cron), אידמפוטנטי, מדווח בדוח', async () => {
+  const store = new Map();
+  const env = { INVEST: { get: async (k, type) => (store.has(k) ? (type === 'text' ? store.get(k) : JSON.parse(store.get(k))) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async () => ({ keys: [], list_complete: true }) }, APP_TOKEN: 'secret', CRON_SECRET: 'cron-s', BRIDGE_SECRET: 'bridge-s', RATE_LIMIT_OFF: '1' };
+  const call = (path, { method = 'GET', body } = {}) => worker.fetch(new Request('https://api.test' + path, { method, headers: { 'CF-Connecting-IP': '9.9.9.9', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }), env, { waitUntil(){} }).then(async (r) => ({ status: r.status, j: await r.json() }));
+  store.set('agent:state', JSON.stringify({ lastDay: '2026-09-28', initialUsd: 66000, positions: { ARKK: { qty: 70, avg: 91.4, lastMark: 89.25, strategy: 'trend' }, UVXY: { qty: -260.4338, avg: 16.62, lastMark: 17.08, strategy: 'trend' }, NOPE: { qty: 5, avg: 1 } } }));
+  assert.equal((await call('/agent/broker/sync?secret=bridge-s', { method: 'POST' })).status, 401, 'סוד הגשר לא מספיק ליצירת פקודות');
+  const s = await call('/agent/broker/sync?secret=cron-s&date=2026-09-29', { method: 'POST' });
+  assert.equal(s.status, 200); assert.equal(s.j.count, 2, 'מכשיר לא מוכר (NOPE) מדולג'); assert.deepEqual(s.j.orders, ['buy 70 ARKK', 'short 260.4338 UVXY']);
+  const p = await call('/agent/broker/pending?secret=bridge-s');
+  assert.equal(p.j.sync.length, 2); assert.equal(p.j.sync[0].kind, 'sync'); assert.equal(p.j.sync[0].clientOrderId, 'agent:sync:2026-09-29:ARKK:buy'); assert.equal(p.j.sync[0].price, 89.25); assert.equal(p.j.sync[0].sent, null); assert.equal(p.j.syncDay, '2026-09-29');
+  await call('/agent/broker/fills?secret=bridge-s', { method: 'POST', body: { day: '2026-09-29', status: { authenticated: true, account: 'DU1' }, sent: [{ clientOrderId: 'agent:sync:2026-09-29:ARKK:buy', orderId: '77', symbol: 'ARKK', side: 'buy', qty: 70 }, { clientOrderId: 'agent:sync:2026-09-29:UVXY:short', orderId: null, symbol: 'UVXY', side: 'short', qty: 0, skipped: 'כבר מוחזק' }], fills: [{ clientOrderId: 'agent:sync:2026-09-29:ARKK:buy', orderId: '77', filledQty: 70, avgPrice: 89.5, status: 'filled' }] } });
+  const p2 = await call('/agent/broker/pending?secret=bridge-s'); assert.equal(p2.j.sync[0].sent.orderId, '77', 'סנכרון שנשלח מסומן — לא יישלח שוב'); assert.equal(p2.j.sync[1].sent.skipped, 'כבר מוחזק');
+  const r = await call('/agent/broker'); assert.deepEqual(r.j.sync, { day: '2026-09-29', requestedAt: r.j.sync.requestedAt, total: 2, sent: 1, skipped: 1 });
+  assert.equal(r.j.reconcile.rows.find((x) => x.symbol === 'ARKK').slipPct, 0.0028, 'ההשוואה מול הסימון האחרון בסימולציה (89.25)');
+  const off = await call('/agent/broker/sync?secret=cron-s&off=1', { method: 'POST' }); assert.equal(off.j.off, true);
+  assert.equal((await call('/agent/broker/pending?secret=bridge-s')).j.sync.length, 0, 'ביטול מוחק את הבקשה');
+  const db = new DB(null); await db.put('agent:state', { positions: {} }); assert.equal((await requestBrokerSync(db)).count, 0);
 });
