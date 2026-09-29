@@ -1,5 +1,5 @@
 /* English — service worker: קאשינג לעבודה ללא אינטרנט */
-var CACHE = "english-v13";
+var CACHE = "english-v14";
 var ASSETS = [
   "./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png",
   "css/main.css",

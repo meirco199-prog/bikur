@@ -520,3 +520,5 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 .sched-status { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .sched-status.warn { color: var(--bad); }
 .sched-status .btn { align-self: flex-start; margin-top: 2px; }
+.nl-cta.nl-now { border: none; width: 100%; cursor: pointer; font-size: 1.05rem; font-family: inherit; margin-top: 8px; }
+.nl-hint { color: #e6e4ff; text-align: center; opacity: .9; }
