@@ -11,7 +11,7 @@ import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
 import { runAggressive, aggrReport, executeAggressive } from './lib/aggressive.js';
 import { runAgent, agentReport, setKill } from './lib/agent.js';
-import { brokerPending, recordBroker, brokerReport } from './lib/agent-broker.js';
+import { brokerPending, recordBroker, brokerReport, requestBrokerSync } from './lib/agent-broker.js';
 import { AGENT_SIM_POLICY } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
@@ -181,6 +181,8 @@ async function handle(req, env0, ctx){
       if (!byBridge) needAuth();
       if (p2 === 'pending') return json(await brokerPending(db));
       if (p2 === 'fills' && req.method === 'POST'){ try { return json(await recordBroker(db, body)); } catch (e) { await db.logError('agent-broker', e.message); return err('גשר IBKR: ' + e.message, 500); } }
+      // סנכרון חד-פעמי של הפוזיציות הקיימות לדמה — רק סוד ה-cron/טוקן (לא BRIDGE_SECRET: הגשר לא יוצר פקודות בעצמו)
+      if (p2 === 'sync' && req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); return json(await requestBrokerSync(db, { day: validDate(q.date) ? q.date : null, off: q.off === '1' })); }
       return err('not found', 404);
     }
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET);
