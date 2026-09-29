@@ -1,11 +1,11 @@
 /* English — service worker: קאשינג לעבודה ללא אינטרנט */
-var CACHE = "english-v11";
+var CACHE = "english-v12";
 var ASSETS = [
   "./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png",
   "css/main.css",
   "js/app.js", "js/util.js", "js/store.js", "js/srs.js", "js/gamify.js", "js/speech.js",
-  "js/ai.js", "js/notify.js", "js/push.js", "js/lesson.js", "js/avatar.js", "js/live.js",
-  "js/data/words.js", "js/data/grammar.js", "js/data/scenarios.js", "js/data/reading.js", "js/data/test.js",
+  "js/ai.js", "js/notify.js", "js/push.js", "js/lesson.js", "js/avatar.js", "js/live.js", "js/curriculum.js",
+  "js/data/words.js", "js/data/grammar.js", "js/data/scenarios.js", "js/data/reading.js", "js/data/test.js", "js/data/course.js",
   "js/screens/onboarding.js", "js/screens/placement.js", "js/screens/home.js", "js/screens/learn.js",
   "js/screens/speak.js", "js/screens/words.js", "js/screens/teacher.js", "js/screens/profile.js",
   "js/screens/classroom.js"

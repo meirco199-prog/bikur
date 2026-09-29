@@ -14,7 +14,7 @@ export function realtimeSupported(){
 function liveBase(){ return (S.settings.liveUrl || "").replace(/\/+$/, ""); }
 
 // מבקש session זמני. מחזיר null אם ה-Worker לא מוגדר (fallback שקט), זורק על שגיאה אחרת.
-async function fetchSession({ teacher, topic }){
+async function fetchSession({ teacher, topic, lessonPlan }){
   if (!liveBase()) return null;
   let res;
   try {
@@ -23,6 +23,7 @@ async function fetchSession({ teacher, topic }){
       body: JSON.stringify({
         teacherId: teacher.id, teacher: teacher.name, topic: topic || null,
         studentName: S.profile.name || null, profile: learnerProfile(),
+        lessonPlan: lessonPlan || null,
       }),
     });
   } catch { return null; } // אין רשת/אין Worker — fallback
@@ -36,9 +37,9 @@ async function fetchSession({ teacher, topic }){
 
 // מתחיל שיחת realtime. handlers: onTeacherText(text, done), onUserText(text),
 // onTeacherSpeaking(bool), onUserSpeaking(bool), onTool(name, args) -> result, onError(msg)
-export async function startLive({ teacher, topic, handlers }){
+export async function startLive({ teacher, topic, lessonPlan = null, handlers }){
   if (!realtimeSupported()) return null;
-  const sess = await fetchSession({ teacher, topic });
+  const sess = await fetchSession({ teacher, topic, lessonPlan });
   if (!sess) return null;
 
   // מיקרופון — אודיו בלבד, עם ביטול הד כדי שהמורה לא ישמע את עצמו מהרמקול
@@ -189,6 +190,11 @@ export async function startLive({ teacher, topic, handlers }){
       state.transcript.push({ role: "user", content: text });
       send({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } });
       send({ type: "response.create" });
+    },
+    // הערה "שקטה" למורה (זמן, תשובה בחידון, תוצאת קריאה) — לא נכנסת לתמלול של התלמיד
+    note(text, respond = true){
+      send({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } });
+      if (respond) send({ type: "response.create" });
     },
     // עצירת המורה באמצע (כפתור) — VAD כבר עושה את זה אוטומטית כשמדברים
     interrupt(){ send({ type: "response.cancel" }); send({ type: "output_audio_buffer.clear" }); },

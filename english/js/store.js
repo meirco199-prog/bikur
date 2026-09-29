@@ -49,6 +49,13 @@ function defaults(){
       pronunciation: {},      // word -> {issue, count, improved, lastSeen} — רק מה שנשמע באמת
       lastLesson: null,       // {date, topic, mode, fillers, minutes, recap}
     },
+    course: {                 // הקורס: אבחון, פרופיל לפי מיומנות, מסלול שיעורים, השיעור הבא מוכן מראש, תזמון
+      placementDone: false,
+      skills: {speaking: null, listening: null, reading: null, vocab: null, grammar: null, pronunciation: null},
+      done: [],               // שיעורים שהושלמו
+      next: null,             // תוכנית השיעור הבא (שקפים, שלבים) — מוכנה לפני שלוחצים Start
+      schedule: null,         // {weekday, time, durationMin, teacherId}
+    },
     settings: {
       theme: "system",
       aiUrl: "https://english-ai.meirco199.workers.dev",

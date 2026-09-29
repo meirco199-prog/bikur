@@ -8,6 +8,8 @@ import { CHALLENGES, PHRASES } from "../data/scenarios.js";
 import { speak } from "../speech.js";
 import { buildLesson, runLesson } from "../lesson.js";
 import { comebackMessage } from "../notify.js";
+import { ensureNextLesson, fmtSchedule, isPlacementDone } from "../curriculum.js";
+import { teacherById } from "../avatar.js";
 
 function dayHash(){
   const d = todayStr();
@@ -46,6 +48,9 @@ export function renderHome(main){
 
     comeback ? el("div", {class: "card notice"}, comeback.text,
       comeback.quick ? el("button", {class: "btn primary small", onclick: () => quickStart(main, 3)}, "אימון 3 דקות") : null) : null,
+
+    // השיעור הבא — מוכן מראש, כמו מורה שהכינה שיעור לפני שהגעת
+    nextLessonCard(),
 
     // היום שלך באנגלית
     el("div", {class: "card today"},
@@ -116,6 +121,19 @@ export function renderHome(main){
     // גרף שבועי מינימלי
     weekChart(),
   ));
+}
+
+function nextLessonCard(){
+  const plan = ensureNextLesson();
+  const t = teacherById(plan.teacherId);
+  const when = fmtSchedule();
+  return el("button", {class: "card next-lesson", onclick: () => { location.hash = "#/live"; }},
+    el("div", {class: "nl-top"},
+      el("span", {class: "nl-label"}, "השיעור הבא שלך"),
+      el("span", {class: "nl-when"}, when || "לא נקבע — לחץ לתזמון")),
+    el("div", {class: "nl-title", dir: "ltr"}, `Lesson ${plan.n} — ${plan.title}`),
+    el("div", {class: "muted small-text"}, `${t.name} · ${plan.durationMin} דקות · ${plan.he}${isPlacementDone() ? "" : " · שיעור היכרות ואבחון"}`),
+    el("div", {class: "nl-cta"}, "🎥 כניסה לשיעור"));
 }
 
 function greeting(){
