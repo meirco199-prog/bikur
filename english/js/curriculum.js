@@ -4,7 +4,9 @@ import { S, save, memorySummary } from "./store.js";
 import { TOPICS, topicById, bandFor } from "./data/course.js";
 import { BANK, LEVELS } from "./data/test.js";
 import { hardWords } from "./srs.js";
-import { shuffle, todayStr } from "./util.js";
+import { todayStr } from "./util.js";
+import { estimateLevel } from "./adaptive.js";
+import { syncReminderState, scheduleLesson } from "./notify.js";
 
 export const DURATIONS = [20, 30, 45];
 export const WEEKDAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -26,6 +28,9 @@ export function setSchedule({weekday, time, durationMin, teacherId}){
   S.course.schedule = {weekday, time, durationMin, teacherId};
   if (S.course.next){ S.course.next.teacherId = teacherId; S.course.next.durationMin = durationMin; S.course.next.phases = phasesFor(S.course.next, durationMin); }
   save();
+  // התזכורת לשיעור: מצב ל-IndexedDB (ל-SW) + לשרת ה-push (כשהאפליקציה סגורה) + טיימר מקומי
+  syncReminderState();
+  scheduleLesson();
 }
 // המועד הבא (Date) לפי יום/שעה; null אם לא נקבע
 export function nextScheduledDate(){
@@ -64,20 +69,13 @@ function baseFields(kind, n){
   return {kind, n, teacherId: sc.teacherId || "sarah", durationMin: sc.durationMin || 30, createdAt: todayStr(), status: "ready"};
 }
 
-// חידון נמדד: שאלה אחת לכל (מיומנות, רמה) מבנק השאלות של מבחן הרמה
-function quizSlides(levels){
-  const typeToSkill = {vocab: "vocab", grammar: "grammar", sentence: "grammar", listen: "listening", read: "reading"};
-  const out = [];
-  for (const skill of ["listening", "reading", "vocab", "grammar"]){
-    for (const lvl of levels){
-      const pool = (BANK[lvl] || []).filter(q => typeToSkill[q.type] === skill);
-      if (!pool.length) continue;
-      const q = shuffle(pool)[0];
-      out.push({type: "quiz", skill, level: lvl, title: `${SKILL_HE[skill]} · ${lvl}`,
-        q: q.q, opts: q.opts, a: q.a, say: q.say || null, text: q.text || null});
-    }
-  }
-  return out;
+// תרגיל אדפטיבי לכל מיומנות (A1→C2): הפריטים נבחרים תוך כדי השיעור (adaptive.js) סביב
+// הרמה של התלמיד — לא פריט בודד לכל רמה. startFor(skill) → רמת ההתחלה.
+export const QUIZ_SKILLS = ["listening", "reading", "vocab", "grammar"];
+const TYPE_TO_SKILL = {vocab: "vocab", grammar: "grammar", sentence: "grammar", listen: "listening", read: "reading"};
+export function quizPool(skill){ return level => (BANK[level] || []).filter(q => TYPE_TO_SKILL[q.type] === skill); }
+function quizSlides(startFor){
+  return QUIZ_SKILLS.map(skill => ({type: "quiz", skill, adaptive: true, start: startFor(skill), title: `${SKILL_HE[skill]} — תרגיל קצר`}));
 }
 
 // שיעור 1 — אבחון: שיחה + חידונים נמדדים + קריאה בקול + משימות דיבור
@@ -88,7 +86,7 @@ export function buildPlacementLesson(){
   const slides = [
     {type: "title", title: "Lesson 1 — Getting to know you", body: "שיעור היכרות ואבחון: שיחה, קצת קריאה וכמה שאלות קצרות. לא מבחן — בסוף המורה תדע איפה אתה חזק ומה לחזק."},
     {type: "prompt", title: "Tell me about yourself", body: "Where you live, what you do, your family, what you like. Take your time."},
-    ...quizSlides(["A2", "B1", "B2"]),
+    ...quizSlides(() => lvl),
     {type: "story", title: "Read aloud", body: topic.story[band], readAloud: true},
     {type: "questions", title: "Let's talk about it", items: topic.questions.slice(0, 3)},
     {type: "prompt", title: "Describe the situation", body: "You are late for an important meeting and your car won't start. What do you do? Describe it step by step."},
@@ -147,14 +145,12 @@ export function buildLesson(n){
 
 // Progress Check: שיחה + חידונים נמדדים ברמה הנוכחית ומעליה + קריאה + סיפור. מעלים רמה רק אם נמדד שיפור.
 export function buildCheckLesson(n){
-  const lv = speakingLevel();
-  const levels = [lv, lvlAt(lvlIdx(lv) + 1)].filter((v, i, a) => a.indexOf(v) === i);
   const topic = TOPICS[(n + 3) % TOPICS.length];
   const band = bandFor(lvlAt(lvlIdx(readingLevel()) + 1));
   const slides = [
     {type: "title", title: `Lesson ${n} — Progress check`, body: "לא מבחן: שיחה, קריאה, קצת האזנה ותרגילים — כדי לראות אם אפשר לעלות רמה."},
     {type: "prompt", title: "Catch me up", body: "What's new since we started? Tell me about your week in detail."},
-    ...quizSlides(levels),
+    ...quizSlides(sk => S.course.skills[sk] || S.profile.level || "A2"),
     {type: "story", title: "Read aloud", body: topic.story[band], readAloud: true},
     {type: "questions", title: "Let's talk about it", items: topic.questions.slice(1, 4)},
     {type: "prompt", title: "Fluency challenge", body: "Tell me a story for 90 seconds. I won't interrupt."},
@@ -192,11 +188,12 @@ export function phasesFor(plan, durationMin){
 
 // ---------- סיום שיעור: מדידה, רמות, השיעור הבא ----------
 // quizAnswers: [{skill, level, correct}]; teacherSkills: {speaking:"B1",...} (הערכת המורה) או null
+// עיקרון: לא נמדד = null. דיבור נקבע רק מהערכת המורה בשיחה; אין נפילה לרמה "משוערת".
 export function completeLesson(plan, {quizAnswers = [], teacherSkills = null, secs = 0, mode = "text"} = {}){
   const measured = skillLevelsFromQuiz(quizAnswers);
   const before = {...S.course.skills};
   if (plan.kind === "placement" || plan.kind === "check"){
-    for (const sk of ["listening", "reading", "vocab", "grammar"]){
+    for (const sk of QUIZ_SKILLS){
       const m = measured[sk];
       if (!m) continue;
       // באבחון קובעים; בבדיקת התקדמות מעלים רק אם נמדד גבוה יותר (לא מורידים אוטומטית)
@@ -206,9 +203,7 @@ export function completeLesson(plan, {quizAnswers = [], teacherSkills = null, se
       const t = teacherSkills.speaking;
       if (plan.kind === "placement" || lvlIdx(t) > lvlIdx(S.course.skills.speaking || "A1")) S.course.skills.speaking = t;
     }
-    // דיבור לא נמדד בחידון; אם המורה לא העריך — נשאר לפי הרמה הכללית
-    if (!S.course.skills.speaking) S.course.skills.speaking = S.profile.level || measured.vocab || "A2";
-    // הרמה הכללית = חציון המיומנויות (ההרגשה של "איפה אני")
+    // הרמה הכללית = חציון המיומנויות שנמדדו/הוערכו בפועל בלבד
     const vals = SKILLS.map(k => S.course.skills[k]).filter(Boolean).map(lvlIdx).sort((a, b) => a - b);
     if (vals.length) S.profile.level = lvlAt(vals[Math.floor((vals.length - 1) / 2)]);
     if (plan.kind === "placement") S.course.placementDone = true;
@@ -222,23 +217,26 @@ export function completeLesson(plan, {quizAnswers = [], teacherSkills = null, se
   return {measured, skills: {...S.course.skills}, before};
 }
 
-// רמה לכל מיומנות מתשובות נמדדות: הרמה הגבוהה ביותר שכל הרמות עד אליה נענו נכון
-export function skillLevelsFromQuiz(answers){
+// רמה לכל מיומנות מהתשובות (adaptive.js): רק מיומנות עם לפחות שתי תשובות ורמה מבוססת נקבעת.
+// פירוט (רמה, ביסוס, מספר פריטים) — quizDetail; לרמות בלבד — skillLevelsFromQuiz.
+export function quizDetail(answers){
   const out = {};
-  for (const sk of ["listening", "reading", "vocab", "grammar"]){
+  for (const sk of QUIZ_SKILLS){
     const mine = answers.filter(a => a.skill === sk);
-    if (!mine.length) continue;
-    const ok = new Set(mine.filter(a => a.correct).map(a => a.level));
-    const asked = [...new Set(mine.map(a => a.level))].sort((a, b) => lvlIdx(a) - lvlIdx(b));
-    let level = null;
-    for (const l of asked){ if (ok.has(l)) level = l; else break; }
-    out[sk] = level || lvlAt(lvlIdx(asked[0]) - 1);
+    if (mine.length < 2) continue;
+    out[sk] = estimateLevel(mine);
   }
+  return out;
+}
+export function skillLevelsFromQuiz(answers){
+  const d = quizDetail(answers), out = {};
+  for (const sk of Object.keys(d)) if (d[sk].confident) out[sk] = d[sk].level;
   return out;
 }
 
 // ---------- טקסט התוכנית למורה ----------
-export function planText(plan, currentSlide = 1){
+// quizDesc(slide) — תיאור הפריט הנוכחי בתרגיל האדפטיבי (נבחר בזמן השיעור, לא בתוכנית)
+export function planText(plan, currentSlide = 1, quizDesc = null){
   const L = [];
   L.push(`LESSON PLAN — Lesson ${plan.n}: ${plan.title} (${plan.kind}). Duration ${plan.durationMin} min. Goals: ${plan.goals.join("; ")}.`);
   L.push("Phases (minutes): " + plan.phases.map(p => `${p.name} ${p.start}-${p.end}${p.slide ? " → slide " + p.slide : ""}`).join(" | "));
@@ -249,7 +247,7 @@ export function planText(plan, currentSlide = 1){
     else if (s.type === "vocab") d += s.items.map(([w, h]) => `${w}=${h}`).join(", ");
     else if (s.type === "story") d += `ask the student to READ IT ALOUD, then comprehension → vocabulary (ask meanings in Hebrew) → opinion → personal experience. Text: "${s.body}"`;
     else if (s.type === "questions") d += s.items.join(" / ");
-    else if (s.type === "quiz") d += `${s.skill} ${s.level}. ${s.say ? `First READ THIS ALOUD once (do not show it): "${s.say}". ` : ""}${s.text ? `Passage on slide: "${s.text}". ` : ""}Question: "${s.q}" Options: ${s.opts.map((o, i) => `${"ABCD"[i]}) ${o}`).join(" ")} (correct: ${"ABCD"[s.a]}). The student answers ON SCREEN; you will get a note with the result — react briefly and move on.`;
+    else if (s.type === "quiz") d += `${s.skill} — adaptive short exercise: the app picks 3-6 items between A1 and C2 around the student's level (starting ${s.start}). The student answers ON SCREEN; after each answer you get a note with the result and the next item — react in a few words and move on. ${quizDesc ? quizDesc(s) : ""}`;
     else d += s.body || "";
     L.push(d);
   }

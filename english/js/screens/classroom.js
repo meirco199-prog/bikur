@@ -13,8 +13,10 @@ import { startLive, realtimeSupported, LiveError } from "../live.js";
 import { review, ensureEntry } from "../srs.js";
 import { WORDS, wordKey } from "../data/words.js";
 import { LEVELS } from "../data/test.js";
-import { ensureNextLesson, setSchedule, fmtSchedule, planText, completeLesson, isPlacementDone,
+import { ensureNextLesson, setSchedule, fmtSchedule, planText, completeLesson, isPlacementDone, quizPool, quizDetail,
   DURATIONS, WEEKDAYS_HE, SKILLS, SKILL_HE } from "../curriculum.js";
+import { createRun } from "../adaptive.js";
+import { lessonReminderStatus, enableNotifs } from "../notify.js";
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const sttOK = !!SR;
@@ -149,7 +151,22 @@ function scheduleEditor(main){
       DURATIONS.map(d => el("button", {class: "chip-btn" + ((sc.durationMin || 30) === d ? " sel" : ""), onclick: () => {
         saveSchedule({durationMin: d}); renderClassroom(main, "course");
       }}, `${d} דק'`))),
-    el("div", {class: "muted small-text"}, fmtSchedule() ? `השיעור הבא: ${fmtSchedule()}. תזכורת תגיע בשעת השיעור (אם ההתראות פועלות).` : "קבע יום ושעה קבועים — כמו שיעור פרטי אמיתי. אפשר להתחיל גם עכשיו."));
+    scheduleStatus(main));
+}
+
+// מה יקרה בפועל עם התזכורת: אומרים רק מה שבאמת יגיע, ומציעים להפעיל התראות אם הן כבויות
+function scheduleStatus(main){
+  if (!fmtSchedule()) return el("div", {class: "muted small-text"}, "קבע יום ושעה קבועים — כמו שיעור פרטי אמיתי. אפשר להתחיל גם עכשיו.");
+  const st = lessonReminderStatus();
+  return el("div", {class: "sched-status" + (st.ok ? "" : " warn")},
+    el("div", {class: "small-text"}, `השיעור הבא: ${fmtSchedule()}`),
+    el("div", {class: "small-text"}, (st.ok ? "🔔 " : "⚠️ ") + st.text),
+    st.reason === "off" ? el("button", {class: "btn ghost small", onclick: async (ev) => {
+      ev.currentTarget.disabled = true; ev.currentTarget.textContent = "מפעיל…";
+      const ok = await enableNotifs();
+      toast(ok ? "ההתראות הופעלו — תזכורת לשיעור תגיע ✓" : "ההרשאה נדחתה בדפדפן — יש לאפשר התראות בהגדרות האתר");
+      renderClassroom(main, "course");
+    }}, "הפעל התראות לשיעור") : null);
 }
 
 // ---------- השיחה החיה ----------
@@ -172,6 +189,7 @@ function startCall(main, {teacher, focus, selfCam, plan = null}){
     seenErrors: [],           // טעויות שתוקנו בשיעור הזה — לכלל "לא חזרה 3 שיעורים = נלמדה"
     // קורס: שקף נוכחי, תשובות בחידונים (נמדדות), הערכת המורה, הערות שקטות למורה, בדיקות קריאה
     slide: plan ? 1 : 0, quizAnswers: [], teacherSkills: null, notes: [], nudged: new Set(), readChecks: [],
+    quiz: {}, quizFlash: null,  // ריצות התרגיל האדפטיבי לפי מיומנות (הפריטים נבחרים תוך כדי)
     hebChars: 0, latChars: 0,  // כמה עברית המורה דיבר בפועל (מהתמלול)
   };
   window.__liveTeardown = teardown;
@@ -285,13 +303,24 @@ function paintSlide(){
       body = el("ol", {class: "slide-q", dir: "ltr"}, s.items.map(q => el("li", {}, q)));
       break;
     case "quiz": {
-      const answered = session.quizAnswers.find(a => a.slide === s.i);
+      const run = quizRun(s);
+      const flash = session.quizFlash && session.quizFlash.slide === s.i ? session.quizFlash : null;
+      const item = flash ? flash.item : run.item;
+      const n = run.answers.length;
+      if (!item && run.done){
+        const e = run.estimate();
+        body = el("div", {class: "slide-quiz"},
+          el("div", {class: "slide-body"}, `✓ ${SKILL_HE[s.skill]}: ${e.floor ? "A1 או מתחת" : e.level}${e.confident ? "" : " (לא מבוסס)"}`),
+          el("div", {class: "muted small-text"}, `נמדד מ-${e.items} פריטים · ${run.answers.filter(a => a.correct).length} נכונים`));
+        break;
+      }
       body = el("div", {class: "slide-quiz"},
-        s.text ? el("div", {class: "slide-story", dir: "ltr", style: "margin-bottom:8px"}, s.text) : null,
-        s.say ? el("div", {class: "muted small-text"}, "🎧 המורה מקריא משפט — הקשב ואז ענה") : null,
-        el("div", {class: "slide-body", dir: /[֐-׿]/.test(s.q) ? "rtl" : "ltr"}, s.q),
-        s.opts.map((o, i) => el("button", {class: "opt" + (answered ? (i === s.a ? " right" : (i === answered.idx ? " wrong" : "")) : ""),
-          dir: /[֐-׿]/.test(o) ? "rtl" : "ltr", disabled: answered ? "" : null,
+        el("div", {class: "muted small-text"}, `פריט ${n + (flash ? 0 : 1)} · רמה ${flash ? flash.level : run.level}`),
+        item.text ? el("div", {class: "slide-story", dir: "ltr", style: "margin-bottom:8px"}, item.text) : null,
+        item.say ? el("div", {class: "muted small-text"}, "🎧 המורה מקריא משפט — הקשב ואז ענה") : null,
+        el("div", {class: "slide-body", dir: /[֐-׿]/.test(item.q) ? "rtl" : "ltr"}, item.q),
+        item.opts.map((o, i) => el("button", {class: "opt" + (flash ? (i === item.a ? " right" : (i === flash.idx ? " wrong" : "")) : ""),
+          dir: /[֐-׿]/.test(o) ? "rtl" : "ltr", disabled: flash ? "" : null,
           onclick: () => answerQuiz(s, i)}, `${ABCD[i]}. ${o}`)));
       break;
     }
@@ -307,22 +336,55 @@ function paintSlide(){
 function moveSlide(delta){
   if (!session?.plan) return;
   const s = showSlide(session.slide + delta, false);
-  if (s) noteTeacher(`[Student moved to slide ${s.i}: ${s.title}]`, false);
+  if (s) noteTeacher(`[Student moved to slide ${s.i}: ${s.title}. ${s.type === "quiz" ? quizDesc(s) : ""}]`, false);
 }
 
-// תשובה בחידון — נמדדת (נכון/לא נכון לפי הבנק), ומדווחת למורה בהערה שקטה
+// הריצה האדפטיבית של שקף תרגיל (מיומנות אחת): נוצרת בפעם הראשונה, הפריט הראשון נבחר מיד
+function quizRun(s){
+  let run = session.quiz[s.skill];
+  if (!run){
+    run = session.quiz[s.skill] = createRun({start: s.start || S.profile.level || "A2", pool: quizPool(s.skill)});
+    run.next();
+  }
+  return run;
+}
+// תיאור הפריט הנוכחי למורה (לתוכנית בזרימה הרגילה, לתוצאת show_slide ב-realtime, ולהערות)
+function quizDesc(s){
+  const run = quizRun(s);
+  if (run.done){ const e = run.estimate(); return `Finished: measured ${e.level} after ${e.items} items.`; }
+  const it = run.item; if (!it) return "";
+  return `Current item (${run.level}): ${it.say ? `READ THIS ALOUD once, do not show it: "${it.say}". ` : ""}${it.text ? `Passage on screen: "${it.text}". ` : ""}Question: "${it.q}" Options: ${it.opts.map((o, i) => `${ABCD[i]}) ${o}`).join(" ")} (correct: ${ABCD[it.a]}).`;
+}
+
+// תשובה בתרגיל — נמדדת (נכון/לא לפי הבנק), הפריט הבא נבחר לפי התשובה, והמורה מקבל הערה שקטה
 function answerQuiz(s, idx){
-  if (!session || session.quizAnswers.some(a => a.slide === s.i)) return;
-  const correct = idx === s.a;
-  session.quizAnswers.push({slide: s.i, skill: s.skill, level: s.level, correct, idx});
+  if (!session) return;
+  const run = quizRun(s);
+  const item = run.item;
+  if (!item || session.quizFlash) return;
+  const level = run.level;
+  const correct = idx === item.a;
+  run.answer(correct);
+  session.quizAnswers.push({slide: s.i, skill: s.skill, level, correct, idx});
+  session.quizFlash = {slide: s.i, idx, item, level};
   paintSlide();
-  const next = session.plan.slides[s.i]; // השקף שאחרי
-  let note = `[Student answered slide ${s.i} (${s.skill} ${s.level}): ${ABCD[idx]} — ${correct ? "correct" : `wrong, the correct answer is ${ABCD[s.a]}`}.`;
-  // רצף תרגילים: מתקדמים לבד לשקף הבא כדי לא לחכות למורה בכל שאלה
-  if (next && next.type === "quiz"){
-    session.timers.push(setTimeout(() => { if (session && session.slide === s.i) showSlide(s.i + 1, false); }, 900));
-    note += ` Slide ${next.i} (${next.skill} ${next.level}) is shown next${next.say ? ` — read this aloud once, do not show it: "${next.say}"` : ""}.]`;
-  } else note += "]";
+  let note = `[Student answered ${s.skill} item (${level}): ${ABCD[idx]} — ${correct ? "correct" : `wrong (correct: ${ABCD[item.a]})`}.`;
+  const nextItem = run.next();
+  const nextSlide = session.plan.slides[s.i]; // השקף שאחרי
+  session.timers.push(setTimeout(() => {
+    if (!session) return;
+    session.quizFlash = null;
+    if (!run.done) paintSlide();
+    else if (nextSlide && session.slide === s.i) showSlide(s.i + 1, false); // המיומנות הסתיימה — הלאה
+    else paintSlide();
+  }, 900));
+  if (nextItem) note += ` Next ${s.skill} item (${run.level}) is on screen. ${quizDesc(s)}]`;
+  else {
+    const e = run.estimate();
+    note += ` ${s.skill} finished after ${e.items} items: measured level ${e.floor ? "A1 or below" : e.level}${e.confident ? "" : " (not confirmed)"}.`;
+    if (nextSlide) note += ` Slide ${nextSlide.i} (${nextSlide.title}) is shown next. ${nextSlide.type === "quiz" ? quizDesc(nextSlide) : ""}`;
+    note += "]";
+  }
   noteTeacher(note, true);
 }
 
@@ -394,7 +456,7 @@ function readingCheck(heard, text){
 
 function scenarioFor(){
   const {plan, focus, teacher} = session;
-  if (plan) return {teacher: teacher.name, topic: plan.title, lessonPlan: planText(plan, session.slide)};
+  if (plan) return {teacher: teacher.name, topic: plan.title, lessonPlan: planText(plan, session.slide, quizDesc)};
   return {teacher: teacher.name, topic: focus?.topic || null};
 }
 
@@ -405,7 +467,7 @@ async function startLesson(focus){
     setStatus("מתחבר לקול realtime…", "thinking");
     try {
       const live = await startLive({teacher: session.teacher, topic: session.plan ? session.plan.title : focus?.topic,
-        lessonPlan: session.plan ? planText(session.plan, 1) : null, handlers: liveHandlers()});
+        lessonPlan: session.plan ? planText(session.plan, 1, quizDesc) : null, handlers: liveHandlers()});
       if (!session || session.destroyed){ live?.close(); return; }
       if (live){
         session.live = live; session.mode = "realtime";
@@ -481,7 +543,9 @@ function applyTool(name, a, phaseHe){
     case "show_slide": {
       if (!session.plan) return {ok: false, error: "no lesson plan"};
       const s = showSlide(a.index, true);
-      return s ? {ok: true, slide: s.i, title: s.title, type: s.type} : {ok: false, error: "no such slide"};
+      if (!s) return {ok: false, error: "no such slide"};
+      // בשקף תרגיל המורה מקבל את הפריט שעל המסך (למשל משפט להקראה) — הפריטים נבחרים בזמן אמת
+      return {ok: true, slide: s.i, title: s.title, type: s.type, ...(s.type === "quiz" ? {item: quizDesc(s)} : {})};
     }
     case "assess_skills": {
       const sk = parseSkills(SKILLS.map(k => a[k] ? `${k}=${a[k]}` : "").filter(Boolean).join(","));
@@ -938,7 +1002,7 @@ async function endCall(){
   const courseRes = plan ? completeLesson(plan, {quizAnswers, teacherSkills, secs, mode}) : null;
   // סוף שיעור בזיכרון: recap לפתיחה הבאה, וטעויות שלא חזרו 3 שיעורים → "נלמדו"
   finishLessonMemory({topic: plan ? `Lesson ${plan.n}: ${plan.title}` : (focus?.he || null), mode, seenErrors, fillers, minutes: Math.max(1, Math.round(secs / 60))});
-  renderSummary(main, fb, rec, prev, teacher, teacherSummary, {plan, courseRes, teacherSkills});
+  renderSummary(main, fb, rec, prev, teacher, teacherSummary, {plan, courseRes, teacherSkills, quizAnswers});
 }
 
 const fmtS = ms => `${Math.round(ms / 1000)} שנ'`;
@@ -951,7 +1015,7 @@ function cmp(cur, prev, higherIsBetter = true){
   return el("span", {class: "delta " + (good ? "up" : "down")}, `${d > 0 ? "▲" : "▼"} ${fmtS(Math.abs(d))} מהקודם`);
 }
 
-function renderSummary(main, fb, rec, prev, teacher, teacherSummary = null, {plan = null, courseRes = null, teacherSkills = null} = {}){
+function renderSummary(main, fb, rec, prev, teacher, teacherSummary = null, {plan = null, courseRes = null, teacherSkills = null, quizAnswers = []} = {}){
   const sc = (fb && fb.scores) || {};
   const numBox = (label, v) => el("div", {class: "card stat-card"},
     el("div", {class: "stat-v"}, typeof v === "number" ? Math.round(v) : "—"),
@@ -991,7 +1055,7 @@ function renderSummary(main, fb, rec, prev, teacher, teacherSummary = null, {pla
       el("div", {class: "summary-emoji"}, "🎓"),
       el("h2", {}, plan ? `Lesson ${plan.n} — ${plan.title}` : `סיכום השיעור עם ${teacher.name}`),
       el("p", {class: "muted"}, `${teacher.name} · ${Math.round(rec.secs / 60)} דקות · ${rec.turns} תשובות שלך · ${rec.mode === "realtime" ? "קול realtime" : "זרימה רגילה"}`)),
-    courseCards(plan, courseRes, teacherSkills),
+    courseCards(plan, courseRes, teacherSkills, quizAnswers),
     teacherSummary ? el("div", {class: "card"},
       el("h3", {}, `🧑‍🏫 הסיכום של ${teacher.name}`),
       el("p", {dir: "ltr"}, el("strong", {}, "Improved: "), teacherSummary.improved),
@@ -1019,26 +1083,28 @@ function renderSummary(main, fb, rec, prev, teacher, teacherSummary = null, {pla
 }
 
 // כרטיסי הקורס בסיכום: פרופיל לפי מיומנות (אבחון/בדיקה), מילות השיעור, והשיעור הבא שכבר מוכן
-function courseCards(plan, courseRes, teacherSkills){
+function courseCards(plan, courseRes, teacherSkills, quizAnswers = []){
   if (!plan || !courseRes) return null;
   const cards = [];
   if (plan.kind === "placement" || plan.kind === "check"){
-    const measuredSet = new Set(Object.keys(courseRes.measured));
+    const detail = quizDetail(quizAnswers);
     cards.push(el("div", {class: "card"},
       el("h3", {}, plan.kind === "placement" ? "🎯 הפרופיל שלך — רמת התחלה לכל מיומנות" : "📈 בדיקת התקדמות — רמות מעודכנות"),
       el("div", {class: "skills-grid"}, [...SKILLS, "pronunciation"].map(k => {
         const lv = courseRes.skills[k];
         const before = courseRes.before[k];
-        // מקור הרמה — כדי שלא ייראה "נמדד" מה שלא נמדד
-        const src = k === "speaking" ? (teacherSkills?.speaking ? "הערכת המורה" : "לפי הרמה הכללית")
-          : (measuredSet.has(k) ? "נמדד" : "לא נמדד הפעם");
+        // מקור הרמה — כדי שלא ייראה "נמדד" מה שלא נמדד. דיבור: רק הערכת המורה; אחרת "לא נמדד".
+        let src = "לא נמדד הפעם";
+        if (k === "speaking") src = teacherSkills?.speaking ? "הערכת המורה בשיחה" : "לא נמדד";
+        else if (detail[k]) src = detail[k].confident ? `נמדד · ${detail[k].items} פריטים` : `לא מבוסס (${detail[k].items} פריטים)`;
+        const changed = before && lv && before !== lv;
         return el("div", {class: "skill-box" + (lv ? "" : " na")},
           el("div", {class: "lv"}, lv || "—"),
           el("div", {class: "lb"}, SKILL_HE[k]),
-          el("div", {class: "lb"}, lv ? (before && before !== lv ? `${before} → ${lv}` : src) : "לא נמדד"));
+          el("div", {class: "lb"}, lv ? (changed ? `${before} → ${lv} · ${src}` : src) : (k === "speaking" ? "לא נמדד — המורה לא העריך" : "לא נמדד")));
       })),
       el("p", {class: "muted small-text"}, plan.kind === "placement"
-        ? "שמיעה/קריאה/מילים/דקדוק נמדדו מהתשובות שלך על המסך; דיבור — מהערכת המורה בשיחה. הגייה תסומן רק כשיהיה ניתוח אודיו."
+        ? "שמיעה/קריאה/מילים/דקדוק נמדדו מתרגיל אדפטיבי (A1–C2, 3–6 פריטים למיומנות, רמה נקבעת רק עם ביסוס); דיבור — רק מהערכת המורה בשיחה. מה שלא נמדד נשאר \"לא נמדד\"."
         : "רמה עולה רק כשנמדד שיפור. אם משהו לא עלה — זה לא כישלון, זה יעד לשיעורים הבאים.")));
   }
   if (plan.vocab?.length){

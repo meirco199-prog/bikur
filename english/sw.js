@@ -1,10 +1,10 @@
 /* English — service worker: קאשינג לעבודה ללא אינטרנט */
-var CACHE = "english-v12";
+var CACHE = "english-v13";
 var ASSETS = [
   "./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png",
   "css/main.css",
   "js/app.js", "js/util.js", "js/store.js", "js/srs.js", "js/gamify.js", "js/speech.js",
-  "js/ai.js", "js/notify.js", "js/push.js", "js/lesson.js", "js/avatar.js", "js/live.js", "js/curriculum.js",
+  "js/ai.js", "js/notify.js", "js/push.js", "js/lesson.js", "js/avatar.js", "js/live.js", "js/curriculum.js", "js/adaptive.js",
   "js/data/words.js", "js/data/grammar.js", "js/data/scenarios.js", "js/data/reading.js", "js/data/test.js", "js/data/course.js",
   "js/screens/onboarding.js", "js/screens/placement.js", "js/screens/home.js", "js/screens/learn.js",
   "js/screens/speak.js", "js/screens/words.js", "js/screens/teacher.js", "js/screens/profile.js",
@@ -69,6 +69,29 @@ function reminderBody(st) {
   return "כמה דקות אנגלית עכשיו ותסמן את היום ✓";
 }
 
+// תזכורת לשיעור החי שנקבע (יום+שעה): חלון [10 דקות לפני, 30 אחרי], פעם אחת ביום.
+// אותה לוגיקה כמו lessonDueNow ב-notify.js — לשמור מסונכרן.
+var LESSON_LEAD_MIN = 10;
+function lessonDue(st, now) {
+  now = now || new Date();
+  var l = st && st.lesson;
+  if (!l || !st.enabled) return false;
+  if (now.getDay() !== l.weekday) return false;
+  var today = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+  if (st.lessonNotifiedOn === today) return false;
+  var p = String(l.time).split(":");
+  var target = (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+  var mins = now.getHours() * 60 + now.getMinutes();
+  return mins >= target - LESSON_LEAD_MIN && mins <= target + 30;
+}
+async function showLessonReminder(st, today) {
+  await self.registration.showNotification("השיעור שלך מתחיל ב-" + st.lesson.time + " 🎥", {
+    body: st.lesson.title + " — היכנס, המורה מחכה", icon: "icon-192.png", badge: "icon-192.png", tag: "lesson-reminder",
+    dir: "rtl", lang: "he", data: { url: "./#/live" }
+  });
+  st.lessonNotifiedOn = today; await idbPut("state", st);
+}
+
 async function showReminder(st, today) {
   await self.registration.showNotification("הזמן שלך ללמוד אנגלית", {
     body: reminderBody(st), icon: "icon-192.png", badge: "icon-192.png", tag: "study-reminder",
@@ -82,6 +105,7 @@ async function maybeRemind() {
   var st = await idbGetState();
   if (!st || !st.enabled) return;
   var today = todayISO();
+  if (lessonDue(st)) { await showLessonReminder(st, today); return; }
   if (studiedOn(st, today)) return;
   if (st.notifiedOn === today) return;                            // כבר הותרע היום
   var now = new Date();
@@ -105,6 +129,8 @@ self.addEventListener("push", function (e) {
     try { data = e.data ? e.data.json() : null; } catch (err) {}
     var st = await idbGetState();
     var today = todayISO();
+    // שיעור חי שנקבע לעכשיו — קודם לכל (גם אם כבר למדנו היום)
+    if (lessonDue(st)) { await showLessonReminder(st, today); return; }
     // אם המכשיר כבר יודע שלמדנו היום — לא מציקים, גם אם השרת חשב אחרת
     if (studiedOn(st, today)) return;
     if (data && data.title) {

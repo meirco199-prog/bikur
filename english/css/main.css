@@ -517,3 +517,6 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 
 .stat-card.na { opacity: .8; }
 .stat-card.na .na-v { font-size: .82rem; font-weight: 700; color: var(--muted); }
+.sched-status { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.sched-status.warn { color: var(--bad); }
+.sched-status .btn { align-self: flex-start; margin-top: 2px; }
