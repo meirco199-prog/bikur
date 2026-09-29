@@ -1,0 +1,75 @@
+# GPT Reviewer — "המהנדס המבקר" האוטומטי (AI Council) לכל הפרויקטים בריפו: על כל PR (פתיחה/דחיפה) ועל דחיפה ישירה ל-main,
+# OpenAI קורא את הדרישה + diff + קבצים + בדיקות + מדיניות הפרויקט (.ai/REVIEW.md) ומפרסם סקירה מסווגת כתגובה ב-PR
+# עם ה-GITHUB_TOKEN המובנה (בלי מחבר GitHub של ChatGPT, בלי relay). Claude בודק כל ממצא מול הקוד ומתקן/מתנגד עם ראיות;
+# push חדש = סבב חדש, עד PASS או עד MAX_REVIEW_ROUNDS סבבים חוסמים → OWNER_DECISION_REQUIRED למאיר. ראה .github/gpt-review/README.md
+# ה-check "GPT Review" אדום = BLOCKED / OWNER_DECISION_REQUIRED (Claude לא ממזג לפני שהוא ירוק). דילוג: ops:, draft, תווית skip-gpt-review.
+# משתמש ב-OPENAI_API_KEY שכבר קיים ב-Actions Secrets. דגם: variable OPENAI_REVIEW_MODEL (ברירת מחדל gpt-5), מאמץ: OPENAI_REVIEW_REASONING.
+# ריפו אחר: `uses: meirco199-prog/bikur/.github/workflows/gpt-review.yml@main` עם `secrets: inherit` (ראה README).
+name: GPT Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'מספר PR לסקירה (ריק = ה-commit האחרון ב-main)'
+        required: false
+        default: ''
+      force:
+        description: 'לסקור גם אם ה-SHA כבר נסקר / אחרי הכרעת בעל הריפו (1)'
+        required: false
+        default: '0'
+  workflow_call:
+    inputs:
+      pr_number:
+        type: string
+        required: false
+        default: ''
+      max_rounds:
+        type: string
+        required: false
+        default: '3'
+    secrets:
+      OPENAI_API_KEY:
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: gpt-review-${{ github.event.pull_request.number || inputs.pr_number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: GPT Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch reviewer (when called from another repository)
+        run: |
+          if [ -f .github/gpt-review/review.mjs ]; then echo "SCRIPT=.github/gpt-review/review.mjs" >> "$GITHUB_ENV"; exit 0; fi
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/meirco199-prog/bikur .gpt-review-tool
+          git -C .gpt-review-tool sparse-checkout set .github/gpt-review
+          echo "SCRIPT=.gpt-review-tool/.github/gpt-review/review.mjs" >> "$GITHUB_ENV"
+      - name: Review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_REVIEW_MODEL: ${{ vars.OPENAI_REVIEW_MODEL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          OPENAI_REVIEW_REASONING: ${{ vars.OPENAI_REVIEW_REASONING }}
+          MAX_REVIEW_ROUNDS: ${{ inputs.max_rounds || vars.MAX_REVIEW_ROUNDS || '3' }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          REVIEW_FORCE: ${{ github.event.inputs.force }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node "$SCRIPT"
