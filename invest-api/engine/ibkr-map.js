@@ -56,6 +56,24 @@ export function toIbkrOrder({ order, conid, acctId, tif = 'DAY' } = {}){
 export const needsConfirm = (resp) => Array.isArray(resp) && resp.length > 0 && !!resp[0]?.id && !resp[0]?.order_id && Array.isArray(resp[0]?.message);
 export const orderIdOf = (resp) => (Array.isArray(resp) ? resp.find((x) => x?.order_id)?.order_id : resp?.order_id) || null;
 
+/**
+ * יציאה (עצירה/חיסול) של הסימולציה מול מה שהדמה באמת מחזיק: הדמה קיבל רק פקודות שנשלחו מאז שהגשר התחבר,
+ * אז פוזיציה שהסימולציה פתחה לפני כן לא קיימת בו — "מכירה" כזו הייתה פותחת שורט בדמה. לכן: אין פוזיציה מתאימה → דילוג,
+ * פוזיציה קטנה יותר → הכמות נחתכת למה שמוחזק. held = כמות חתומה בדמה (שלילי = שורט).
+ * → { ok, qty, reason }
+ */
+export function clipExitToHeld(order = {}, held = 0){
+  const isExit = order.kind === 'stop' || order.kind === 'liquidation';
+  if (!isExit) return { ok: true, qty: order.qty };
+  const h = Number(held) || 0;
+  const closingLong = order.side === 'sell', closingShort = order.side === 'cover';
+  if (!closingLong && !closingShort) return { ok: true, qty: order.qty };
+  const avail = closingLong ? h : -h;
+  if (!(avail > 0)) return { ok: false, qty: 0, reason: `הדמה לא מחזיק ${closingLong ? 'לונג' : 'שורט'} ב-${order.symbol} (נפתח בסימולציה לפני חיבור הגשר) — לא סוגרים` };
+  const qty = Math.min(Number(order.qty) || 0, avail);
+  return { ok: qty > 0, qty, reason: qty < (Number(order.qty) || 0) ? `כמות נחתכה ל-${qty} (מוחזק בדמה)` : undefined };
+}
+
 /** מילוי מ-/iserver/account/orders (או trades) → שורה אחידה */
 export function normalizeBrokerOrder(o = {}){
   const filled = Number(o.filledQuantity ?? o.filled_quantity ?? o.size ?? 0) || 0;
