@@ -510,6 +510,82 @@ async function handle(req, env0, ctx){
     const issues = async () => ({ invest: ISSUE, ...((await db.get('council:issues')) || {}) }); // מספרי ה-Issues לכל פרויקט, כפי שה-relay דיווח
     const tasks = async () => (await db.get('council:tasks')) || [];
     const saveTask = async (t) => { const all = (await tasks()).filter((x) => x.id !== t.id); all.push(t); await db.put('council:tasks', all.slice(-TASKS_MAX)); return t; };
+    // MCP (Model Context Protocol) — ChatGPT כ-connector בשיחה רגילה (Developer mode → custom connector), בלי GPT מותאם:
+    // אותם כלים בדיוק (postCouncilComment, getCouncilTasks, …) כעטיפת JSON-RPC מעל הנתיבים הקיימים למטה — אין לוגיקה כפולה.
+    // dual-era: 2026-07-28 (server/discover, בקשות חסרות-מצב עם _meta) וגם 2025-xx (initialize/tools/list/tools/call, ping).
+    // אימות: Bearer = המפתח המשותף, או המפתח בנתיב (/council/mcp/<key>) ל-connector במצב "No authentication" (URL-סודי).
+    if (p1 === 'mcp'){
+      if (req.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+      const wantMcp = env.COUNCIL_SECRET || (await readSecret()) || '';
+      const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+      const sameK = (x, y) => { if (!x || !y || x.length !== y.length) return false; let d = 0; for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i); return d === 0; };
+      const key = sameK(bearer, wantMcp) ? bearer : sameK(p2 || '', wantMcp) ? p2 : '';
+      const rpcErr = (id, code, message, status = 200, data) => json({ jsonrpc: '2.0', id: id ?? null, error: { code, message, ...(data ? { data } : {}) } }, status);
+      if (!wantMcp) return rpcErr(null, -32000, 'ערוץ ה-Council טרם הופעל (המפתח המשותף לא נוצר)', 503);
+      if (!key) return rpcErr(null, -32000, 'unauthorized', 401);
+      const SUPPORTED = ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26'];
+      const SERVER = { name: 'bikur-ai-council', version: '1.0.0' };
+      const INSTRUCTIONS = `AI Council of meirco199-prog/bikur: send tasks/findings to Claude (postCouncilComment), track what Claude did with them (getCouncilTasks), read a project's thread (getCouncilThread). Projects: ${PROJECTS.join(', ')}. When the user says "תשלח לקלוד…" / "send to Claude", call postCouncilComment with the right project (food = nutrition app, english = English learning app, invest = investment platform), a short title, a Markdown body (what, where, why, how to reproduce, what Claude should check) and source "gpt-audit". Never include keys or secrets. Claude verifies every finding against the code before acting and may reject it with evidence.`;
+      const TOOLS = [
+        { name: 'postCouncilComment', title: 'Send a task or finding to Claude (AI Council)', description: `Queue a message to Claude in the AI Council channel of a project. Claude marks it RECEIVED, verifies it against the code, then fixes it in a PR (reviewed by GPT Reviewer), rejects it with evidence, or marks DONE. Projects: ${PROJECTS.join(', ')}. The same message twice returns the existing task (duplicate) instead of a new one.`,
+          inputSchema: { type: 'object', properties: { project: { type: 'string', enum: PROJECTS, description: 'Target project' }, type: { type: 'string', enum: TYPES, description: 'bug/security/test/regression = findings Claude must verify and fix; review/question/proposal/task/note otherwise' }, title: { type: 'string', maxLength: 140 }, body: { type: 'string', description: 'Markdown: what was found, where (file/line), why it matters, how to reproduce, what Claude should check. Max 8000 chars. No secrets.' }, source: { type: 'string', description: 'Origin, e.g. gpt-audit (default chatgpt)' }, idempotency_key: { type: 'string', description: 'Optional: your own id; the same key never creates a second task' } }, required: ['project', 'type', 'title', 'body'], additionalProperties: false },
+          annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilTasks', title: 'Status of tasks sent to Claude', description: 'What happened to messages sent via postCouncilComment: QUEUED → POSTED → RECEIVED → IN_PROGRESS → PR_OPEN → PASS, or REJECTED / DONE / OWNER_DECISION_REQUIRED / FAILED / DUPLICATE. Filter by project or id.',
+          inputSchema: { type: 'object', properties: { project: { type: 'string', enum: PROJECTS }, id: { type: 'string', description: 'Task id (cm_…)' }, limit: { type: 'integer', minimum: 1, maximum: 50, default: 20 } }, additionalProperties: false },
+          annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilProjects', title: 'Known projects, message types and statuses', description: 'Lists the projects that accept council messages, the allowed message types, the task statuses, and each project\'s GitHub Issue number.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilThread', title: 'Latest comments in a project\'s council Issue', description: 'Reads the most recent comments on the project\'s AI Council GitHub Issue: Claude\'s replies and statuses, reports, and messages posted via this channel.',
+          inputSchema: { type: 'object', properties: { project: { type: 'string', enum: PROJECTS, default: 'invest' }, limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 } }, additionalProperties: false },
+          annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilStatus', title: 'Channel status', description: 'Quota used today, messages pending in the relay inbox, and the Issue of each project.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+      ];
+      // קריאת כלי = בקשה פנימית לאותם נתיבים (אותה לוגיקה, אותו אימות), בלי לצאת לרשת
+      const callTool = async (name, args = {}) => {
+        const hdr = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'CF-Connecting-IP': req.headers.get('CF-Connecting-IP') || 'mcp' };
+        const sub = (path, init) => handle(new Request(`${url.origin}/council/${path}`, { headers: hdr, ...init }), env0, ctx);
+        const qs = (o) => { const u = new URLSearchParams(); for (const [k, v] of Object.entries(o)) if (v !== undefined && v !== null && v !== '') u.set(k, String(v)); const t = u.toString(); return t ? `?${t}` : ''; };
+        let r;
+        if (name === 'postCouncilComment') r = await sub('comment', { method: 'POST', body: JSON.stringify({ project: args.project, type: args.type, title: args.title, body: args.body, source: args.source || 'chatgpt', ...(args.idempotency_key ? { idempotency_key: args.idempotency_key } : {}) }) });
+        else if (name === 'getCouncilTasks') r = await sub(`tasks${qs({ project: args.project, id: args.id, limit: args.limit })}`);
+        else if (name === 'getCouncilProjects') r = await sub('projects');
+        else if (name === 'getCouncilThread') r = await sub(`thread${qs({ project: args.project, limit: args.limit })}`);
+        else if (name === 'getCouncilStatus') r = await sub('status');
+        else return null;
+        const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+        return { ok: r.ok, data: j };
+      };
+      const meta = (body?.params && body.params._meta) || {};
+      const hdrVer = req.headers.get('MCP-Protocol-Version') || '';
+      const metaVer = meta['io.modelcontextprotocol/protocolVersion'] || '';
+      const ver = hdrVer || metaVer || '';
+      const modern = ver === '2026-07-28' || body?.method === 'server/discover';
+      const id = body?.id; const method = String(body?.method || ''); const params = body?.params || {};
+      if (Array.isArray(body)) return rpcErr(null, -32600, 'batch requests are not supported', 400);
+      if (!method) return rpcErr(id, -32600, 'invalid JSON-RPC request', 400);
+      // אימות כותרות-גוף (2026-07-28): אי-התאמה נדחית; חוסר נסלח (ידידותי ללקוחות ביניים)
+      const hMethod = req.headers.get('Mcp-Method'); if (hMethod && hMethod !== method) return rpcErr(id, -32020, `Header mismatch: Mcp-Method header value '${hMethod}' does not match body value '${method}'`, 400);
+      const hName = req.headers.get('Mcp-Name'); if (hName && !hName.startsWith('=?base64?') && params?.name && hName !== params.name) return rpcErr(id, -32020, `Header mismatch: Mcp-Name header value '${hName}' does not match body value '${params.name}'`, 400);
+      if (hdrVer && metaVer && hdrVer !== metaVer) return rpcErr(id, -32020, `Header mismatch: MCP-Protocol-Version '${hdrVer}' does not match _meta '${metaVer}'`, 400);
+      if (ver && !SUPPORTED.includes(ver)) return rpcErr(id, -32022, `Unsupported protocol version: ${ver}`, 400, { supported: SUPPORTED, requested: ver });
+      const serverMeta = { 'io.modelcontextprotocol/serverInfo': SERVER };
+      const result = (r) => json({ jsonrpc: '2.0', id: id ?? null, result: modern ? { resultType: 'complete', ...r, _meta: serverMeta } : r });
+      if (method === 'server/discover') return result({ supportedVersions: SUPPORTED, capabilities: { tools: {} }, instructions: INSTRUCTIONS, ttlMs: 3600000, cacheScope: 'private' });
+      if (method === 'initialize'){ const reqVer = String(params.protocolVersion || ''); return result({ protocolVersion: SUPPORTED.includes(reqVer) && reqVer !== '2026-07-28' ? reqVer : '2025-06-18', capabilities: { tools: {} }, serverInfo: SERVER, instructions: INSTRUCTIONS }); }
+      if (method === 'notifications/initialized' || method.startsWith('notifications/')) return new Response(null, { status: 202 });
+      if (method === 'ping') return result({});
+      if (method === 'tools/list') return result({ tools: TOOLS, ...(modern ? { ttlMs: 300000, cacheScope: 'private' } : {}) });
+      if (method === 'tools/call'){
+        const name = String(params.name || ''); const args = params.arguments && typeof params.arguments === 'object' ? params.arguments : {};
+        const out = await callTool(name, args);
+        if (!out) return rpcErr(id, -32602, `Unknown tool: ${name}`, modern ? 404 : 200);
+        const isError = !out.ok || out.data?.ok === false;
+        const text = isError ? `Error: ${out.data?.error || JSON.stringify(out.data)}` : JSON.stringify(out.data, null, 1);
+        return result({ content: [{ type: 'text', text }], structuredContent: out.data, isError });
+      }
+      return rpcErr(id, -32601, `Method not found: ${method}`, modern ? 404 : 200);
+    }
     // המפתח למסך ההגדרות (מאומת בלבד): נוצר בפעם הראשונה, rotate מחליף
     if (p1 === 'secret'){ needAuth(); let s = env.COUNCIL_SECRET || (await readSecret()); if (!env.COUNCIL_SECRET && (!s || (req.method === 'POST' && (body.rotate || q.rotate === '1')))) s = await newSecret(); return json({ ok: true, secret: s, source: env.COUNCIL_SECRET ? 'secret' : 'kv', importUrl: 'https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml', endpoint: `${url.origin}/council/comment`, direct: !!env.GH_COUNCIL_TOKEN, projects: PROJECTS, pending: ((await db.get('council:inbox')) || []).length }); }
     // צד GitHub Actions (סוד ה-cron): קריאת התיבה, אישור פרסום (עם מספרי ה-Issues שנפתרו), ועדכון סטטוס משימות מתוך תגובות Claude
