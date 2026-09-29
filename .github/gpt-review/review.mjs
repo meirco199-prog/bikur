@@ -17,7 +17,7 @@ export const FINDING_TYPES = ['BLOCKER', 'BUG', 'SECURITY', 'REGRESSION', 'MISSI
 export const ALWAYS_BLOCKING = new Set(['BLOCKER', 'SECURITY']);
 export const NEVER_BLOCKING = new Set(['OPTIONAL IMPROVEMENT']);
 // שערי אישור: שני המודלים לא מחליטים לבד — עובר למאיר (דרישה 8)
-export const OWNER_GATES = ['הוצאה כספית חדשה / מנוי / שדרוג תוכנית', 'שינוי ספק בתשלום', 'שימוש בכסף אמיתי', 'מסחר/מינוף אמיתי', 'secrets/credentials (הוספה, העברה, חשיפה)', 'מחיקה משמעותית של מידע', 'שינוי ארכיטקטורה בלתי הפיך', 'שינוי מהות המוצר'];
+export const OWNER_GATES = ['הוצאה כספית חדשה / מנוי / שדרוג תוכנית (שלא אושרו במפורש בדרישה שהובילה לשינוי)', 'שינוי ספק בתשלום', 'שימוש בכסף אמיתי', 'מסחר/מינוף אמיתי', 'secrets/credentials: הוספת סוד חדש, העברתו למקום אחר, הרחבת הרשאות, או חשיפת ערך (צריכת סוד שכבר מוגדר, באותה דרך כמו workflows קיימים — לא שער)', 'מחיקה משמעותית של מידע', 'שינוי ארכיטקטורה בלתי הפיך', 'שינוי מהות המוצר'];
 
 // מגבלות עלות (דרישה 10): לא שולחים את כל הריפו; diff מוגבל, תוקצב לכל קובץ, ומסמכים מקוצרים
 export const LIMITS = { diffChars: 90_000, fileChars: 14_000, docChars: 5_000, issueChars: 3_000, commentChars: 3_500, prevRounds: 4, testOutChars: 4_000, outTokens: 16_000, maxLineChars: 1_500 };
@@ -60,6 +60,11 @@ export function roundState(comments, headSha, maxRounds){
   const last = reviews[reviews.length - 1] || null;
   return { reviews, alreadyReviewed: !!done, blockedRounds: blocked, round: reviews.length + 1, last, finalRound: blocked >= maxRounds, ownerDecided: !!last && last.verdict === 'OWNER_DECISION_REQUIRED' };
 }
+
+/** דחיפה ל-main: מספר ה-PR שמוזג (squash: "(#N)" בסוף הכותרת) — כדי לא לסקור שוב PR שכבר נסקר */
+export const mergedPrNumber = (message) => { const m = String(message || '').match(/\(#(\d+)\)\s*$/m); return m ? Number(m[1]) : null; };
+/** דחיפה ראשונה לענף (before = אפסים) — אין מה להשוות */
+export const isFirstPush = (before) => !before || /^0+$/.test(before);
 
 /** זיהוי עבודה של Claude לפי כמה אותות (דרישה 11) — לא מסתמכים על אחד */
 export function claudeSignals({ branch = '', commits = [], body = '' } = {}){
@@ -112,10 +117,10 @@ export function matchPolicies(policies, files){
 }
 export const topDirs = (files) => [...new Set(files.map((f) => f.filename.split('/')[0]).filter((d) => d && !d.includes('.')))];
 
-/** בניית ה-diff בתקציב: קבצי קוד קודם, קבצי דילוג בחוץ, שורות ענק (minified) מקוצרות, ומה שלא נכנס — רשימה בלבד */
+/** בניית ה-diff בתקציב: קבצי קוד קודם (ובתוכם הגדולים קודם — התקרה לקובץ מגינה על התקציב), קבצי דילוג בחוץ, שורות ענק (minified) מקוצרות, ומה שלא נכנס — רשימה בלבד */
 export function buildDiff(files, limits = LIMITS){
   const order = (f) => (CODE_EXT.test(f.filename) ? 0 : /\.md$/i.test(f.filename) ? 2 : 1);
-  const sorted = [...files].filter((f) => !isSkippedPath(f.filename)).sort((a, b) => order(a) - order(b) || ((a.changes || 0) - (b.changes || 0)));
+  const sorted = [...files].filter((f) => !isSkippedPath(f.filename)).sort((a, b) => order(a) - order(b) || ((b.changes || 0) - (a.changes || 0)));
   let used = 0; const parts = [], omitted = [];
   for (const f of sorted){
     const head = `### ${f.status || 'modified'} ${f.filename} (+${f.additions || 0} −${f.deletions || 0})`;
@@ -186,7 +191,8 @@ export function buildMessages(ctx){
     sec('diff', diff),
     'בצע את הסקירה והחזר JSON לפי הסכימה.',
   ].filter(Boolean).join('\n');
-  return [{ role: 'system', content: system }, { role: 'user', content: user }];
+  // הסתרת ערכי סוד גם בהקשר שנשלח למודל (diff, לוגים, תגובות) — לא רק בתגובה שמתפרסמת
+  return [{ role: 'system', content: system }, { role: 'user', content: redact(user) }];
 }
 
 /** אכיפת כללי הפסיקה בצד הסקריפט (לא סומכים על המודל לבד) */
@@ -261,12 +267,12 @@ async function main(){
   if (!number && process.env.GITHUB_EVENT_NAME === 'push'){
     kind = 'push'; headSha = event.after || process.env.GITHUB_SHA; baseRef = (event.ref || '').replace('refs/heads/', '');
     const msg = event.head_commit?.message || '';
-    const m = msg.match(/\(#(\d+)\)\s*$/m);
-    if (m){ // מיזוג של PR — אם ה-PR כבר נסקר, אין מה לסקור שוב
-      const cs = await api(`issues/${m[1]}/comments?per_page=100`);
-      if (parseMarkers(cs).length){ summary(`⏭️ דילוג: commit \`${short(headSha)}\` הוא מיזוג של PR #${m[1]} שכבר נסקר`); setOut('verdict', 'SKIPPED'); return; }
+    const merged = mergedPrNumber(msg);
+    if (merged){ // מיזוג של PR — אם ה-PR כבר נסקר, אין מה לסקור שוב
+      const cs = await api(`issues/${merged}/comments?per_page=100`);
+      if (parseMarkers(cs).length){ summary(`⏭️ דילוג: commit \`${short(headSha)}\` הוא מיזוג של PR #${merged} שכבר נסקר`); setOut('verdict', 'SKIPPED'); return; }
     }
-    if (!event.before || /^0+$/.test(event.before)){ summary('⏭️ דילוג: דחיפה ראשונה לענף (אין before להשוואה)'); setOut('verdict', 'SKIPPED'); return; }
+    if (isFirstPush(event.before)){ summary('⏭️ דילוג: דחיפה ראשונה לענף (אין before להשוואה)'); setOut('verdict', 'SKIPPED'); return; }
     const cmp = await api(`compare/${event.before}...${event.after}`);
     files = cmp.files || []; commits = cmp.commits || []; title = msg.split('\n')[0]; body = msg; pushRange = `${short(event.before)}...${short(event.after)}`;
     const existing = await api(`commits/${headSha}/comments?per_page=100`);

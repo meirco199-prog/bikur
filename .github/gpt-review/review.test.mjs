@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { shouldSkipChange, roundState, marker, parseMarkers, claudeSignals, kindOf, parseFrontMatter, findPolicies, matchPolicies, buildDiff, buildMessages, normalize, formatComment, redact, LABELS, LIMITS, FINDING_TYPES } from './review.mjs';
+import { shouldSkipChange, roundState, marker, parseMarkers, claudeSignals, kindOf, parseFrontMatter, findPolicies, matchPolicies, buildDiff, buildMessages, normalize, formatComment, redact, mergedPrNumber, isFirstPush, LABELS, LIMITS, FINDING_TYPES } from './review.mjs';
 
 const f = (filename, additions = 5, deletions = 1, patch = '@@ -1 +1 @@\n-a\n+b') => ({ filename, additions, deletions, changes: additions + deletions, status: 'modified', patch });
 const gpt = (sha, round, verdict, at) => ({ id: round, created_at: at, user: { login: 'github-actions[bot]' }, body: `## GPT REVIEW: ${verdict}\n${marker({ sha, round, verdict })}\nממצא` });
@@ -29,6 +29,13 @@ test('gpt-review: ספירת סבבים, דדופליקציה לפי SHA, סבב
   assert.equal(s3.ownerDecided, true);
   assert.equal(roundState([gpt('aaaaaaa', 1, 'PASS', '1')], 'fffffff', 3).blockedRounds, 0, 'PASS לא נספר כסבב חוסם');
   assert.equal(parseMarkers([{ body: 'x' }]).length, 0);
+});
+
+test('gpt-review: דחיפה ל-main — זיהוי מיזוג של PR (לא לסקור פעמיים) ודחיפה ראשונה', () => {
+  assert.equal(mergedPrNumber('כותרת (#93)\n\nגוף\nCo-Authored-By: x'), 93);
+  assert.equal(mergedPrNumber('תיקון ישיר ב-main'), null);
+  assert.equal(mergedPrNumber('ראה #12 בגוף'), null, '#N באמצע השורה אינו מיזוג');
+  assert.equal(isFirstPush('0000000000000000000000000000000000000000'), true); assert.equal(isFirstPush(''), true); assert.equal(isFirstPush('abc1234'), false);
 });
 
 test('gpt-review: זיהוי Claude לפי כמה אותות, וסיווג תגובות', () => {
@@ -62,6 +69,8 @@ test('gpt-review: ה-diff בתקציב — קוד קודם, קבצי דילוג 
   const files = [f('README.md', 1, 0), f('english/js/app.js', 3, 3, 'x'.repeat(2000)), f('english/icon.png', 0, 0, null), f('invest-api/worker.js', 500, 100, ('y'.repeat(100) + '\n').repeat(300))];
   const d = buildDiff(files, { ...LIMITS, diffChars: 10000, fileChars: 14000 });
   assert.ok(d.text.indexOf('english/js/app.js') < d.text.indexOf('README.md'), 'קוד לפני md');
+  const big = buildDiff([f('a.js', 1, 1, 'small'), f('b.js', 300, 10, ('z'.repeat(50) + '\n').repeat(100))]);
+  assert.ok(big.text.indexOf('b.js') < big.text.indexOf('a.js'), 'בתוך קבצי קוד — הגדול קודם');
   assert.ok(!d.text.includes('icon.png')); assert.ok(d.list.includes('icon.png (modified, +0 −0) — לא נסקר'));
   assert.ok(d.text.includes('(שורה קוצרה)'));
   assert.ok(d.omitted.length === 1 && d.omitted[0].startsWith('invest-api/worker.js'), 'הקובץ הגדול מחוץ לתקציב');
@@ -74,6 +83,8 @@ test('gpt-review: ההודעות למודל כוללות סיווג, שערי א
   for (const t of FINDING_TYPES) assert.ok(sys.content.includes(`- ${t}`), t);
   assert.ok(sys.content.includes('כסף אמיתי') && sys.content.includes('סבב 2 מתוך 3'));
   for (const s of ['#3: הדרישה', 'אין fake metrics', 'invest-api tests: completed / success', 'node --test → exit 0', 'README', 'סבב 1 (BLOCKED', '· Claude\nתוקן', 'DIFF', 'ענף claude/*']) assert.ok(usr.content.includes(s), s);
+  const [, leaky] = buildMessages({ ...ctx, diff: '+const KEY = "sk-abcdefghijklmnop1234"', tests: [{ cmd: 'x', code: 1, out: 'token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345' }] });
+  assert.ok(!leaky.content.includes('sk-abcdefghijklmnop1234') && !leaky.content.includes('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345') && leaky.content.includes('[REDACTED]'), 'ההקשר שנשלח למודל מוסתר, לא רק התגובה');
   const [sysFinal] = buildMessages({ ...ctx, finalRound: true });
   assert.ok(sysFinal.content.includes('הסבב האחרון') && sysFinal.content.includes('dispute'));
 });
