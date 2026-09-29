@@ -160,9 +160,30 @@ async function runWorkersAI(env, system, messages, maxTokens){
   throw lastErr || new Error('ai_failed');
 }
 
+// המוח של רמי: קריאה פנימית (service binding) ל-Worker של רמי, שמחזיק כבר
+// מפתח Claude. ככה התזונאית מדברת באותו מוח בלי להגדיר מפתח נוסף.
+async function runViaRemi(env, system, messages, maxTokens){
+  if (!env.REMI) throw new Error('no_remi');
+  const r = await env.REMI.fetch('https://remi-internal/claude', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({system, messages, max_tokens: maxTokens}),
+  });
+  if (!r.ok) throw new Error('remi_' + r.status);
+  const data = await r.json();
+  if (data.stop_reason === 'refusal') throw new Error('remi_refusal');
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  if (!text.trim()) throw new Error('remi_empty');
+  return text;
+}
+
 async function runLLM(env, system, messages, maxTokens = 700){
   if (env.ANTHROPIC_API_KEY){
     try { return await runClaude(env, system, messages, maxTokens); }
+    catch (e) { /* ממשיכים למוח של רמי */ }
+  }
+  if (env.REMI){
+    try { return await runViaRemi(env, system, messages, maxTokens); }
     catch (e) { /* נופלים חזרה ל-Workers AI */ }
   }
   return runWorkersAI(env, system, messages, maxTokens);
