@@ -8,8 +8,33 @@ import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminde
 import { pushSupported, pushStatus, testPush } from "../push.js";
 import { cefrDesc } from "./onboarding.js";
 import { renderPlacement } from "./placement.js";
+import { course, progressionStats, isPlacementDone, SKILLS as COURSE_SKILLS } from "../curriculum.js";
 
-const SKILL_HE = {vocab: "אוצר מילים", grammar: "דקדוק", listening: "שמיעה", reading: "קריאה", speaking: "דיבור", writing: "כתיבה"};
+const SKILL_HE = {vocab: "אוצר מילים", grammar: "דקדוק", listening: "שמיעה", reading: "קריאה", speaking: "דיבור", writing: "כתיבה", pronunciation: "הגייה"};
+
+// הפרופיל לפי מיומנות מהקורס (CEFR לכל מיומנות — רק מה שנמדד), והתקדמות לאורך השיעורים החיים
+function renderCourseCard(){
+  const c = course();
+  const skills = [...COURSE_SKILLS, "pronunciation"];
+  const prog = progressionStats();
+  const checks = c.done.filter(d => d.kind === "check" || d.kind === "placement");
+  return el("div", {class: "card"},
+    el("h3", {}, "🎓 הקורס שלך"),
+    isPlacementDone()
+      ? el("div", {class: "skills-grid"}, skills.map(k => el("div", {class: "skill-box" + (c.skills[k] ? "" : " na")},
+          el("div", {class: "lv"}, c.skills[k] || "—"),
+          el("div", {class: "lb"}, SKILL_HE[k]),
+          c.skills[k] ? null : el("div", {class: "lb"}, "לא נמדד"))))
+      : el("p", {class: "muted small-text"}, "הרמה לכל מיומנות תיקבע בשיעור 1 (שיעור היכרות ואבחון) — מדידה, לא ניחוש."),
+    el("div", {class: "muted small-text", style: "margin-top:8px"},
+      `${c.done.length} שיעורים הושלמו${checks.length ? ` · ${checks.length} בדיקות רמה` : ""}${c.next ? ` · הבא: Lesson ${c.next.n} — ${c.next.title}` : ""}`),
+    prog ? el("ul", {class: "metrics-list", style: "margin-top:8px"},
+      el("li", {}, el("span", {class: "muted"}, "רצף דיבור הכי ארוך"), el("span", {}, `${Math.round(prog.longestFirst / 1000)} → ${Math.round(prog.longestLast / 1000)} שנ'`)),
+      prog.studentPctFirst != null && prog.studentPctLast != null ? el("li", {}, el("span", {class: "muted"}, "חלקך בשיחה"), el("span", {}, `${prog.studentPctFirst}% → ${prog.studentPctLast}%`)) : null,
+      prog.hebrewFirst != null ? el("li", {}, el("span", {class: "muted"}, "עברית בדברי המורה"), el("span", {}, `${prog.hebrewFirst}% → ${prog.hebrewLast}%`)) : null)
+      : el("p", {class: "muted small-text"}, "השוואה לאורך זמן (רצף דיבור, חלקך בשיחה, כמה עברית המורה צריך) תופיע אחרי שני שיעורים חיים עם מיקרופון."),
+    el("button", {class: "btn ghost small", onclick: () => { location.hash = "#/live"; }}, "לשיעור הבא"));
+}
 
 export function renderProfile(main){
   const p = S.profile;
@@ -50,6 +75,9 @@ export function renderProfile(main){
             renderProfile(main);
           }}, L))),
       el("div", {class: "muted small-text"}, cefrDesc(p.level))),
+
+    // הקורס: פרופיל לפי מיומנות והתקדמות נמדדת
+    renderCourseCard(),
 
     // דוח שבועי
     el("div", {class: "card"},

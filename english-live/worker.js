@@ -37,14 +37,32 @@ function levelGuide(level){
   }[level] || 'Use simple everyday vocabulary and short sentences.';
 }
 
-function instructions({ teacher, topic, profile: p = {}, studentName }){
+// עברית היא כלי עזר, לא שפת השיעור — ובמינון לפי רמה. שני המורים מבינים עברית תמיד.
+function hebrewPolicy(level){
+  const share = {A1: 'up to 20-30% Hebrew when needed', A2: 'about 10% Hebrew, only for explanations', B1: 'very little Hebrew (about 5%)'}[level]
+    || 'almost no Hebrew — English only, except a rare one-line explanation';
+  return `LANGUAGE: teach in English; Hebrew is a support tool — ${share}. You ALWAYS understand spoken Hebrew. If the student says "לא הבנתי" or speaks Hebrew, say "בסדר, רגע בעברית", explain in one or two Hebrew sentences, then "Now let's try it again in English." In the review part, quiz vocabulary in BOTH directions: "What does 'appointment' mean in Hebrew?" and "איך אומרים 'לקוח' באנגלית?" — confirm briefly ("Exactly") and continue in English. If they don't know, give the Hebrew meaning in one line, then two English examples.`;
+}
+
+function lessonRules(plan){
+  return `${plan}
+STRUCTURE: follow the plan's phases and keep the lesson moving — this is a real lesson in a course, not random small talk. Each lesson has ONE clear topic. You will receive short notes like [Time: 12/30 min — move to the story slide] or [Student answered slide 4: B — correct]; treat them as your own awareness, never read them aloud.
+SLIDES: call show_slide({index}) whenever you move to a new slide, and say "Let's look at the next slide." Always know which slide is showing and what is on it.
+READING: on a story slide ask the student to read it aloud ("Read the first paragraph for me"), LISTEN to the reading — if you clearly hear a misread or mispronounced word, stop gently ("Try 'comfortable' again"), say it once, let them repeat. Then comprehension questions, vocabulary (meanings in Hebrew), opinion, personal experience — turn the text into 10-15 minutes of real conversation. Bring today's new words back later in the lesson.
+QUIZ slides: for a listening quiz, read the sentence aloud once yourself. The student answers on screen; react to the note briefly and continue.
+PLACEMENT / PROGRESS CHECK: friendly and gradual, never stressful. At the end call assess_skills with CEFR levels for what you actually observed (speaking from the conversation; the others only if you have real evidence beyond the on-screen quizzes). Never invent a pronunciation level.
+SUMMARY: at the summary slide, tell the student the new words, the most important corrections, what improved, and what the next lesson will be about — then call end_lesson_summary.`;
+}
+
+function instructions({ teacher, topic, profile: p = {}, studentName, lessonPlan }){
   const lang = p.englishOnly
     ? "Speak English only, at the student's level. If they are truly stuck, rephrase more simply rather than switching to Hebrew."
-    : "Speak mostly in English at the student's level (this is \"Tinglish\"). Drop in a short Hebrew word or phrase only when the student is clearly stuck or asks — then come back to English.";
+    : hebrewPolicy(p.level);
   return `You are ${teacher}, a warm, patient English teacher giving a LIVE one-on-one voice lesson (like a Zoom call) to a Hebrew-speaking student${studentName ? ` named ${studentName}` : ''} (level ${p.level || 'A2'}).
 ${profileText(p)}
 ${levelGuide(p.level)}
 ${lang}
+${lessonPlan ? lessonRules(lessonPlan) : ''}
 You are in a real-time VOICE conversation. Behave like a real private teacher, not a chatbot:
 
 TALK TIME — the student should talk ~70%, you ~30%.
@@ -85,6 +103,12 @@ const TOOLS = [
     parameters: { type: 'object', properties: { word: { type: 'string' }, issue: { type: 'string' }, improved: { type: 'boolean' } }, required: ['word', 'issue'] } },
   { type: 'function', name: 'lesson_phase', description: 'You moved to a new phase of the lesson arc.',
     parameters: { type: 'object', properties: { phase: { type: 'string', enum: ['opening', 'review', 'main', 'practice', 'correction', 'fluency', 'summary'] } }, required: ['phase'] } },
+  { type: 'function', name: 'show_slide', description: 'Show a slide from the lesson plan to the student.',
+    parameters: { type: 'object', properties: { index: { type: 'integer', description: '1-based slide number' } }, required: ['index'] } },
+  { type: 'function', name: 'assess_skills', description: 'Placement / progress check: your CEFR assessment per skill from what you actually observed.',
+    parameters: { type: 'object', properties: {
+      speaking: { type: 'string', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] }, listening: { type: 'string' }, reading: { type: 'string' },
+      vocab: { type: 'string' }, grammar: { type: 'string' }, note_he: { type: 'string', description: 'One Hebrew sentence: strengths and what to work on' } }, required: ['speaking'] } },
   { type: 'function', name: 'end_lesson_summary', description: 'Your end-of-lesson summary for the student.',
     parameters: { type: 'object', properties: {
       improved: { type: 'string' }, weak: { type: 'string' }, next: { type: 'string' } }, required: ['improved', 'weak', 'next'] } },
@@ -132,7 +156,8 @@ export default {
       voice: VOICES[teacherId] || VOICES.sarah,
       modalities: ['audio', 'text'],
       instructions: instructions({ teacher, topic: body.topic ? String(body.topic).slice(0, 200) : null,
-        profile: body.profile || {}, studentName: body.studentName ? String(body.studentName).slice(0, 40) : null }),
+        profile: body.profile || {}, studentName: body.studentName ? String(body.studentName).slice(0, 40) : null,
+        lessonPlan: body.lessonPlan ? String(body.lessonPlan).slice(0, 12000) : null }),
       // תמלול של התלמיד — לכתוביות, לזיכרון ולמדדים (לא לניקוד הגייה)
       input_audio_transcription: { model: 'whisper-1' },
       // VAD בצד השרת = קטיעה (barge-in) מובנית: כשהתלמיד מדבר המורה נעצר

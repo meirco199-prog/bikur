@@ -475,5 +475,45 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 .metrics-list li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px dashed var(--line); padding: 5px 0; }
 .metrics-list li:last-child { border-bottom: none; }
 
+/* השיעור הבא (בית) */
+.next-lesson { display: flex; flex-direction: column; gap: 6px; cursor: pointer; text-align: start; width: 100%;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; border: none; }
+.next-lesson .muted { color: #e6e4ff !important; }
+.nl-top { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; }
+.nl-label { font-weight: 700; opacity: .9; }
+.nl-when { background: rgba(255,255,255,.18); border-radius: 999px; padding: 3px 10px; font-weight: 700; }
+.nl-title { font-size: 1.15rem; font-weight: 800; text-align: left; }
+.nl-cta { margin-top: 4px; background: #fff; color: var(--brand); border-radius: 12px; padding: 9px; text-align: center; font-weight: 800; }
+
+/* שקפים בשיעור */
+.slides { border-radius: 16px; border: 1px solid var(--line); background: var(--card); overflow: hidden; }
+.slides-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--brand-soft); font-size: .82rem; font-weight: 700; color: var(--brand); }
+.slides-head .btn { padding: 4px 10px; }
+.slide { padding: 14px; min-height: 90px; animation: fadein .2s; }
+.slide-title { font-weight: 800; font-size: 1.05rem; margin-bottom: 8px; }
+.slide-body { font-size: 1.02rem; line-height: 1.6; }
+.slide-story { font-size: 1.05rem; line-height: 1.8; }
+.slide-vocab { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.slide-vocab div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding: 3px 0; }
+.slide-vocab b { direction: ltr; }
+.slide-q { margin: 0; padding-inline-start: 18px; line-height: 1.7; }
+.slide-quiz .opt { margin-top: 6px; }
+.slide-quiz .opt.right { border-color: var(--good); background: var(--good-soft); }
+.slide-quiz .opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.slide-phase { font-size: .78rem; color: var(--muted); }
+.slides.flash { box-shadow: 0 0 0 3px var(--brand); transition: box-shadow .15s; }
+/* עם שקפים המסך של המורה קטן יותר — השקף הוא הלוח */
+.call.with-slides .call-stage { flex: 0 0 auto; min-height: 170px; height: 170px; }
+.call.with-slides .self-tile { width: 70px; }
+.skill-box.na .lv { color: var(--muted); font-size: 1rem; }
+.sched .row.gap > .input { flex: 1; min-width: 0; }
+.sched-time { max-width: 140px; direction: ltr; }
+.next-lesson .today-list { margin: 0; padding: 0; list-style: none; }
+.next-lesson .today-list li { color: #fff; border: none; padding: 2px 0; }
+.skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.skill-box { text-align: center; border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px; }
+.skill-box .lv { font-weight: 800; font-size: 1.2rem; }
+.skill-box .lb { font-size: .75rem; color: var(--muted); }
+
 .stat-card.na { opacity: .8; }
 .stat-card.na .na-v { font-size: .82rem; font-weight: 700; color: var(--muted); }
