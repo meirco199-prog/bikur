@@ -276,6 +276,15 @@
   .typed-row{display:none;gap:8px;padding:6px 0}
   .typed-row.open{display:flex}
   .typed-row input{background:rgba(255,255,255,.95);border-color:transparent}
+  .turn-btn-box{min-height:64px;display:flex;justify-content:center;align-items:center;padding:2px 0 6px}
+  .turn-btn{
+    border:none;border-radius:999px;cursor:pointer;font-family:inherit;font-weight:900;
+    font-size:1.05rem;padding:15px 30px;min-height:56px;width:min(92%,420px);
+    transition:transform .12s;box-shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  .turn-btn:active{transform:scale(.97)}
+  .turn-btn.done{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+  .turn-btn.myturn{background:rgba(255,255,255,.16);color:#fff;border:2px solid rgba(255,255,255,.35);box-shadow:none}
   .coach-pick{display:flex;gap:12px;justify-content:center;margin:10px 0}
   .coach-pick .cp{
     background:#fff;border:3px solid var(--border);border-radius:22px;padding:8px;cursor:pointer;width:120px;
@@ -303,6 +312,7 @@
 const API = '/api/family';
 const COACH_API = '/api/coach';
 const POLL_MS = 15000;
+const APP_VER = '3.2';
 
 /* ---------- תפריט וחוקים ---------- */
 const MEALS = [
@@ -1086,6 +1096,7 @@ function renderHome(){
       ${badges.map(b=>`<span class="badge-chip">${b}</span>`).join('')}
     </div>`:''}
     <button class="btn secondary block" onclick="setView('today')">🍽️ ליומן המלא של היום</button>
+    <p class="center muted" style="margin-top:14px">גרסה ${APP_VER}</p>
   </div>`;
 }
 
@@ -1560,15 +1571,19 @@ function openCall(){
   caps.className='captions';
   caps.appendChild(capCoach); caps.appendChild(capUser);
 
+  const turnBtnBox=document.createElement('div');
+  turnBtnBox.className='turn-btn-box';
+
   overlay.appendChild(top);
   overlay.appendChild(stage);
   overlay.appendChild(pendingBox);
   overlay.appendChild(caps);
+  overlay.appendChild(turnBtnBox);
   overlay.appendChild(typedRow);
   overlay.appendChild(controls);
   document.body.appendChild(overlay);
 
-  call.ui={overlay,capCoach,capUser,statusEl,tile,micBtn,input,typedRow,pendingBox};
+  call.ui={overlay,capCoach,capUser,statusEl,tile,micBtn,input,typedRow,pendingBox,turnBtnBox};
   call.timerInt=setInterval(()=>{
     if(!call) return;
     const s=Math.floor((Date.now()-call.start)/1000);
@@ -1604,6 +1619,37 @@ function setCallStatus(text,cls=''){
   call.ui.statusEl.className='call-status '+cls;
   call.ui.tile.classList.toggle('is-speaking',cls==='speaking');
   call.ui.tile.classList.toggle('is-listening',cls==='listening');
+  // הכפתור הגדול: בזמן הקשבה — "סיימתי לדבר"; בזמן שהיא מדברת — "תורי לדבר"
+  const box=call.ui.turnBtnBox;
+  if(cls==='listening' && !call.typedOnly){
+    box.innerHTML='<button class="turn-btn done" onclick="finishSpeaking()">✅ סיימתי לדבר — עני לי</button>';
+  }else if(cls==='speaking'){
+    box.innerHTML='<button class="turn-btn myturn" onclick="manualInterrupt()">✋ עצרי — תורי לדבר</button>';
+  }else{
+    box.innerHTML='';
+  }
+}
+
+/* הילד סיים לדבר ולוחץ — שולחים מיד את מה שנקלט, גם אם המכשיר עוד לא
+   "סגר" את הזיהוי בעצמו (הבעיה הנפוצה: הזיהוי נשאר פתוח והתשובה לא נשלחת) */
+function finishSpeaking(){
+  if(!call) return;
+  const t=(call.liveTranscript||'').trim();
+  stopRec();
+  if(call.pendingFinish) call.pendingFinish(t);
+}
+
+/* עצירה ידנית של הדיבור שלה — התור עובר לילד מיד */
+function manualInterrupt(){
+  if(!call||!call.saying) return;
+  stopRec();
+  stopSpeaking();
+  if(call.sayFinish) call.sayFinish({interrupted:true});
+  // אם התור כבר ממתין (אישור מהצ'יפים) — פותחים הקשבה; בזרימה הרגילה
+  // הלולאה עושה את זה בעצמה, והמזהה שכבר רץ לא יופעל שוב
+  call.timers.push(setTimeout(()=>{
+    if(call && call.pendingFinish && !call.rec && sttOK && !call.muted && !call.typedOnly) startRecognizer('listen');
+  },80));
 }
 
 function saveChatMsg(role,text){
@@ -1916,8 +1962,9 @@ function startRecognizer(role){
   rec.lang='he-IL'; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
   if(role==='listen'){
     call.avatar.setState('listening');
-    setCallStatus('מקשיבה לך… דברו עכשיו 🎙️','listening');
+    setCallStatus('מקשיבה לך… דברו, ובסוף לחצו "סיימתי" 🎙️','listening');
     call.ui.capUser.textContent='';
+    call.liveTranscript='';
   }
   let finalText='', lastErr='';
   rec.onresult=(e)=>{
@@ -1932,6 +1979,7 @@ function startRecognizer(role){
       if(shouldIgnoreWhileSpeaking(text,call.sayingText)) return;
       bargeIn();
     }
+    if(call.recRole==='listen') call.liveTranscript=text;
     call.ui.capUser.textContent=text;
   };
   rec.onerror=(ev)=>{ lastErr=ev?.error||''; };
@@ -1958,7 +2006,7 @@ function startRecognizer(role){
       },150));
       return;
     }
-    const t=finalText.trim();
+    const t=(finalText.trim()||call.liveTranscript||'').trim();
     // השהיה קטנה לפני סיבוב חוזר — שכישלון מהיר לא יהפוך ללולאה צפופה
     call.timers.push(setTimeout(()=>{
       if(!call) return;
