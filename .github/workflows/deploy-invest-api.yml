@@ -13,6 +13,7 @@ on:
     paths:
       - 'invest-api/**'
       - 'invest-api/config.json'
+      - '.github/council/projects.json'
       - '.github/workflows/deploy-invest-api.yml'
   workflow_dispatch:
 
@@ -77,6 +78,9 @@ jobs:
           import json,sys
           cfg = json.load(open("invest-api/config.json"))
           plain = [{"type": "plain_text", "name": k, "text": str(v)} for k, v in cfg.items() if not k.startswith("_")]
+          # רשימת הפרויקטים של AI Council (ניתוב הודעות ChatGPT) — מקור האמת: .github/council/projects.json
+          council = json.load(open(".github/council/projects.json"))["projects"]
+          plain.append({"type": "plain_text", "name": "COUNCIL_PROJECTS", "text": ",".join(council.keys())})
           print(json.dumps({
             "main_module": "worker.js",
             "compatibility_date": "2025-01-01",

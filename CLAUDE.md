@@ -36,6 +36,26 @@
 6. **סשן שנסגר לפני PASS**: ה-Routine "GPT Review follow-up" סורק PR-ים פתוחים עם `gpt-review:blocked` שאין בהם
    תשובת Claude אחרי הסקירה האחרונה, ומטפל לפי הכללים כאן.
 
+## AI Council inbox — משימות מ-GPT לכל הפרויקטים <a id="ai-council-inbox"></a>
+
+ChatGPT שולח הודעות (`project`, `type`, `title`, `body`) דרך `POST /council/comment`; ה-relay מנתב אותן ל-Issue של הפרויקט
+(`.github/council/projects.json`: invest → #25, food → #98, english → #99, פרויקט חדש → Issue שנפתח אוטומטית). פירוט:
+`.github/council/README.md`. invest ממשיך להיות מטופל על ידי ה-Routine הקיימת של Issue #25; שאר הפרויקטים — Routine
+"AI Council inbox". בשני המקרים הכללים זהים:
+
+1. **סטטוס לכל משימה** — כל הודעה של GPT נושאת `<!-- council-msg id=cm_… -->`. התגובה הראשונה שלך עליה מסמנת `RECEIVED`,
+   ואחר כך `IN_PROGRESS` → `PR_OPEN` (עם `pr=<url>`) → `PASS`, או `REJECTED` / `DONE` / `OWNER_DECISION_REQUIRED` / `FAILED`.
+   הסמן: `<!-- council-status id=cm_… status=RECEIVED -->` בגוף התגובה, והתגובה מסתיימת בחתימת Claude Code. בלי סמן —
+   המשימה נראית "אבודה" ל-GPT (`GET /council/tasks`).
+2. **Evidence first** (AI_COUNCIL כלל 1): ממצא מסוג bug/security/test/regression — בדוק מול הקוד, הבדיקות והמדיניות
+   (`.ai/REVIEW.md`) לפני שאתה מקבל אותו. נכון → ענף + PR עם תיקון ובדיקה (ה-GPT Reviewer נכנס אוטומטית; הלולאה עד PASS, 3
+   סבבים). לא נכון → `REJECTED` עם ראיה (`קובץ:שורה`, בדיקה, ריצה). שאלה/הצעה שנענתה בלי קוד → `DONE`.
+3. **החלטות מוצר ובעל הריפו** — לא משנים לבד: `OWNER_DECISION_REQUIRED` + סיכום למאיר (מה GPT מציע, מה אתה חושב, ההשלכה).
+   ה-`owner_rules` של הפרויקט ב-`projects.json` מחייבים; ב-**food**: כל חוקי התזונה הנוכחיים נשארים כפי שהם אלא אם מאיר
+   מבקש במפורש.
+4. **כפילויות** — אותה הודעה מקבלת אותו `id` (ה-Worker מסנן); אם בכל זאת שני ממצאים זהים — טפל באחד וסמן את השני `DUPLICATE`.
+5. **לא לשנות את חוזה הערוץ** (פורמט ההודעה `**ChatGPT** …`, הסמנים, Issue #25) — ה-Routines וה-relay תלויים בו.
+
 ## מבנה הריפו
 
 הריפו מארח כמה אפליקציות עצמאיות, כל אחת בתיקייה משלה, ללא build step:

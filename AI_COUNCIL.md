@@ -651,3 +651,19 @@ BLOCKED על "assert בלתי אפשרי" — ממצא שווא שנגרם מה�
 דחה עם ראיה (check ירוק + ריצה מקומית) ותיקן את ההנחיה למודל → סבב 3 PASS, והמבקר אישר שסבב 2 היה שגוי. עלות: ~29K קלט +
 ~8K פלט לסבב (gpt-5, medium). לקח: הרדקציה נכונה, אבל המודל חייב לדעת ש-[REDACTED] הוא placeholder. הדחיפה ל-main אחרי
 המיזוג דילגה כצפוי ("מיזוג של PR שכבר נסקר").
+
+### AI_COUNCIL#23: ערוץ ה-Council לכל הפרויקטים — project routing, סטטוס משימות, ו-Claude עוקב אוטומטית
+**קטגוריה:** תשתית תיאום (הכללה של #18/#19/#22). **Issue:** בעל הריפו (29/9): "GPT יוכל לשלוח משימה/ביקורת עם project (food /
+english / invest / עתידי) והמערכת תנתב אותה אוטומטית למקום שבו Claude יכול לקרוא, להגיב ולבצע. אל תבנה מערכת חדשה ואל תשבור
+את Council ההשקעות." **Claude position:** אותו Worker, אותה תיבה, אותו relay, אותו מפתח — נוספו: `project/type/title/body/source`
+ב-`POST /council/comment` (תאימות: `{text}` = invest/#25 בדיוק כמו קודם), אימות `project` מול רשימה שמוזרקת בפריסה מתוך
+`.github/council/projects.json` (לא הרשאה — ניתוב; לא מוכר → 400), דדופליקציה לפי hash/`idempotency_key` (אותה הודעה = אותה
+משימה, בלי מכסה), רישום סטטוס לכל משימה (`GET /council/tasks`), relay כסקריפט (`.github/council/relay.mjs`) שמנתב ל-Issue של
+הפרויקט (food #98, english #99; פרויקט חדש → Issue שנפתח אוטומטית עם `council:<project>`), מדלג על מה שכבר פורסם, ומסנכרן את
+סמני הסטטוס של Claude (`<!-- council-status id=… status=… -->`) בחזרה ל-Worker. Claude: Routine "AI Council inbox" לכל הפרויקטים
+חוץ מ-invest (שנשאר עם ה-Routine של #25), evidence first, PR → GPT Reviewer (#22). **החלטת בעל הריפו ב-food:** כל חוקי התזונה
+הנוכחיים נשארים — נרשם ב-`projects.json` (`owner_rules`), ב-`food/.ai/REVIEW.md` וב-Issue #98.
+**Evidence:** `invest-api/tests/worker.test.mjs` (34, כולל תאימות, פרויקט לא מוכר, כפילויות, סטטוסים), `.github/council/relay.test.mjs`
+(6: ניתוב, לא ברישום → FAILED בלי פרסום, דדופ, סטטוסים, E2E). קצה-לקצה: "AI Council relay" → Run workflow → `e2e_project`.
+**Risks:** מכסה משותפת (20/יום) לכל הפרויקטים; Issue #25 ממשיך לקבל גם הודעות ישנות-סגנון. **Owner decision:** "פתח PR; אל תמזג
+לפני CI ירוק ו-GPT Reviewer PASS". **Status:** TESTING.
