@@ -6,7 +6,7 @@
 // מדריך התקנה: invest/docs/IBKR_BRIDGE.md
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { IbkrClient } from '../lib/ibkr-client.js';
-import { toIbkrOrder, normalizeBrokerOrder } from '../engine/ibkr-map.js';
+import { toIbkrOrder, normalizeBrokerOrder, clipExitToHeld } from '../engine/ibkr-map.js';
 import { nyParts } from '../engine/session.js';
 
 const args = new Set(process.argv.slice(2));
@@ -58,10 +58,20 @@ async function tick(ib, state){
   } else {
     const today = nyDay();
     const todo = [...(pend.orders || []).filter((o) => pend.day && pend.day < today), ...(pend.exits || [])].filter((o) => !o.sent && !state.sent[o.clientOrderId]);
+    // יציאות נבדקות מול מה שהדמה מחזיק בפועל (פוזיציה שנפתחה בסימולציה לפני חיבור הגשר לא קיימת בדמה — מכירה שלה הייתה פותחת שורט)
+    const held = todo.some((o) => o.kind === 'stop' || o.kind === 'liquidation') ? await ib.positions(acct).catch((e) => { errors.push('positions: ' + e.message); return null; }) : [];
     for (const o of todo){
       try {
         const c = state.conids[o.symbol] || (await ib.resolveConid(o.symbol, today)); state.conids[o.symbol] = c;
-        const b = toIbkrOrder({ order: o, conid: c.conid, acctId: acct });
+        let qty = o.qty;
+        if (o.kind === 'stop' || o.kind === 'liquidation'){
+          if (!held) throw new Error('לא ניתן לקרוא פוזיציות מהדמה — היציאה תנוסה בסבב הבא');
+          const clip = clipExitToHeld(o, held.filter((p) => Number(p.conid) === Number(c.conid)).reduce((a, p) => a + (Number(p.qty) || 0), 0));
+          if (!clip.ok){ log('דילוג', o.symbol, clip.reason); state.sent[o.clientOrderId] = { skipped: clip.reason, at: new Date().toISOString() }; sentNow.push({ clientOrderId: o.clientOrderId, orderId: null, symbol: o.symbol, side: o.side, qty: 0, skipped: clip.reason }); saveState(state); continue; }
+          if (clip.reason) log(o.symbol, clip.reason);
+          qty = clip.qty;
+        }
+        const b = toIbkrOrder({ order: { ...o, qty }, conid: c.conid, acctId: acct });
         if (!b.ok){ log('דילוג', o.symbol, b.reason); state.sent[o.clientOrderId] = { skipped: b.reason, at: new Date().toISOString() }; sentNow.push({ clientOrderId: o.clientOrderId, orderId: null, symbol: o.symbol, side: o.side, qty: 0, skipped: b.reason }); continue; }
         if (DRY){ log('DRY', JSON.stringify(b.order)); continue; }
         const r = await ib.placeOrder(acct, b.order);
