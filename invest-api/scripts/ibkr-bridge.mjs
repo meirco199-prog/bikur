@@ -57,19 +57,28 @@ async function tick(ib, state){
     log('מחוץ לחלון השליחה (09:31–15:50 ניו יורק) — רק מדווח');
   } else {
     const today = nyDay();
-    const todo = [...(pend.orders || []).filter((o) => pend.day && pend.day < today), ...(pend.exits || [])].filter((o) => !o.sent && !state.sent[o.clientOrderId]);
-    // יציאות נבדקות מול מה שהדמה מחזיק בפועל (פוזיציה שנפתחה בסימולציה לפני חיבור הגשר לא קיימת בדמה — מכירה שלה הייתה פותחת שורט)
-    const held = todo.some((o) => o.kind === 'stop' || o.kind === 'liquidation') ? await ib.positions(acct).catch((e) => { errors.push('positions: ' + e.message); return null; }) : [];
+    // סדר: פקודות הסשן, יציאות, ואז סנכרון חד-פעמי של פוזיציות קיימות (החלטת בעל הריפו 29/9)
+    const todo = [...(pend.orders || []).filter((o) => pend.day && pend.day < today), ...(pend.exits || []), ...(pend.sync || [])].filter((o) => !o.sent && !state.sent[o.clientOrderId]);
+    // יציאות וסנכרון נבדקים מול מה שהדמה מחזיק בפועל (פוזיציה שנפתחה בסימולציה לפני חיבור הגשר לא קיימת בדמה — מכירה שלה הייתה פותחת שורט;
+    // סנכרון לא נשלח שוב אם הדמה כבר מחזיק)
+    const needHeld = todo.some((o) => o.kind === 'stop' || o.kind === 'liquidation' || o.kind === 'sync');
+    const held = needHeld ? await ib.positions(acct).catch((e) => { errors.push('positions: ' + e.message); return null; }) : [];
+    const skip = (o, reason) => { log('דילוג', o.symbol, reason); state.sent[o.clientOrderId] = { skipped: reason, at: new Date().toISOString() }; sentNow.push({ clientOrderId: o.clientOrderId, orderId: null, symbol: o.symbol, side: o.side, qty: 0, skipped: reason }); saveState(state); };
     for (const o of todo){
       try {
         const c = state.conids[o.symbol] || (await ib.resolveConid(o.symbol, today)); state.conids[o.symbol] = c;
         let qty = o.qty;
+        const heldQty = () => held.filter((p) => Number(p.conid) === Number(c.conid)).reduce((a, p) => a + (Number(p.qty) || 0), 0);
         if (o.kind === 'stop' || o.kind === 'liquidation'){
           if (!held) throw new Error('לא ניתן לקרוא פוזיציות מהדמה — היציאה תנוסה בסבב הבא');
-          const clip = clipExitToHeld(o, held.filter((p) => Number(p.conid) === Number(c.conid)).reduce((a, p) => a + (Number(p.qty) || 0), 0));
-          if (!clip.ok){ log('דילוג', o.symbol, clip.reason); state.sent[o.clientOrderId] = { skipped: clip.reason, at: new Date().toISOString() }; sentNow.push({ clientOrderId: o.clientOrderId, orderId: null, symbol: o.symbol, side: o.side, qty: 0, skipped: clip.reason }); saveState(state); continue; }
+          const clip = clipExitToHeld(o, heldQty());
+          if (!clip.ok){ skip(o, clip.reason); continue; }
           if (clip.reason) log(o.symbol, clip.reason);
           qty = clip.qty;
+        } else if (o.kind === 'sync'){
+          if (!held) throw new Error('לא ניתן לקרוא פוזיציות מהדמה — הסנכרון ינוסה בסבב הבא');
+          const h = heldQty(), want = o.side === 'buy' ? o.qty : -o.qty;
+          if ((want > 0 && h >= want) || (want < 0 && h <= want)){ skip(o, `הדמה כבר מחזיק ${h} ${o.symbol} — סנכרון מיותר`); continue; }
         }
         const b = toIbkrOrder({ order: { ...o, qty }, conid: c.conid, acctId: acct });
         if (!b.ok){ log('דילוג', o.symbol, b.reason); state.sent[o.clientOrderId] = { skipped: b.reason, at: new Date().toISOString() }; sentNow.push({ clientOrderId: o.clientOrderId, orderId: null, symbol: o.symbol, side: o.side, qty: 0, skipped: b.reason }); continue; }
