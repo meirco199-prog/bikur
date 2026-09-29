@@ -8,6 +8,7 @@ import { renderSpeak } from "./screens/speak.js";
 import { renderWords } from "./screens/words.js";
 import { renderProfile, applyTheme } from "./screens/profile.js";
 import { renderTeacher } from "./screens/teacher.js";
+import { renderClassroom } from "./screens/classroom.js";
 import { scheduleDaily, syncReminderState, remindIfDue, refreshPush } from "./notify.js";
 import { stopSpeaking } from "./speech.js";
 
@@ -19,6 +20,7 @@ const ROUTES = {
   "#/learn": {render: renderLearn, nav: "learn"},
   "#/speak": {render: renderSpeak, nav: "speak"},
   "#/teacher": {render: renderTeacher, nav: "learn"},
+  "#/live": {render: renderClassroom, nav: "speak"},
   "#/words": {render: renderWords, nav: "words"},
   "#/profile": {render: renderProfile, nav: "profile"},
 };
@@ -42,6 +44,7 @@ function buildNav(){
 
 function route(){
   stopSpeaking();
+  if (window.__liveTeardown){ window.__liveTeardown(); }
   document.querySelector(".word-popup")?.remove();
   if (!S.profile.onboarded){
     nav.style.display = "none";

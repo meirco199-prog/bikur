@@ -11,6 +11,12 @@ export function renderSpeak(main){
   stopSpeaking();
   main.replaceChildren(el("div", {class: "screen"},
     el("h1", {}, "דיבור"),
+    el("button", {class: "card live-cta", onclick: () => { location.hash = "#/live"; }},
+      el("div", {class: "live-cta-emoji"}, "🎥"),
+      el("div", {class: "li-main"},
+        el("div", {class: "li-title"}, "שיעור חי בזום"),
+        el("div", {class: "muted small-text"}, "מורה שמדבר איתך פנים אל פנים — שואל, אתה עונה, הוא מתקן")),
+      el("span", {class: "live-badge"}, "חדש")),
     sttSupported() ? null : el("div", {class: "card notice"},
       "הדפדפן הזה לא תומך בזיהוי דיבור. אפשר עדיין לשוחח בהקלדה, ולשמוע הכול. (Chrome באנדרואיד/מחשב תומך מלא.)"),
     el("div", {class: "grid2"},
