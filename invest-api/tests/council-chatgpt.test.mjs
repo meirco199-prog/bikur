@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldSkip, buildMessages, formatComment, kindOf, redact, MARKER } from '../scripts/council-chatgpt.mjs';
+import { shouldSkip, buildMessages, formatComment, kindOf, redact, slimBroker, MARKER, DEMO_HEADER } from '../scripts/council-chatgpt.mjs';
 
 const bot = (body, at = '2026-09-22T06:00:00Z') => ({ body, created_at: at, user: { login: 'github-actions[bot]' } });
 const owner = (body, at = '2026-09-22T07:00:00Z') => ({ body, created_at: at, user: { login: 'meirco199-prog' } });
@@ -26,4 +26,14 @@ test('council-chatgpt: התגובה מתחילה ב-**ChatGPT** (כדי שה-Rou
   const b = formatComment({ text: 'ממצא. מפתח: sk-abcdefghijklmnop1234', model: 'gpt-5', runUrl: 'https://x/run/1', today: '2026-09-22' });
   assert.ok(b.startsWith('**ChatGPT**')); assert.ok(b.includes(`<!-- ${MARKER} 2026-09-22 -->`)); assert.ok(!b.includes('sk-abcdefghijklmnop1234')); assert.ok(b.includes('[REDACTED]'));
   assert.equal(redact('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345'), '[REDACTED]');
+});
+
+test('council-chatgpt: חוות דעת חובה על עסקאות הדמה — כותרת קבועה בהנחיות, ונתוני הדמה מצומצמים', () => {
+  const m = buildMessages({ comments: [], data: {}, rules: 'x', today: '2026-09-29' });
+  assert.ok(m[0].content.includes(DEMO_HEADER), 'הכותרת שה-Routine מחפשת מופיעה בהנחיות');
+  assert.ok(m[0].content.includes('agent/broker') && m[0].content.includes('pending.orders'));
+  const b = slimBroker({ day: '2026-09-29', authenticated: true, account: 'DU1', broker: { netLiquidationUsd: 1 }, sizeRatio: 15, sync: { total: 8 }, positions: [{ symbol: 'ARKK', qty: 70, avgPrice: 90, marketPrice: 89.9, unrealizedUsd: -10.5, conid: 1, currency: 'USD' }], fills: [{ symbol: 'ARKK', side: 'BUY', filledQty: 70, avgPrice: 90.02, status: 'filled', at: 't', clientOrderId: 'agent:sync:x', conid: 1 }], reconcile: { rows: [{ symbol: 'ARKK', slipPct: 0.0086 }], summary: { filled: 1 }, extraBroker: [] }, errors: ['a', 'b', 'c', 'd'] });
+  assert.deepEqual(b.positions[0], { symbol: 'ARKK', qty: 70, avgPrice: 90, marketPrice: 89.9, unrealizedUsd: -10.5 });
+  assert.equal(b.fills[0].qty, 70); assert.equal(b.fills[0].id, 'agent:sync:x'); assert.equal(b.errors.length, 3); assert.equal(b.reconcile.rows[0].slipPct, 0.0086);
+  assert.deepEqual(slimBroker({ missing: true }), { missing: true }); assert.equal(slimBroker('HTTP 500'), 'HTTP 500');
 });

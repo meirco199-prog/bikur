@@ -1,8 +1,8 @@
 // שיעור חי עם מורה AI — כמו שיחת זום. המורה מדבר בקול (השפתיים זזות), מקשיב לך,
 // שואל, אתה עונה, והוא מתקן — hands-free. עם חלון "מצלמה" שלך (רשות), כתוביות,
 // ובקרות שיחה. נופל יפה להקלדה כשאין זיהוי דיבור, וללא קול כשאין הקראה.
-import { el, toast, pick } from "../util.js";
-import { S, logDay, skillResult, recordMistake } from "../store.js";
+import { el, toast, pick, todayStr } from "../util.js";
+import { S, save, logDay, skillResult, recordMistake } from "../store.js";
 import { speak, stopSpeaking, ttsSupported } from "../speech.js";
 import { chat, feedback, aiErrorMessage } from "../ai.js";
 import { addXP } from "../gamify.js";
@@ -81,9 +81,15 @@ function startCall(main, {teacher, focus, selfCam}){
   session = {
     main, teacher, focus, avatar,
     messages: [], start: Date.now(), destroyed: false, ending: false,
-    muted: false, typedOnly: !sttOK, pendingFinish: null, rec: null,
+    muted: false, typedOnly: !sttOK, pendingFinish: null, rec: null, recRole: null,
     timers: [], mouthRAF: null, mouthBoost: 0, camStream: null, emptyCount: 0,
     timerInt: null,
+    // קטיעה (barge-in): מזהה-דיבור "צופה" רץ בזמן שהמורה מדבר; דיבור אמיתי עוצר את המורה
+    bargeIn: sttOK && S.settings.bargeIn !== false, bargeConflict: false, barged: false,
+    saying: false, sayingText: "", sayFinish: null, spokenChars: 0, carryText: null,
+    // מדדים שנמדדים בפועל (לא הערכות): זמני דיבור, רצף, זמן תגובה, קטיעות
+    metrics: {studentMs: 0, teacherMs: 0, longestMs: 0, latencies: [], interruptions: 0, firstSpeechAt: 0},
+    turnRequestedAt: 0,
   };
   window.__liveTeardown = teardown;
 
@@ -113,8 +119,10 @@ function startCall(main, {teacher, focus, selfCam}){
     input, el("button", {class: "btn primary small", onclick: sendTyped}, "שלח"));
 
   const micBtn = el("button", {class: "call-btn mic", onclick: toggleMic}, "🎤");
+  const bargeBtn = el("button", {class: "call-btn" + (session.bargeIn ? "" : " off"), title: "קטיעה באמצע דיבור", onclick: toggleBarge}, "⚡");
   const controls = el("div", {class: "call-controls"},
     sttOK ? micBtn : null,
+    sttOK ? bargeBtn : null,
     el("button", {class: "call-btn", title: "שמע שוב", onclick: repeatLast}, "🔁"),
     el("button", {class: "call-btn", title: "מקלדת", onclick: () => typedRow.classList.toggle("open")}, "⌨️"),
     el("button", {class: "call-btn end", title: "סיים שיעור", onclick: endCall}, "✕"));
@@ -128,7 +136,7 @@ function startCall(main, {teacher, focus, selfCam}){
     typedRow,
     controls));
 
-  session.ui = {capTeacher, capUser, statusEl, ring, micBtn, teacherTile, input, typedRow};
+  session.ui = {capTeacher, capUser, statusEl, ring, micBtn, bargeBtn, teacherTile, input, typedRow};
 
   // טיימר
   session.timerInt = setInterval(() => {
@@ -149,10 +157,19 @@ function setStatus(text, cls = ""){
   session.ui.teacherTile.classList.toggle("is-listening", cls === "listening");
 }
 
+// אם התלמיד קטע — ההודעה של המורה בהיסטוריה נחתכת במקום שבו נעצר, כדי שהמודל
+// ידע שלא הכול נאמר ויגיב לקטיעה עצמה (למשל "Wait, what does that mean?").
+function markIfInterrupted(msg, res){
+  if (!res?.interrupted) return;
+  const spoken = msg.content.slice(0, res.spokenChars || 0).trim();
+  msg.content = (spoken ? spoken + " …" : "…") + " (the student interrupted here)";
+}
+
 async function runLesson(focus){
   const opener = openingLine(session.teacher, focus);
-  session.messages.push({role: "assistant", content: opener});
-  await say(opener);
+  const openerMsg = {role: "assistant", content: opener};
+  session.messages.push(openerMsg);
+  markIfInterrupted(openerMsg, await say(opener));
   while (session && !session.destroyed){
     const userText = await getUserTurn();
     if (!session || session.destroyed) return;
@@ -176,47 +193,79 @@ async function runLesson(focus){
       continue;
     }
     if (!session || session.destroyed) return;
-    session.messages.push({role: "assistant", content: reply});
-    await say(reply);
+    const msg = {role: "assistant", content: reply};
+    session.messages.push(msg);
+    markIfInterrupted(msg, await say(reply));
   }
 }
 
-// המורה מדבר: כתובית + הנפשת פה + קול. מסתיים ב-onend, בעצירת הדיבור, או בגיבוי.
+// המורה מדבר: כתובית + הנפשת פה + קול. בזמן הדיבור רץ מזהה-דיבור "צופה" (barge-in):
+// אם התלמיד מתחיל לדבר באמת — המורה נעצר מיד והמזהה הופך לתור של התלמיד.
+// נפתר ב-{interrupted, spokenChars}: ב-onend, בעצירת הדיבור, בקטיעה, או בגיבוי.
 function say(text){
-  if (!session) return Promise.resolve();
+  if (!session) return Promise.resolve({interrupted: false, spokenChars: 0});
   session.ui.capTeacher.textContent = text;
   session.ui.capUser.textContent = "";
   session.avatar.setState("speaking");
   setStatus(`${session.teacher.name} מדבר…`, "speaking");
+  session.sayingText = text; session.saying = true; session.spokenChars = 0; session.barged = false;
+  const t0 = Date.now();
   return new Promise(resolve => {
     let done = false;
-    const finish = () => {
+    const finish = (info = {}) => {
       if (done) return; done = true;
-      if (session?.sayPoll){ clearInterval(session.sayPoll); session.sayPoll = null; }
+      session.saying = false; session.sayFinish = null;
+      if (session.sayPoll){ clearInterval(session.sayPoll); session.sayPoll = null; }
       stopMouth();
-      if (session && !session.destroyed){ session.avatar.setMouth(0); session.avatar.setState("idle"); }
-      resolve();
+      session.metrics.teacherMs += Date.now() - t0;
+      if (!session.destroyed){
+        session.avatar.setMouth(0);
+        if (!info.interrupted) session.avatar.setState("idle");
+      }
+      // סיום רגיל: הצופה כבר לא נחוץ (בקטיעה הוא הפך לתור התלמיד ונשאר)
+      if (!info.interrupted && session.recRole === "watch") stopRec();
+      resolve({interrupted: !!info.interrupted, spokenChars: session.spokenChars});
     };
+    session.sayFinish = finish;
     startMouth();
     const est = Math.min(16000, 900 + text.length * 60);
     const ok = speak(text, {
       voice: session.teacher.voice,
-      onend: finish,
-      onboundary: () => { if (session) session.mouthBoost = 1; },
+      onend: () => finish(),
+      onboundary: (ev) => {
+        if (!session) return;
+        session.mouthBoost = 1;
+        if (ev && typeof ev.charIndex === "number") session.spokenChars = ev.charIndex; // כמה כבר נאמר — לקטיעה
+      },
     });
+    if (session.bargeIn && !session.muted && !session.typedOnly) startRecognizer("watch");
     // בלי קול ממשי (אין voices בדפדפן) — קוצבים לפי זמן קריאה, לא נתקעים
     const silent = !ttsSupported() || (speechSynthesis.getVoices && speechSynthesis.getVoices().length === 0);
     if (!ok || silent){
-      session.timers.push(setTimeout(finish, Math.min(8000, 400 + text.length * 38)));
+      session.timers.push(setTimeout(() => finish(), Math.min(8000, 400 + text.length * 38)));
       return;
     }
     // יש קול: מסתמכים על onend, עם גיבוי אם הדיבור נעצר בלי onend, ותקרה קשיחה
-    let started = false; const t0 = Date.now();
+    let started = false;
     session.sayPoll = setInterval(() => {
       if (done) return;
       const sp = speechSynthesis.speaking;
       if (sp) started = true;
-      if (started && !sp) finish();
+      if (started && !sp){
+        // הדיבור מת מיד אחרי שהצופה עלה, בלי קטיעה = בחלק ממכשירי אנדרואיד
+        // המיקרופון "גונב" את האודיו. מכבים קטיעה לשיעור הזה ואומרים שוב.
+        const elapsed = Date.now() - t0;
+        if (!session.barged && session.bargeIn && session.recRole === "watch" && elapsed < est * 0.35 && !session.bargeConflict){
+          session.bargeConflict = true;
+          setBarge(false, true);
+          clearInterval(session.sayPoll); session.sayPoll = null;
+          done = true; session.saying = false; session.sayFinish = null; stopMouth();
+          toast("קטיעה באמצע דיבור לא נתמכת במכשיר הזה — ממשיכים בלי");
+          say(text).then(resolve);
+          return;
+        }
+        finish();
+      }
       else if (Date.now() - t0 > est + 6000) finish();
     }, 150);
   });
@@ -241,42 +290,129 @@ function startMouth(){
 function stopMouth(){ if (session?.mouthRAF) cancelAnimationFrame(session.mouthRAF); if (session) session.mouthRAF = null; }
 
 // תור המשתמש: זיהוי דיבור (או הקלדה). נפתר בטקסט, או "" אם היה שקט.
+// אם התלמיד כבר קטע את המורה — המזהה כבר רץ כתור שלו, רק מחברים אליו.
 function getUserTurn(){
   return new Promise(resolve => {
-    session.pendingFinish = (text) => { session.pendingFinish = null; stopRec(); resolve(text); };
-    if (sttOK && !session.muted && !session.typedOnly) startListening();
+    session.turnRequestedAt = Date.now();
+    session.metrics.firstSpeechAt = 0;
+    session.pendingFinish = (text) => {
+      session.pendingFinish = null;
+      const lat = session.metrics.firstSpeechAt - session.turnRequestedAt;
+      if (session.metrics.firstSpeechAt && lat > 0) session.metrics.latencies.push(lat);
+      stopRec();
+      resolve(text);
+    };
+    if (session.carryText != null){ // הקטיעה כבר הסתיימה לפני שהתור התבקש
+      const t = session.carryText; session.carryText = null;
+      session.pendingFinish(t); return;
+    }
+    if (session.barged){ session.barged = false; return; } // המזהה כבר מקשיב מהקטיעה
+    if (sttOK && !session.muted && !session.typedOnly) startRecognizer("listen");
     else setStatus("הקלד תשובה ושלח 👇", "");
   });
 }
 
-function startListening(){
-  if (!session || session.destroyed) return;
-  session.avatar.setState("listening");
-  setStatus("מקשיב לך… דבר עכשיו 🎙️", "listening");
-  session.ui.capUser.textContent = "";
-  let finalText = "";
+const wordsOf = s => (s || "").toLowerCase().replace(/[^a-z' ]+/g, " ").split(/\s+/).filter(Boolean);
+
+// האם מה שנשמע בזמן שהמורה מדבר הוא באמת התלמיד — ולא הד של הרמקול או רעש.
+// קצר מדי (<2 מילים) או חופף ברובו למשפט של המורה = מתעלמים.
+function shouldIgnoreWhileSpeaking(heard, spoken){
+  const h = wordsOf(heard);
+  if (h.length < 2) return true;
+  const set = new Set(wordsOf(spoken));
+  const overlap = h.filter(w => set.has(w)).length / h.length;
+  return overlap >= 0.6;
+}
+
+// מזהה-דיבור אחד לשני תפקידים: "listen" = התור של התלמיד, "watch" = צופה לקטיעה
+// בזמן שהמורה מדבר. בקטיעה התפקיד מתהפך ל-listen באותו מזהה, כך שלא מאבדים מילים.
+function startRecognizer(role){
+  if (!session || session.destroyed || !sttOK) return;
+  stopRec();
   const rec = new SR();
-  session.rec = rec;
+  session.rec = rec; session.recRole = role;
   rec.lang = "en-US"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  if (role === "listen"){
+    session.avatar.setState("listening");
+    setStatus("מקשיב לך… דבר עכשיו 🎙️", "listening");
+    session.ui.capUser.textContent = "";
+  }
+  let finalText = "", speechStart = 0;
+  const noteSpeech = () => {
+    if (speechStart) return;
+    speechStart = Date.now();
+    if (session.recRole === "listen" && !session.metrics.firstSpeechAt) session.metrics.firstSpeechAt = speechStart;
+  };
+  rec.onspeechstart = noteSpeech;
   rec.onresult = (e) => {
+    if (!session || session.rec !== rec) return;
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++){
       const tr = e.results[i][0].transcript;
       if (e.results[i].isFinal) finalText += tr + " "; else interim += tr;
     }
-    session.ui.capUser.textContent = (finalText + interim).trim();
+    const text = (finalText + interim).trim();
+    if (session.recRole === "watch"){
+      if (shouldIgnoreWhileSpeaking(text, session.sayingText)) return;
+      bargeIn();
+    }
+    noteSpeech();
+    session.ui.capUser.textContent = text;
   };
   rec.onerror = () => {};
   rec.onend = () => {
-    if (!session) return;
+    if (!session || session.rec !== rec) return; // מזהה ישן
     session.rec = null;
-    if (session.destroyed || session.muted) return; // הושהה/הסתיים — לא לפתור
-    if (session.pendingFinish) session.pendingFinish(finalText.trim());
+    const wasRole = session.recRole;
+    if (session.destroyed || session.muted) return;
+    if (wasRole === "watch"){
+      // נגמר בלי קטיעה (המזהה נסגר אחרי שקט) — אם המורה עדיין מדבר, ממשיכים לצפות
+      if (session.saying) session.timers.push(setTimeout(() => {
+        if (session?.saying && !session.rec && session.bargeIn) startRecognizer("watch");
+      }, 150));
+      return;
+    }
+    const t = finalText.trim();
+    if (speechStart){
+      const dur = Date.now() - speechStart;
+      session.metrics.studentMs += dur;
+      session.metrics.longestMs = Math.max(session.metrics.longestMs, dur);
+    }
+    if (session.pendingFinish) session.pendingFinish(t);
+    else session.carryText = t; // הקטיעה נגמרה לפני שהלולאה ביקשה תור — שומרים
   };
-  try { rec.start(); } catch { if (session?.pendingFinish) session.pendingFinish(""); }
+  try { rec.start(); } catch { if (role === "listen" && session.pendingFinish) session.pendingFinish(""); }
 }
 
-function stopRec(){ try { session?.rec?.abort(); } catch {} if (session && session.rec) session.rec = null; }
+// התלמיד התחיל לדבר בזמן שהמורה מדבר: עוצרים את המורה מיד, והמזהה הופך לתור התלמיד
+function bargeIn(){
+  if (!session || session.recRole !== "watch") return;
+  session.recRole = "listen";
+  session.barged = true;
+  session.metrics.interruptions++;
+  stopSpeaking();
+  if (session.sayFinish) session.sayFinish({interrupted: true});
+  session.avatar.setState("listening");
+  setStatus("קטעת — מקשיב לך 🎙️", "listening");
+}
+
+function stopRec(){
+  if (!session) return;
+  const rec = session.rec;
+  session.rec = null; session.recRole = null;
+  try { rec?.abort(); } catch {}
+}
+
+function setBarge(on, silent = false){
+  if (!session) return;
+  session.bargeIn = on;
+  session.ui.bargeBtn?.classList.toggle("off", !on);
+  S.settings.bargeIn = on; save();
+  if (!on && session.recRole === "watch") stopRec();
+  if (on && session.saying && !session.rec && !session.muted) startRecognizer("watch");
+  if (!silent) toast(on ? "⚡ קטיעה פעילה — אפשר לדבר גם כשהמורה מדבר" : "קטיעה כבויה — המורה יסיים לדבר לפני שתענה");
+}
+function toggleBarge(){ if (session) setBarge(!session.bargeIn); }
 
 function toggleMic(){
   if (!session) return;
@@ -285,10 +421,13 @@ function toggleMic(){
   session.ui.micBtn.textContent = session.muted ? "🔇" : "🎤";
   if (session.muted){
     stopRec();
+    session.barged = false;
     session.avatar.setState("idle");
     setStatus("מושהה — הקש 🎤 להמשך", "");
   } else if (session.pendingFinish && sttOK && !session.typedOnly){
-    startListening();
+    startRecognizer("listen");
+  } else if (session.saying && session.bargeIn){
+    startRecognizer("watch");
   }
 }
 
@@ -297,8 +436,9 @@ async function repeatLast(){
   const last = [...session.messages].reverse().find(m => m.role === "assistant");
   if (!last) return;
   stopRec();
-  await say(last.content);
-  if (session && !session.destroyed && session.pendingFinish && sttOK && !session.muted && !session.typedOnly) startListening();
+  const res = await say(last.content.replace(/ …? ?\(the student interrupted here\)$/, ""));
+  if (!session || session.destroyed) return;
+  if (!res.interrupted && session.pendingFinish && sttOK && !session.muted && !session.typedOnly) startRecognizer("listen");
 }
 
 async function startCam(tile){
@@ -320,53 +460,90 @@ async function endCall(){
   const messages = session.messages.slice();
   const secs = Math.round((Date.now() - session.start) / 1000);
   const userTurns = messages.filter(m => m.role === "user");
+  // מדדים שנמדדו בפועל — נלקחים לפני ה-teardown שמאפס את ה-session
+  const m = session.metrics;
+  const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+  const rec = {
+    date: todayStr(), teacher: teacher.id, secs, turns: userTurns.length,
+    studentMs: m.studentMs, teacherMs: m.teacherMs, longestMs: m.longestMs,
+    avgLatencyMs: avg(m.latencies), interruptions: m.interruptions, typed: !sttOK,
+  };
   teardown();
 
   if (userTurns.length === 0){ renderClassroom(main); return; }
 
+  const prev = (S.liveLessons || []).slice(-1)[0] || null;
+  S.liveLessons = [...(S.liveLessons || []), rec].slice(-50);
+  save();
+
   skillResult("speaking", true);
-  logDay({speakSec: secs});
+  // זמן דיבור: הערך שנמדד; בהקלדה (ללא מיקרופון) אין דיבור נמדד — לא ממציאים
+  if (rec.studentMs > 0) logDay({speakSec: Math.round(rec.studentMs / 1000)});
   addXP(15 + userTurns.length * 6, "שיעור חי");
 
   main.replaceChildren(el("div", {class: "screen"},
     el("div", {class: "card center"}, el("div", {class: "muted"}, `${teacher.name} מכין לך סיכום מהשיעור…`))));
 
-  const transcript = messages.map(m => `${m.role === "user" ? "Student" : "Teacher"}: ${m.content}`).join("\n");
+  const transcript = messages.map(mm => `${mm.role === "user" ? "Student" : "Teacher"}: ${mm.content}`).join("\n");
+  let fb = null;
   try {
-    const fb = await feedback(transcript);
-    (fb.mistakes || []).slice(0, 5).forEach(m => recordMistake(`lesson: ${m.original || ""} → ${m.better || ""}`, "speaking"));
-    renderSummary(main, fb, secs, userTurns.length, teacher);
-  } catch {
-    main.replaceChildren(el("div", {class: "screen"},
-      el("div", {class: "card center summary"},
-        el("div", {class: "summary-emoji"}, "🎓"),
-        el("h2", {}, "כל הכבוד על השיעור!"),
-        el("p", {class: "muted"}, `דיברת ${userTurns.length} פעמים במשך ${Math.round(secs / 60)} דקות.`),
-        el("button", {class: "btn primary big", onclick: () => renderClassroom(main)}, "שיעור נוסף"),
-        el("button", {class: "btn ghost", onclick: () => { location.hash = "#/home"; }}, "לדף הבית"))));
-  }
+    fb = await feedback(transcript);
+    (fb.mistakes || []).slice(0, 5).forEach(mm => recordMistake(`lesson: ${mm.original || ""} → ${mm.better || ""}`, "speaking"));
+  } catch { fb = null; }
+  renderSummary(main, fb, rec, prev, teacher);
 }
 
-function renderSummary(main, fb, secs, turns, teacher){
-  const sc = fb.scores || {};
-  const box = (label, v) => el("div", {class: "card stat-card"},
+const fmtS = ms => `${Math.round(ms / 1000)} שנ'`;
+// השוואה לשיעור הקודם — רק כשיש נתון קודם אמיתי
+function cmp(cur, prev, higherIsBetter = true){
+  if (!prev || !cur) return null;
+  const d = cur - prev;
+  if (Math.abs(d) < 500) return el("span", {class: "muted small-text"}, "כמו בשיעור הקודם");
+  const good = higherIsBetter ? d > 0 : d < 0;
+  return el("span", {class: "delta " + (good ? "up" : "down")}, `${d > 0 ? "▲" : "▼"} ${fmtS(Math.abs(d))} מהקודם`);
+}
+
+function renderSummary(main, fb, rec, prev, teacher){
+  const sc = (fb && fb.scores) || {};
+  const numBox = (label, v) => el("div", {class: "card stat-card"},
     el("div", {class: "stat-v"}, typeof v === "number" ? Math.round(v) : "—"),
     el("div", {class: "stat-l"}, label));
+  // הגייה לא נמדדת במסלול הזה — אין ניתוח אודיו. לא מציגים מספר מומצא.
+  const naBox = (label) => el("div", {class: "card stat-card na"},
+    el("div", {class: "stat-v na-v"}, "לא נמדד"),
+    el("div", {class: "stat-l"}, label));
+  const row = (label, val, extra) => el("li", {}, el("span", {class: "muted"}, label), el("span", {}, el("strong", {}, val), " ", extra || ""));
+  const total = rec.studentMs + rec.teacherMs;
+  const measured = rec.studentMs > 0 ? [
+    row("זמן הדיבור שלך", fmtS(rec.studentMs), cmp(rec.studentMs, prev?.studentMs)),
+    rec.teacherMs > 0 ? row("זמן הדיבור של המורה", fmtS(rec.teacherMs)) : null,
+    total > 0 ? row("חלקך בשיחה", `${Math.round(100 * rec.studentMs / total)}%`, el("span", {class: "muted small-text"}, "יעד: 65–75%")) : null,
+    row("רצף הדיבור הארוך ביותר", fmtS(rec.longestMs), cmp(rec.longestMs, prev?.longestMs)),
+    rec.avgLatencyMs ? row("זמן תגובה ממוצע", fmtS(rec.avgLatencyMs), cmp(rec.avgLatencyMs, prev?.avgLatencyMs, false)) : null,
+    row("קטיעות של המורה", String(rec.interruptions)),
+  ] : [row("זמן דיבור", "לא נמדד", el("span", {class: "muted small-text"}, "השיעור היה בהקלדה"))];
+
   main.replaceChildren(el("div", {class: "screen"},
     el("div", {class: "card center"},
       el("div", {class: "summary-emoji"}, "🎓"),
       el("h2", {}, `סיכום השיעור עם ${teacher.name}`),
-      el("p", {class: "muted"}, `${Math.round(secs / 60)} דקות · ${turns} תשובות שלך`)),
-    el("div", {class: "stats-grid"},
-      box("שטף", sc.fluency), box("הגייה", sc.pronunciation),
-      box("אוצר מילים", sc.vocabulary), box("דקדוק", sc.grammar)),
-    fb.summary ? el("div", {class: "card"}, el("h3", {}, "מה היה טוב ומה לחזק"), el("p", {}, fb.summary)) : null,
-    fb.mistakes?.length ? el("div", {class: "card"},
+      el("p", {class: "muted"}, `${Math.round(rec.secs / 60)} דקות · ${rec.turns} תשובות שלך`)),
+    el("div", {class: "card"},
+      el("h3", {}, "📏 מה נמדד בפועל"),
+      el("ul", {class: "metrics-list"}, measured)),
+    fb ? el("div", {class: "stats-grid"},
+      numBox("שטף (הערכה)", sc.fluency),
+      numBox("אוצר מילים (הערכה)", sc.vocabulary),
+      numBox("דקדוק (הערכה)", sc.grammar),
+      naBox("הגייה")) : el("div", {class: "card notice"}, "המורה לא הצליח להכין משוב מילולי (בעיית חיבור). המדדים למעלה נמדדו מקומית ותקפים."),
+    fb ? el("p", {class: "muted small-text"}, "שטף/אוצר/דקדוק הם הערכה מהתמלול של השיחה. הגייה תסומן כ\"נמדד\" רק כשיתווסף ניתוח אודיו אמיתי.") : null,
+    fb?.summary ? el("div", {class: "card"}, el("h3", {}, "מה היה טוב ומה לחזק"), el("p", {}, fb.summary)) : null,
+    fb?.mistakes?.length ? el("div", {class: "card"},
       el("h3", {}, "תיקונים מהשיעור"),
-      el("ul", {class: "fb-list"}, fb.mistakes.map(m => el("li", {},
-        el("div", {dir: "ltr", class: "bad-text"}, m.original || ""),
-        el("div", {dir: "ltr", class: "good-text"}, m.better || ""),
-        m.note ? el("div", {class: "muted small-text"}, m.note) : null)))) : null,
+      el("ul", {class: "fb-list"}, fb.mistakes.map(mm => el("li", {},
+        el("div", {dir: "ltr", class: "bad-text"}, mm.original || ""),
+        el("div", {dir: "ltr", class: "good-text"}, mm.better || ""),
+        mm.note ? el("div", {class: "muted small-text"}, mm.note) : null)))) : null,
     el("button", {class: "btn primary big", onclick: () => renderClassroom(main)}, "שיעור נוסף"),
     el("button", {class: "btn ghost", onclick: () => { location.hash = "#/home"; }}, "לדף הבית")));
 }

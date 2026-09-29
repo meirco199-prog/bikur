@@ -42,12 +42,14 @@ function defaults(){
     challenge: {date: null, idx: 0, done: false},
     lessonDate: null,         // תאריך האימון היומי האחרון שהושלם
     teacherHistory: [],       // צ'אט עם המורה
+    liveLessons: [],          // מדדים שנמדדו בפועל בכל שיעור חי — להשוואה בין שיעורים
     settings: {
       theme: "system",
       aiUrl: "https://english-ai.meirco199.workers.dev",
       pushUrl: "https://english-push.meirco199.workers.dev", // שרת התזכורות (Web Push)
       notifs: false,
       voiceRate: 1,
+      bargeIn: true,          // קטיעה של המורה באמצע דיבור (שיעור חי)
     },
   };
 }
