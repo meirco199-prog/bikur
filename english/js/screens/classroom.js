@@ -2,7 +2,7 @@
 // שואל, אתה עונה, והוא מתקן — hands-free. עם חלון "מצלמה" שלך (רשות), כתוביות,
 // ובקרות שיחה. נופל יפה להקלדה כשאין זיהוי דיבור, וללא קול כשאין הקראה.
 import { el, toast, pick, todayStr } from "../util.js";
-import { S, save, logDay, skillResult, recordMistake } from "../store.js";
+import { S, save, logDay, skillResult, recordMistake, logError, logWordUse, logPronunciation, finishLessonMemory, memorySummary } from "../store.js";
 import { speak, stopSpeaking, ttsSupported } from "../speech.js";
 import { chat, feedback, aiErrorMessage } from "../ai.js";
 import { addXP } from "../gamify.js";
@@ -95,6 +95,7 @@ function startCall(main, {teacher, focus, selfCam}){
     turnRequestedAt: 0,
     // realtime (OpenAI, דרך english-live): speech-to-speech עם קטיעה מובנית. null = זרימה רגילה
     live: null, mode: "text", liveSummary: null,
+    seenErrors: [],           // טעויות שתוקנו בשיעור הזה — לכלל "לא חזרה 3 שיעורים = נלמדה"
   };
   window.__liveTeardown = teardown;
 
@@ -212,20 +213,23 @@ function liveHandlers(){
 function applyTool(name, a, phaseHe){
   if (!session) return {ok: false};
   switch (name){
-    case "log_correction":
-      recordMistake(`lesson (${a.kind || "significant"}): ${a.original || ""} → ${a.corrected || ""}${a.note_he ? " · " + a.note_he : ""}`, "speaking");
-      return {ok: true};
+    case "log_correction": {
+      const e = logError({original: a.original, corrected: a.corrected, kind: a.kind, note: a.note_he});
+      if (e) session.seenErrors.push(a.original);
+      return {ok: true, timesSeen: e ? e.count : 0};
+    }
     case "mark_word_used": {
-      // גם מילה שהמורה לימד ואינה במילון המובנה נכנסת ל-SRS: כך היא מגיעה ל-reuseWords
-      // והמורה שוזר אותה בשיעורים הבאים (spaced repetition בתוך שיחה)
+      // גם מילה שהמורה לימד ואינה במילון המובנה נכנסת ל-SRS ולזיכרון: כך היא מגיעה
+      // ל-reuseWords והמורה שוזר אותה בשיעורים הבאים (spaced repetition בתוך שיחה)
       const key = String(a.word || "").toLowerCase().trim();
       if (!key || key.length > 40) return {ok: false, error: "bad word"};
       const w = WORDS.find(x => wordKey(x) === key);
       review(w ? wordKey(w) : key, !!a.correct);
+      logWordUse(key, !!a.correct);
       return {ok: true, inDictionary: !!w};
     }
     case "pronunciation_note":
-      recordMistake(`pronunciation: ${a.word || ""} — ${a.issue || ""}${a.improved ? " (improved)" : ""}`, "pronunciation");
+      logPronunciation(a.word, a.issue, !!a.improved);
       return {ok: true};
     case "lesson_phase":
       if (a.phase && session.ui) session.ui.statusEl.textContent = `שלב: ${phaseHe[a.phase] || a.phase}`;
@@ -564,8 +568,9 @@ async function startCam(tile){
 async function endCall(){
   if (!session || session.ending) return;
   session.ending = true;
-  const {main, teacher} = session;
+  const {main, teacher, focus} = session;
   const mode = session.mode;
+  const seenErrors = session.seenErrors.slice();
   let teacherSummary = session.liveSummary;
 
   // realtime: נותנים למורה לסכם (אם עוד לא), ולוקחים תמלול ומדדים מהאירועים האמיתיים (VAD)
@@ -589,10 +594,16 @@ async function endCall(){
   const secs = Math.round((Date.now() - session.start) / 1000);
   const userTurns = messages.filter(mm => mm.role === "user");
   const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+  // מילות מילוי — נספרות רק מתמלול של דיבור אמיתי (um/uh/er/hmm/"you know").
+  // בשיעור בהקלדה אין דיבור, אז לא ממציאים מדד: 0.
+  const typedMode = mode === "text" && !sttOK;
+  const fillers = typedMode ? 0 :
+    userTurns.reduce((n, mm) => n + ((mm.content.match(/\b(um+|uh+|er+|erm|hmm+|you know)\b/gi) || []).length), 0);
   const rec = {
     date: todayStr(), teacher: teacher.id, secs, turns: userTurns.length, mode,
     studentMs: m.studentMs, teacherMs: m.teacherMs, longestMs: m.longestMs,
-    avgLatencyMs: avg(m.latencies), interruptions: m.interruptions, typed: mode === "text" && !sttOK,
+    avgLatencyMs: avg(m.latencies), interruptions: m.interruptions, typed: typedMode,
+    fillers,
   };
   teardown();
 
@@ -614,8 +625,13 @@ async function endCall(){
   let fb = null;
   try {
     fb = await feedback(transcript);
-    (fb.mistakes || []).slice(0, 5).forEach(mm => recordMistake(`lesson: ${mm.original || ""} → ${mm.better || ""}`, "speaking"));
+    // תיקונים מהמשוב הטקסטואלי נכנסים לאותו זיכרון מובנה (בזרימה הרגילה אין כלים)
+    (fb.mistakes || []).slice(0, 5).forEach(mm => {
+      if (mm.original){ logError({original: mm.original, corrected: mm.better, note: mm.note}); seenErrors.push(mm.original); }
+    });
   } catch { fb = null; }
+  // סוף שיעור בזיכרון: recap לפתיחה הבאה, וטעויות שלא חזרו 3 שיעורים → "נלמדו"
+  finishLessonMemory({topic: focus?.he || null, mode, seenErrors, fillers, minutes: Math.max(1, Math.round(secs / 60))});
   renderSummary(main, fb, rec, prev, teacher, teacherSummary);
 }
 
@@ -647,7 +663,19 @@ function renderSummary(main, fb, rec, prev, teacher, teacherSummary = null){
     row("רצף הדיבור הארוך ביותר", fmtS(rec.longestMs), cmp(rec.longestMs, prev?.longestMs)),
     rec.avgLatencyMs ? row("זמן תגובה ממוצע", fmtS(rec.avgLatencyMs), cmp(rec.avgLatencyMs, prev?.avgLatencyMs, false)) : null,
     row("קטיעות של המורה", String(rec.interruptions)),
+    row("מילות מילוי (um/uh)", String(rec.fillers || 0), rec.fillers && prev?.fillers != null ? el("span", {class: "muted small-text"}, `בקודם: ${prev.fillers}`) : null),
   ] : [row("זמן דיבור", "לא נמדד", el("span", {class: "muted small-text"}, "השיעור היה בהקלדה"))];
+  // מה המורה זוכר אחרי השיעור הזה — טעויות שחזרו, מה כבר נלמד, מילים בחיזוק
+  const mem = memorySummary();
+  const memCard = (mem.recurring.length || mem.resolved.length || mem.reinforcing.length) ? el("div", {class: "card"},
+    el("h3", {}, "🧠 מה המורה זוכר"),
+    el("ul", {class: "metrics-list"},
+      mem.recurring.length ? row("טעויות שעדיין חוזרות", String(mem.recurring.length),
+        el("span", {class: "muted small-text", dir: "ltr"}, mem.recurring.slice(0, 2).map(e => `${e.original} → ${e.corrected}`).join(" · "))) : null,
+      mem.resolved.length ? row("טעויות שכבר נלמדו ✓", String(mem.resolved.length),
+        el("span", {class: "muted small-text", dir: "ltr"}, mem.resolved.slice(0, 2).map(e => e.corrected).join(" · "))) : null,
+      mem.reinforcing.length ? row("מילים בחיזוק", String(mem.reinforcing.length),
+        el("span", {class: "muted small-text", dir: "ltr"}, mem.reinforcing.slice(0, 4).map(w => w.word).join(", "))) : null)) : null;
 
   main.replaceChildren(el("div", {class: "screen"},
     el("div", {class: "card center"},
@@ -662,6 +690,7 @@ function renderSummary(main, fb, rec, prev, teacher, teacherSummary = null){
     el("div", {class: "card"},
       el("h3", {}, "📏 מה נמדד בפועל"),
       el("ul", {class: "metrics-list"}, measured)),
+    memCard,
     fb ? el("div", {class: "stats-grid"},
       numBox("שטף (הערכה)", sc.fluency),
       numBox("אוצר מילים (הערכה)", sc.vocabulary),

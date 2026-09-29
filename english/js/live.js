@@ -80,7 +80,7 @@ export async function startLive({ teacher, topic, handlers }){
 
   dc.onopen = () => {
     // המורה פותח את השיעור מיד — בלי לחכות שהתלמיד ידבר ראשון
-    send({ type: "response.create", instructions: "Greet the student warmly by name if you know it, in one or two short sentences, and ask one easy opening question." });
+    send({ type: "response.create", instructions: "Greet the student warmly by name if you know it, in one or two short sentences. If your instructions mention a last lesson, connect to it in one short sentence. Then ask one easy opening question." });
   };
 
   dc.onmessage = (ev) => {
