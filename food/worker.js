@@ -134,28 +134,38 @@ async function runClaude(env, system, messages, maxTokens){
   return text;
 }
 
+// תקציב זמן לכל ניסיון — שיחה קולית לא יכולה לחכות חצי דקה למודל תקוע
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('model_timeout')), ms)),
+  ]);
+}
+
 async function runWorkersAI(env, system, messages, maxTokens){
   if (!env.AI) throw new Error('no_ai');
   let lastErr;
   for (const model of WORKERS_AI_MODELS){
-    try {
-      let r;
-      if (model.includes('gpt-oss')){
-        // מודלי gpt-oss ב-Workers AI משתמשים בסכמת Responses: instructions + input
-        r = await env.AI.run(model, {
-          instructions: system,
-          input: messages.map(m => ({role: m.role, content: m.content})),
-        });
-      } else {
-        r = await env.AI.run(model, {
+    // gpt-oss הוא מודל חשיבה — בלי הגבלת עומק הוא איטי מדי לשיחה קולית.
+    // מנסים עם חשיבה מקוצרת, ואם השדה לא נתמך — בלעדיו.
+    const attempts = model.includes('gpt-oss')
+      ? [
+          {instructions: system, input: messages.map(m => ({role: m.role, content: m.content})), reasoning: {effort: 'low'}},
+          {instructions: system, input: messages.map(m => ({role: m.role, content: m.content}))},
+        ]
+      : [{
           messages: [{role: 'system', content: system}, ...messages],
           max_tokens: maxTokens,
           temperature: 0.5,
-        });
-      }
-      const text = extractText(r);
-      if (text) return text;
-    } catch (e) { lastErr = e; }
+        }];
+    for (const params of attempts){
+      try {
+        const r = await withTimeout(env.AI.run(model, params), model.includes('gpt-oss') ? 15000 : 10000);
+        const text = extractText(r);
+        if (text) return text;
+        break; // המודל ענה ריק — עוברים למודל הבא, לא לניסיון נוסף באותו מודל
+      } catch (e) { lastErr = e; if (e.message === 'model_timeout') break; }
+    }
   }
   throw lastErr || new Error('ai_failed');
 }
@@ -164,11 +174,11 @@ async function runWorkersAI(env, system, messages, maxTokens){
 // מפתח Claude. ככה התזונאית מדברת באותו מוח בלי להגדיר מפתח נוסף.
 async function runViaRemi(env, system, messages, maxTokens){
   if (!env.REMI) throw new Error('no_remi');
-  const r = await env.REMI.fetch('https://remi-internal/claude', {
+  const r = await withTimeout(env.REMI.fetch('https://remi-internal/claude', {
     method: 'POST',
     headers: {'content-type': 'application/json'},
     body: JSON.stringify({system, messages, max_tokens: maxTokens}),
-  });
+  }), 25000);
   if (!r.ok) throw new Error('remi_' + r.status);
   const data = await r.json();
   if (data.stop_reason === 'refusal') throw new Error('remi_refusal');
