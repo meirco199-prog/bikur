@@ -666,4 +666,8 @@ english / invest / עתידי) והמערכת תנתב אותה אוטומטית
 **Evidence:** `invest-api/tests/worker.test.mjs` (34, כולל תאימות, פרויקט לא מוכר, כפילויות, סטטוסים), `.github/council/relay.test.mjs`
 (6: ניתוב, לא ברישום → FAILED בלי פרסום, דדופ, סטטוסים, E2E). קצה-לקצה: "AI Council relay" → Run workflow → `e2e_project`.
 **Risks:** מכסה משותפת (20/יום) לכל הפרויקטים; Issue #25 ממשיך לקבל גם הודעות ישנות-סגנון. **Owner decision:** "פתח PR; אל תמזג
-לפני CI ירוק ו-GPT Reviewer PASS". **Status:** TESTING.
+לפני CI ירוק ו-GPT Reviewer PASS". **Status:** RESOLVED (29/9) — E2E: food → #98, english → #99, כפילות נדחתה, Claude סימן RECEIVED→DONE
+(Routine על סשן קבוע — סשן חדש מ-trigger ללא sources לא מקבל גישת כתיבה ל-GitHub; תוקן), סטטוסים סונכרנו ל-Worker.
+**תוספת (29/9, בקשת מאיר "שה-ChatGPT הרגיל יוכל לקרוא ל-postCouncilComment"):** `POST /council/mcp` — שרת MCP dual-era
+(2026-07-28 `server/discover` + legacy `initialize`) שעוטף את אותם נתיבים; ChatGPT מתחבר כ-custom connector ב-Developer mode
+(`.github/council/CHATGPT_SETUP.md`). מפתח: Bearer או בנתיב (`/council/mcp/<key>`) ל-connector בלי אימות.

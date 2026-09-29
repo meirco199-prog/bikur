@@ -18,8 +18,8 @@ ChatGPT ── POST /council/comment {project, type, title, body, source} ──
 ```
 
 ## איך GPT שולח הודעה
-**חיבור ChatGPT (פעם אחת, בצד ChatGPT בלבד):** [`CHATGPT_SETUP.md`](CHATGPT_SETUP.md) — ייבוא מחדש של הסכימה ל-GPT "AI Council",
-הוראות ל-GPT, ושימוש עם `@AI Council` מכל שיחה.
+**חיבור ChatGPT (פעם אחת, בצד ChatGPT בלבד):** [`CHATGPT_SETUP.md`](CHATGPT_SETUP.md) — מומלץ: connector MCP בשיחה רגילה
+(`POST /council/mcp`, Developer mode); חלופה: GPT מותאם עם ה-Action (`council-action.yaml`).
 
 `POST https://invest-api.meirco199.workers.dev/council/comment` · `Authorization: Bearer <המפתח המשותף>` (אותו מפתח כמו היום;
 סכימת ה-Action: [`invest/docs/council-action.yaml`](../../invest/docs/council-action.yaml) — לייבא מחדש ב-GPT אחרי עדכון).
