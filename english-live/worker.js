@@ -19,6 +19,10 @@ function profileText(p = {}){
     p.recentMistakes?.length ? `Recurring errors to watch for and gently fix when they repeat: ${p.recentMistakes.slice(0, 6).join(' | ')}.` : '',
     p.reuseWords?.length ? `Words recently taught — weave them back into questions naturally to check reuse (do not announce it as a test): ${p.reuseWords.join(', ')}.` : '',
     p.pronunciationIssues?.length ? `Pronunciation issues heard before: ${p.pronunciationIssues.join(' | ')}.` : '',
+    p.recurringErrors?.length ? `Recurring errors (times seen) — fix gently when they repeat, drill the top one once per lesson: ${p.recurringErrors.join(' | ')}.` : '',
+    p.resolvedErrors?.length ? `Already fixed in past lessons — do NOT re-teach unless they come back: ${p.resolvedErrors.join(' | ')}.` : '',
+    p.lastLessonRecap ? `Last lesson: ${p.lastLessonRecap}. Open by briefly connecting to it in one sentence ("Last time you kept saying ... — remember what we changed it to?").` : '',
+    p.fillerRate ? `Filler words last lesson: ~${p.fillerRate} per minute — mention only if it is a clear pattern, never per sentence.` : '',
   ].filter(Boolean).join(' ');
 }
 

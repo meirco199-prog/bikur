@@ -1,6 +1,6 @@
 // פרופיל: התקדמות, דוח שבועי, הישגים, מטרות והגדרות.
 import { el, toast, fmtMinutes, todayStr } from "../util.js";
-import { S, save, resetAll, weekSummary } from "../store.js";
+import { S, save, resetAll, weekSummary, memorySummary } from "../store.js";
 import { levelInfo, ACHIEVEMENTS, LEVELS } from "../gamify.js";
 import { srsCounts } from "../srs.js";
 import { enableNotifs, disableNotifs, scheduleDaily, notifSupported, testReminder, syncReminderState,
@@ -89,6 +89,9 @@ export function renderProfile(main){
         ACHIEVEMENTS.map(a => el("div", {class: "badge" + (S.game.achievements.includes(a.id) ? " got" : "")},
           el("div", {class: "badge-icon"}, a.icon),
           el("div", {class: "badge-name"}, a.name))))),
+
+    // מה המורה זוכר — שקיפות על הזיכרון ארוך-הטווח שמזין את השיעורים
+    renderMemoryCard(),
 
     // מילים
     el("div", {class: "card"},
@@ -273,6 +276,26 @@ function renderSettings(main){
 function settingRow(label, control){
   return el("div", {class: "setting-row"},
     el("span", {class: "setting-label"}, label), control);
+}
+
+function renderMemoryCard(){
+  const mem = memorySummary();
+  const empty = !mem.recurring.length && !mem.once.length && !mem.resolved.length && !mem.reinforcing.length && !mem.pronunciation.length;
+  const line = (en, he) => el("li", {}, el("span", {dir: "ltr"}, en), he ? el("span", {class: "muted small-text"}, he) : null);
+  return el("div", {class: "card"},
+    el("h3", {}, "🧠 מה המורה זוכר עליך"),
+    empty ? el("p", {class: "muted small-text"}, "עדיין ריק — אחרי השיעור החי הראשון המורה יתחיל לזכור טעויות, מילים שלימד ומה כבר נלמד.") : null,
+    mem.lastLesson ? el("p", {class: "muted small-text"}, `שיעור אחרון: ${mem.lastLesson.date}${mem.lastLesson.topic ? " · " + mem.lastLesson.topic : ""}`) : null,
+    mem.recurring.length ? el("div", {}, el("strong", {}, "טעויות שחוזרות"),
+      el("ul", {class: "metrics-list"}, mem.recurring.map(e => line(`${e.original} → ${e.corrected}`, `×${e.count}`)))) : null,
+    mem.once.length ? el("div", {}, el("strong", {}, "תוקנו לאחרונה (נעקוב אם יחזרו)"),
+      el("ul", {class: "metrics-list"}, mem.once.map(e => line(`${e.original} → ${e.corrected}`)))) : null,
+    mem.resolved.length ? el("div", {}, el("strong", {}, "כבר נלמדו ✓ (המורה לא יציק)"),
+      el("ul", {class: "metrics-list"}, mem.resolved.map(e => line(e.corrected)))) : null,
+    mem.reinforcing.length ? el("div", {}, el("strong", {}, "מילים שהמורה לימד ובחיזוק"),
+      el("ul", {class: "metrics-list"}, mem.reinforcing.map(w => line(w.word, `שימוש נכון ${w.reusedOk}${w.reusedBad ? " · שגוי " + w.reusedBad : ""}`)))) : null,
+    mem.pronunciation.length ? el("div", {}, el("strong", {}, "הגייה שנשמעה בשיעורי קול"),
+      el("ul", {class: "metrics-list"}, mem.pronunciation.map(p => line(`${p.word}: ${p.issue}`, p.improved ? `השתפר ×${p.improved}` : "")))) : null);
 }
 
 // מבחן רמה מחדש מתוך הפרופיל, ועדכון הרמה בסיום
