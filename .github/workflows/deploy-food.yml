@@ -1,0 +1,130 @@
+# פריסה אוטומטית של יומן האוכל המשפחתי ל-Cloudflare Workers.
+# כל דחיפה ל-main שמשנה את food/ בונה את ה-worker (מזריקה את האפליקציה
+# והאייקונים לתוך food/worker.js) ומעלה אותו ל-Worker בשם food:
+#   https://food.<subdomain>.workers.dev
+# הנתונים הקיימים נשמרים: אותו worker, אותו KV namespace (food-app-data).
+# משתמש ב-Secrets שכבר מוגדרים בריפו: CF_API_TOKEN (חובה), CF_ACCOUNT_ID (אופציונלי).
+# אופציונלי: סוד ANTHROPIC_API_KEY ב-Cloudflare (ולא בריפו!) משדרג את מוח התזונאית ל-Claude.
+
+name: Deploy food app to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'food/**'
+      - '.github/workflows/deploy-food.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build worker (inject app + icons)
+        run: |
+          python3 - <<'EOF'
+          import base64
+
+          def b64(path):
+              return base64.b64encode(open(path, 'rb').read()).decode()
+
+          worker = open('food/worker.js', encoding='utf-8').read()
+          for placeholder, path in [
+              ('__HTML_B64__', 'food/index.html'),
+              ('__ICON192_B64__', 'food/icons/icon-192.png'),
+              ('__ICON512_B64__', 'food/icons/icon-512.png'),
+              ('__APPLE_B64__', 'food/icons/apple-touch-icon.png'),
+          ]:
+              assert placeholder in worker, placeholder
+              worker = worker.replace(placeholder, b64(path))
+          open('worker.js', 'w', encoding='utf-8').write(worker)
+          print('worker size:', len(worker))
+          EOF
+
+      - name: Deploy worker "food"
+        run: |
+          if [ -z "${{ secrets.CF_API_TOKEN }}" ]; then
+            echo "::error::חסר הסוד CF_API_TOKEN בהגדרות הריפו"
+            exit 1
+          fi
+          ACCOUNT_ID="${{ secrets.CF_ACCOUNT_ID }}"
+          if ! echo "$ACCOUNT_ID" | grep -qE '^[0-9a-f]{32}$'; then
+            ACCOUNT_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts" \
+              -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); r=d.get("result") or []; print(r[0]["id"] if d.get("success") and r else "")')
+          fi
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "::error::לא הצלחתי לגלות את מזהה החשבון מהטוקן"
+            exit 1
+          fi
+          echo "account: ${ACCOUNT_ID:0:6}..."
+
+          # KV namespace לנתוני המשפחות — אותו אחד שכבר קיים (הנתונים נשמרים)
+          NS_ID=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/storage/kv/namespaces?per_page=100" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((n["id"] for n in d.get("result") or [] if n.get("title")=="food-app-data"), ""))')
+          if [ -z "$NS_ID" ]; then
+            NS_ID=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/storage/kv/namespaces" \
+              -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              --data '{"title":"food-app-data"}' \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("result") or {}).get("id",""))')
+          fi
+          if [ -z "$NS_ID" ]; then
+            echo "::error::לא הצלחתי ליצור/למצוא KV namespace"
+            exit 1
+          fi
+          echo "kv namespace: ${NS_ID:0:6}..."
+
+          resp=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/food" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -F 'metadata={"main_module":"worker.js","compatibility_date":"2025-01-01","keep_bindings":["secret_text"],"bindings":[{"type":"kv_namespace","name":"KV","namespace_id":"'"$NS_ID"'"},{"type":"ai","name":"AI"}]};type=application/json' \
+            -F 'worker.js=@worker.js;type=application/javascript+module')
+          echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("upload success:", d.get("success"), json.dumps(d.get("errors"), ensure_ascii=False)); sys.exit(0 if d.get("success") else 1)'
+
+          sub=$(curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/food/subdomain" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"enabled":true,"previews_enabled":false}')
+          echo "subdomain enable: $sub"
+
+          SUBDOMAIN=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/subdomain" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("result") or {}).get("subdomain",""))')
+          echo "APP_URL=https://food.$SUBDOMAIN.workers.dev" >> "$GITHUB_ENV"
+          echo "app url: https://food.$SUBDOMAIN.workers.dev"
+
+      - name: Verify app, storage and coach endpoint
+        run: |
+          # מחכים שהגרסה החדשה תתפשט: התזונאית קיימת רק בגרסה החדשה
+          ok=""
+          for i in $(seq 1 18); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$APP_URL/api/coach" \
+              -H "Content-Type: application/json" --data '{}' || true)
+            echo "attempt $i: coach endpoint HTTP $code"
+            if [ "$code" = "400" ]; then ok=1; break; fi
+            sleep 5
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::הגרסה החדשה לא עלתה ב-$APP_URL"
+            exit 1
+          fi
+          code=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/" || true)
+          test "$code" = "200" || { echo "::error::האפליקציה לא עונה (HTTP $code)"; exit 1; }
+          curl -sS "$APP_URL/manifest.webmanifest" | grep -q short_name || { echo "::error::manifest לא מוגש"; exit 1; }
+          mcode=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/icon-192.png")
+          test "$mcode" = "200" || { echo "::error::אייקון לא מוגש"; exit 1; }
+          # בדיקת אחסון: יצירה + קריאה חזרה
+          FAM_ID=$(curl -sS -X POST "$APP_URL/api/family" \
+            -H "Content-Type: application/json" --data '{"healthcheck":true}' \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))')
+          if [ -z "$FAM_ID" ]; then
+            echo "::error::יצירת רשומת בדיקה ב-KV נכשלה"
+            exit 1
+          fi
+          curl -sS "$APP_URL/api/family/$FAM_ID" | grep -q healthcheck || { echo "::error::קריאת KV נכשלה"; exit 1; }
+          echo "::notice::האפליקציה + אחסון + תזונאית באוויר: $APP_URL"

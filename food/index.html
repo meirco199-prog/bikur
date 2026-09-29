@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#16a34a" />
+<title>יומן אוכל משפחתי</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" type="image/png" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="יומן אוכל" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f3faf4;
+    --card:#ffffff;
+    --ink:#132a1b;
+    --ink2:#1e5631;
+    --muted:#68766c;
+    --green:#16a34a;
+    --green2:#22c55e;
+    --green-soft:#dcfce7;
+    --green-mist:#eefcf1;
+    --red:#dc2626;
+    --red-soft:#fee2e2;
+    --amber:#f59e0b;
+    --amber-soft:#fef3c7;
+    --blue:#0ea5e9;
+    --blue-soft:#e0f2fe;
+    --violet:#7c3aed;
+    --violet-soft:#ede9fe;
+    --border:#e4ece6;
+    --radius:22px;
+    --shadow:0 6px 24px rgba(19,42,27,.07);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{font-size:17px}
+  body{
+    font-family:'Heebo',sans-serif;
+    background:
+      radial-gradient(1200px 500px at 80% -10%, #e5f8ec 0%, transparent 60%),
+      radial-gradient(900px 420px at -10% 20%, #f2fbe9 0%, transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  .wrap{max-width:540px;margin:0 auto;padding:14px 16px 108px}
+  h1{font-size:1.35rem;font-weight:900;letter-spacing:-.01em}
+  h2{font-size:1.12rem;font-weight:800}
+  h3{font-size:1rem;font-weight:800}
+  .card{
+    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:18px;margin-bottom:14px;border:1px solid rgba(30,86,49,.05);
+  }
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    border:none;border-radius:16px;padding:14px 20px;font-family:inherit;
+    font-size:1rem;font-weight:800;cursor:pointer;transition:transform .12s;
+    background:linear-gradient(135deg,var(--green2),var(--green));color:#fff;
+    min-height:52px;box-shadow:0 4px 14px rgba(22,163,74,.25);
+  }
+  .btn:active{transform:scale(.97)}
+  .btn.secondary{background:#fff;color:var(--ink);border:2px solid var(--border);box-shadow:none}
+  .btn.small{padding:9px 14px;font-size:.88rem;border-radius:13px;min-height:40px;box-shadow:none}
+  .btn.danger{background:var(--red)}
+  .btn.ghost{background:transparent;color:var(--ink2);border:none;font-weight:700;box-shadow:none}
+  .btn.block{width:100%}
+  .btn.huge{font-size:1.12rem;padding:18px 22px;min-height:62px;border-radius:20px}
+  .btn:disabled{opacity:.5;cursor:default}
+  input,select,textarea{
+    font-family:inherit;font-size:1rem;padding:13px;border:2px solid var(--border);
+    border-radius:14px;width:100%;background:#fff;color:var(--ink);
+  }
+  input:focus,textarea:focus{outline:none;border-color:var(--green)}
+  textarea{resize:vertical;min-height:70px}
+  .row{display:flex;gap:10px;align-items:center}
+  .muted{color:var(--muted);font-size:.82rem}
+  .center{text-align:center}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 14px;gap:8px}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;background:var(--green-soft);
+    color:var(--ink2);border-radius:999px;padding:6px 13px;font-size:.8rem;font-weight:700;white-space:nowrap;
+  }
+  .banner{
+    border-radius:18px;padding:14px 16px;margin-bottom:12px;font-weight:700;
+    display:flex;gap:10px;align-items:center;font-size:.92rem;line-height:1.45;
+  }
+  .banner.cheat{background:linear-gradient(135deg,#fdf4ff,#fae8ff);color:#86198f;border:1px solid #f0abfc}
+  .banner.warn{background:var(--red-soft);color:var(--red);border:1px solid #fecaca}
+  .banner.info{background:var(--blue-soft);color:#075985;border:1px solid #bae6fd}
+  .banner.weigh{background:var(--amber-soft);color:#92400e;border:1px solid #fde68a}
+  /* ---- מסך הבית של ילד ---- */
+  .hero{
+    display:flex;align-items:center;gap:14px;padding:6px 2px 14px;
+  }
+  .hero .kid-ava{
+    width:58px;height:58px;border-radius:20px;background:var(--green-soft);
+    display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;
+  }
+  .coach-card{
+    background:linear-gradient(145deg,#0f3d24,#14532d 55%,#1e6b3c);color:#fff;
+    border-radius:26px;padding:18px;margin-bottom:14px;display:flex;gap:14px;align-items:center;
+    box-shadow:0 10px 30px rgba(20,83,45,.35);
+  }
+  .coach-card .ava{width:86px;height:92px;border-radius:20px;overflow:hidden;flex-shrink:0;background:#e9e7ff}
+  .coach-card .ava svg{width:100%;height:100%;display:block}
+  .coach-bubble{font-size:.95rem;font-weight:600;line-height:1.5;margin-bottom:10px;opacity:.95}
+  .coach-card .btn{background:#fff;color:var(--ink2);box-shadow:none;width:100%}
+  .glance{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+  .glance .g{
+    background:#fff;border:1px solid var(--border);border-radius:18px;padding:10px 4px;
+    text-align:center;cursor:pointer;
+  }
+  .glance .g .ic{font-size:22px;display:block}
+  .glance .g .lb{font-size:.66rem;font-weight:700;color:var(--muted);display:block;margin-top:3px}
+  .glance .g .st{font-size:.8rem;font-weight:900;display:block;margin-top:2px}
+  .glance .g.done{background:var(--green-mist);border-color:#bbe7c8}
+  .glance .g.done .st{color:var(--green)}
+  .glance .g.miss .st{color:#c2cbc5}
+  .streak{
+    display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--border);
+    border-radius:18px;padding:12px 14px;margin-bottom:14px;flex-wrap:wrap;
+  }
+  .streak b{font-size:.95rem}
+  .badge-chip{
+    background:var(--amber-soft);border-radius:999px;padding:5px 11px;font-size:.78rem;font-weight:800;color:#92400e;
+  }
+  /* ---- ארוחות ---- */
+  .meal{border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;background:#fff}
+  .meal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .meal-title{font-size:1.02rem;font-weight:800;display:flex;align-items:center;gap:8px}
+  .meal-hint{font-size:.8rem;color:var(--muted);margin-bottom:10px;line-height:1.5}
+  .water{
+    display:flex;align-items:center;gap:6px;background:var(--blue-soft);
+    border-radius:13px;padding:9px 13px;margin-bottom:10px;font-size:.8rem;font-weight:600;color:#075985;flex-wrap:wrap;
+  }
+  .cup{font-size:24px;background:none;border:none;cursor:pointer;filter:grayscale(1);opacity:.45;transition:.15s;padding:2px}
+  .cup.on{filter:none;opacity:1;transform:scale(1.12)}
+  .fooditem{
+    display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:14px;
+    margin-bottom:7px;font-weight:600;font-size:.92rem;
+  }
+  .fooditem.ok{background:var(--green-soft);color:var(--ink2)}
+  .fooditem.bad{background:var(--red-soft);color:var(--red)}
+  .fooditem.cheat{background:var(--violet-soft);color:var(--violet)}
+  .fooditem .mark{font-size:18px;font-weight:900}
+  .fooditem .why{font-size:.72rem;font-weight:500;opacity:.85}
+  .fooditem .del{
+    margin-inline-start:auto;background:none;border:none;cursor:pointer;
+    color:inherit;opacity:.5;font-size:16px;padding:6px;
+  }
+  .addrow{display:flex;gap:8px;margin-top:8px}
+  .addrow input{flex:1}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .chip{
+    background:#f4f7f4;border:1px solid var(--border);border-radius:999px;
+    padding:8px 14px;font-size:.82rem;font-weight:700;cursor:pointer;color:var(--ink2);
+  }
+  .chip:active{background:var(--green-soft)}
+  /* ---- בחירת משתמש ---- */
+  .usergrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .userbtn{
+    background:#fff;border:2px solid var(--border);border-radius:var(--radius);
+    padding:20px 10px;text-align:center;cursor:pointer;font-family:inherit;
+  }
+  .userbtn .emoji{font-size:38px;display:block;margin-bottom:6px}
+  .userbtn .name{font-size:1rem;font-weight:800;color:var(--ink)}
+  .userbtn:active{border-color:var(--green)}
+  .codeinput{letter-spacing:12px;text-align:center;font-size:26px;font-weight:800;direction:ltr}
+  .rule{display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-bottom:1px dashed var(--border);font-size:.92rem;line-height:1.55}
+  .rule:last-child{border-bottom:none}
+  .rule .ic{font-size:20px;flex-shrink:0}
+  /* ---- ניווט תחתון ---- */
+  .tabbar{
+    position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
+    border-top:1px solid var(--border);display:flex;justify-content:space-around;
+    padding:8px 0 max(12px,env(safe-area-inset-bottom));z-index:40;
+  }
+  .tab{
+    background:none;border:none;font-family:inherit;cursor:pointer;text-align:center;
+    color:var(--muted);font-size:.68rem;font-weight:800;display:flex;flex-direction:column;gap:3px;align-items:center;
+    min-width:64px;padding:4px 6px;border-radius:14px;
+  }
+  .tab .ic{font-size:24px}
+  .tab.on{color:var(--green);background:var(--green-mist)}
+  /* ---- פאנל הורה ---- */
+  .kidcard{
+    background:#fff;border:1px solid var(--border);border-radius:var(--radius);
+    padding:16px;margin-bottom:12px;display:flex;gap:14px;align-items:center;cursor:pointer;
+  }
+  .kidcard .kid-ava{width:54px;height:54px;border-radius:18px;background:var(--green-soft);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0}
+  .kidcard .st-ok{color:var(--green);font-weight:800;font-size:.82rem}
+  .kidcard .st-no{color:var(--amber);font-weight:800;font-size:.82rem}
+  .daybox{padding:12px 14px;border-top:1px dashed var(--border)}
+  .daybox h4{font-size:.88rem;font-weight:800;margin-bottom:6px}
+  .mini{font-size:.85rem;padding:7px 11px;margin-bottom:5px}
+  .weightrow{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px dashed var(--border);font-size:.88rem;font-weight:600}
+  .weightrow:last-child{border-bottom:none}
+  .insight{
+    display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 13px;
+    font-size:.8rem;font-weight:700;margin:0 0 7px 7px;
+  }
+  .insight.good{background:var(--green-soft);color:var(--ink2)}
+  .insight.gap{background:var(--amber-soft);color:#92400e}
+  .factline{background:var(--violet-soft);color:#5b21b6;border-radius:13px;padding:9px 13px;font-size:.85rem;font-weight:600;margin-bottom:6px}
+  .sync{
+    position:fixed;top:8px;left:8px;z-index:60;font-size:.68rem;font-weight:700;
+    padding:4px 10px;border-radius:999px;background:var(--amber-soft);color:#92400e;display:none;
+  }
+  .sync.show{display:block}
+  .codechip{background:#111827;color:#fff;border-radius:8px;padding:3px 10px;font-weight:800;letter-spacing:2px;direction:ltr;display:inline-block}
+  svg.chart{width:100%;height:130px;display:block}
+  .goalgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+  .goalbox{background:#f9fbf9;border:1px solid var(--border);border-radius:16px;padding:11px 6px;text-align:center}
+  .goalbox .val{font-size:1.15rem;font-weight:900;color:var(--ink)}
+  .goalbox .lbl{font-size:.68rem;color:var(--muted);font-weight:700}
+  .pbar{background:#e5eae6;border-radius:999px;height:14px;overflow:hidden}
+  .pbar>div{background:linear-gradient(90deg,var(--green),#4ade80);height:100%;border-radius:999px;transition:width .4s}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:.88rem;font-weight:800;margin-bottom:6px}
+  .fade{animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  /* ---- שיחת וידאו עם התזונאית ---- */
+  .call{
+    position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;
+    background:radial-gradient(1000px 600px at 50% -10%, #1e4d33 0%, #0c2417 60%, #071710 100%);
+    color:#fff;padding:max(14px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom));
+  }
+  .call-top{display:flex;justify-content:space-between;align-items:center;padding:4px 2px 10px}
+  .call-who{font-weight:800;font-size:.95rem;display:flex;align-items:center;gap:8px}
+  .live-dot{width:9px;height:9px;border-radius:50%;background:#4ade80;display:inline-block;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .call-timer{font-size:.78rem;opacity:.7;font-weight:600;direction:ltr}
+  .call-status{font-size:.85rem;font-weight:700;opacity:.85;min-height:1.3em}
+  .call-status.speaking{color:#86efac}
+  .call-status.listening{color:#7dd3fc}
+  .call-stage{flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:0}
+  .tile{position:relative;border-radius:28px;overflow:hidden}
+  .coach-tile{width:min(78vw,340px);aspect-ratio:20/21;box-shadow:0 18px 60px rgba(0,0,0,.5)}
+  .coach-tile .ava, .coach-tile .ava svg{width:100%;height:100%;display:block}
+  .speaking-ring{
+    position:absolute;inset:-4px;border-radius:32px;border:3px solid transparent;pointer-events:none;z-index:2;
+  }
+  .tile.is-speaking .speaking-ring{border-color:#4ade80;animation:ringpulse 1.1s infinite}
+  .tile.is-listening .speaking-ring{border-color:#38bdf8;animation:ringpulse 1.4s infinite}
+  @keyframes ringpulse{0%,100%{opacity:.9}50%{opacity:.3}}
+  .tile-name{
+    position:absolute;bottom:10px;right:12px;background:rgba(0,0,0,.45);border-radius:999px;
+    padding:4px 12px;font-size:.75rem;font-weight:700;z-index:2;
+  }
+  .captions{min-height:74px;padding:10px 4px;text-align:center}
+  .cap-coach{font-size:1rem;font-weight:700;line-height:1.45;color:#e7fff0}
+  .cap-user{font-size:.88rem;font-weight:600;color:#a5d8ff;margin-top:5px;min-height:1.2em}
+  .pending{
+    background:rgba(255,255,255,.1);border:1px solid rgba(134,239,172,.4);border-radius:18px;
+    padding:12px 14px;margin:0 auto 8px;max-width:440px;
+  }
+  .pending .p-title{font-size:.8rem;font-weight:800;color:#86efac;margin-bottom:7px}
+  .pending .p-item{font-size:.88rem;font-weight:600;padding:3px 0}
+  .pending .row{margin-top:9px}
+  .pending .btn{min-height:44px;padding:9px 16px;font-size:.9rem}
+  .call-controls{display:flex;justify-content:center;gap:14px;padding:10px 0 4px}
+  .call-btn{
+    width:58px;height:58px;border-radius:50%;border:none;cursor:pointer;font-size:23px;
+    background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;
+    transition:transform .12s;
+  }
+  .call-btn:active{transform:scale(.94)}
+  .call-btn.mic{background:#16a34a}
+  .call-btn.mic.muted{background:rgba(255,255,255,.14)}
+  .call-btn.end{background:#dc2626}
+  .call-btn.off{opacity:.45}
+  .typed-row{display:none;gap:8px;padding:6px 0}
+  .typed-row.open{display:flex}
+  .typed-row input{background:rgba(255,255,255,.95);border-color:transparent}
+  .coach-pick{display:flex;gap:12px;justify-content:center;margin:10px 0}
+  .coach-pick .cp{
+    background:#fff;border:3px solid var(--border);border-radius:22px;padding:8px;cursor:pointer;width:120px;
+  }
+  .coach-pick .cp.sel{border-color:var(--green)}
+  .coach-pick .cp .ava svg{width:100%;height:110px;display:block;border-radius:16px}
+  .coach-pick .cp .nm{text-align:center;font-weight:800;font-size:.9rem;padding-top:6px;color:var(--ink)}
+  .toast{
+    position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#132a1b;color:#fff;
+    border-radius:999px;padding:11px 20px;font-size:.88rem;font-weight:700;z-index:120;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);animation:fade .25s ease;white-space:nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="sync" id="syncBadge">⏳ מסנכרן…</div>
+<div class="wrap" id="app"></div>
+
+<script>
+/* ================= יומן אוכל משפחתי =================
+   רישום ארוחות (בלי ספירת קלוריות) + חוקים + סנכרון משפחתי + תזונאית AI קולית.
+   סנכרון: אחסון KV באותו שרת שמגיש את האפליקציה (Cloudflare Worker).
+====================================================== */
+
+const API = '/api/family';
+const COACH_API = '/api/coach';
+const POLL_MS = 15000;
+
+/* ---------- תפריט וחוקים ---------- */
+const MEALS = [
+  {key:'breakfast', name:'ארוחת בוקר',  emoji:'🍳', hint:'עדיפות לחלבון: חביתה / טונה / קוטג׳ — עם פיתה או לחמנייה',
+   chips:['חביתה','טונה','קוטג׳','פיתה','לחמנייה','ירקות']},
+  {key:'lunch',     name:'ארוחת צהריים', emoji:'🍗', hint:'אוכלים טוב! בלי תוספות שמנות כמו צ׳יפס וכדומה',
+   chips:['עוף','אורז','פסטה','קציצות','תפוח אדמה','סלט']},
+  {key:'snack',     name:'ארוחת ביניים', emoji:'🍎', hint:'חטיף בריאות או פרי — עדיפות לפירות!',
+   chips:['תפוח','בננה','אבטיח','ענבים','חטיף בריאות']},
+  {key:'dinner',    name:'ארוחת ערב',   emoji:'🥗', hint:'עד 19:00 בלבד! חלבון בלבד: ביצים / טונה / סלט',
+   chips:['ביצים','חביתה','טונה','סלט','קוטג׳']},
+];
+const MEAL_BY_KEY = k => MEALS.find(m=>m.key===k);
+
+const RULES = [
+  ['💧','לפני כל ארוחה שותים כוס מים — עדיף 2 כוסות!'],
+  ['🚫','לא אוכלים אחרי השעה 19:00 בערב!!!'],
+  ['🍳','ארוחת בוקר: עדיפות לחלבון — חביתה, טונה או קוטג׳, עם פיתה או לחמנייה.'],
+  ['🍗','צהריים: אוכלים טוב. בלי תוספות שמנות כמו צ׳יפס וכדומה.'],
+  ['🍎','ארוחת ביניים (בין צהריים לערב): חטיף בריאות או פרי — עדיפות לפירות.'],
+  ['🥗','ארוחת ערב: עד השעה 19:00, וחלבון בלבד — ביצים, טונה, סלט.'],
+  ['⚖️','שקילה פעם בשבוע.'],
+  ['🎉','יום צ׳יט אחד בשבוע — יום שישי!'],
+  ['🎂','יש אירוע או יום הולדת? אוכלים בצהריים את ארוחת הערב.'],
+];
+
+/* מילות מפתח לבדיקת התפריט. ההתאמה לפי "הטקסט מכיל". */
+const DINNER_OK = ['ביצה','ביצים','ביצת','חביתה','חביתת','טונה','סלט','ירקות','קוטג','גבינה','מלפפון','עגבני'];
+const BREAKFAST_OK = [...DINNER_OK,'פיתה','לחמניה','לחמנייה','לחם','אבוקדו','יוגורט'];
+const SNACK_OK = ['פרי','פירות','תפוח','בננה','אגס','אבטיח','מלון','ענבים','אפרסק','נקטרינה','שזיף','תות','מנגו','קלמנטינה','תפוז','מנדרינה','רימון','אננס','קיווי','אפרסמון','גזר','מלפפון','חטיף בריאות','חטיף דגנים','חטיף חלבון'];
+const FRUITS = ['פרי','פירות','תפוח','בננה','אבטיח','ענבים','מלון','אגס','אפרסק','תות','מנגו','שזיף','קלמנטינה','תפוז'];
+const VEGGIES = ['ירקות','סלט','מלפפון','עגבני','גזר','פלפל','חסה','כרוב','ברוקולי','קולורבי'];
+const JUNK = ['ציפס','ציפס','בורקס','מטוגן','שוקולד','עוגה','עוגיה','עוגיות','עוגיי','גלידה','ממתק','סוכריה','סוכריות','במבה','ביסלי','דוריטוס','ציטוס','קולה','שתיה מתוקה','משקה מתוק','מאפה','מלאווח','גחנון','סופגניה','סופגניות','פיצה','נקניקיה','נקניקיות','וופל','חטיף מלוח','שווארמה בלאפה','קרואסון','דונאט'];
+
+function norm(t){
+  return (t||'').replace(/['"׳״`]/g,'').replace(/\s+/g,' ').trim();
+}
+function hasAny(text, list){
+  const n = norm(text);
+  return list.some(w => n.includes(norm(w)));
+}
+
+/* בדיקת פריט: מחזיר {status:'ok'|'bad'|'cheat', why} */
+function checkFood(mealKey, text, {cheat=false, late=false, eventLunch=false}={}){
+  if (cheat) return {status:'cheat', why:'יום צ׳יט — הכל מותר 🎉'};
+  if (mealKey==='dinner' && late) return {status:'bad', why:'אחרי 19:00 — לא אוכלים!'};
+  const asDinner = mealKey==='dinner' || (mealKey==='lunch' && eventLunch);
+  if (asDinner){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'לא בתפריט ערב'};
+    if (hasAny(text, DINNER_OK)) return {status:'ok', why:'חלבון — מעולה!'};
+    return {status:'bad', why:'בערב חלבון בלבד: ביצים / טונה / סלט'};
+  }
+  if (mealKey==='breakfast'){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'לא בתפריט הבוקר'};
+    if (hasAny(text, BREAKFAST_OK)) return {status:'ok', why:'לפי התפריט!'};
+    return {status:'bad', why:'לא בתפריט — עדיף חלבון עם פיתה/לחמנייה'};
+  }
+  if (mealKey==='lunch'){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'תוספת שמנה / לא בריא'};
+    return {status:'ok', why:'בתיאבון!'};
+  }
+  if (mealKey==='snack'){
+    if (hasAny(text, JUNK)) return {status:'bad', why:'לא בתפריט'};
+    if (hasAny(text, SNACK_OK)) return {status:'ok', why: hasAny(text,FRUITS)?'פרי — הכי טוב!':'חטיף בריאות — סבבה'};
+    return {status:'bad', why:'רק פרי או חטיף בריאות'};
+  }
+  return {status:'ok', why:''};
+}
+
+/* ---------- עזרי תאריך ---------- */
+function todayKey(d=new Date()){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function isFriday(d=new Date()){ return d.getDay()===5; }
+function after19(d=new Date()){ return d.getHours()>=19; }
+function hebDate(d=new Date()){
+  return new Intl.DateTimeFormat('he-IL',{weekday:'long', day:'numeric', month:'long'}).format(d);
+}
+function hebDateShort(key){
+  const [y,m,dd]=key.split('-').map(Number);
+  const d=new Date(y,m-1,dd);
+  return new Intl.DateTimeFormat('he-IL',{weekday:'short', day:'numeric', month:'numeric'}).format(d);
+}
+function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+function timeOfDayHe(){
+  const h=new Date().getHours();
+  if(h<11) return 'בוקר';
+  if(h<15) return 'צהריים';
+  if(h<18) return 'אחר הצהריים';
+  return 'ערב';
+}
+
+/* ---------- מצב ---------- */
+let DATA = null;
+let familyId = localStorage.getItem('fam.id') || null;
+let currentUserId = localStorage.getItem('fam.user') || null;
+let view = 'home';
+let dirty = false;
+let syncing = false;
+let pollTimer = null;
+let notFound = false;
+
+function emptyData(name){
+  return {
+    familyName: name||'המשפחה שלנו',
+    parent: {name:'הורה', code: randCode(), codeTs: Date.now()},
+    kids: [],
+    logs: {},
+    weights: {},
+    chats: {},
+    updatedAt: Date.now()
+  };
+}
+function randCode(){ return String(Math.floor(1000+Math.random()*9000)); }
+
+/* ---------- סנכרון ---------- */
+function showSync(txt){
+  const b=document.getElementById('syncBadge');
+  if(!txt){ b.classList.remove('show'); return; }
+  b.textContent=txt; b.classList.add('show');
+}
+
+async function apiCreate(data){
+  const r = await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok) throw new Error('create failed '+r.status);
+  const j = await r.json();
+  if(!j.id) throw new Error('no id');
+  return j.id;
+}
+async function apiGet(id){
+  const r = await fetch(API+'/'+id,{cache:'no-store'});
+  if(r.status===404) throw new Error('notfound');
+  if(!r.ok) throw new Error('get failed '+r.status);
+  return r.json();
+}
+async function apiPut(id,data){
+  const r = await fetch(API+'/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok) throw new Error('put failed '+r.status);
+  return data;
+}
+
+/* מיזוג בין הגרסה בענן לגרסה המקומית, לפי חותמות זמן */
+function mergeData(a,b){
+  if(!a) return b; if(!b) return a;
+  const [x,y]=[a,b];
+  const out = {familyName: x.updatedAt>=y.updatedAt?x.familyName:y.familyName};
+  out.parent = (x.parent?.codeTs||0) >= (y.parent?.codeTs||0) ? {...x.parent} : {...y.parent};
+  const kidMap = {};
+  [...(x.kids||[]),...(y.kids||[])].forEach(k=>{
+    const ex = kidMap[k.id];
+    if(!ex){ kidMap[k.id]={...k}; return; }
+    const merged={...ex,...k};
+    if((ex.codeTs||0)>(k.codeTs||0)){ merged.code=ex.code; merged.codeTs=ex.codeTs; }
+    if((ex.profileTs||0)>(k.profileTs||0)){
+      merged.height=ex.height; merged.targetKg=ex.targetKg;
+      merged.startKg=ex.startKg; merged.profileTs=ex.profileTs;
+      merged.birthYear=ex.birthYear; merged.gender=ex.gender; merged.coach=ex.coach;
+    }
+    if((ex.parentTs||0)>(k.parentTs||0)){
+      merged.pgoals=ex.pgoals; merged.pnotes=ex.pnotes; merged.parentTs=ex.parentTs;
+    }
+    kidMap[k.id]=merged;
+  });
+  const removed = new Set([...(x.removedKids||[]),...(y.removedKids||[])]);
+  out.removedKids = [...removed];
+  out.kids = Object.values(kidMap).filter(k=>!removed.has(k.id));
+  out.logs = {};
+  const kidIds = new Set([...Object.keys(x.logs||{}),...Object.keys(y.logs||{})]);
+  kidIds.forEach(kid=>{
+    out.logs[kid]={};
+    const days = new Set([...Object.keys(x.logs?.[kid]||{}),...Object.keys(y.logs?.[kid]||{})]);
+    days.forEach(day=>{
+      const da=x.logs?.[kid]?.[day], db=y.logs?.[kid]?.[day];
+      if(!da){ out.logs[kid][day]=db; return; }
+      if(!db){ out.logs[kid][day]=da; return; }
+      const d={event:(da.eventTs||0)>=(db.eventTs||0)?da.event:db.event,
+               eventTs:Math.max(da.eventTs||0,db.eventTs||0), meals:{}};
+      MEALS.forEach(m=>{
+        const ma=da.meals?.[m.key], mb=db.meals?.[m.key];
+        if(!ma && !mb) return;
+        const items={};
+        [...(ma?.items||[]),...(mb?.items||[])].forEach(it=>{
+          const ex=items[it.id];
+          if(!ex || (it.ts||0)>(ex.ts||0)) items[it.id]=it;
+        });
+        d.meals[m.key]={
+          water: (ma?.waterTs||0)>=(mb?.waterTs||0)?(ma?.water||0):(mb?.water||0),
+          waterTs: Math.max(ma?.waterTs||0, mb?.waterTs||0),
+          items: Object.values(items).sort((p,q)=>(p.ts||0)-(q.ts||0)),
+        };
+      });
+      out.logs[kid][day]=d;
+    });
+  });
+  out.weights={};
+  const wIds=new Set([...Object.keys(x.weights||{}),...Object.keys(y.weights||{})]);
+  wIds.forEach(kid=>{
+    out.weights[kid]={};
+    const weeks=new Set([...Object.keys(x.weights?.[kid]||{}),...Object.keys(y.weights?.[kid]||{})]);
+    weeks.forEach(w=>{
+      const wa=x.weights?.[kid]?.[w], wb=y.weights?.[kid]?.[w];
+      out.weights[kid][w] = !wa?wb : !wb?wa : ((wa.ts||0)>=(wb.ts||0)?wa:wb);
+    });
+  });
+  // שיחות עם התזונאית: הודעות מאוחדות לפי (ts,role), עובדות-זיכרון לפי id
+  out.chats={};
+  const cIds=new Set([...Object.keys(x.chats||{}),...Object.keys(y.chats||{})]);
+  cIds.forEach(kid=>{
+    const ca=x.chats?.[kid], cb=y.chats?.[kid];
+    if(!ca){ out.chats[kid]=cb; return; }
+    if(!cb){ out.chats[kid]=ca; return; }
+    const msgMap={};
+    [...(ca.msgs||[]),...(cb.msgs||[])].forEach(m=>{ msgMap[(m.ts||0)+'|'+m.r]=m; });
+    const msgs=Object.values(msgMap).sort((p,q)=>(p.ts||0)-(q.ts||0)).slice(-40);
+    const factMap={};
+    [...(ca.facts||[]),...(cb.facts||[])].forEach(f=>{
+      const ex=factMap[f.id];
+      if(!ex || (f.ts||0)>(ex.ts||0)) factMap[f.id]=f;
+    });
+    const psum = (ca.psum?.ts||0)>=(cb.psum?.ts||0) ? ca.psum : cb.psum;
+    out.chats[kid]={
+      msgs,
+      facts:Object.values(factMap).sort((p,q)=>(p.ts||0)-(q.ts||0)).slice(-30),
+      day: (ca.day||'')>(cb.day||'')?ca.day:cb.day,
+      psum,
+    };
+  });
+  out.updatedAt = Math.max(x.updatedAt||0, y.updatedAt||0);
+  return out;
+}
+
+let syncQueued=false;
+function queueSync(){
+  dirty=true;
+  localStorage.setItem('fam.cache', JSON.stringify(DATA));
+  if(syncQueued) return;
+  syncQueued=true;
+  setTimeout(()=>{syncQueued=false; syncNow();}, 900);
+}
+async function syncNow(){
+  if(!familyId || syncing) return;
+  syncing=true; showSync('⏳ מסנכרן…');
+  try{
+    const remote = await apiGet(familyId);
+    notFound = false;
+    const merged = mergeData(remote, DATA);
+    if(dirty){
+      merged.updatedAt = Date.now();
+      await apiPut(familyId, merged);
+      dirty=false;
+    }
+    const changed = JSON.stringify(merged) !== JSON.stringify(DATA);
+    DATA = merged;
+    localStorage.setItem('fam.cache', JSON.stringify(DATA));
+    showSync('');
+    if(changed) render();
+  }catch(e){
+    const hadData = !!DATA;
+    if(e && e.message==='notfound' && !DATA){
+      showSync('');
+      notFound=true;
+    }else{
+      showSync('📴 אין חיבור — יסתנכרן אוטומטית');
+    }
+    if(!hadData) render();
+  }finally{ syncing=false; }
+}
+function startPolling(){
+  clearInterval(pollTimer);
+  pollTimer=setInterval(()=>{ if(!document.hidden) syncNow(); }, POLL_MS);
+}
+
+/* ---------- עזרי נתונים ---------- */
+function getDay(kidId, dayKey, create){
+  DATA.logs[kidId] = DATA.logs[kidId]||{};
+  if(!DATA.logs[kidId][dayKey] && create){
+    DATA.logs[kidId][dayKey]={event:false,eventTs:0,meals:{}};
+  }
+  return DATA.logs[kidId][dayKey];
+}
+function getMeal(day, key, create){
+  if(!day.meals[key] && create) day.meals[key]={water:0,waterTs:0,items:[]};
+  return day.meals[key];
+}
+function weekKey(d=new Date()){
+  const t=new Date(d); t.setDate(t.getDate()-t.getDay());
+  return todayKey(t);
+}
+function kidById(id){ return (DATA.kids||[]).find(k=>k.id===id); }
+function lastWeight(kidId){
+  const arr=weightList(kidId);
+  return arr[arr.length-1]||null;
+}
+function weightList(kidId){
+  const w=DATA.weights?.[kidId]||{};
+  return Object.values(w).filter(e=>!e.del).sort((a,b)=>a.date<b.date?-1:1);
+}
+function getChat(kidId, create){
+  DATA.chats = DATA.chats||{};
+  if(!DATA.chats[kidId] && create) DATA.chats[kidId]={msgs:[],facts:[],day:''};
+  return DATA.chats[kidId];
+}
+function mealItems(kidId, dayKey, mealKey){
+  const day=DATA.logs?.[kidId]?.[dayKey];
+  return ((day?.meals?.[mealKey]?.items)||[]).filter(i=>!i.del);
+}
+function dayWater(kidId, dayKey){
+  const day=DATA.logs?.[kidId]?.[dayKey];
+  if(!day) return 0;
+  return MEALS.reduce((s,m)=>s+((day.meals?.[m.key]?.water)||0),0);
+}
+function dayReported(kidId, dayKey){
+  return MEALS.some(m=>mealItems(kidId,dayKey,m.key).length>0);
+}
+function kidAge(kid){
+  if(!kid?.birthYear) return null;
+  const a=new Date().getFullYear()-kid.birthYear;
+  return (a>=3 && a<=25) ? a : null;
+}
+
+/* ---------- גיימיפיקציה עדינה (לא לפי משקל!) ---------- */
+function reportStreak(kidId){
+  let n=0;
+  for(let i=0;i<90;i++){
+    const has=dayReported(kidId, todayKey(daysAgo(i)));
+    if(has) n++;
+    else { if(i===0) continue; break; }
+  }
+  return n;
+}
+function kidBadges(kidId){
+  const out=[];
+  const streak=reportStreak(kidId);
+  if(streak>=14) out.push('🏆 שבועיים של דיווח');
+  else if(streak>=7) out.push('🥈 שבוע של דיווח');
+  else if(streak>=3) out.push('🥉 3 ימי דיווח');
+  if(weightList(kidId).length>=4) out.push('⚖️ מתמיד בשקילה');
+  let fruit=0, waterDay=false;
+  for(let i=0;i<14;i++){
+    const dk=todayKey(daysAgo(i));
+    if(mealItems(kidId,dk,'snack').some(it=>hasAny(it.text,FRUITS))) fruit++;
+    if(dayWater(kidId,dk)>=6) waterDay=true;
+  }
+  if(fruit>=5) out.push('🍎 אלוף הפירות');
+  if(waterDay) out.push('💧 שיאן מים');
+  return out;
+}
+
+/* ---------- רנדור ---------- */
+const app=document.getElementById('app');
+function h(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content; }
+function esc(s){ return (s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function toast(msg){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div');
+  t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2600);
+}
+
+function render(){
+  // שומרים מה שהוקלד ואת הפוקוס — שרינדור מחדש (למשל בסנכרון) לא ימחק הקלדה
+  const active=document.activeElement;
+  const focusId=(active && app.contains(active) && active.id) ? active.id : null;
+  const selStart=(focusId && active.selectionStart!=null) ? active.selectionStart : null;
+  const vals={};
+  app.querySelectorAll('input,textarea').forEach(i=>{ if(i.id && i.type!=='checkbox') vals[i.id]=i.value; });
+
+  renderView();
+
+  Object.entries(vals).forEach(([id,v])=>{
+    const el=document.getElementById(id);
+    if(el && v!=='' ) el.value=v;
+  });
+  if(focusId){
+    const el=document.getElementById(focusId);
+    if(el){
+      el.focus();
+      if(selStart!=null){ try{ el.setSelectionRange(selStart,selStart); }catch(e){} }
+    }
+  }
+}
+function renderView(){
+  if(!familyId){ renderStart(); renderTabs(); return; }
+  if(!DATA){ renderLoading(); return; }
+  if(!currentUserId){ renderUserPick(); renderTabs(); return; }
+  if(currentUserId==='parent'){ renderParent(); renderTabs(); return; }
+  if(!kidById(currentUserId)){ currentUserId=null; localStorage.removeItem('fam.user'); renderUserPick(); renderTabs(); return; }
+  if(!kidById(currentUserId).profileTs || view==='profile'){ renderProfileSetup(); renderTabs(); return; }
+  if(view==='today') renderToday();
+  else if(view==='weight') renderWeight();
+  else if(view==='rules') renderRules();
+  else renderHome();
+  renderTabs();
+}
+
+function renderLoading(){
+  const head = notFound
+    ? '<h2>🤔 היומן לא נמצא</h2><p class="muted" style="margin-top:6px">אולי הקישור ישן או שהיומן נוצר מחדש.<br>בקשו מההורה קישור חדש, או התחילו מחדש.</p>'
+    : '<h2>⏳ טוען…</h2><p class="muted">מתחבר ליומן המשפחתי</p>';
+  app.innerHTML=`<div class="card center fade" style="margin-top:22vh">
+    ${head}
+    <div class="row" style="justify-content:center;margin-top:16px">
+      <button class="btn small" onclick="syncNow()">🔄 נסו שוב</button>
+      <button class="btn small secondary" onclick="disconnectDevice()">🔌 התחלה מחדש</button>
+    </div>
+  </div>`;
+}
+
+/* --- מסך פתיחה: יצירה / הצטרפות --- */
+function renderStart(){
+  app.innerHTML=`
+  <div class="fade">
+    <div class="center" style="padding:30px 0 10px">
+      <div style="font-size:60px">🥗</div>
+      <h1 style="font-size:1.6rem">יומן אוכל משפחתי</h1>
+      <p class="muted" style="margin-top:6px">רושמים מה אכלנו, מדברים עם התזונאית, וכולם מסונכרנים 💚</p>
+    </div>
+    <div class="card">
+      <h2>🚀 פעם ראשונה?</h2>
+      <p class="muted" style="margin:8px 0 12px">ההורה יוצר את היומן המשפחתי פעם אחת, ואז שולח קישור לכל הילדים.</p>
+      <div style="margin-bottom:10px"><input id="famName" placeholder="שם המשפחה (למשל: משפחת כהן)" /></div>
+      <div style="margin-bottom:10px">
+        <input id="famCode" class="codeinput" inputmode="numeric" maxlength="4" placeholder="••••" />
+        <p class="muted" style="margin-top:6px">🔑 בחרו קוד הורה — 4 ספרות שקל לכם לזכור (איתו נכנסים לפאנל ההורה)</p>
+      </div>
+      <button class="btn block" onclick="createFamily()">צור יומן משפחתי חדש</button>
+      <p class="muted" id="createErr" style="color:var(--red);margin-top:8px"></p>
+    </div>
+    <div class="card">
+      <h2>🔗 קיבלתם קישור או קוד?</h2>
+      <p class="muted" style="margin:8px 0 12px">אם ההורה שלח לכם קישור — פשוט לוחצים עליו. אפשר גם להדביק כאן את קוד המשפחה:</p>
+      <div class="row">
+        <input id="joinCode" placeholder="קוד משפחה" style="direction:ltr" />
+        <button class="btn" onclick="joinFamily()">הצטרפות</button>
+      </div>
+      <p class="muted" id="joinErr" style="color:var(--red);margin-top:8px"></p>
+    </div>
+    ${installBanner()}
+  </div>`;
+}
+
+async function createFamily(){
+  const name=document.getElementById('famName').value.trim();
+  const code=document.getElementById('famCode').value.trim();
+  const err=document.getElementById('createErr');
+  if(!/^\d{4}$/.test(code)){ err.textContent='נא לבחור קוד הורה של 4 ספרות'; return; }
+  err.textContent='';
+  const d=emptyData(name);
+  d.parent.code=code;
+  showSync('⏳ יוצר יומן…');
+  try{
+    familyId=await apiCreate(d);
+    localStorage.setItem('fam.id',familyId);
+    DATA=d;
+    localStorage.setItem('fam.cache',JSON.stringify(DATA));
+    currentUserId='parent';
+    localStorage.setItem('fam.user','parent');
+    showSync('');
+    startPolling();
+    alert('היומן נוצר! 🎉\nקוד ההורה שבחרת: '+code+'\nעכשיו מוסיפים את הילדים ושולחים להם קישור.');
+    render();
+  }catch(e){
+    showSync('');
+    alert('לא הצלחתי להתחבר לשרת הסנכרון. בדקו חיבור אינטרנט ונסו שוב.');
+  }
+}
+async function joinFamily(){
+  let code=(document.getElementById('joinCode').value||'').trim();
+  code=code.split('/').filter(Boolean).pop().replace(/[#?].*$/,'').replace(/^family=/,'');
+  if(!code){ document.getElementById('joinErr').textContent='נא להזין קוד'; return; }
+  showSync('⏳ מתחבר…');
+  try{
+    const d=await apiGet(code);
+    if(!d || !d.parent) throw new Error('bad');
+    familyId=code; DATA=d;
+    localStorage.setItem('fam.id',familyId);
+    localStorage.setItem('fam.cache',JSON.stringify(DATA));
+    showSync('');
+    startPolling();
+    render();
+  }catch(e){
+    showSync('');
+    document.getElementById('joinErr').textContent='קוד לא נכון או שאין חיבור. נסו שוב.';
+  }
+}
+
+/* --- בחירת משתמש + קוד אישי --- */
+function renderUserPick(){
+  const kids=DATA.kids||[];
+  app.innerHTML=`
+  <div class="fade">
+    <div class="center" style="padding:22px 0 8px">
+      <div style="font-size:46px">👋</div>
+      <h1>מי נכנס עכשיו?</h1>
+      <p class="muted">${esc(DATA.familyName)}</p>
+    </div>
+    <div class="usergrid" style="margin-bottom:12px">
+      ${kids.map(k=>`
+        <button class="userbtn" onclick="pickUser('${k.id}')">
+          <span class="emoji">${k.emoji||'🙂'}</span>
+          <span class="name">${esc(k.name)}</span>
+        </button>`).join('')}
+      <button class="userbtn" onclick="pickUser('parent')">
+        <span class="emoji">👨‍👩‍👧</span>
+        <span class="name">הורה</span>
+      </button>
+    </div>
+    ${kids.length===0?'<p class="muted center">עדיין אין ילדים ביומן — ההורה מוסיף אותם בפאנל ההורה.</p>':''}
+    ${installBanner()}
+    <div id="codeBox"></div>
+    <p class="center" style="margin-top:18px">
+      <button class="btn ghost" style="font-size:.8rem;color:var(--muted)" onclick="disconnectDevice()">🔌 ניתוק המכשיר מהיומן והתחלה מחדש</button>
+    </p>
+  </div>`;
+}
+function disconnectDevice(){
+  if(!confirm('לנתק את המכשיר הזה מהיומן?\nהנתונים בענן לא נמחקים — אפשר תמיד להתחבר שוב עם הקישור.')) return;
+  localStorage.removeItem('fam.id');
+  localStorage.removeItem('fam.user');
+  localStorage.removeItem('fam.cache');
+  familyId=null; currentUserId=null; DATA=null; dirty=false;
+  clearInterval(pollTimer);
+  render();
+}
+let pendingUser=null;
+function pickUser(id){
+  pendingUser=id;
+  const name = id==='parent' ? 'הורה' : (kidById(id)?.name||'');
+  document.getElementById('codeBox').innerHTML=`
+    <div class="card fade">
+      <h3 class="center">🔒 הקוד של ${esc(name)}</h3>
+      <div style="margin:12px 0"><input id="pcode" class="codeinput" inputmode="numeric" maxlength="4" placeholder="••••" /></div>
+      <button class="btn block" onclick="tryLogin()">כניסה</button>
+      <p class="muted center" id="codeErr" style="color:var(--red);margin-top:8px"></p>
+      <p class="center" style="margin-top:6px">
+        <button class="btn ghost" style="font-size:.8rem" onclick="forgotCode()">🙈 שכחתי את הקוד</button>
+      </p>
+    </div>`;
+  const inp=document.getElementById('pcode');
+  inp.focus();
+  inp.addEventListener('input',()=>{ if(inp.value.length===4) tryLogin(); });
+}
+function tryLogin(){
+  const code=document.getElementById('pcode').value.trim();
+  const real = pendingUser==='parent' ? DATA.parent.code : kidById(pendingUser)?.code;
+  if(code && code===real){
+    currentUserId=pendingUser;
+    localStorage.setItem('fam.user',currentUserId);
+    view = currentUserId==='parent' ? 'parent' : 'home';
+    render();
+  }else{
+    document.getElementById('codeErr').textContent='קוד לא נכון 🙈 נסו שוב';
+    document.getElementById('pcode').value='';
+  }
+}
+function logout(){
+  currentUserId=null; localStorage.removeItem('fam.user'); view='home'; render();
+}
+function forgotCode(){
+  if(pendingUser!=='parent'){
+    const k=kidById(pendingUser);
+    alert('אין בעיה! ההורה רואה את הקוד של '+(k?k.name:'הילד/ה')+' בפאנל ההורה, ויכול גם לאפס אותו שם 👨‍👩‍👧');
+    return;
+  }
+  const fam=prompt('כדי לאפס את קוד ההורה, הדביקו כאן את קוד המשפחה\n(המחרוזת הארוכה מקישור ההצטרפות ששלחתם לילדים):');
+  if(fam===null) return;
+  const cleaned=(fam||'').trim().split('/').filter(Boolean).pop().replace(/[#?].*$/,'').replace(/^family=/,'');
+  if(cleaned!==familyId){
+    alert('קוד המשפחה לא תואם. אפשר למצוא אותו בקישור ששלחתם בוואטסאפ (החלק שאחרי ‎#family=).');
+    return;
+  }
+  const c=prompt('קוד הורה חדש (4 ספרות):');
+  if(c===null) return;
+  if(!/^\d{4}$/.test(c)){ alert('הקוד חייב להיות 4 ספרות'); return; }
+  DATA.parent.code=c; DATA.parent.codeTs=Date.now();
+  queueSync();
+  alert('קוד ההורה עודכן ל־'+c+' — עכשיו אפשר להיכנס איתו!');
+}
+
+/* --- ניווט תחתון (לילדים) --- */
+function renderTabs(){
+  const old=document.querySelector('.tabbar'); if(old) old.remove();
+  if(!currentUserId || currentUserId==='parent' || !DATA || !kidById(currentUserId)) return;
+  document.body.appendChild(h(`
+    <div class="tabbar">
+      <button class="tab ${view==='home'?'on':''}" onclick="setView('home')"><span class="ic">🏠</span>הבית</button>
+      <button class="tab ${view==='today'?'on':''}" onclick="setView('today')"><span class="ic">🍽️</span>היום שלי</button>
+      <button class="tab ${view==='weight'?'on':''}" onclick="setView('weight')"><span class="ic">⚖️</span>שקילה</button>
+      <button class="tab ${view==='rules'?'on':''}" onclick="setView('rules')"><span class="ic">📜</span>חוקים</button>
+    </div>`));
+}
+function setView(v){ view=v; render(); }
+
+/* --- כניסה ראשונה של ילד: פרטים אישיים --- */
+function renderProfileSetup(){
+  const kid=kidById(currentUserId);
+  const firstTime=!kid.profileTs;
+  const lw=lastWeight(currentUserId);
+  const yearNow=new Date().getFullYear();
+  app.innerHTML=`
+  <div class="fade">
+    <div class="center" style="padding:24px 0 8px">
+      <div style="font-size:50px">${kid.emoji||'🙂'}</div>
+      <h1>${firstTime?'ברוך הבא, '+esc(kid.name)+'!':'עדכון פרטים — '+esc(kid.name)}</h1>
+      <p class="muted" style="margin-top:6px">${firstTime?'לפני שמתחילים — כמה פרטים קצרים:':'אפשר לעדכן את הפרטים:'}</p>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>📏 גובה (בס״מ)</label>
+        <input id="pfHeight" type="number" inputmode="numeric" placeholder="למשל: 150" value="${kid.height||''}" />
+      </div>
+      <div class="field">
+        <label>⚖️ משקל נוכחי (בק״ג)</label>
+        <input id="pfWeight" type="number" step="0.1" inputmode="decimal" placeholder="למשל: 48.5" value="${lw?lw.kg:''}" />
+      </div>
+      <div class="field">
+        <label>🎯 יעד משקל רצוי (בק״ג)</label>
+        <input id="pfTarget" type="number" step="0.1" inputmode="decimal" placeholder="למשל: 42" value="${kid.targetKg||''}" />
+      </div>
+      <div class="field">
+        <label>🎂 שנת לידה (כדי שהתזונאית תדבר בגובה העיניים)</label>
+        <input id="pfYear" type="number" inputmode="numeric" placeholder="למשל: ${yearNow-10}" value="${kid.birthYear||''}" />
+      </div>
+      <div class="field">
+        <label>🙋 אני…</label>
+        <select id="pfGender">
+          <option value="" ${!kid.gender?'selected':''}>מעדיפ/ה לא לציין</option>
+          <option value="m" ${kid.gender==='m'?'selected':''}>בן</option>
+          <option value="f" ${kid.gender==='f'?'selected':''}>בת</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>🧑‍⚕️ עם מי בא לך לדבר?</label>
+        <div class="coach-pick">
+          ${COACHES.map(c=>`
+            <div class="cp ${(kid.coach||'noa')===c.id?'sel':''}" onclick="pickCoach('${c.id}')" id="cp-${c.id}">
+              <div class="ava">${coachSvg(c)}</div>
+              <div class="nm">${c.name}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <button class="btn block" onclick="saveProfile()">${firstTime?'מתחילים! 🚀':'שמירה'}</button>
+      ${firstTime?'':'<button class="btn ghost block" style="margin-top:6px" onclick="setView(\'weight\')">ביטול</button>'}
+    </div>
+  </div>`;
+}
+let chosenCoach=null;
+function pickCoach(id){
+  chosenCoach=id;
+  document.querySelectorAll('.coach-pick .cp').forEach(el=>el.classList.remove('sel'));
+  document.getElementById('cp-'+id)?.classList.add('sel');
+}
+function saveProfile(){
+  const height=parseFloat(document.getElementById('pfHeight').value);
+  const kg=parseFloat(document.getElementById('pfWeight').value);
+  const target=parseFloat(document.getElementById('pfTarget').value);
+  const year=parseInt(document.getElementById('pfYear').value,10);
+  const gender=document.getElementById('pfGender').value||null;
+  if(!height || height<80 || height>230){ alert('נא להזין גובה תקין בס״מ'); return; }
+  if(!kg || kg<=0 || kg>250){ alert('נא להזין משקל תקין בק״ג'); return; }
+  if(!target || target<=0 || target>250){ alert('נא להזין יעד משקל תקין בק״ג'); return; }
+  const yearNow=new Date().getFullYear();
+  if(document.getElementById('pfYear').value && (isNaN(year) || year<yearNow-25 || year>yearNow-3)){ alert('נא להזין שנת לידה תקינה'); return; }
+  const kid=kidById(currentUserId);
+  kid.height=height;
+  kid.targetKg=target;
+  if(!isNaN(year)) kid.birthYear=year;
+  kid.gender=gender;
+  kid.coach=chosenCoach||kid.coach||'noa';
+  if(!kid.startKg) kid.startKg=kg;
+  kid.profileTs=Date.now();
+  DATA.weights[currentUserId]=DATA.weights[currentUserId]||{};
+  DATA.weights[currentUserId][weekKey()]={kg, date:todayKey(), ts:Date.now()};
+  view='home';
+  queueSync(); render();
+}
+
+/* התקדמות לעבר היעד */
+function progressInfo(kid){
+  const lw=lastWeight(kid.id);
+  if(!lw || !kid.targetKg) return null;
+  const start=kid.startKg||lw.kg;
+  const cur=lw.kg, target=kid.targetKg;
+  const total=start-target;
+  const done=start-cur;
+  const pct = Math.abs(total)<0.01 ? 100 : Math.max(0,Math.min(100,Math.round(done/total*100)));
+  const remain=+(cur-target).toFixed(1);
+  const reached = (total>=0 && cur<=target) || (total<0 && cur>=target);
+  return {start,cur,target,pct:reached?100:pct,remain,reached};
+}
+function progressBarHtml(p){
+  if(!p) return '';
+  const txt = p.reached
+    ? '🎉 הגעת ליעד! כל הכבוד!'
+    : 'נשארו עוד '+Math.abs(p.remain)+' ק״ג ליעד 💪';
+  return `
+    <div class="goalgrid">
+      <div class="goalbox"><div class="val">${p.start}</div><div class="lbl">התחלה</div></div>
+      <div class="goalbox" style="border-color:var(--green);background:var(--green-soft)"><div class="val">${p.cur}</div><div class="lbl">עכשיו</div></div>
+      <div class="goalbox"><div class="val">${p.target}</div><div class="lbl">🎯 היעד</div></div>
+    </div>
+    <div class="pbar"><div style="width:${p.pct}%"></div></div>
+    <p class="center" style="font-size:.88rem;font-weight:700;margin-top:8px">${txt} (${p.pct}%)</p>`;
+}
+
+/* --- מסך הבית של ילד --- */
+function coachGreeting(kid){
+  const dk=todayKey();
+  const missing=MEALS.filter(m=>{
+    if(m.key==='breakfast' && new Date().getHours()<10) return false;
+    if(m.key==='lunch' && new Date().getHours()<14) return false;
+    if(m.key==='snack' && new Date().getHours()<17) return false;
+    if(m.key==='dinner' && new Date().getHours()<19) return false;
+    return mealItems(kid.id,dk,m.key).length===0;
+  });
+  if(isFriday()) return 'יום שישי — יום צ׳יט! 🎉 מגיע לך, ספר/י לי מה היה היום';
+  const lw=lastWeight(kid.id);
+  const needWeigh = !lw || (Date.now()-new Date(lw.date).getTime()) > 7*24*3600*1000;
+  if(missing.length===0 && dayReported(kid.id,dk)) return 'איזה יופי, דיווחת על הכל! רוצה לספר לי איך היה היום?';
+  if(needWeigh) return 'היי! השבוע עוד לא נשקלת — ואפשר גם לספר לי מה אכלת 😊';
+  if(missing.length>0) return 'היי '+kid.name+'! עוד לא סיפרת לי על '+MEAL_BY_KEY(missing[0].key).name+'. בוא/י נדבר!';
+  return 'היי '+kid.name+'! מה אכלת היום? בוא/י נדבר 😊';
+}
+
+function renderHome(){
+  const kid=kidById(currentUserId);
+  const dk=todayKey();
+  const coach=coachById(kid.coach);
+  const streak=reportStreak(currentUserId);
+  const badges=kidBadges(currentUserId);
+  const cheat=isFriday();
+  const glance=MEALS.map(m=>{
+    const items=mealItems(currentUserId,dk,m.key);
+    const done=items.length>0;
+    const bad=items.some(i=>i.status==='bad');
+    return `<div class="g ${done?'done':'miss'}" onclick="setView('today')">
+      <span class="ic">${m.emoji}</span>
+      <span class="lb">${m.name.replace('ארוחת ','')}</span>
+      <span class="st">${done?(bad&&!cheat?'✗':'✓'):'—'}</span>
+    </div>`;
+  }).join('')+`
+    <div class="g ${dayWater(currentUserId,dk)>=4?'done':'miss'}" onclick="setView('today')">
+      <span class="ic">💧</span><span class="lb">מים</span>
+      <span class="st">${dayWater(currentUserId,dk)||'—'}</span>
+    </div>`;
+
+  let banners='';
+  if(cheat) banners+=`<div class="banner cheat">🎉 יום שישי — יום צ׳יט! היום הכל מותר 😎</div>`;
+  const day=DATA.logs?.[currentUserId]?.[dk];
+  if(day?.event && !cheat) banners+=`<div class="banner info">🎂 יום אירוע: בצהריים אוכלים את ארוחת הערב, ובערב — האירוע!</div>`;
+  if(after19() && !cheat) banners+=`<div class="banner warn">🚫 השעה אחרי 19:00 — לא אוכלים יותר היום!</div>`;
+  const lw=lastWeight(currentUserId);
+  const needWeigh = !lw || (Date.now()-new Date(lw.date).getTime()) > 7*24*3600*1000;
+  if(needWeigh) banners+=`<div class="banner weigh" onclick="setView('weight')" style="cursor:pointer">⚖️ הגיע הזמן לשקילה השבועית! לחצו כאן</div>`;
+  banners+=installBanner();
+
+  app.innerHTML=`
+  <div class="fade">
+    <div class="hero">
+      <div class="kid-ava">${kid.emoji||'🙂'}</div>
+      <div style="flex:1">
+        <h1>היי ${esc(kid.name)}!</h1>
+        <p class="muted">${hebDate()}</p>
+      </div>
+      <button class="btn ghost small" onclick="logout()" title="החלפת משתמש">🔄</button>
+    </div>
+    ${banners}
+    <div class="coach-card">
+      <div class="ava">${coachSvg(coach)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="coach-bubble">💬 ${esc(coachGreeting(kid))}</div>
+        <button class="btn" onclick="openCall()">🎤 לדבר עם ${esc(coach.name)}</button>
+      </div>
+    </div>
+    <div class="glance">${glance}</div>
+    ${streak>0||badges.length?`
+    <div class="streak">
+      ${streak>0?`<b>🔥 ${streak} ${streak===1?'יום':'ימים'} של דיווח רצוף</b>`:''}
+      ${badges.map(b=>`<span class="badge-chip">${b}</span>`).join('')}
+    </div>`:''}
+    <button class="btn secondary block" onclick="setView('today')">🍽️ ליומן המלא של היום</button>
+  </div>`;
+}
+
+/* --- מסך "היום שלי" — רישום ידני מלא --- */
+function renderToday(){
+  const kid=kidById(currentUserId);
+  const dayKey=todayKey();
+  const day=getDay(currentUserId,dayKey,true);
+  const cheat=isFriday();
+  const late=after19();
+  const ev=!!day.event;
+
+  let banners='';
+  if(cheat) banners+=`<div class="banner cheat">🎉 יום שישי — יום צ׳יט! היום הכל מותר 😎</div>`;
+  if(ev && !cheat) banners+=`<div class="banner info">🎂 יום אירוע: בצהריים אוכלים את ארוחת הערב (חלבון), ובערב — האירוע!</div>`;
+  if(late && !cheat) banners+=`<div class="banner warn">🚫 השעה אחרי 19:00 — לא אוכלים יותר היום!</div>`;
+
+  const mealsHtml = MEALS.map(m=>{
+    const isEventLunch = ev && m.key==='lunch' && !cheat;
+    const isEventDinner = ev && m.key==='dinner' && !cheat;
+    const meal=getMeal(day,m.key,false)||{water:0,items:[]};
+    const items=(meal.items||[]).filter(i=>!i.del);
+    const title = isEventLunch ? 'ארוחת צהריים 🎂 (אוכלים בה את ארוחת הערב)' :
+                  isEventDinner ? 'ערב — האירוע 🎉' : m.name;
+    const hint = isEventLunch ? 'יום אירוע: בצהריים אוכלים חלבון כמו בערב — ביצים / טונה / סלט' :
+                 isEventDinner ? 'בתיאבון באירוע! מחר חוזרים לתפריט 💪' : m.hint;
+    const itemsHtml = items.map(it=>{
+      const cls = it.status==='ok'?'ok': it.status==='cheat'?'cheat':'bad';
+      const mark = it.status==='ok'?'✓': it.status==='cheat'?'🎉':'✗';
+      return `<div class="fooditem ${cls}">
+        <span class="mark">${mark}</span>
+        <span>${esc(it.text)}${it.why?` <span class="why">· ${esc(it.why)}</span>`:''}</span>
+        <button class="del" onclick="delItem('${m.key}','${it.id}')" title="מחיקה">🗑</button>
+      </div>`;
+    }).join('');
+    const chipList = isEventLunch ? MEALS.find(mm=>mm.key==='dinner').chips : m.chips;
+    const chips = chipList.map(c=>
+      `<span class="chip" onclick="addFood('${m.key}','${esc(c)}')">+ ${esc(c)}</span>`).join('');
+    return `
+    <div class="meal">
+      <div class="meal-head">
+        <div class="meal-title">${m.emoji} ${title}</div>
+        ${items.length?'<span class="badge">דווח ✓</span>':''}
+      </div>
+      <div class="meal-hint">${hint}</div>
+      <div class="water">
+        💧 מים לפני האוכל:
+        <button class="cup ${meal.water>=1?'on':''}" onclick="setWater('${m.key}',${meal.water>=1?0:1})">🥤</button>
+        <button class="cup ${meal.water>=2?'on':''}" onclick="setWater('${m.key}',${meal.water>=2?1:2})">🥤</button>
+        <span class="muted" style="font-size:.66rem">(עדיף 2 כוסות)</span>
+      </div>
+      ${itemsHtml}
+      <div class="addrow">
+        <input id="inp-${m.key}" placeholder="מה אכלת? (למשל: חביתה ופיתה)" onkeydown="if(event.key==='Enter')addFromInput('${m.key}')" />
+        <button class="btn small" onclick="addFromInput('${m.key}')">הוספה</button>
+      </div>
+      <div class="chips">${chips}</div>
+    </div>`;
+  }).join('');
+
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar">
+      <div>
+        <h1>🍽️ היום שלי</h1>
+        <p class="muted">${hebDate()}</p>
+      </div>
+      <span class="badge">${esc(kid.name)} ${kid.emoji||''}</span>
+    </div>
+    <button class="btn huge block" style="margin-bottom:14px" onclick="openCall()">🎤 ספרו לי מה אכלתם — בקול!</button>
+    ${banners}
+    <label class="card" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <input type="checkbox" style="width:22px;height:22px;flex-shrink:0" ${ev?'checked':''} onchange="toggleEvent(this.checked)" />
+      <div><b>🎂 יש היום אירוע / יום הולדת</b><div class="muted">אם מסמנים — בצהריים אוכלים את ארוחת הערב</div></div>
+    </label>
+    ${mealsHtml}
+  </div>`;
+}
+
+function toggleEvent(on){
+  const day=getDay(currentUserId,todayKey(),true);
+  day.event=on; day.eventTs=Date.now();
+  queueSync(); render();
+}
+function addFromInput(mealKey){
+  const inp=document.getElementById('inp-'+mealKey);
+  addFood(mealKey, inp.value);
+  inp.value='';
+}
+function addFood(mealKey,text){
+  text=norm(text);
+  if(!text) return null;
+  const day=getDay(currentUserId,todayKey(),true);
+  const meal=getMeal(day,mealKey,true);
+  const res=checkFood(mealKey,text,{
+    cheat:isFriday(),
+    late: mealKey==='dinner' && after19(),
+    eventLunch: !!day.event,
+  });
+  meal.items.push({id:uid(), text, ts:Date.now(), status:res.status, why:res.why});
+  queueSync(); render();
+  return res;
+}
+function delItem(mealKey,id){
+  const day=getDay(currentUserId,todayKey(),true);
+  const meal=getMeal(day,mealKey,true);
+  const it=(meal.items||[]).find(i=>i.id===id);
+  if(it){ it.del=true; it.ts=Date.now(); }
+  queueSync(); render();
+}
+function setWater(mealKey,n){
+  const day=getDay(currentUserId,todayKey(),true);
+  const meal=getMeal(day,mealKey,true);
+  meal.water=n; meal.waterTs=Date.now();
+  queueSync(); render();
+}
+
+/* --- מסך שקילה --- */
+function renderWeight(){
+  const kid=kidById(currentUserId);
+  const list=weightList(currentUserId);
+  const wk=weekKey();
+  const thisWeek=DATA.weights?.[currentUserId]?.[wk];
+  const msg = thisWeek && !thisWeek.del
+    ? `<div class="banner info">✅ נשקלת השבוע (${thisWeek.kg} ק״ג). שקילה הבאה — שבוע הבא.</div>`
+    : `<div class="banner weigh">⚖️ שקילה שבועית — עולים על המשקל ורושמים!</div>`;
+  const rows=[...list].reverse().slice(0,12).map(e=>
+    `<div class="weightrow"><span>${hebDateShort(e.date)}</span><b>${e.kg} ק״ג</b></div>`).join('');
+  const prog=progressInfo(kid);
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar">
+      <h1>⚖️ שקילה — ${esc(kid.name)}</h1>
+      <span class="badge">פעם בשבוע</span>
+    </div>
+    ${msg}
+    ${prog?`<div class="card"><h3 style="margin-bottom:10px">🎯 הדרך ליעד</h3>${progressBarHtml(prog)}</div>`:''}
+    <div class="card">
+      <div class="row">
+        <input id="wkg" type="number" step="0.1" inputmode="decimal" placeholder="משקל בק״ג" />
+        <button class="btn" onclick="saveWeight()">שמירה</button>
+      </div>
+      <p class="muted" style="margin-top:8px">אם רושמים שוב באותו שבוע — המשקל מתעדכן. אפשר גם פשוט להגיד לתזונאית 🎤</p>
+    </div>
+    ${list.length?`<div class="card"><h3 style="margin-bottom:8px">📉 הגרף שלי</h3>${weightChart(list)}</div>`:''}
+    ${rows?`<div class="card"><h3 style="margin-bottom:6px">ההיסטוריה</h3>${rows}</div>`:''}
+    <div class="card row" style="justify-content:space-between">
+      <div><b>📏 גובה: ${kid.height||'—'} ס״מ</b><div class="muted">🎯 יעד: ${kid.targetKg||'—'} ק״ג</div></div>
+      <button class="btn small secondary" onclick="setView('profile')">✏️ עדכון פרטים</button>
+    </div>
+  </div>`;
+}
+function saveWeight(){
+  const v=parseFloat(document.getElementById('wkg').value);
+  if(!v || v<=0 || v>250){ alert('נא להזין משקל תקין בק״ג'); return; }
+  DATA.weights[currentUserId]=DATA.weights[currentUserId]||{};
+  DATA.weights[currentUserId][weekKey()]={kg:v, date:todayKey(), ts:Date.now()};
+  queueSync(); render();
+}
+function weightChart(list){
+  const pts=list.slice(-10);
+  if(pts.length<2) return '<p class="muted">אחרי עוד שקילה יופיע כאן גרף 📈</p>';
+  const kgs=pts.map(p=>p.kg);
+  const min=Math.min(...kgs), max=Math.max(...kgs);
+  const pad=(max-min)*0.2||1;
+  const lo=min-pad, hi=max+pad;
+  const W=300,H=120;
+  const xy=pts.map((p,i)=>{
+    const x=10+(W-20)*i/(pts.length-1);
+    const y=H-10-(H-20)*((p.kg-lo)/(hi-lo));
+    return [x,y];
+  });
+  const line=xy.map(p=>p.join(',')).join(' ');
+  const dots=xy.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#16a34a"/><text x="${p[0]}" y="${p[1]-8}" font-size="9" text-anchor="middle" fill="#166534" font-weight="700">${pts[i].kg}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}"><polyline points="${line}" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>`;
+}
+
+/* --- חוקים --- */
+function renderRules(){
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar"><h1>📜 החוקים שלנו</h1></div>
+    <div class="card">
+      ${RULES.map(r=>`<div class="rule"><span class="ic">${r[0]}</span><span>${r[1]}</span></div>`).join('')}
+    </div>
+    <div class="card center" style="background:var(--green-soft)">
+      <b>💪 שומרים על החוקים — מצליחים ביחד!</b>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   התזונאית הווירטואלית — דמות, קול, ושיחה חיה
+   ================================================================ */
+
+const COACHES = [
+  {id:'noa', name:'נועה', gender:'f',
+   skin:'#f0c6a0', cheek:'#e6a98a', hair:'#6b4423', hairStyle:'long',
+   iris:'#4a7c59', shirt:'#16a34a', bg1:'#e7f8ec', bg2:'#cdeed8'},
+  {id:'dani', name:'דני', gender:'m',
+   skin:'#e3b088', cheek:'#d19468', hair:'#2f2a26', hairStyle:'short',
+   iris:'#5a4632', shirt:'#0ea5e9', bg1:'#e2f1f8', bg2:'#c8e2ef'},
+];
+function coachById(id){ return COACHES.find(c=>c.id===id) || COACHES[0]; }
+
+/* דמות אנושית מאוירת (SVG) עם עיניים שממצמצות ופה שזז בזמן דיבור */
+function coachSvg(t){
+  const crown = `<path d="M49 78 Q49 28 100 26 Q151 28 151 78 Q151 56 128 54 Q100 49 72 54 Q49 56 49 78 Z" fill="${t.hair}"/>`;
+  const backHair = t.hairStyle === 'long' ? `
+    <path d="M46 66 Q32 130 50 176 Q38 112 60 74 Z" fill="${t.hair}"/>
+    <path d="M154 66 Q168 130 150 176 Q162 112 140 74 Z" fill="${t.hair}"/>
+    <path d="M48 70 Q44 120 58 150 Q50 104 62 78 Z" fill="${t.hair}" opacity="0.9"/>
+    <path d="M152 70 Q156 120 142 150 Q150 104 138 78 Z" fill="${t.hair}" opacity="0.9"/>` : '';
+  return `
+  <svg viewBox="0 0 200 210" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <radialGradient id="cbg-${t.id}" cx="50%" cy="38%" r="80%">
+        <stop offset="0%" stop-color="${t.bg1}"/><stop offset="100%" stop-color="${t.bg2}"/>
+      </radialGradient>
+    </defs>
+    <rect x="0" y="0" width="200" height="210" fill="url(#cbg-${t.id})"/>
+    <path d="M28 210 Q34 158 74 150 Q100 168 126 150 Q166 158 172 210 Z" fill="${t.shirt}"/>
+    <path d="M86 150 Q100 166 114 150 L110 138 L90 138 Z" fill="${t.skin}"/>
+    ${backHair}
+    <rect x="88" y="120" width="24" height="30" rx="10" fill="${t.skin}"/>
+    <ellipse cx="52" cy="98" rx="9" ry="13" fill="${t.skin}"/>
+    <ellipse cx="148" cy="98" rx="9" ry="13" fill="${t.skin}"/>
+    <g class="cv-head">
+      <ellipse cx="100" cy="94" rx="50" ry="56" fill="${t.skin}"/>
+      <ellipse cx="72" cy="108" rx="10" ry="7" fill="${t.cheek}" opacity="0.4"/>
+      <ellipse cx="128" cy="108" rx="10" ry="7" fill="${t.cheek}" opacity="0.4"/>
+      ${crown}
+      <rect class="cv-brow" x="60" y="74" width="26" height="6" rx="3" fill="${t.hair}"/>
+      <rect class="cv-brow" x="114" y="74" width="26" height="6" rx="3" fill="${t.hair}"/>
+      <g class="cv-eye">
+        <ellipse cx="74" cy="90" rx="12" ry="8" fill="#fff"/>
+        <circle class="cv-iris" cx="74" cy="90" r="5.2" fill="${t.iris}"/>
+        <circle cx="74" cy="90" r="2.4" fill="#20232c"/>
+        <circle cx="76" cy="88" r="1.1" fill="#fff"/>
+      </g>
+      <g class="cv-eye">
+        <ellipse cx="126" cy="90" rx="12" ry="8" fill="#fff"/>
+        <circle class="cv-iris" cx="126" cy="90" r="5.2" fill="${t.iris}"/>
+        <circle cx="126" cy="90" r="2.4" fill="#20232c"/>
+        <circle cx="128" cy="88" r="1.1" fill="#fff"/>
+      </g>
+      <path d="M100 96 Q96 108 92 112 Q100 116 108 112 Q104 108 100 96 Z" fill="${t.cheek}" opacity="0.5"/>
+      <g>
+        <ellipse cx="100" cy="126" rx="17" ry="8" fill="${t.cheek}" opacity="0.55"/>
+        <ellipse class="cv-mouth" cx="100" cy="126" rx="13" ry="2.5" fill="#7a3b3b"/>
+        <path class="cv-smile" d="M86 124 Q100 134 114 124" stroke="#7a3b3b" stroke-width="3" fill="none" stroke-linecap="round"/>
+      </g>
+    </g>
+  </svg>`;
+}
+function makeAvatar(t){
+  const node=document.createElement('div');
+  node.className='ava';
+  node.innerHTML=coachSvg(t);
+  const mouth=node.querySelector('.cv-mouth');
+  const smile=node.querySelector('.cv-smile');
+  const irises=node.querySelectorAll('.cv-iris');
+  const eyes=node.querySelectorAll('.cv-eye');
+  const blink=setInterval(()=>{
+    eyes.forEach(e=>e.style.transform='scaleY(0.1)');
+    setTimeout(()=>eyes.forEach(e=>e.style.transform=''),130);
+  }, 3200+Math.random()*2200);
+  function setState(state){
+    let dx=0,dy=0;
+    if(state==='thinking') dy=-2.2;
+    if(state==='listening') dx=1.6;
+    irises.forEach(i=>i.setAttribute('transform',`translate(${dx} ${dy})`));
+    if(state!=='speaking') setMouth(0);
+  }
+  function setMouth(v){
+    if(v>0.06){
+      smile.style.opacity='0';
+      mouth.setAttribute('ry', String(2+v*9));
+      mouth.setAttribute('rx', String(13-v*3));
+    }else{
+      smile.style.opacity='1';
+      mouth.setAttribute('ry','2.5');
+      mouth.setAttribute('rx','13');
+    }
+  }
+  setState('idle');
+  return {node,setState,setMouth,destroy(){clearInterval(blink);}};
+}
+
+/* --- דיבור והקשבה בעברית (Web Speech API — חינם, בדפדפן) --- */
+let hebVoices=[];
+function loadHebVoices(){
+  if(!('speechSynthesis' in window)) return;
+  hebVoices=speechSynthesis.getVoices().filter(v=>(v.lang||'').toLowerCase().startsWith('he')||/עברית|hebrew|carmit/i.test(v.name));
+}
+if('speechSynthesis' in window){
+  loadHebVoices();
+  speechSynthesis.onvoiceschanged=loadHebVoices;
+}
+function hebVoice(){
+  return hebVoices.find(v=>/google/i.test(v.name)) || hebVoices[0] || null;
+}
+function ttsSupported(){ return 'speechSynthesis' in window; }
+function speakHe(text,{onend=null,onboundary=null}={}){
+  if(!ttsSupported()) return false;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='he-IL';
+  const v=hebVoice();
+  if(v) u.voice=v;
+  u.rate=1;
+  if(onend) u.onend=onend;
+  if(onboundary) u.onboundary=onboundary;
+  speechSynthesis.speak(u);
+  return true;
+}
+function stopSpeaking(){ if(ttsSupported()) speechSynthesis.cancel(); }
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const sttOK = !!SR;
+
+/* --- הקשר שנשלח לתזונאית: רק הנתונים של הילד הזה --- */
+function mealsText(kidId, dayKey){
+  const parts=[];
+  MEALS.forEach(m=>{
+    const items=mealItems(kidId,dayKey,m.key);
+    if(items.length) parts.push(m.name+': '+items.map(i=>i.text+(i.status==='bad'?' (לא בתפריט)':'')).join(', '));
+  });
+  const w=dayWater(kidId,dayKey);
+  if(w) parts.push('מים: '+w+' כוסות');
+  return parts.join(' | ');
+}
+function frequentFoods(kidId){
+  const count={};
+  for(let i=0;i<14;i++){
+    const dk=todayKey(daysAgo(i));
+    MEALS.forEach(m=>mealItems(kidId,dk,m.key).forEach(it=>{
+      const t=norm(it.text);
+      count[t]=(count[t]||0)+1;
+    }));
+  }
+  return Object.entries(count).filter(([,c])=>c>=3).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t])=>t);
+}
+function coachContext(kid){
+  const dk=todayKey();
+  const lw=lastWeight(kid.id);
+  const wl=weightList(kid.id).slice(-4);
+  let trend='';
+  if(wl.length>=2){
+    const d=+(wl[wl.length-1].kg-wl[0].kg).toFixed(1);
+    trend = d<-0.2?('ירידה של '+Math.abs(d)+' ק"ג'):d>0.2?('עלייה של '+d+' ק"ג'):'יציב';
+  }
+  const recent=[];
+  for(let i=1;i<=3;i++){
+    const rk=todayKey(daysAgo(i));
+    const t=mealsText(kid.id,rk);
+    if(t) recent.push(hebDateShort(rk)+': '+t);
+  }
+  const chat=getChat(kid.id,false);
+  const day=DATA.logs?.[kid.id]?.[dk];
+  return {
+    coachName: coachById(kid.coach).name,
+    name: kid.name,
+    age: kidAge(kid),
+    gender: kid.gender||null,
+    height: kid.height||null,
+    weightNow: lw?lw.kg:null,
+    weightTrend: trend||null,
+    targetKg: kid.targetKg||null,
+    todayMeals: mealsText(kid.id,dk)||null,
+    recentMeals: recent.join(' || ')||null,
+    favoriteFoods: frequentFoods(kid.id).join(', ')||null,
+    parentGoals: kid.pgoals||null,
+    parentNotes: kid.pnotes||null,
+    facts: (chat?.facts||[]).filter(f=>!f.del).map(f=>f.text),
+    timeOfDay: timeOfDayHe(),
+    isCheatDay: isFriday(),
+    isEventDay: !!(day?.event),
+  };
+}
+async function postCoach(body){
+  const r=await fetch(COACH_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok) throw new Error('coach_http_'+r.status);
+  const data=await r.json();
+  if(data.error) throw new Error(data.error);
+  return data;
+}
+
+/* --- שיחת הווידאו --- */
+let call=null;
+
+function openCall(){
+  if(call) return;
+  const kid=kidById(currentUserId);
+  if(!kid) return;
+  const coach=coachById(kid.coach);
+  const avatar=makeAvatar(coach);
+  const chat=getChat(kid.id,true);
+
+  call={
+    kid, coach, avatar,
+    messages:[], start:Date.now(), destroyed:false,
+    muted:false, typedOnly:!sttOK, pendingFinish:null, rec:null, recRole:null,
+    timers:[], mouthRAF:null, mouthBoost:0, emptyCount:0, timerInt:null,
+    bargeIn:sttOK, barged:false, bargeConflict:false,
+    saying:false, sayingText:'', sayFinish:null, sayPoll:null, carryText:null,
+    pendingActions:null, userTurns:0,
+  };
+
+  const overlay=document.createElement('div');
+  overlay.className='call'; overlay.id='callOverlay';
+  const capCoach=h(`<div class="cap-coach"></div>`).firstChild;
+  const capUser=h(`<div class="cap-user"></div>`).firstChild;
+  const statusEl=h(`<div class="call-status">מתחבר…</div>`).firstChild;
+  const timerEl=h(`<span class="call-timer">0:00</span>`).firstChild;
+  const ring=h(`<div class="speaking-ring"></div>`).firstChild;
+  const pendingBox=h(`<div></div>`).firstChild;
+
+  const tile=document.createElement('div');
+  tile.className='tile coach-tile';
+  tile.appendChild(ring);
+  tile.appendChild(avatar.node);
+  tile.appendChild(h(`<div class="tile-name">${esc(coach.name)} · תזונאית${coach.gender==='m'?' 🧑‍⚕️':' 👩‍⚕️'}</div>`).firstChild);
+
+  const input=h(`<input class="call-input" placeholder="אפשר גם לכתוב כאן…" autocomplete="off" />`).firstChild;
+  const typedRow=document.createElement('div');
+  typedRow.className='typed-row'+(call.typedOnly?' open':'');
+  const sendBtn=h(`<button class="btn small">שלח</button>`).firstChild;
+  typedRow.appendChild(input); typedRow.appendChild(sendBtn);
+  const sendTyped=()=>{
+    const v=input.value.trim();
+    if(!v) return;
+    input.value=''; capUser.textContent=v;
+    if(call && call.pendingFinish) call.pendingFinish(v);
+  };
+  sendBtn.onclick=sendTyped;
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter') sendTyped(); });
+
+  const micBtn=h(`<button class="call-btn mic" title="השתקה">🎤</button>`).firstChild;
+  micBtn.onclick=toggleMic;
+  const controls=document.createElement('div');
+  controls.className='call-controls';
+  if(sttOK) controls.appendChild(micBtn);
+  const kbBtn=h(`<button class="call-btn" title="מקלדת">⌨️</button>`).firstChild;
+  kbBtn.onclick=()=>typedRow.classList.toggle('open');
+  controls.appendChild(kbBtn);
+  const endBtn=h(`<button class="call-btn end" title="סיום שיחה">✕</button>`).firstChild;
+  endBtn.onclick=endCall;
+  controls.appendChild(endBtn);
+
+  const top=document.createElement('div');
+  top.className='call-top';
+  top.appendChild(h(`<div class="call-who">${esc(coach.name)} <span class="live-dot"></span></div>`).firstChild);
+  top.firstChild.appendChild(timerEl);
+  top.appendChild(statusEl);
+
+  const stage=document.createElement('div');
+  stage.className='call-stage';
+  stage.appendChild(tile);
+
+  const caps=document.createElement('div');
+  caps.className='captions';
+  caps.appendChild(capCoach); caps.appendChild(capUser);
+
+  overlay.appendChild(top);
+  overlay.appendChild(stage);
+  overlay.appendChild(pendingBox);
+  overlay.appendChild(caps);
+  overlay.appendChild(typedRow);
+  overlay.appendChild(controls);
+  document.body.appendChild(overlay);
+
+  call.ui={overlay,capCoach,capUser,statusEl,tile,micBtn,input,typedRow,pendingBox};
+  call.timerInt=setInterval(()=>{
+    if(!call) return;
+    const s=Math.floor((Date.now()-call.start)/1000);
+    timerEl.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  },1000);
+
+  if(!sttOK && !call.typedOnly) typedRow.classList.add('open');
+
+  // ממשיכים שיחה מהיום, או מתחילים חדשה
+  if(chat.day===todayKey() && (chat.msgs||[]).length){
+    call.messages=(chat.msgs||[]).slice(-14).map(m=>({role:m.r==='u'?'user':'assistant',content:m.t}));
+  }
+  runCoachLoop();
+}
+
+function setCallStatus(text,cls=''){
+  if(!call?.ui) return;
+  call.ui.statusEl.textContent=text;
+  call.ui.statusEl.className='call-status '+cls;
+  call.ui.tile.classList.toggle('is-speaking',cls==='speaking');
+  call.ui.tile.classList.toggle('is-listening',cls==='listening');
+}
+
+function saveChatMsg(role,text){
+  const chat=getChat(currentUserId,true);
+  chat.day=todayKey();
+  chat.msgs=[...(chat.msgs||[]),{r:role,t:text.slice(0,600),ts:Date.now()}].slice(-40);
+  queueSync();
+}
+function addFacts(facts){
+  if(!facts||!facts.length) return;
+  const chat=getChat(currentUserId,true);
+  facts.forEach(f=>{
+    if((chat.facts||[]).some(x=>!x.del&&x.text===f)) return;
+    chat.facts=[...(chat.facts||[]),{id:uid(),text:f,ts:Date.now()}].slice(-30);
+  });
+  queueSync();
+}
+
+async function coachTurn(userText){
+  // פנייה לשרת — שולחת רק את ההקשר של הילד הנוכחי
+  const ctx=coachContext(call.kid);
+  const messages=[...call.messages];
+  if(userText!==null) messages.push({role:'user',content:userText});
+  return postCoach({ctx, messages});
+}
+
+const AFFIRM_RE=/^(כן|קדימה|יאללה|בטח|אוקיי|אוקי|סבבה|אישור|מאשר|מאשרת|תרשמי|תרשום|רשום|רשמי|בבקשה|נכון|כן כן)[!,. ]*/;
+const NEGATE_RE=/^(לא|אל תרשמי|אל תרשום|בטל|בטלי|טעות|רגע)[!,. ]*/;
+
+function describeAction(a){
+  if(a.type==='addMeal') return MEAL_BY_KEY(a.meal).emoji+' '+MEAL_BY_KEY(a.meal).name+': '+a.text;
+  if(a.type==='addWeight') return '⚖️ משקל: '+a.kg+' ק״ג';
+  if(a.type==='setHeight') return '📏 גובה: '+a.cm+' ס״מ';
+  return '';
+}
+function showPending(actions){
+  call.pendingActions=actions;
+  if(!actions||!actions.length){ call.ui.pendingBox.innerHTML=''; return; }
+  call.ui.pendingBox.innerHTML=`
+    <div class="pending fade">
+      <div class="p-title">רוצה שארשום ביומן?</div>
+      ${actions.map(a=>`<div class="p-item">${esc(describeAction(a))}</div>`).join('')}
+      <div class="row">
+        <button class="btn small block" onclick="confirmPending(true)">✓ כן, תרשמי</button>
+        <button class="btn small secondary block" onclick="confirmPending(false)">✗ לא</button>
+      </div>
+    </div>`;
+}
+function applyActions(actions){
+  let saved=0, flagged=0;
+  actions.forEach(a=>{
+    if(a.type==='addMeal'){
+      const res=addFood(a.meal,a.text);
+      if(res){ saved++; if(res.status==='bad') flagged++; }
+    }else if(a.type==='addWeight'){
+      DATA.weights[currentUserId]=DATA.weights[currentUserId]||{};
+      DATA.weights[currentUserId][weekKey()]={kg:a.kg, date:todayKey(), ts:Date.now()};
+      saved++;
+    }else if(a.type==='setHeight'){
+      const kid=kidById(currentUserId);
+      kid.height=a.cm; kid.profileTs=Date.now();
+      saved++;
+    }
+  });
+  queueSync(); render();
+  return {saved,flagged};
+}
+function confirmPending(yes){
+  if(!call||!call.pendingActions) return;
+  const actions=call.pendingActions;
+  showPending(null);
+  if(!yes){
+    sayInCall('בסדר, לא רושמת. ספרו לי שוב מה לתקן.');
+    return;
+  }
+  const {saved,flagged}=applyActions(actions);
+  const ack= flagged>0
+    ? 'רשמתי! שמתי לב שמשהו לא לפי התפריט — לא נורא, מחר מיישרים קו. עוד משהו?'
+    : 'מעולה, רשמתי ביומן! עוד משהו לספר לי?';
+  saveChatMsg('a',ack);
+  call.messages.push({role:'assistant',content:'[נרשם ביומן: '+actions.map(describeAction).join(', ')+'] '+ack});
+  sayInCall(ack);
+  toast('✓ נשמר ביומן ('+saved+')');
+}
+async function sayInCall(text){
+  const res=await say(text);
+  if(call && !call.destroyed && !res.interrupted) listenForTurn();
+}
+
+/* לולאת השיחה הראשית: פתיח מהתזונאית → הקשבה → תשובה → הקשבה… */
+async function runCoachLoop(){
+  setCallStatus('מתחברת…','thinking');
+  call.avatar.setState('thinking');
+  let opener;
+  try{
+    const isNew=call.messages.length===0;
+    const data=await coachTurn(isNew
+      ? '[הילד נכנס עכשיו לשיחה. פתח/י במשפט חם וקצר + שאלה אחת, לפי ההקשר והזיכרונות.]'
+      : '[הילד חזר לשיחה. המשך/כי בקצרה מאיפה שהפסקתם.]');
+    opener=data.say;
+    if(data.actions?.length) showPending(data.actions);
+    addFacts(data.remember);
+  }catch(e){
+    const kid=call.kid;
+    opener='היי '+kid.name+'! איזה כיף שבאת. ספר/י לי — מה אכלת היום?';
+  }
+  if(!call||call.destroyed) return;
+  call.messages.push({role:'assistant',content:opener});
+  saveChatMsg('a',opener);
+  const res=await say(opener);
+  if(!call||call.destroyed) return;
+  if(res.interrupted) markInterrupted(opener,res);
+  mainLoop();
+}
+function markInterrupted(text,res){
+  const last=call.messages[call.messages.length-1];
+  if(last&&last.role==='assistant'){
+    const spoken=text.slice(0,res.spokenChars||0).trim();
+    last.content=(spoken?spoken+' …':'…')+' (הילד קטע כאן)';
+  }
+}
+async function mainLoop(){
+  while(call && !call.destroyed){
+    const userText=await getUserTurn();
+    if(!call||call.destroyed) return;
+    if(!userText||!userText.trim()){
+      call.emptyCount++;
+      if(call.emptyCount>=3){ setCallStatus('מוכנה כשתהיו מוכנים — הקישו 🎤 או כתבו',''); continue; }
+      const nudge=['לא שמעתי טוב — אפשר שוב?','קחו את הזמן, אני מקשיבה 😊','עוד פעם? לא קלטתי'][call.emptyCount-1]||'אפשר שוב?';
+      await say(nudge);
+      continue;
+    }
+    call.emptyCount=0;
+    call.userTurns++;
+    // אישור/ביטול קולי של פעולות ממתינות
+    if(call.pendingActions&&call.pendingActions.length){
+      if(AFFIRM_RE.test(userText.trim())){
+        const rest=userText.trim().replace(AFFIRM_RE,'').trim();
+        confirmPending(true);
+        if(rest.length<4) continue;
+        // יש עוד תוכן אחרי ה"כן" — ממשיכים איתו לשיחה
+        await handleUserText(rest);
+        continue;
+      }
+      if(NEGATE_RE.test(userText.trim())){
+        confirmPending(false);
+        continue;
+      }
+      showPending(null); // דיבר על משהו אחר — מוותרים על ההצעה הישנה
+    }
+    await handleUserText(userText);
+  }
+}
+async function handleUserText(userText){
+  saveChatMsg('u',userText);
+  call.messages.push({role:'user',content:userText});
+  setCallStatus(call.coach.name+' חושבת…','thinking');
+  call.avatar.setState('thinking');
+  let data;
+  try{
+    const ctx=coachContext(call.kid);
+    data=await postCoach({ctx, messages:call.messages});
+  }catch(e){
+    await say('אוי, הקו קצת נתקע. נסו שוב עוד רגע.');
+    return;
+  }
+  if(!call||call.destroyed) return;
+  call.messages.push({role:'assistant',content:data.say});
+  saveChatMsg('a',data.say);
+  addFacts(data.remember);
+  if(data.actions&&data.actions.length) showPending(data.actions);
+  const res=await say(data.say);
+  if(!call||call.destroyed) return;
+  if(res.interrupted) markInterrupted(data.say,res);
+}
+
+/* התזונאית מדברת: כתובית + הנפשת פה + קול, עם אפשרות קטיעה */
+function say(text){
+  if(!call) return Promise.resolve({interrupted:false,spokenChars:0});
+  call.ui.capCoach.textContent=text;
+  call.ui.capUser.textContent='';
+  call.avatar.setState('speaking');
+  setCallStatus(call.coach.name+' מדברת…','speaking');
+  call.sayingText=text; call.saying=true; call.spokenChars=0; call.barged=false;
+  const t0=Date.now();
+  return new Promise(resolve=>{
+    let done=false;
+    const finish=(info={})=>{
+      if(done) return; done=true;
+      call.saying=false; call.sayFinish=null;
+      if(call.sayPoll){ clearInterval(call.sayPoll); call.sayPoll=null; }
+      stopMouth();
+      if(!call.destroyed){
+        call.avatar.setMouth(0);
+        if(!info.interrupted) call.avatar.setState('idle');
+      }
+      if(!info.interrupted && call.recRole==='watch') stopRec();
+      resolve({interrupted:!!info.interrupted, spokenChars:call.spokenChars});
+    };
+    call.sayFinish=finish;
+    startMouth();
+    const est=Math.min(20000, 900+text.length*70);
+    const ok=speakHe(text,{
+      onend:()=>finish(),
+      onboundary:(ev)=>{
+        if(!call) return;
+        call.mouthBoost=1;
+        if(ev&&typeof ev.charIndex==='number') call.spokenChars=ev.charIndex;
+      },
+    });
+    if(call.bargeIn && !call.muted && !call.typedOnly) startRecognizer('watch');
+    const silent=!ttsSupported() || !hebVoice();
+    if(!ok||silent){
+      call.timers.push(setTimeout(()=>finish(), Math.min(9000, 500+text.length*45)));
+      return;
+    }
+    let started=false;
+    call.sayPoll=setInterval(()=>{
+      if(done) return;
+      const sp=speechSynthesis.speaking;
+      if(sp) started=true;
+      if(started&&!sp){
+        // הדיבור מת מוקדם מדי אחרי שהמזהה עלה — במכשירים מסוימים המיקרופון גונב את האודיו
+        const elapsed=Date.now()-t0;
+        if(!call.barged && call.bargeIn && call.recRole==='watch' && elapsed<est*0.35 && !call.bargeConflict){
+          call.bargeConflict=true;
+          call.bargeIn=false;
+          stopRec();
+          clearInterval(call.sayPoll); call.sayPoll=null;
+          done=true; call.saying=false; call.sayFinish=null; stopMouth();
+          say(text).then(resolve);
+          return;
+        }
+        finish();
+      }
+      else if(Date.now()-t0>est+7000) finish();
+    },150);
+  });
+}
+function startMouth(){
+  const t0=performance.now();
+  const loop=(t)=>{
+    if(!call||call.destroyed) return;
+    const speaking=ttsSupported()?speechSynthesis.speaking:false;
+    const active=speaking||!ttsSupported()||!hebVoice();
+    let v=0;
+    if(active&&call.saying){
+      v=Math.min(1,(0.35+0.4*Math.abs(Math.sin((t-t0)/95)))*(0.6+Math.random()*0.6)+call.mouthBoost);
+      call.mouthBoost*=0.7;
+    }
+    call.avatar.setMouth(call.saying?v:0);
+    call.mouthRAF=requestAnimationFrame(loop);
+  };
+  call.mouthRAF=requestAnimationFrame(loop);
+}
+function stopMouth(){ if(call?.mouthRAF) cancelAnimationFrame(call.mouthRAF); if(call) call.mouthRAF=null; }
+
+function getUserTurn(){
+  return new Promise(resolve=>{
+    call.pendingFinish=(text)=>{
+      call.pendingFinish=null;
+      stopRec();
+      resolve(text);
+    };
+    if(call.carryText!=null){
+      const t=call.carryText; call.carryText=null;
+      call.pendingFinish(t); return;
+    }
+    if(call.barged){ call.barged=false; return; } // המזהה כבר מקשיב מהקטיעה
+    if(sttOK && !call.muted && !call.typedOnly) startRecognizer('listen');
+    else setCallStatus('כתבו תשובה ושלחו 👇','');
+  });
+}
+function listenForTurn(){
+  if(call && call.pendingFinish && sttOK && !call.muted && !call.typedOnly) startRecognizer('listen');
+}
+const hebWordsOf=s=>(s||'').replace(/[^֐-׿' ]+/g,' ').split(/\s+/).filter(Boolean);
+function shouldIgnoreWhileSpeaking(heard,spoken){
+  const hw=hebWordsOf(heard);
+  if(hw.length<2) return true;
+  const set=new Set(hebWordsOf(spoken));
+  const overlap=hw.filter(w=>set.has(w)).length/hw.length;
+  return overlap>=0.6;
+}
+function startRecognizer(role){
+  if(!call||call.destroyed||!sttOK) return;
+  stopRec();
+  const rec=new SR();
+  call.rec=rec; call.recRole=role;
+  rec.lang='he-IL'; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
+  if(role==='listen'){
+    call.avatar.setState('listening');
+    setCallStatus('מקשיבה לך… דברו עכשיו 🎙️','listening');
+    call.ui.capUser.textContent='';
+  }
+  let finalText='';
+  rec.onresult=(e)=>{
+    if(!call||call.rec!==rec) return;
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const tr=e.results[i][0].transcript;
+      if(e.results[i].isFinal) finalText+=tr+' '; else interim+=tr;
+    }
+    const text=(finalText+interim).trim();
+    if(call.recRole==='watch'){
+      if(shouldIgnoreWhileSpeaking(text,call.sayingText)) return;
+      bargeIn();
+    }
+    call.ui.capUser.textContent=text;
+  };
+  rec.onerror=()=>{};
+  rec.onend=()=>{
+    if(!call||call.rec!==rec) return;
+    call.rec=null;
+    const wasRole=call.recRole;
+    if(call.destroyed||call.muted) return;
+    if(wasRole==='watch'){
+      if(call.saying) call.timers.push(setTimeout(()=>{
+        if(call?.saying && !call.rec && call.bargeIn) startRecognizer('watch');
+      },150));
+      return;
+    }
+    const t=finalText.trim();
+    if(call.pendingFinish) call.pendingFinish(t);
+    else call.carryText=t;
+  };
+  try{ rec.start(); }catch{ if(role==='listen'&&call.pendingFinish) call.pendingFinish(''); }
+}
+function bargeIn(){
+  if(!call||call.recRole!=='watch') return;
+  call.recRole='listen';
+  call.barged=true;
+  stopSpeaking();
+  if(call.sayFinish) call.sayFinish({interrupted:true});
+  call.avatar.setState('listening');
+  setCallStatus('קטעת — מקשיבה לך 🎙️','listening');
+}
+function stopRec(){
+  if(!call) return;
+  const rec=call.rec;
+  call.rec=null; call.recRole=null;
+  try{ rec?.abort(); }catch{}
+}
+function toggleMic(){
+  if(!call) return;
+  call.muted=!call.muted;
+  call.ui.micBtn.classList.toggle('muted',call.muted);
+  call.ui.micBtn.textContent=call.muted?'🔇':'🎤';
+  if(call.muted){
+    stopRec();
+    call.barged=false;
+    call.avatar.setState('idle');
+    setCallStatus('מושהה — הקישו 🎤 להמשך','');
+  }else if(call.pendingFinish && sttOK && !call.typedOnly){
+    startRecognizer('listen');
+  }else if(call.saying && call.bargeIn){
+    startRecognizer('watch');
+  }
+}
+function endCall(){
+  if(!call) return;
+  const turns=call.userTurns;
+  call.destroyed=true;
+  stopSpeaking();
+  stopRec();
+  stopMouth();
+  if(call.sayPoll) clearInterval(call.sayPoll);
+  call.timers.forEach(clearTimeout);
+  if(call.timerInt) clearInterval(call.timerInt);
+  call.avatar.destroy();
+  call.ui.overlay.remove();
+  call=null;
+  if(turns>0) toast('👋 השיחה נשמרה — אפשר להמשיך אותה מתי שרוצים');
+  render();
+}
+
+/* ================================================================
+   פאנל הורה — צפייה בלבד + הגדרות
+   ================================================================ */
+let openKid=null;
+let parentTab='today';
+function weekInsights(kidId){
+  let repDays=0, veg=0, fruit=0, waterSum=0, late=0, noBreak=0;
+  for(let i=0;i<7;i++){
+    const dk=todayKey(daysAgo(i));
+    if(dayReported(kidId,dk)) repDays++;
+    else continue;
+    let hadVeg=false;
+    MEALS.forEach(m=>mealItems(kidId,dk,m.key).forEach(it=>{
+      if(hasAny(it.text,VEGGIES)) hadVeg=true;
+      if(m.key==='snack'&&hasAny(it.text,FRUITS)) fruit++;
+      if(m.key==='dinner'&&it.status==='bad'&&/19:00/.test(it.why||'')) late++;
+    }));
+    if(hadVeg) veg++;
+    waterSum+=dayWater(kidId,dk);
+    if(mealItems(kidId,dk,'breakfast').length===0) noBreak++;
+  }
+  const out=[];
+  if(repDays>=5) out.push({good:true,text:'📝 דיווח ב-'+repDays+' מתוך 7 ימים'});
+  else out.push({good:false,text:'📝 דיווח רק ב-'+repDays+' מתוך 7 ימים'});
+  if(veg>=4) out.push({good:true,text:'🥒 ירקות ב-'+veg+' ימים'});
+  else out.push({good:false,text:'🥒 מעט ירקות השבוע ('+veg+' ימים)'});
+  if(fruit>=3) out.push({good:true,text:'🍎 '+fruit+' פירות בביניים'});
+  else out.push({good:false,text:'🍎 מעט פירות ('+fruit+')'});
+  if(repDays) out.push({good:(waterSum/repDays)>=4,text:'💧 ממוצע '+(waterSum/Math.max(1,repDays)).toFixed(1)+' כוסות מים ביום'});
+  if(late>0) out.push({good:false,text:'🌙 אכילה אחרי 19:00 ('+late+')'});
+  if(noBreak>=3) out.push({good:false,text:'🍳 דילוגים על ארוחת בוקר ('+noBreak+' ימים)'});
+  return out;
+}
+function mealsHtmlForDay(kidId,dk){
+  const day=DATA.logs?.[kidId]?.[dk];
+  const wkEntry=Object.values(DATA.weights?.[kidId]||{}).find(e=>!e.del&&e.date===dk);
+  let inner='';
+  if(day?.event) inner+=`<div class="muted" style="margin-bottom:4px">🎂 יום אירוע — ארוחת הערב נאכלה בצהריים</div>`;
+  MEALS.forEach(m=>{
+    const meal=day?.meals?.[m.key];
+    const items=(meal?.items||[]).filter(i=>!i.del);
+    if(!items.length && !(meal?.water)) return;
+    const water=meal?.water?` <span class="muted">💧×${meal.water}</span>`:'';
+    inner+=`<div style="margin:5px 0 2px"><b style="font-size:.82rem">${m.emoji} ${m.name}</b>${water}</div>`;
+    inner+=items.map(it=>{
+      const cls=it.status==='ok'?'ok':it.status==='cheat'?'cheat':'bad';
+      const mark=it.status==='ok'?'✓':it.status==='cheat'?'🎉':'✗';
+      return `<div class="fooditem mini ${cls}"><span class="mark">${mark}</span><span>${esc(it.text)}${it.why?` <span class="why">· ${esc(it.why)}</span>`:''}</span></div>`;
+    }).join('');
+  });
+  if(wkEntry) inner+=`<div class="fooditem mini ok"><span class="mark">⚖️</span><span>שקילה: <b>${wkEntry.kg} ק״ג</b></span></div>`;
+  return inner;
+}
+function renderParent(){
+  const kids=DATA.kids||[];
+  const shareLink=location.origin+location.pathname+'#family='+familyId;
+  if(openKid && kidById(openKid)){ renderKidDetail(kidById(openKid)); return; }
+  const dk=todayKey();
+  const kidsHtml=kids.map(k=>{
+    const rep=dayReported(k.id,dk);
+    const lw=lastWeight(k.id);
+    const streak=reportStreak(k.id);
+    return `
+    <div class="kidcard" onclick="openKidDetail('${k.id}')">
+      <div class="kid-ava">${k.emoji||'🙂'}</div>
+      <div style="flex:1;min-width:0">
+        <b style="font-size:1rem">${esc(k.name)}</b>
+        <div class="${rep?'st-ok':'st-no'}">${rep?'✓ דיווח היום':'עוד לא דיווח היום'}</div>
+        <div class="muted">${lw?('משקל: '+lw.kg+' ק״ג'):'אין שקילה'}${streak>0?' · 🔥 '+streak+' ימים':''}</div>
+      </div>
+      <span style="font-size:20px;color:var(--muted)">‹</span>
+    </div>`;
+  }).join('');
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar">
+      <div><h1>👨‍👩‍👧 פאנל הורה</h1><p class="muted">${esc(DATA.familyName)} · צפייה בלבד</p></div>
+      <button class="btn small secondary" onclick="logout()">🔄 יציאה</button>
+    </div>
+    ${kidsHtml||'<div class="card center muted">עדיין אין ילדים — מוסיפים למטה 👇</div>'}
+    <div class="card">
+      <h3 style="margin-bottom:8px">➕ הוספת ילד/ה</h3>
+      <div class="row">
+        <input id="newKidName" placeholder="שם הילד/ה" />
+        <button class="btn" onclick="addKid()">הוספה</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">🔗 חיבור מכשירים</h3>
+      <p class="muted" style="margin-bottom:10px">שולחים לכל ילד את הקישור — הוא נכנס, בוחר את השם שלו ומקליד את הקוד האישי שלו:</p>
+      <input readonly value="${shareLink}" style="direction:ltr;font-size:12px" onclick="this.select()" />
+      <div class="row" style="margin-top:10px">
+        <a class="btn small block" style="text-decoration:none" href="https://wa.me/?text=${encodeURIComponent('הצטרפו ליומן האוכל המשפחתי שלנו! 🥗\n'+shareLink)}" target="_blank">📲 שיתוף בוואטסאפ</a>
+        <button class="btn small secondary" onclick="copyLink('${shareLink}')">העתקה</button>
+      </div>
+    </div>
+    ${installBanner()}
+    <div class="card">
+      <h3 style="margin-bottom:8px">🔑 קוד הורה</h3>
+      <p class="muted">הקוד הנוכחי: <span class="codechip">${DATA.parent.code}</span></p>
+      <button class="btn small secondary" style="margin-top:8px" onclick="resetParentCode()">איפוס קוד הורה</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">📜 החוקים</h3>
+      ${RULES.map(r=>`<div class="rule"><span class="ic">${r[0]}</span><span>${r[1]}</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+function openKidDetail(id){ openKid=id; parentTab='today'; render(); }
+function closeKidDetail(){ openKid=null; render(); }
+function setParentTab(t){ parentTab=t; render(); }
+function renderKidDetail(k){
+  const dk=todayKey();
+  const lw=lastWeight(k.id);
+  const chat=getChat(k.id,false);
+  const facts=(chat?.facts||[]).filter(f=>!f.del);
+  const insights=weekInsights(k.id);
+  const wl=weightList(k.id);
+  const prog=progressInfo(k);
+  const tabs=[
+    ['today','🍽️ היום'],
+    ['week','📅 שבוע'],
+    ['weight','⚖️ משקל'],
+    ['coach','🧠 תזונאית'],
+    ['settings','⚙️ הגדרות'],
+  ];
+  let body='';
+  if(parentTab==='today'){
+    const inner=mealsHtmlForDay(k.id,dk);
+    body=`<div class="card">
+      <h3 style="margin-bottom:6px">מה ${esc(k.name)} רשם היום</h3>
+      ${inner||'<p class="muted">עדיין לא דווח כלום היום.</p>'}
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">🔍 תמונת השבוע</h3>
+      <div>${insights.map(i=>`<span class="insight ${i.good?'good':'gap'}">${i.text}</span>`).join('')}</div>
+    </div>`;
+  }else if(parentTab==='week'){
+    const days=[0,1,2,3,4,5,6].map(n=>todayKey(daysAgo(n)));
+    body='<div class="card">'+days.map(d=>{
+      const inner=mealsHtmlForDay(k.id,d);
+      if(!inner) return '';
+      return `<div class="daybox"><h4>${hebDateShort(d)}</h4>${inner}</div>`;
+    }).join('')+'</div>';
+  }else if(parentTab==='weight'){
+    body=`
+    ${prog?`<div class="card"><h3 style="margin-bottom:10px">🎯 הדרך ליעד</h3>${progressBarHtml(prog)}</div>`:''}
+    <div class="card"><h3 style="margin-bottom:8px">📉 מעקב משקל</h3>${wl.length?weightChart(wl):'<p class="muted">עדיין אין שקילות.</p>'}
+    ${[...wl].reverse().slice(0,10).map(e=>`<div class="weightrow"><span>${hebDateShort(e.date)}</span><b>${e.kg} ק״ג</b></div>`).join('')}
+    </div>
+    <div class="card muted">📏 גובה: ${k.height||'—'} ס״מ · שקילה אחרונה: ${lw?hebDateShort(lw.date):'—'}</div>`;
+  }else if(parentTab==='coach'){
+    const psum=chat?.psum;
+    body=`
+    <div class="card">
+      <h3 style="margin-bottom:8px">🧠 תובנות מהשיחות עם ${esc(k.name)}</h3>
+      <p class="muted" style="margin-bottom:10px">מה שהתזונאית שמה לב אליו בשיחות (בלי לחשוף את כל השיחה — שומרים על הפרטיות של הילד):</p>
+      ${facts.length?facts.slice(-8).reverse().map(f=>`<div class="factline">💡 ${esc(f.text)}</div>`).join(''):'<p class="muted">עדיין אין — התובנות נאספות מהשיחות של הילד עם התזונאית.</p>'}
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">📋 סיכום שבועי מהתזונאית</h3>
+      ${psum?`<p style="font-size:.92rem;line-height:1.6;margin-bottom:8px">${esc(psum.text)}</p><p class="muted">עודכן: ${new Date(psum.ts).toLocaleDateString('he-IL')}</p>`:'<p class="muted" style="margin-bottom:8px">עדיין לא הופק סיכום.</p>'}
+      <button class="btn small block" id="psumBtn" onclick="makeParentSummary('${k.id}')">🧠 הפק/רענן סיכום שבועי</button>
+    </div>`;
+  }else{
+    body=`
+    <div class="card">
+      <h3 style="margin-bottom:8px">🎯 מטרות והעדפות (התזונאית תכיר אותן)</h3>
+      <div class="field">
+        <label>מטרות ל${esc(k.name)}</label>
+        <textarea id="pgoals" placeholder="למשל: להוסיף ירק בכל ארוחת ערב, לשתות יותר מים">${esc(k.pgoals||'')}</textarea>
+      </div>
+      <div class="field">
+        <label>הערות (אלרגיות, רגישויות, דברים שחשוב שהתזונאית תדע)</label>
+        <textarea id="pnotes" placeholder="למשל: אלרגי לבוטנים, לא אוהב דגים">${esc(k.pnotes||'')}</textarea>
+      </div>
+      <button class="btn small block" onclick="saveParentPrefs('${k.id}')">שמירה</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">🔑 קוד של ${esc(k.name)}: <span class="codechip">${k.code}</span></h3>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small secondary block" onclick="resetKidCode('${k.id}')">🔑 איפוס קוד</button>
+        <button class="btn small danger" onclick="removeKid('${k.id}')">🗑 הסרה</button>
+      </div>
+    </div>`;
+  }
+  app.innerHTML=`
+  <div class="fade">
+    <div class="topbar">
+      <div class="row">
+        <button class="btn ghost small" onclick="closeKidDetail()">→</button>
+        <div><h1>${k.emoji||'🙂'} ${esc(k.name)}</h1>
+        <p class="muted">${lw?('משקל אחרון: '+lw.kg+' ק״ג'):'אין שקילה עדיין'}${k.height?' · גובה '+k.height+' ס״מ':''}</p></div>
+      </div>
+    </div>
+    <div class="chips" style="margin-bottom:14px">
+      ${tabs.map(([t,l])=>`<span class="chip" style="${parentTab===t?'background:var(--green-soft);border-color:var(--green)':''}" onclick="setParentTab('${t}')">${l}</span>`).join('')}
+    </div>
+    ${body}
+  </div>`;
+}
+async function makeParentSummary(kidId){
+  const k=kidById(kidId); if(!k) return;
+  const btn=document.getElementById('psumBtn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ מכינה סיכום…'; }
+  const days=[];
+  for(let i=0;i<7;i++){
+    const d=todayKey(daysAgo(i));
+    const t=mealsText(kidId,d);
+    if(t) days.push(hebDateShort(d)+': '+t);
+  }
+  const wl=weightList(kidId).slice(-3).map(e=>hebDateShort(e.date)+': '+e.kg+' ק"ג');
+  const chat=getChat(kidId,true);
+  try{
+    const data=await postCoach({mode:'parentSummary', ctx:{
+      name:k.name,
+      weekData: (days.join(' || ')||'לא דווחו ארוחות השבוע')+(wl.length?' | שקילות: '+wl.join(', '):''),
+      facts:(chat.facts||[]).filter(f=>!f.del).map(f=>f.text),
+    }});
+    chat.psum={text:data.say, ts:Date.now()};
+    queueSync(); render();
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='🧠 הפק/רענן סיכום שבועי'; }
+    toast('לא הצלחתי להפיק סיכום — נסו שוב');
+  }
+}
+function saveParentPrefs(kidId){
+  const k=kidById(kidId); if(!k) return;
+  k.pgoals=document.getElementById('pgoals').value.trim().slice(0,400);
+  k.pnotes=document.getElementById('pnotes').value.trim().slice(0,400);
+  k.parentTs=Date.now();
+  queueSync(); render();
+  toast('✓ נשמר — התזונאית תתחשב בזה');
+}
+const KID_EMOJIS=['🦁','🐯','🐼','🦊','🐸','🦄','🐬','🦋','🐢','🦖'];
+function addKid(){
+  const name=document.getElementById('newKidName').value.trim();
+  if(!name) return;
+  const code=randCode();
+  DATA.kids.push({id:uid(), name, code, codeTs:Date.now(), emoji:KID_EMOJIS[DATA.kids.length%KID_EMOJIS.length]});
+  queueSync(); render();
+  alert('נוסף! 🎉 הקוד של '+name+' הוא: '+code);
+}
+function resetKidCode(id){
+  const k=kidById(id); if(!k) return;
+  const c=prompt('קוד חדש (4 ספרות) עבור '+k.name+':', randCode());
+  if(c===null) return;
+  if(!/^\d{4}$/.test(c)){ alert('הקוד חייב להיות 4 ספרות'); return; }
+  k.code=c; k.codeTs=Date.now();
+  queueSync(); render();
+  alert('הקוד של '+k.name+' אופס ל־'+c);
+}
+function removeKid(id){
+  const k=kidById(id); if(!k) return;
+  if(!confirm('להסיר את '+k.name+' מהיומן?')) return;
+  DATA.kids=DATA.kids.filter(x=>x.id!==id);
+  DATA.removedKids=[...(DATA.removedKids||[]), id];
+  openKid=null;
+  queueSync(); render();
+}
+function resetParentCode(){
+  const c=prompt('קוד הורה חדש (4 ספרות):', randCode());
+  if(c===null) return;
+  if(!/^\d{4}$/.test(c)){ alert('הקוד חייב להיות 4 ספרות'); return; }
+  DATA.parent.code=c; DATA.parent.codeTs=Date.now();
+  queueSync(); render();
+  alert('קוד ההורה אופס ל־'+c);
+}
+function copyLink(l){
+  navigator.clipboard?.writeText(l).then(()=>alert('הקישור הועתק! 📋')).catch(()=>{});
+}
+
+/* ---------- התקנה כאפליקציה (PWA) ---------- */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  render();
+});
+window.addEventListener('appinstalled',()=>{ deferredPrompt=null; render(); });
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
+}
+function installBanner(){
+  if(isStandalone()) return '';
+  return `<div class="banner info" style="cursor:pointer" onclick="installApp()">📲 התקינו כאפליקציה — לחצו כאן ותקבלו אייקון במסך הבית</div>`;
+}
+async function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    try{ await deferredPrompt.userChoice; }catch(e){}
+    deferredPrompt=null;
+    render();
+    return;
+  }
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  alert(ios
+    ? 'להתקנה באייפון:\n1. לוחצים על כפתור השיתוף (הריבוע עם החץ) למטה\n2. בוחרים "הוסף למסך הבית"\n3. לוחצים "הוסף"'
+    : 'להתקנה:\n1. לוחצים על תפריט הדפדפן (⋮)\n2. בוחרים "הוספה למסך הבית" או "התקנת אפליקציה"');
+}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+
+/* ---------- אתחול ---------- */
+(function init(){
+  const m=location.hash.match(/family=([A-Za-z0-9]+)/);
+  if(m && m[1] && m[1]!==familyId){
+    familyId=m[1];
+    localStorage.setItem('fam.id',familyId);
+    currentUserId=null; localStorage.removeItem('fam.user');
+    localStorage.removeItem('fam.cache'); DATA=null;
+    history.replaceState(null,'',location.pathname);
+  }
+  const cache=localStorage.getItem('fam.cache');
+  if(cache && !DATA){ try{ DATA=JSON.parse(cache); }catch(e){} }
+  render();
+  if(familyId){
+    startPolling();
+    syncNow();
+  }
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && familyId) syncNow(); });
+})();
+</script>
+</body>
+</html>
