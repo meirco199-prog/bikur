@@ -1389,10 +1389,16 @@ function hebVoice(){
   return hebVoices.find(v=>/google/i.test(v.name)) || hebVoices[0] || null;
 }
 function ttsSupported(){ return 'speechSynthesis' in window; }
+/* מנקים לפני הקראה: אימוג'ים וסימנים שהקול קורא מוזר — משאירים עברית, מספרים ופיסוק */
+function cleanForSpeech(t){
+  return (t||'')
+    .replace(/[^֐-׿a-zA-Z0-9 .,!?:;()"'%׳״-]+/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
 function speakHe(text,{onend=null,onboundary=null}={}){
   if(!ttsSupported()) return false;
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
+  const u=new SpeechSynthesisUtterance(cleanForSpeech(text));
   u.lang='he-IL';
   const v=hebVoice();
   if(v) u.voice=v;

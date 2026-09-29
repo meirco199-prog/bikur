@@ -96,7 +96,30 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
             | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("result") or {}).get("subdomain",""))')
           echo "APP_URL=https://food.$SUBDOMAIN.workers.dev" >> "$GITHUB_ENV"
+          echo "ACCOUNT_ID=$ACCOUNT_ID" >> "$GITHUB_ENV"
           echo "app url: https://food.$SUBDOMAIN.workers.dev"
+
+      - name: Upgrade coach brain to Claude (optional ANTHROPIC_API_KEY secret)
+        run: |
+          # אם קיים סוד ANTHROPIC_API_KEY ב-GitHub (Settings → Secrets → Actions),
+          # מעבירים אותו כסוד ל-Worker — והתזונאית עוברת לדבר ב-Claude (עברית מצוינת).
+          # בלי הסוד — ממשיכים על Workers AI החינמי.
+          if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "אין סוד ANTHROPIC_API_KEY — התזונאית רצה על Workers AI (חינם)"
+            exit 0
+          fi
+          resp=$(curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/food/secrets" \
+            -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"name":"ANTHROPIC_API_KEY","text":"${{ secrets.ANTHROPIC_API_KEY }}","type":"secret_text"}')
+          okv=$(echo "$resp" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("success"))')
+          if [ "$okv" != "True" ]; then
+            echo "::error::העברת המפתח ל-Worker נכשלה"
+            echo "$resp" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("errors"), ensure_ascii=False))'
+            exit 1
+          fi
+          echo "::notice::מוח התזונאית שודרג ל-Claude 🧠"
 
       - name: Verify app, storage and coach endpoint
         run: |
