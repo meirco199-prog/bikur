@@ -349,8 +349,12 @@ async function endCall(){
 
 function renderSummary(main, fb, secs, turns, teacher){
   const sc = fb.scores || {};
-  const box = (label, v) => el("div", {class: "card stat-card"},
+  const numBox = (label, v) => el("div", {class: "card stat-card"},
     el("div", {class: "stat-v"}, typeof v === "number" ? Math.round(v) : "—"),
+    el("div", {class: "stat-l"}, label));
+  // הגייה לא נמדדת במסלול הזה — אין ניתוח אודיו. לא מציגים מספר מומצא.
+  const naBox = (label) => el("div", {class: "card stat-card na"},
+    el("div", {class: "stat-v na-v"}, "לא נמדד"),
     el("div", {class: "stat-l"}, label));
   main.replaceChildren(el("div", {class: "screen"},
     el("div", {class: "card center"},
@@ -358,8 +362,11 @@ function renderSummary(main, fb, secs, turns, teacher){
       el("h2", {}, `סיכום השיעור עם ${teacher.name}`),
       el("p", {class: "muted"}, `${Math.round(secs / 60)} דקות · ${turns} תשובות שלך`)),
     el("div", {class: "stats-grid"},
-      box("שטף", sc.fluency), box("הגייה", sc.pronunciation),
-      box("אוצר מילים", sc.vocabulary), box("דקדוק", sc.grammar)),
+      numBox("שטף (הערכה)", sc.fluency),
+      numBox("אוצר מילים (הערכה)", sc.vocabulary),
+      numBox("דקדוק (הערכה)", sc.grammar),
+      naBox("הגייה")),
+    el("p", {class: "muted small-text"}, "שטף/אוצר/דקדוק הם הערכה מהתמלול של השיחה. הגייה תסומן כ\"נמדד\" רק כשיתווסף ניתוח אודיו אמיתי."),
     fb.summary ? el("div", {class: "card"}, el("h3", {}, "מה היה טוב ומה לחזק"), el("p", {}, fb.summary)) : null,
     fb.mistakes?.length ? el("div", {class: "card"},
       el("h3", {}, "תיקונים מהשיעור"),
