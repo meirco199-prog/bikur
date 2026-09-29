@@ -82,6 +82,7 @@ test('gpt-review: ההודעות למודל כוללות סיווג, שערי א
   const [sys, usr] = buildMessages(ctx);
   for (const t of FINDING_TYPES) assert.ok(sys.content.includes(`- ${t}`), t);
   assert.ok(sys.content.includes('כסף אמיתי') && sys.content.includes('סבב 2 מתוך 3'));
+  assert.ok(sys.content.includes('[REDACTED]') && sys.content.includes('placeholder'), 'המודל יודע ש-[REDACTED] הוא placeholder ולא הטקסט המקורי');
   for (const s of ['#3: הדרישה', 'אין fake metrics', 'invest-api tests: completed / success', 'node --test → exit 0', 'README', 'סבב 1 (BLOCKED', '· Claude\nתוקן', 'DIFF', 'ענף claude/*']) assert.ok(usr.content.includes(s), s);
   const [, leaky] = buildMessages({ ...ctx, diff: '+const KEY = "sk-abcdefghijklmnop1234"', tests: [{ cmd: 'x', code: 1, out: 'token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345' }] });
   assert.ok(!leaky.content.includes('sk-abcdefghijklmnop1234') && !leaky.content.includes('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345') && leaky.content.includes('[REDACTED]'), 'ההקשר שנשלח למודל מוסתר, לא רק התגובה');
