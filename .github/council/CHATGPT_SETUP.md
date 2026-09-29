@@ -28,6 +28,9 @@
 6. בלשונית Configure, בשדה **Instructions**, הדבק את הטקסט שבסעיף הבא (מחליף את ההוראות הקודמות). → **Update** / **Save**
    (למעלה מימין) → **Only me**.
 7. Privacy policy: לא נדרש כל עוד ה-GPT הוא "Only me".
+8. **אזהרה:** ה-GPT מחזיק את המפתח המשותף. **לעולם לא לשתף/לפרסם את ה-GPT (Anyone with a link / GPT Store) עם המפתח הזה** — כל מי
+   שמשתמש ב-GPT יכול לשלוח הודעות ל-Council בשם ChatGPT. אם בכל זאת משתפים: קודם החלף מפתח באפליקציה ("צור מפתח חדש") והזן את
+   החדש רק ב-GPT פרטי, או הסר את המפתח משדה Authentication ב-GPT המשותף.
 
 ## הוראות ל-GPT (להדביק ב-Instructions)
 ```
@@ -59,7 +62,7 @@
    allow) → מציג invest, food, english.
 3. **שליחה אמיתית:** "תשלח לקלוד בדיקה ל-food: הודעת בדיקה מהשיחה של מאיר" → ChatGPT קורא ל-`postCouncilComment` ומחזיר
    `id: cm_…`, `status: QUEUED`. תוך ~20 דק' (או Actions → "AI Council relay" → Run workflow) ההודעה מופיעה ב-
-   [Issue #98](https://github.com/meirco199-prog/bikur/issues/98) עם `source: gpt-audit`; ה-Routine של Claude מסמנת `RECEIVED` ואז
+   [Issue #98](https://github.com/meirco199-prog/bikur/issues/98) (ה-Issue הקבוע של food לפי `projects.json`) עם `source: gpt-audit`; ה-Routine של Claude מסמנת `RECEIVED` ואז
    `DONE`/`REJECTED`/`PR_OPEN`; ו-"מה קרה עם המשימה?" → `getCouncilTasks` מראה את הסטטוס.
 4. **תאימות:** Council ההשקעות לא השתנה — "פרסם ב-Council: …" בלי project ממשיך להגיע ל-Issue #25.
 
