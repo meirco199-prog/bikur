@@ -82,9 +82,27 @@ window.addEventListener("focus", onResume);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) onResume(); });
 window.addEventListener("pageshow", onResume);
 
-// service worker לעבודה ללא רשת + התראות ברקע
+// service worker לעבודה ללא רשת + התראות ברקע.
+// עדכון אוטומטי: כשמתגלה גרסה חדשה, טוענים אותה מיד — כדי שלא תיתקע
+// על גרסה ישנה בזיכרון (הבעיה הנפוצה שבה פיצ'רים חדשים "לא מופיעים").
 if ("serviceWorker" in navigator){
+  let reloading = false;
   navigator.serviceWorker.register("sw.js")
-    .then(() => refreshPush())
+    .then(reg => {
+      refreshPush();
+      if (navigator.serviceWorker.controller) reg.update().catch(() => {});
+      reg.addEventListener("updatefound", () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener("statechange", () => {
+          // גרסה חדשה מוכנה והדף כבר נשלט ע"י SW ישן → זה עדכון אמיתי, נטען מחדש
+          if (nw.state === "installed" && navigator.serviceWorker.controller && !reloading){
+            reloading = true;
+            location.reload();
+          }
+        });
+      });
+    })
     .catch(() => {});
 }
+
