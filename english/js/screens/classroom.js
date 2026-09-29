@@ -7,6 +7,9 @@ import { speak, stopSpeaking, ttsSupported } from "../speech.js";
 import { chat, feedback, aiErrorMessage } from "../ai.js";
 import { addXP } from "../gamify.js";
 import { createAvatar, TEACHERS } from "../avatar.js";
+import { startLive, realtimeSupported, LiveError } from "../live.js";
+import { review } from "../srs.js";
+import { WORDS, wordKey } from "../data/words.js";
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const sttOK = !!SR;
@@ -90,6 +93,8 @@ function startCall(main, {teacher, focus, selfCam}){
     // מדדים שנמדדים בפועל (לא הערכות): זמני דיבור, רצף, זמן תגובה, קטיעות
     metrics: {studentMs: 0, teacherMs: 0, longestMs: 0, latencies: [], interruptions: 0, firstSpeechAt: 0},
     turnRequestedAt: 0,
+    // realtime (OpenAI, דרך english-live): speech-to-speech עם קטיעה מובנית. null = זרימה רגילה
+    live: null, mode: "text", liveSummary: null,
   };
   window.__liveTeardown = teardown;
 
@@ -112,6 +117,7 @@ function startCall(main, {teacher, focus, selfCam}){
     const v = input.value.trim();
     if (!v) return;
     input.value = ""; capUser.textContent = v;
+    if (session.live){ session.live.sendText(v); return; }
     if (session.pendingFinish) session.pendingFinish(v);
   };
   input.addEventListener("keydown", e => { if (e.key === "Enter") sendTyped(); });
@@ -146,7 +152,103 @@ function startCall(main, {teacher, focus, selfCam}){
 
   if (selfCam) startCam(selfTile);
 
+  startLesson(focus);
+}
+
+// מנסה קודם realtime (speech-to-speech). אם ה-Worker רדום / WebRTC נכשל / כבוי בהגדרות —
+// נופל בשקט לזרימה הרגילה (STT/TTS של הדפדפן עם קטיעה). תמיד יש שיעור.
+async function startLesson(focus){
+  if (S.settings.realtime !== false && realtimeSupported()){
+    setStatus("מתחבר לקול realtime…", "thinking");
+    try {
+      const live = await startLive({teacher: session.teacher, topic: focus.topic, handlers: liveHandlers()});
+      if (!session || session.destroyed){ live?.close(); return; }
+      if (live){
+        session.live = live; session.mode = "realtime";
+        // בקטיעה מובנית (VAD בשרת) אין צורך בצופה של הזרימה הרגילה
+        session.ui.bargeBtn && (session.ui.bargeBtn.style.display = "none");
+        setStatus(`${session.teacher.name} מתחבר…`, "speaking");
+        startMouthLive();
+        return;
+      }
+    } catch (e){
+      if (!session || session.destroyed) return;
+      if (e instanceof LiveError && e.message === "mic") toast("אין גישה למיקרופון — ממשיכים בזרימה הרגילה");
+      else if (e instanceof LiveError && e.message === "rate") toast("יותר מדי חיבורים — ממשיכים בזרימה הרגילה");
+      else toast("קול realtime לא זמין כרגע — ממשיכים בזרימה הרגילה");
+    }
+  }
   runLesson(focus);
+}
+
+// אירועים מה-realtime → מסך, אווטאר, זיכרון. נבנה לפני החיבור, סוגר על ה-session.
+function liveHandlers(){
+  const phaseHe = {opening: "פתיחה", review: "חזרה", main: "הנושא של היום", practice: "תרגול", correction: "תיקון", fluency: "אתגר שטף", summary: "סיכום"};
+  let errToasted = false;
+  return {
+    onTeacherText(text){ if (session?.ui) session.ui.capTeacher.textContent = text; },
+    onTeacherSpeaking(on){
+      if (!session || session.destroyed) return;
+      session.avatar.setState(on ? "speaking" : "idle");
+      setStatus(on ? `${session.teacher.name} מדבר…` : "מקשיב לך… דבר כשתרצה 🎙️", on ? "speaking" : "listening");
+      if (!on) session.avatar.setState("listening");
+    },
+    onUserSpeaking(on){
+      if (!session || session.destroyed) return;
+      if (on){
+        const interrupting = session.live?.state.teacherSpeaking;
+        session.ui.capUser.textContent = "";
+        session.avatar.setState("listening");
+        setStatus(interrupting ? "קטעת — מקשיב לך 🎙️" : "מקשיב לך… 🎙️", "listening");
+      }
+    },
+    onUserText(t){ if (session?.ui) session.ui.capUser.textContent = t; },
+    onTool(name, args){ return applyTool(name, args, phaseHe); },
+    onError(msg){ if (!errToasted){ errToasted = true; toast("שגיאת realtime: " + msg); } },
+  };
+}
+
+// הכלים שהמורה קורא להם — נשמרים בזיכרון המקומי (ההתקדמות נשארת במכשיר)
+function applyTool(name, a, phaseHe){
+  if (!session) return {ok: false};
+  switch (name){
+    case "log_correction":
+      recordMistake(`lesson (${a.kind || "significant"}): ${a.original || ""} → ${a.corrected || ""}${a.note_he ? " · " + a.note_he : ""}`, "speaking");
+      return {ok: true};
+    case "mark_word_used": {
+      // גם מילה שהמורה לימד ואינה במילון המובנה נכנסת ל-SRS: כך היא מגיעה ל-reuseWords
+      // והמורה שוזר אותה בשיעורים הבאים (spaced repetition בתוך שיחה)
+      const key = String(a.word || "").toLowerCase().trim();
+      if (!key || key.length > 40) return {ok: false, error: "bad word"};
+      const w = WORDS.find(x => wordKey(x) === key);
+      review(w ? wordKey(w) : key, !!a.correct);
+      return {ok: true, inDictionary: !!w};
+    }
+    case "pronunciation_note":
+      recordMistake(`pronunciation: ${a.word || ""} — ${a.issue || ""}${a.improved ? " (improved)" : ""}`, "pronunciation");
+      return {ok: true};
+    case "lesson_phase":
+      if (a.phase && session.ui) session.ui.statusEl.textContent = `שלב: ${phaseHe[a.phase] || a.phase}`;
+      return {ok: true};
+    case "end_lesson_summary":
+      session.liveSummary = {improved: a.improved || "", weak: a.weak || "", next: a.next || ""};
+      return {ok: true};
+    default:
+      return {ok: false, error: "unknown tool"};
+  }
+}
+
+// לק-סינק אמיתי: פתיחת הפה לפי עוצמת האודיו של המורה (לא לפי טיימר)
+function startMouthLive(){
+  let smooth = 0;
+  const loop = () => {
+    if (!session || session.destroyed || !session.live) return;
+    const lv = session.live.level();
+    smooth = smooth * 0.6 + lv * 0.4;
+    session.avatar.setMouth(session.live.state.teacherSpeaking ? Math.min(1, smooth * 1.4) : 0);
+    session.mouthRAF = requestAnimationFrame(loop);
+  };
+  session.mouthRAF = requestAnimationFrame(loop);
 }
 
 function setStatus(text, cls = ""){
@@ -412,13 +514,18 @@ function setBarge(on, silent = false){
   if (on && session.saying && !session.rec && !session.muted) startRecognizer("watch");
   if (!silent) toast(on ? "⚡ קטיעה פעילה — אפשר לדבר גם כשהמורה מדבר" : "קטיעה כבויה — המורה יסיים לדבר לפני שתענה");
 }
-function toggleBarge(){ if (session) setBarge(!session.bargeIn); }
+function toggleBarge(){ if (session && !session.live) setBarge(!session.bargeIn); }
 
 function toggleMic(){
   if (!session) return;
   session.muted = !session.muted;
   session.ui.micBtn.classList.toggle("muted", session.muted);
   session.ui.micBtn.textContent = session.muted ? "🔇" : "🎤";
+  if (session.live){
+    session.live.mute(session.muted);
+    setStatus(session.muted ? "המיקרופון מושתק — הקש 🎤 להמשך" : "מקשיב לך… 🎙️", session.muted ? "" : "listening");
+    return;
+  }
   if (session.muted){
     stopRec();
     session.barged = false;
@@ -433,6 +540,7 @@ function toggleMic(){
 
 async function repeatLast(){
   if (!session) return;
+  if (session.live){ session.live.sendText("Could you say that again, please? A little slower."); return; }
   const last = [...session.messages].reverse().find(m => m.role === "assistant");
   if (!last) return;
   stopRec();
@@ -457,16 +565,34 @@ async function endCall(){
   if (!session || session.ending) return;
   session.ending = true;
   const {main, teacher} = session;
-  const messages = session.messages.slice();
+  const mode = session.mode;
+  let teacherSummary = session.liveSummary;
+
+  // realtime: נותנים למורה לסכם (אם עוד לא), ולוקחים תמלול ומדדים מהאירועים האמיתיים (VAD)
+  let messages, m;
+  if (session.live){
+    const live = session.live;
+    setStatus("המורה מסכם…", "thinking");
+    if (!live.state.lessonSummary && live.state.transcript.some(x => x.role === "user")){
+      live.askSummary();
+      const t0 = Date.now();
+      await new Promise(res => { const iv = setInterval(() => {
+        if (!session || live.state.lessonSummary || Date.now() - t0 > 9000){ clearInterval(iv); res(); } }, 200); });
+      if (live.state.lessonSummary) teacherSummary = live.state.lessonSummary;
+    }
+    messages = live.state.transcript.slice();
+    m = live.state.metrics;
+  } else {
+    messages = session.messages.slice();
+    m = session.metrics;
+  }
   const secs = Math.round((Date.now() - session.start) / 1000);
-  const userTurns = messages.filter(m => m.role === "user");
-  // מדדים שנמדדו בפועל — נלקחים לפני ה-teardown שמאפס את ה-session
-  const m = session.metrics;
+  const userTurns = messages.filter(mm => mm.role === "user");
   const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
   const rec = {
-    date: todayStr(), teacher: teacher.id, secs, turns: userTurns.length,
+    date: todayStr(), teacher: teacher.id, secs, turns: userTurns.length, mode,
     studentMs: m.studentMs, teacherMs: m.teacherMs, longestMs: m.longestMs,
-    avgLatencyMs: avg(m.latencies), interruptions: m.interruptions, typed: !sttOK,
+    avgLatencyMs: avg(m.latencies), interruptions: m.interruptions, typed: mode === "text" && !sttOK,
   };
   teardown();
 
@@ -490,7 +616,7 @@ async function endCall(){
     fb = await feedback(transcript);
     (fb.mistakes || []).slice(0, 5).forEach(mm => recordMistake(`lesson: ${mm.original || ""} → ${mm.better || ""}`, "speaking"));
   } catch { fb = null; }
-  renderSummary(main, fb, rec, prev, teacher);
+  renderSummary(main, fb, rec, prev, teacher, teacherSummary);
 }
 
 const fmtS = ms => `${Math.round(ms / 1000)} שנ'`;
@@ -503,7 +629,7 @@ function cmp(cur, prev, higherIsBetter = true){
   return el("span", {class: "delta " + (good ? "up" : "down")}, `${d > 0 ? "▲" : "▼"} ${fmtS(Math.abs(d))} מהקודם`);
 }
 
-function renderSummary(main, fb, rec, prev, teacher){
+function renderSummary(main, fb, rec, prev, teacher, teacherSummary = null){
   const sc = (fb && fb.scores) || {};
   const numBox = (label, v) => el("div", {class: "card stat-card"},
     el("div", {class: "stat-v"}, typeof v === "number" ? Math.round(v) : "—"),
@@ -527,7 +653,12 @@ function renderSummary(main, fb, rec, prev, teacher){
     el("div", {class: "card center"},
       el("div", {class: "summary-emoji"}, "🎓"),
       el("h2", {}, `סיכום השיעור עם ${teacher.name}`),
-      el("p", {class: "muted"}, `${Math.round(rec.secs / 60)} דקות · ${rec.turns} תשובות שלך`)),
+      el("p", {class: "muted"}, `${Math.round(rec.secs / 60)} דקות · ${rec.turns} תשובות שלך · ${rec.mode === "realtime" ? "קול realtime" : "זרימה רגילה"}`)),
+    teacherSummary ? el("div", {class: "card"},
+      el("h3", {}, `🧑‍🏫 הסיכום של ${teacher.name}`),
+      el("p", {dir: "ltr"}, el("strong", {}, "Improved: "), teacherSummary.improved),
+      el("p", {dir: "ltr"}, el("strong", {}, "Still weak: "), teacherSummary.weak),
+      el("p", {dir: "ltr"}, el("strong", {}, "Next time: "), teacherSummary.next)) : null,
     el("div", {class: "card"},
       el("h3", {}, "📏 מה נמדד בפועל"),
       el("ul", {class: "metrics-list"}, measured)),
@@ -556,6 +687,7 @@ function teardown(){
   stopSpeaking();
   stopRec();
   stopMouth();
+  try { session.live?.close(); } catch {}
   if (session.sayPoll) clearInterval(session.sayPoll);
   session.timers.forEach(clearTimeout);
   if (session.timerInt) clearInterval(session.timerInt);

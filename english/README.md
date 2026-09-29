@@ -27,6 +27,14 @@
    `https://english-push.meirco199.workers.dev`
    ה-workflow מקים לבד את מרחב ה-KV (`english-push`) ואת שעון ה-cron, ומפתחות ה-VAPID
    נוצרים לבד בקריאה הראשונה ונשמרים ב-KV — אין שום סוד להזין ואין הגדרה ידנית בדשבורד.
+4. **שרת ה-realtime לשיעור החי** (אופציונלי, בתשלום) — `english-live/worker.js`, בכתובת
+   `https://english-live.meirco199.workers.dev`. מנפיק session זמני ל-OpenAI Realtime; הדפדפן
+   מתחבר ב-WebRTC **ישירות** ל-OpenAI (האודיו לא עובר דרך ה-Worker). כדי להפעיל: להוסיף פעם
+   אחת את הסוד `OPENAI_API_KEY` ב-Settings → Secrets → Actions (ה-workflow מעלה אותו ל-Worker),
+   או להזין אותו בדשבורד של Cloudflare תחת אותו שם. **בלי המפתח** ה-Worker מחזיר `not_configured`
+   והשיעור החי רץ בזרימה הרגילה (STT/TTS של הדפדפן, עם קטיעה). עלות משוערת:
+   ‎~$0.30–0.70 לשיעור של 15–20 דק' ב-`gpt-4o-mini-realtime` (ברירת המחדל; אפשר להחליף עם
+   המשתנה `REALTIME_MODEL` ב-Worker).
 
 ## מבנה
 
@@ -43,10 +51,14 @@ english/
   js/ai.js              לקוח ל-Worker + פרופיל לומד מסוכם
   js/notify.js          ניהול התזכורת היומית (הרשאות, תזמון, אבחון)
   js/push.js            רישום Web Push וסנכרון המצב לשרת התזכורות
+  js/live.js            מנוע realtime לשיעור החי (WebRTC ל-OpenAI, session מה-Worker)
+  js/avatar.js          דמות המורה (SVG) עם לק-סינק
+  js/screens/classroom.js  השיעור החי: realtime עם fallback לזרימת STT/TTS + קטיעה
   js/data/              תוכן: מילים, דקדוק, תרחישים, קריאה, מבחן רמה
   js/screens/           המסכים: בית, לימוד, דיבור, מילים, מורה, פרופיל, onboarding
 english-ai/worker.js    שכבת ה-AI (Cloudflare Worker + Workers AI)
 english-push/worker.js  שרת התזכורות (Cloudflare Worker + KV + cron)
+english-live/worker.js  session זמני ל-OpenAI Realtime לשיעור החי (רדום בלי OPENAI_API_KEY)
 ```
 
 ## איך התזכורת עובדת
