@@ -152,8 +152,9 @@ function renderFeedback(main, fb, sec){
   main.replaceChildren(el("div", {class: "screen"},
     backBar(main, "משוב מהמורה"),
     el("div", {class: "stats-grid"},
-      scoreCard("שטף", scores.fluency), scoreCard("הגייה", scores.pronunciation),
-      scoreCard("אוצר מילים", scores.vocabulary), scoreCard("דקדוק", scores.grammar)),
+      scoreCard("שטף (הערכה)", scores.fluency), naCard("הגייה"),
+      scoreCard("אוצר מילים (הערכה)", scores.vocabulary), scoreCard("דקדוק (הערכה)", scores.grammar)),
+    el("p", {class: "muted small-text"}, "הציונים הם הערכה מהתמלול. הגייה לא נמדדת ללא ניתוח אודיו — לכן היא לא מוצגת כמספר."),
     fb.summary ? el("div", {class: "card"}, el("h3", {}, "סיכום"), el("p", {}, fb.summary)) : null,
     fb.mistakes?.length ? el("div", {class: "card"},
       el("h3", {}, "טעויות לתיקון"),
@@ -172,6 +173,12 @@ function scoreCard(label, v){
   const val = typeof v === "number" ? Math.max(0, Math.min(100, Math.round(v))) : null;
   return el("div", {class: "card stat-card"},
     el("div", {class: "stat-v"}, val === null ? "—" : val),
+    el("div", {class: "stat-l"}, label));
+}
+
+function naCard(label){
+  return el("div", {class: "card stat-card na"},
+    el("div", {class: "stat-v na-v"}, "לא נמדד"),
     el("div", {class: "stat-l"}, label));
 }
 
@@ -220,7 +227,7 @@ function renderPronunciation(main){
         result.replaceChildren(
           el("div", {dir: "ltr", class: "word-marks"},
             words.map(x => el("span", {class: x.ok ? "w-ok" : "w-bad"}, x.word + " "))),
-          el("div", {class: "muted small-text"}, `דיוק: ${acc}% · ${acc >= 85 ? "מצוין!" : acc >= 60 ? "יפה, אפשר לחדד" : "נסה שוב לאט יותר"}`),
+          el("div", {class: "muted small-text"}, `המערכת זיהתה ${acc}% מהמילים · ${acc >= 85 ? "ברור מאוד!" : acc >= 60 ? "כמעט — נסה לבטא ברור יותר" : "נסה שוב, לאט וברור"}`),
           el("div", {class: "row gap"},
             el("button", {class: "btn ghost small", onclick: () => speak(target, {rate: 0.7})}, "🐢 שמע לאט"),
             el("button", {class: "btn ghost small", onclick: () => { micBtn.disabled = false; micBtn.textContent = "🎤 דבר שוב"; }}, "🔁 דבר שוב"),
@@ -247,8 +254,8 @@ function renderPronunciation(main){
     main.replaceChildren(el("div", {class: "screen"},
       el("div", {class: "card center summary"},
         el("div", {class: "summary-emoji"}, avg >= 85 ? "🌟" : "🗣️"),
-        el("h2", {}, `דיוק ממוצע: ${avg}%`),
-        el("p", {class: "muted"}, avg >= 85 ? "הגייה מעולה!" : "ההגייה משתפרת עם כל חזרה — נתראה מחר?"),
+        el("h2", {}, `זוהו ${avg}% מהמילים`),
+        el("p", {class: "muted"}, "המדד משקף כמה ברור נשמעו המילים (זיהוי דיבור), לא ניתוח הגייה מלא. תרגול חוזר משפר בפועל את הבהירות."),
         el("button", {class: "btn primary big", onclick: () => renderSpeak(main)}, "סיום"))));
   }
 

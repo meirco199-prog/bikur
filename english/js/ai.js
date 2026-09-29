@@ -15,6 +15,11 @@ export function learnerProfile(){
   const learned = Object.entries(S.srs).filter(([, e]) => e.ok + e.fail > 0).length;
   const recentMistakes = S.mistakes.slice(-6).map(m => m.text);
   const weak = Object.entries(S.skills).sort((a, b) => a[1] - b[1]).slice(0, 2).map(e => e[0]);
+  // מילים שנלמדו לאחרונה (לא בשליטה מלאה) — שהמורה ישזור בשיחה לחיזוק (spaced repetition)
+  const reuseWords = Object.entries(S.srs)
+    .filter(([, e]) => (e.ok + e.fail) > 0 && e.status !== "mastered")
+    .sort((a, b) => (b[1].due || "").localeCompare(a[1].due || ""))
+    .slice(0, 8).map(([k]) => k);
   return {
     level: S.profile.level || "A2",
     goals: S.profile.goals,
@@ -23,6 +28,7 @@ export function learnerProfile(){
     hardWords: hard,
     weakSkills: weak,
     recentMistakes,
+    reuseWords,
     englishOnly: !!S.profile.englishOnly,
   };
 }

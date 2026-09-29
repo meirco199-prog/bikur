@@ -470,3 +470,6 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 .call-btn.mic { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; border: none; }
 .call-btn.mic.muted { background: #6b7280; }
 .call-btn.end { background: #ef4444; color: #fff; border: none; }
+
+.stat-card.na { opacity: .8; }
+.stat-card.na .na-v { font-size: .82rem; font-weight: 700; color: var(--muted); }
