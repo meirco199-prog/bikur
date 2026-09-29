@@ -81,6 +81,14 @@ export function renderHome(main){
         renderHome(main);
       }}, "סיימתי את האתגר ✓")),
 
+    // שיעור חי בזום
+    el("button", {class: "card live-cta", onclick: () => { location.hash = "#/live"; }},
+      el("span", {class: "live-cta-emoji"}, "🎥"),
+      el("span", {class: "li-main"},
+        el("span", {class: "li-title"}, "שיעור חי בזום"),
+        el("span", {class: "muted small-text"}, "מורה שמדבר איתך פנים אל פנים ומתקן אותך")),
+      el("span", {class: "live-badge"}, "חדש")),
+
     // גישה מהירה למורה
     el("button", {class: "card teacher-cta", onclick: () => { location.hash = "#/teacher"; }},
       el("span", {class: "lc-icon"}, "🧑‍🏫"),

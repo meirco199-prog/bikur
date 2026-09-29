@@ -11,26 +11,27 @@ if ("speechSynthesis" in window){
   speechSynthesis.onvoiceschanged = loadVoices;
 }
 
-function bestVoice(){
-  const prefs = ["Google US English", "Samantha", "Microsoft Aria", "Microsoft Zira", "Daniel"];
-  for (const p of prefs){
+function bestVoice(prefs){
+  const list = prefs || ["Google US English", "Samantha", "Microsoft Aria", "Microsoft Zira", "Daniel"];
+  for (const p of list){
     const v = voices.find(v => v.name.includes(p));
     if (v) return v;
   }
-  return voices.find(v => v.lang === "en-US") || voices[0] || null;
+  return voices.find(v => v.lang === "en-US") || voices.find(v => v.lang.startsWith("en")) || voices[0] || null;
 }
 
 export function ttsSupported(){ return "speechSynthesis" in window; }
 
-export function speak(text, {rate = null, onend = null} = {}){
+export function speak(text, {rate = null, onend = null, onboundary = null, voice = null} = {}){
   if (!ttsSupported()) return false;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
-  const v = bestVoice();
+  const v = bestVoice(voice);
   if (v) u.voice = v;
   u.rate = rate ?? (S.settings.voiceRate || 1);
   if (onend) u.onend = onend;
+  if (onboundary) u.onboundary = onboundary;
   speechSynthesis.speak(u);
   return true;
 }

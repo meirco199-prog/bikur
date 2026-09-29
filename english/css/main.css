@@ -394,3 +394,79 @@ hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 
 .level-chips { margin: 10px 0; }
 .level-chips .chip-btn { min-width: 48px; text-align: center; font-weight: 700; }
+
+/* ---------- שיעור חי בזום ---------- */
+.live-cta { display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: start; width: 100%;
+  background: linear-gradient(135deg, #1f2440, #3a2f6b); color: #fff; border: none; }
+.live-cta .muted { color: #c9c6ee !important; }
+.live-cta-emoji { font-size: 1.9rem; }
+.live-badge { margin-inline-start: auto; background: #ff5470; color: #fff; border-radius: 999px;
+  padding: 3px 10px; font-size: .72rem; font-weight: 800; }
+
+/* אווטאר */
+.ava { width: 100%; height: 100%; }
+.ava-svg { width: 100%; height: 100%; display: block; }
+.ava-eye { transform-box: fill-box; transform-origin: center; transition: transform .09s ease; }
+.ava-head { transform-box: fill-box; transform-origin: center; animation: ava-breathe 5s ease-in-out infinite; }
+@keyframes ava-breathe { 0%,100% { transform: translateY(0) } 50% { transform: translateY(1.4px) } }
+
+/* בחירת מורה (טרום-שיחה) */
+.teacher-pick { display: flex; gap: 12px; }
+.teacher-card { flex: 1; background: var(--card); border: 2px solid var(--line); border-radius: 18px;
+  padding: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: border-color .15s, transform .12s; }
+.teacher-card:active { transform: scale(.98); }
+.teacher-card.sel { border-color: var(--brand); }
+.teacher-card .ava { width: 100%; aspect-ratio: 1 / 1.05; border-radius: 14px; overflow: hidden; }
+.teacher-name { font-weight: 700; font-size: .9rem; }
+.cam-row { align-items: center; }
+
+/* תצוגת השיחה */
+.call { display: flex; flex-direction: column; gap: 12px; min-height: calc(100dvh - 150px); animation: fadein .25s; }
+.call-top { display: flex; justify-content: space-between; align-items: center; }
+.call-who { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.live-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 0 rgba(255,77,77,.6);
+  animation: live-pulse 1.6s infinite; }
+@keyframes live-pulse { 0%{box-shadow:0 0 0 0 rgba(255,77,77,.6)} 70%{box-shadow:0 0 0 8px rgba(255,77,77,0)} 100%{box-shadow:0 0 0 0 rgba(255,77,77,0)} }
+.call-timer { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.call-status { font-size: .9rem; color: var(--muted); font-weight: 600; }
+.call-status.speaking { color: var(--brand); }
+.call-status.listening { color: var(--good); }
+.call-status.thinking { color: var(--amber); }
+
+.call-stage { position: relative; flex: 1; border-radius: 22px; overflow: hidden; background: #10131c;
+  min-height: 340px; display: flex; align-items: stretch; }
+.teacher-tile { flex: 1; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+.teacher-tile .ava { position: absolute; inset: 0; }
+.tile-name { position: absolute; bottom: 8px; inset-inline-start: 10px; z-index: 2;
+  background: rgba(0,0,0,.45); color: #fff; font-size: .78rem; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px; }
+.speaking-ring { position: absolute; inset: 0; z-index: 1; border-radius: 22px; pointer-events: none;
+  box-shadow: inset 0 0 0 0 transparent; transition: box-shadow .2s; }
+.teacher-tile.is-speaking .speaking-ring { box-shadow: inset 0 0 0 4px rgba(124,111,240,.9); }
+.teacher-tile.is-listening .speaking-ring { box-shadow: inset 0 0 0 4px rgba(16,185,129,.9); animation: ring-pulse 1.4s infinite; }
+@keyframes ring-pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+.teacher-tile.is-listening .ava-head { animation: none; transform: rotate(2.5deg); }
+
+.self-tile { position: absolute; width: 34%; max-width: 150px; aspect-ratio: 3/4; bottom: 12px; inset-inline-end: 12px;
+  z-index: 3; border-radius: 14px; overflow: hidden; background: #22283a; border: 2px solid rgba(255,255,255,.15);
+  display: flex; align-items: center; justify-content: center; }
+.self-initials { color: #fff; font-size: 2rem; font-weight: 800; opacity: .85; }
+.self-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+.captions { min-height: 70px; display: flex; flex-direction: column; gap: 6px; }
+.cap-teacher { font-size: 1.05rem; font-weight: 600; line-height: 1.4; }
+.cap-user { font-size: .95rem; color: var(--good); min-height: 20px; }
+
+.typed-row { display: none; gap: 8px; }
+.typed-row.open { display: flex; }
+.call-input { flex: 1; }
+
+.call-controls { display: flex; justify-content: center; gap: 14px; padding: 4px 0 2px; }
+.call-btn { width: 54px; height: 54px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--card); border: 1px solid var(--line); font-size: 1.3rem; box-shadow: var(--shadow);
+  transition: transform .1s; }
+.call-btn:active { transform: scale(.92); }
+.call-btn.mic { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; border: none; }
+.call-btn.mic.muted { background: #6b7280; }
+.call-btn.end { background: #ef4444; color: #fff; border: none; }
