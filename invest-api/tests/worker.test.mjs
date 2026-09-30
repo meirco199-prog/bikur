@@ -406,3 +406,94 @@ test('אוטומט: ביצוע רק בשעות המסחר בניו יורק — 
   const j = await r.json();
   if (!inTradingWindow()) { assert.equal(j.ran, false); assert.ok(j.deferred || /כבר רץ היום/.test(j.reason), JSON.stringify(j).slice(0, 200)); } // כבר רץ היום = בדיקות קודמות באותו KV
 });
+test('ערוץ ה-Council לכל הפרויקטים: project/type/title/body/source, ניתוב לפי רישום, פרויקט לא מוכר נדחה, דדופליקציה, סטטוס משימות, תאימות ל-{text}', async () => {
+  const e = { ...env, COUNCIL_SECRET: undefined, GH_COUNCIL_TOKEN: undefined, CRON_SECRET: 'cron-secret-for-tests', COUNCIL_PROJECTS: 'invest,food,english' };
+  const call = (path, { method = 'GET', body, bearer, auth } = {}) => worker.fetch(new Request('https://api.test' + path, { method, headers: { 'CF-Connecting-IP': '1.1.1.1', 'Content-Type': 'application/json', ...(bearer ? { Authorization: 'Bearer ' + bearer } : {}), ...(auth ? { Authorization: 'Bearer secret' } : {}) }, body: body ? JSON.stringify(body) : undefined }), e, { waitUntil(){} });
+  for (const k of [...store.keys()]) if (k.startsWith('council:')) store.delete(k);
+  const key = (await (await call('/council/secret', { auth: true })).json()).secret;
+  const n0 = githubPosts.length;
+  // הודעה מובנית ל-food
+  const r1 = await call('/council/comment', { method: 'POST', body: { project: 'food', type: 'bug', title: 'התזונאית מציעה דיאטה', body: 'ממצא: הפרומפט מאפשר…', source: 'gpt-audit' }, bearer: key }); const j1 = await r1.json();
+  assert.equal(r1.status, 200, JSON.stringify(j1)); assert.equal(j1.queued, true); assert.equal(j1.project, 'food'); assert.equal(j1.status, 'QUEUED'); assert.match(j1.id, /^cm_/);
+  // אותה הודעה שוב = כפילות: אותו id, בלי משימה חדשה ובלי ניצול מכסה
+  const r2 = await call('/council/comment', { method: 'POST', body: { project: 'food', type: 'bug', title: 'התזונאית מציעה דיאטה', body: 'ממצא: הפרומפט מאפשר…', source: 'gpt-audit' }, bearer: key }); const j2 = await r2.json();
+  assert.equal(j2.duplicate, true); assert.equal(j2.id, j1.id); assert.equal(j2.queued, false);
+  const r2b = await (await call('/council/comment', { method: 'POST', body: { project: 'english', type: 'test', title: 'x', body: 'y', idempotency_key: 'run-42' }, bearer: key })).json();
+  const r2c = await (await call('/council/comment', { method: 'POST', body: { project: 'english', type: 'test', title: 'אחר לגמרי', body: 'אחר', idempotency_key: 'run-42' }, bearer: key })).json();
+  assert.equal(r2c.duplicate, true); assert.equal(r2c.id, r2b.id, 'idempotency_key גובר על התוכן');
+  // פרויקט לא מוכר / type לא מוכר / חסר title — 400, שום דבר לא נכנס לתיבה
+  const bad = await call('/council/comment', { method: 'POST', body: { project: 'crypto-bot', type: 'bug', title: 't', body: 'b' }, bearer: key }); assert.equal(bad.status, 400); assert.match((await bad.json()).error, /project לא מוכר.*invest, food, english/);
+  assert.equal((await call('/council/comment', { method: 'POST', body: { project: '../etc', title: 't', body: 'b' }, bearer: key })).status, 400);
+  assert.equal((await call('/council/comment', { method: 'POST', body: { project: 'food', type: 'nuke', title: 't', body: 'b' }, bearer: key })).status, 400);
+  assert.equal((await call('/council/comment', { method: 'POST', body: { project: 'food', type: 'bug', body: 'b' }, bearer: key })).status, 400, 'מבנה חדש בלי title');
+  // תאימות: {text} בלבד → invest, בלי כותרת, בדיוק כמו קודם (מתחיל ב-**ChatGPT**)
+  const legacy = await (await call('/council/comment', { method: 'POST', body: { text: 'ממצא ישן-סגנון' }, bearer: key })).json(); assert.equal(legacy.project, 'invest'); assert.equal(legacy.queued, true);
+  const inbox = await (await call('/council/inbox?secret=cron-secret-for-tests')).json();
+  assert.deepEqual(inbox.projects, ['invest', 'food', 'english']); assert.equal(inbox.issues.invest, 25);
+  assert.equal(inbox.items.length, 3, 'שלוש הודעות: food, english, invest (הכפילויות לא נכנסו)');
+  const food = inbox.items[0]; assert.equal(food.project, 'food'); assert.equal(food.type, 'bug'); assert.match(food.body, /^\*\*ChatGPT\*\*/); assert.ok(food.body.includes('`project: food`') && food.body.includes('### התזונאית מציעה דיאטה') && food.body.includes(`<!-- council-msg id=${food.id} project=food type=bug hash=`));
+  const inv = inbox.items[2]; assert.equal(inv.project, 'invest'); assert.ok(inv.body.startsWith('**ChatGPT** (דרך ערוץ ה-Council, לא ישירות מהחשבון):\n\nממצא ישן-סגנון'), 'הפורמט הישן נשמר');
+  assert.equal(githubPosts.length, n0, 'בלי PAT לא פונים ל-GitHub מה-Worker');
+  // ה-relay מאשר עם קישורים ומספרי Issues → QUEUED → POSTED; thread לפי project
+  const ack = await (await call('/council/ack?secret=cron-secret-for-tests', { method: 'POST', body: { posted: [{ id: food.id, url: 'https://gh/98/c1', issue: 98 }], issues: { food: 98, english: 99, hacker: 1 } } })).json(); assert.equal(ack.left, 2);
+  const tasks = await (await call('/council/tasks?project=food', { bearer: key })).json(); assert.equal(tasks.items.length, 1); assert.equal(tasks.items[0].status, 'POSTED'); assert.equal(tasks.items[0].url, 'https://gh/98/c1'); assert.equal(tasks.items[0].issue, 98);
+  const st = await (await call('/council/status', { bearer: key })).json(); assert.deepEqual(st.issues, { invest: 25, food: 98, english: 99 }, 'פרויקט לא מוכר ב-issues נדחה');
+  assert.equal((await call('/council/thread?project=crypto-bot', { bearer: key })).status, 400);
+  // Claude סימן סטטוס בתגובה → ה-relay מדווח → ChatGPT רואה
+  assert.equal((await call('/council/task-status', { method: 'POST', body: { updates: [{ id: food.id, status: 'PR_OPEN' }] } })).status, 401, 'עדכון סטטוס רק עם סוד ה-cron');
+  const up = await (await call('/council/task-status?secret=cron-secret-for-tests', { method: 'POST', body: { updates: [{ id: food.id, status: 'PR_OPEN', pr: 'https://github.com/x/pull/9' }, { id: food.id, status: 'BOGUS' }, { id: 'cm_nope', status: 'PASS' }] } })).json(); assert.equal(up.updated, 1);
+  const one = await (await call(`/council/tasks?id=${food.id}`, { bearer: key })).json(); assert.equal(one.items[0].status, 'PR_OPEN'); assert.equal(one.items[0].pr, 'https://github.com/x/pull/9');
+  const dupAgain = await (await call('/council/comment', { method: 'POST', body: { project: 'food', type: 'bug', title: 'התזונאית מציעה דיאטה', body: 'ממצא: הפרומפט מאפשר…', source: 'gpt-audit' }, bearer: key })).json(); assert.equal(dupAgain.status, 'PR_OPEN', 'כפילות מחזירה את הסטטוס הנוכחי');
+  // E2E מ-GitHub Actions: סוד ה-cron מורשה לשלוח הודעת בדיקה בלי מפתח ה-GPT; source נעול ל-e2e-test
+  const e2e = await (await call('/council/comment?secret=cron-secret-for-tests', { method: 'POST', body: { project: 'english', type: 'test', title: 'בדיקה', body: 'b' } })).json(); assert.equal(e2e.queued, true);
+  const inbox2 = await (await call('/council/inbox?secret=cron-secret-for-tests')).json(); assert.ok(inbox2.items.find((m) => m.id === e2e.id).body.includes('`source: e2e-test`'));
+  const projects = await (await call('/council/projects', { bearer: key })).json(); assert.deepEqual(projects.projects, ['invest', 'food', 'english']); assert.ok(projects.types.includes('security') && projects.statuses.includes('OWNER_DECISION_REQUIRED'));
+  for (const k of [...store.keys()]) if (k.startsWith('council:')) store.delete(k);
+});
+test('MCP (/council/mcp): ChatGPT כ-connector — dual-era (2026-07-28 ו-initialize), אימות, כלים מעל אותם נתיבים, כפילויות, שגיאות', async () => {
+  const e = { ...env, COUNCIL_SECRET: undefined, GH_COUNCIL_TOKEN: undefined, CRON_SECRET: 'cron-secret-for-tests', COUNCIL_PROJECTS: 'invest,food,english' };
+  const call = (path, { method = 'GET', body, bearer, auth, headers = {} } = {}) => worker.fetch(new Request('https://api.test' + path, { method, headers: { 'CF-Connecting-IP': '1.1.1.1', 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...(bearer ? { Authorization: 'Bearer ' + bearer } : {}), ...(auth ? { Authorization: 'Bearer secret' } : {}), ...headers }, body: body ? JSON.stringify(body) : undefined }), e, { waitUntil(){} });
+  for (const k of [...store.keys()]) if (k.startsWith('council:')) store.delete(k);
+  const key = (await (await call('/council/secret', { auth: true })).json()).secret;
+  const rpc = (body, opts = {}) => call('/council/mcp', { method: 'POST', body, bearer: key, ...opts });
+  // תחבורה ואימות
+  assert.equal((await call('/council/mcp', { bearer: key })).status, 405, 'GET → 405');
+  assert.equal((await call('/council/mcp', { method: 'POST', body: { jsonrpc: '2.0', id: 1, method: 'tools/list' } })).status, 401, 'בלי מפתח');
+  assert.equal((await call('/council/mcp', { method: 'POST', body: { jsonrpc: '2.0', id: 1, method: 'tools/list' }, bearer: 'wrong-' + key })).status, 401);
+  // legacy: initialize → tools/list → tools/call
+  const init = await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'openai-mcp', version: '1.0.0' } } }); const ij = await init.json();
+  assert.equal(init.status, 200); assert.equal(ij.result.protocolVersion, '2025-06-18'); assert.ok(ij.result.capabilities.tools && ij.result.serverInfo.name); assert.equal(ij.result.resultType, undefined, 'legacy בלי resultType');
+  assert.equal((await rpc({ jsonrpc: '2.0', method: 'notifications/initialized' })).status, 202);
+  assert.deepEqual((await (await rpc({ jsonrpc: '2.0', id: 2, method: 'ping' })).json()).result, {});
+  const list = await (await rpc({ jsonrpc: '2.0', id: 3, method: 'tools/list' })).json();
+  assert.deepEqual(list.result.tools.map((t) => t.name), ['postCouncilComment', 'getCouncilTasks', 'getCouncilProjects', 'getCouncilThread', 'getCouncilStatus']);
+  assert.deepEqual(list.result.tools[0].inputSchema.required, ['project', 'type', 'title', 'body']); assert.deepEqual(list.result.tools[0].inputSchema.properties.project.enum, ['invest', 'food', 'english']);
+  assert.equal(list.result.tools[1].annotations.readOnlyHint, true); assert.equal(list.result.tools[0].annotations.readOnlyHint, false);
+  const proj = await (await rpc({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'getCouncilProjects', arguments: {} } })).json();
+  assert.equal(proj.result.isError, false); assert.deepEqual(proj.result.structuredContent.projects, ['invest', 'food', 'english']); assert.equal(proj.result.content[0].type, 'text');
+  const post = await (await rpc({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'postCouncilComment', arguments: { project: 'food', type: 'security', title: 'בדיקה מ-MCP', body: 'גוף', source: 'gpt-audit' } } })).json();
+  assert.equal(post.result.isError, false); assert.equal(post.result.structuredContent.queued, true); assert.match(post.result.structuredContent.id, /^cm_/); assert.equal(post.result.structuredContent.status, 'QUEUED');
+  const dup = await (await rpc({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'postCouncilComment', arguments: { project: 'food', type: 'security', title: 'בדיקה מ-MCP', body: 'גוף', source: 'gpt-audit' } } })).json();
+  assert.equal(dup.result.structuredContent.duplicate, true); assert.equal(dup.result.structuredContent.id, post.result.structuredContent.id);
+  const inbox = await (await call('/council/inbox?secret=cron-secret-for-tests')).json(); assert.equal(inbox.items.length, 1); assert.equal(inbox.items[0].project, 'food'); assert.ok(inbox.items[0].body.includes('`source: gpt-audit`'));
+  const bad = await (await rpc({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'postCouncilComment', arguments: { project: 'crypto', type: 'bug', title: 't', body: 'b' } } })).json();
+  assert.equal(bad.result.isError, true); assert.match(bad.result.content[0].text, /^Error: project לא מוכר/);
+  const tasks = await (await rpc({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'getCouncilTasks', arguments: { project: 'food' } } })).json(); assert.equal(tasks.result.structuredContent.items[0].id, post.result.structuredContent.id);
+  const unknownTool = await (await rpc({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'nuke', arguments: {} } })).json(); assert.equal(unknownTool.error.code, -32602);
+  assert.equal((await (await rpc({ jsonrpc: '2.0', id: 10, method: 'resources/list' })).json()).error.code, -32601);
+  // modern (2026-07-28): server/discover, כותרות, גרסה לא נתמכת, 404 למתודה לא מוכרת
+  const modernHdr = { 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'server/discover' };
+  const disc = await rpc({ jsonrpc: '2.0', id: 'openai-mcp-discover', method: 'server/discover', params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientInfo': { name: 'openai-mcp', version: '1.0.0' }, 'io.modelcontextprotocol/clientCapabilities': {} } } }, { headers: modernHdr }); const dj = await disc.json();
+  assert.equal(disc.status, 200); assert.equal(dj.result.resultType, 'complete'); assert.ok(dj.result.supportedVersions.includes('2026-07-28')); assert.equal(dj.result._meta['io.modelcontextprotocol/serverInfo'].name, 'bikur-ai-council'); assert.ok(dj.result.instructions.includes('postCouncilComment'));
+  const mlist = await (await rpc({ jsonrpc: '2.0', id: 11, method: 'tools/list', params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } } }, { headers: { 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/list' } })).json();
+  assert.equal(mlist.result.resultType, 'complete'); assert.equal(mlist.result.ttlMs, 300000); assert.equal(mlist.result.tools.length, 5);
+  const mcall = await (await rpc({ jsonrpc: '2.0', id: 12, method: 'tools/call', params: { name: 'getCouncilStatus', arguments: {}, _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } } }, { headers: { 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': 'getCouncilStatus' } })).json();
+  assert.equal(mcall.result.resultType, 'complete'); assert.equal(mcall.result.structuredContent.pending, 1);
+  const mism = await rpc({ jsonrpc: '2.0', id: 13, method: 'tools/list' }, { headers: { 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call' } }); assert.equal(mism.status, 400); assert.equal((await mism.json()).error.code, -32020);
+  const unsup = await rpc({ jsonrpc: '2.0', id: 14, method: 'tools/list' }, { headers: { 'MCP-Protocol-Version': '2030-01-01' } }); assert.equal(unsup.status, 400); const uj = await unsup.json(); assert.equal(uj.error.code, -32022); assert.ok(uj.error.data.supported.includes('2026-07-28'));
+  assert.equal((await rpc({ jsonrpc: '2.0', id: 15, method: 'resources/list' }, { headers: { 'MCP-Protocol-Version': '2026-07-28' } })).status, 404);
+  // מפתח בנתיב (connector במצב No authentication) — בלי כותרת Authorization
+  const viaPath = await call(`/council/mcp/${key}`, { method: 'POST', body: { jsonrpc: '2.0', id: 16, method: 'tools/call', params: { name: 'getCouncilProjects', arguments: {} } } }); assert.equal(viaPath.status, 200); assert.equal((await viaPath.json()).result.structuredContent.ok, true);
+  assert.equal((await call('/council/mcp/wrong-key-000', { method: 'POST', body: { jsonrpc: '2.0', id: 17, method: 'tools/list' } })).status, 401);
+  for (const k of [...store.keys()]) if (k.startsWith('council:')) store.delete(k);
+});

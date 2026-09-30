@@ -628,3 +628,46 @@ PR ומונחים; הפרטים הטכניים מאחורי קישור.
 במסך של IBKR יתאימו לסוכן (~200 אלף ש"ח). האיפוס בוצע ע"י מאיר ב-29/9 ונכנס לתוקף ביום המסחר הבא; אחריו הגשר מעתיק מחדש את פוזיציות
 הסוכן (`broker-sync`). השוואות הדמה מתחילות מחדש מיום הסנכרון החדש; העסקאות של 29/9 (מיליון $) נשארות ביומן כהיסטוריה.
 **Status:** IMPLEMENTED — רץ עם המדיניות המקורית; תקופת מדידה בכסף דמה, ההכרעות בסוף התהליך.
+
+### AI_COUNCIL#22: GPT Reviewer — המהנדס המבקר האוטומטי לכל הפרויקטים (לא רק invest)
+**קטגוריה:** תשתית תיאום (הכללה של #18/#19 מעבר לפלטפורמת ההשקעות).
+**Issue:** בעל הריפו (29/9): "בכל פעם ש-Claude מסיים שינוי מהותי / PR / push, OpenAI יהיה מהנדס מבקר אוטומטי, יקרא את ה-diff
+והקוד הרלוונטי, וייתן הערות ישירות ב-GitHub בלי שמאיר יצטרך להעביר הודעות". general purpose, לא כפול לתשתית הקיימת.
+**Claude position (אחרי audit):** ממחזר מ-`council-chatgpt.mjs` את דפוס הקריאה ל-OpenAI (reasoning, תקציב פלט גדול), הסתרת סודות,
+סמן HTML לדדופליקציה וזיהוי תשובות Claude לפי החתימה; **לא** ממחזר את `council-relay` (תיבת KV ל-GPT המותאם → Issue #25) —
+לסקירת PR תגובה ישירה מ-Action עם `GITHUB_TOKEN` פשוטה ובטוחה יותר, כפי שמאיר ביקש. נבנה חדש: `.github/gpt-review/review.mjs`
+(הקשר בתקציב: דרישה/Issue, diff, קבצים, check runs, בדיקות לפי מדיניות, README, `.ai/REVIEW.md`; פלט JSON מובנה; סבבים;
+תוויות; check), `gpt-review.yml` (PR / push ל-main / dispatch / `workflow_call` לריפוזיטוריז אחרים), מדיניות לכל פרויקט
+(`.ai/REVIEW.md`: כללי, english, food, invest-api), והצד של Claude ב-`CLAUDE.md` (מנוי לאירועי ה-PR, evidence first, מיזוג רק
+אחרי PASS, עצירה ב-OWNER_DECISION/APPROVAL) + Routine גיבוי לסשנים שנסגרו. ה-council היומי ב-Issue #25 נשאר כפי שהוא.
+**Evidence:** `.github/gpt-review/review.test.mjs` (דילוג, סבבים/דדופ/סבב הכרעה, אותות Claude, מדיניות, תקציב diff, אכיפת
+הפסיקה, פורמט התגובה, הסתרת סודות); PR האימות של המנגנון עצמו (הסקירה הראשונה רצה עליו).
+**Risks:** עלות לסבב (~20–40K קלט + עד 16K פלט, `gpt-5`); סקירה שגויה — לכן Claude מאמת ולא מקבל אוטומטית; לולאה — לכן
+MAX_REVIEW_ROUNDS=3 ואז הכרעת מאיר. שערי אישור (כסף, ספקים, secrets, מחיקה, ארכיטקטורה, מהות המוצר) לא בידי המודלים.
+**Owner decision:** "תיישם, תבדוק על PR אמיתי, ותוודא שהלולאה Claude → GPT → Claude → GPT עובדת בלי התערבות" (29/9).
+**Status:** RESOLVED (29/9) — אומת על PR #93 (המנגנון עצמו), שלושה סבבים בלי התערבות של בעל הריפו: סבב 1 PASS עם 3 ממצאים
+אופציונליים (2 תוקנו, 1 חלקית) ושני שערי אישור (אחד נדחה עם ראיה — צריכת סוד קיים; אחד אושר בדרישה עצמה — העלות) → סבב 2
+BLOCKED על "assert בלתי אפשרי" — ממצא שווא שנגרם מהרדקציה של ההקשר (המפתחות המזויפים בבדיקות הפכו ל-[REDACTED]); Claude
+דחה עם ראיה (check ירוק + ריצה מקומית) ותיקן את ההנחיה למודל → סבב 3 PASS, והמבקר אישר שסבב 2 היה שגוי. עלות: ~29K קלט +
+~8K פלט לסבב (gpt-5, medium). לקח: הרדקציה נכונה, אבל המודל חייב לדעת ש-[REDACTED] הוא placeholder. הדחיפה ל-main אחרי
+המיזוג דילגה כצפוי ("מיזוג של PR שכבר נסקר").
+
+### AI_COUNCIL#23: ערוץ ה-Council לכל הפרויקטים — project routing, סטטוס משימות, ו-Claude עוקב אוטומטית
+**קטגוריה:** תשתית תיאום (הכללה של #18/#19/#22). **Issue:** בעל הריפו (29/9): "GPT יוכל לשלוח משימה/ביקורת עם project (food /
+english / invest / עתידי) והמערכת תנתב אותה אוטומטית למקום שבו Claude יכול לקרוא, להגיב ולבצע. אל תבנה מערכת חדשה ואל תשבור
+את Council ההשקעות." **Claude position:** אותו Worker, אותה תיבה, אותו relay, אותו מפתח — נוספו: `project/type/title/body/source`
+ב-`POST /council/comment` (תאימות: `{text}` = invest/#25 בדיוק כמו קודם), אימות `project` מול רשימה שמוזרקת בפריסה מתוך
+`.github/council/projects.json` (לא הרשאה — ניתוב; לא מוכר → 400), דדופליקציה לפי hash/`idempotency_key` (אותה הודעה = אותה
+משימה, בלי מכסה), רישום סטטוס לכל משימה (`GET /council/tasks`), relay כסקריפט (`.github/council/relay.mjs`) שמנתב ל-Issue של
+הפרויקט (food #98, english #99; פרויקט חדש → Issue שנפתח אוטומטית עם `council:<project>`), מדלג על מה שכבר פורסם, ומסנכרן את
+סמני הסטטוס של Claude (`<!-- council-status id=… status=… -->`) בחזרה ל-Worker. Claude: Routine "AI Council inbox" לכל הפרויקטים
+חוץ מ-invest (שנשאר עם ה-Routine של #25), evidence first, PR → GPT Reviewer (#22). **החלטת בעל הריפו ב-food:** כל חוקי התזונה
+הנוכחיים נשארים — נרשם ב-`projects.json` (`owner_rules`), ב-`food/.ai/REVIEW.md` וב-Issue #98.
+**Evidence:** `invest-api/tests/worker.test.mjs` (34, כולל תאימות, פרויקט לא מוכר, כפילויות, סטטוסים), `.github/council/relay.test.mjs`
+(6: ניתוב, לא ברישום → FAILED בלי פרסום, דדופ, סטטוסים, E2E). קצה-לקצה: "AI Council relay" → Run workflow → `e2e_project`.
+**Risks:** מכסה משותפת (20/יום) לכל הפרויקטים; Issue #25 ממשיך לקבל גם הודעות ישנות-סגנון. **Owner decision:** "פתח PR; אל תמזג
+לפני CI ירוק ו-GPT Reviewer PASS". **Status:** RESOLVED (29/9) — E2E: food → #98, english → #99, כפילות נדחתה, Claude סימן RECEIVED→DONE
+(Routine על סשן קבוע — סשן חדש מ-trigger ללא sources לא מקבל גישת כתיבה ל-GitHub; תוקן), סטטוסים סונכרנו ל-Worker.
+**תוספת (29/9, בקשת מאיר "שה-ChatGPT הרגיל יוכל לקרוא ל-postCouncilComment"):** `POST /council/mcp` — שרת MCP dual-era
+(2026-07-28 `server/discover` + legacy `initialize`) שעוטף את אותם נתיבים; ChatGPT מתחבר כ-custom connector ב-Developer mode
+(`.github/council/CHATGPT_SETUP.md`). מפתח: Bearer או בנתיב (`/council/mcp/<key>`) ל-connector בלי אימות.

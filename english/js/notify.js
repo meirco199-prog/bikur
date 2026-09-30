@@ -12,6 +12,10 @@ import { S, save } from "./store.js";
 import { srsCounts } from "./srs.js";
 import { todayStr, daysBetween } from "./util.js";
 import { ensurePush, syncPush, disablePush, pushSupported } from "./push.js";
+import { TEACHERS } from "./avatar.js";
+
+// תזכורת לשיעור החי: כמה דקות לפני המועד שנקבע
+export const LESSON_LEAD_MIN = 10;
 
 export function notifSupported(){ return "Notification" in window; }
 
@@ -59,10 +63,32 @@ function goalMetDate(){
 // המצב שגם ה-SW וגם השרת מקבלים. שים לב: "למד היום" נמדד לפי האימון היומי /
 // עמידה ביעד הדקות — לא לפי כל פעילות קטנה, אחרת פתיחה חטופה של האפליקציה
 // הייתה מבטלת את התזכורת של אותו יום.
+// השיעור החי שנקבע (יום/שעה) — אותו מבנה מגיע ל-SW ולשרת. null = לא נקבע.
+export function lessonSchedule(){
+  const sc = S.course?.schedule;
+  if (!sc || sc.weekday == null || !/^\d{1,2}:\d{2}$/.test(sc.time || "")) return null;
+  const t = TEACHERS.find(x => x.id === sc.teacherId) || TEACHERS[0];
+  const next = S.course.next;
+  return {weekday: sc.weekday, time: sc.time, title: `${t.name}${next ? ` · Lesson ${next.n} — ${next.title}` : ""}`};
+}
+
+// האם תזכורת לשיעור מגיעה עכשיו: היום הנכון, בחלון [LEAD דקות לפני, 30 אחרי], ולא הותרע להיום.
+// אותה לוגיקה בדיוק חיה גם ב-sw.js (ל-push/periodicsync) — לשמור מסונכרן.
+export function lessonDueNow(st, now = new Date()){
+  const l = st?.lesson;
+  if (!l || !st.enabled) return false;
+  if (now.getDay() !== l.weekday) return false;
+  if (st.lessonNotifiedOn === todayStr(now)) return false;
+  const [h, m] = l.time.split(":").map(Number);
+  const target = h * 60 + m, mins = now.getHours() * 60 + now.getMinutes();
+  return mins >= target - LESSON_LEAD_MIN && mins <= target + 30;
+}
+
 export function reminderState(){
   return {
     enabled: !!S.settings.notifs,
     time: S.profile.reminderTime || "20:00",
+    lesson: lessonSchedule(),
     lastLesson: S.lessonDate,
     metGoal: goalMetDate(),
     lastActive: S.game.lastActive,
@@ -93,6 +119,7 @@ export async function enableNotifs(){
     // קודם השכבות המקומיות: הן לא תלויות ברשת, ואם הרישום לשרת נכשל
     // לפחות תהיה תזכורת כשהאפליקציה פתוחה — במקום שום דבר.
     scheduleDaily();
+    scheduleLesson();
     registerPeriodicSync();
     // הרישום לשרת ממשיך ברקע גם אם הוא איטי — לא מקפיאים את הכפתור עליו
     const registering = ensurePush(state);
@@ -113,6 +140,7 @@ export async function disableNotifs(){
   S.settings.notifs = false;
   save();
   clearTimeout(reminderTimer);
+  clearTimeout(lessonTimer);
   await syncReminderState();
   await disablePush();
   try {
@@ -148,6 +176,63 @@ export function scheduleDaily(){
     await remindIfDue();
     scheduleDaily();
   }, delay);
+}
+
+// ---------- תזכורת לשיעור החי שנקבע (יום+שעה): טיימר מקומי ל-LEAD דקות לפני ----------
+let lessonTimer = null;
+export function nextLessonReminderAt(now = new Date()){
+  const l = lessonSchedule();
+  if (!l) return null;
+  const [h, m] = l.time.split(":").map(Number);
+  const d = new Date(now); d.setHours(h, m - LESSON_LEAD_MIN, 0, 0);
+  let delta = (l.weekday - d.getDay() + 7) % 7;
+  if (delta === 0 && d <= now) delta = 7;
+  d.setDate(d.getDate() + delta);
+  return d;
+}
+export function scheduleLesson(){
+  clearTimeout(lessonTimer);
+  if (!notifSupported() || Notification.permission !== "granted" || !S.settings.notifs) return false;
+  const l = lessonSchedule();
+  if (!l) return false;
+  // נקבע שיעור להיום פחות מ-LEAD דקות לפני המועד (או כבר בתוך החלון)? מתריעים עכשיו, לא בשבוע הבא
+  if (lessonDueNow({enabled: true, lesson: l})) remindLessonIfDue();
+  const at = nextLessonReminderAt();
+  if (!at) return false;
+  const delay = Math.min(at - new Date(), 2 ** 31 - 1);
+  lessonTimer = setTimeout(async () => {
+    await remindLessonIfDue();
+    scheduleLesson();
+  }, Math.max(0, delay));
+  return true;
+}
+export async function remindLessonIfDue(){
+  if (!S.settings.notifs || Notification.permission !== "granted") return false;
+  const state = await syncReminderState();
+  if (!lessonDueNow(state)) return false;
+  const shown = await showLessonReminder(state.lesson);
+  if (shown) await idbSet({...state, lessonNotifiedOn: todayStr()});
+  return shown;
+}
+export async function showLessonReminder(lesson){
+  const title = `השיעור שלך מתחיל ב-${lesson.time} 🎥`;
+  const opts = {body: `${lesson.title} — היכנס, המורה מחכה`, icon: "icon-192.png", badge: "icon-192.png", tag: "lesson-reminder",
+    dir: "rtl", lang: "he", data: {url: "./#/live"}};
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg?.showNotification){ await reg.showNotification(title, opts); return true; }
+  } catch {}
+  try { new Notification(title, opts); return true; } catch {}
+  return false;
+}
+// מה יקרה בפועל עם התזכורת לשיעור — למסך התזמון (לא מבטיחים מה שלא יגיע)
+export function lessonReminderStatus(){
+  if (!lessonSchedule()) return {ok: false, reason: "no_schedule", text: "לא נקבע מועד"};
+  if (!notifSupported()) return {ok: false, reason: "unsupported", text: "הדפדפן הזה לא תומך בהתראות — לא תגיע תזכורת"};
+  if (!S.settings.notifs || Notification.permission !== "granted") return {ok: false, reason: "off", text: "ההתראות כבויות — לא תגיע תזכורת לשיעור"};
+  return {ok: true, reason: pushSupported() ? "push" : "local",
+    text: pushSupported() ? `תזכורת ${LESSON_LEAD_MIN} דקות לפני — גם כשהאפליקציה סגורה, אם המכשיר רשום לשרת ההתראות (מצב הרישום בפרופיל)`
+      : `תזכורת ${LESSON_LEAD_MIN} דקות לפני — רק כשהאפליקציה פתוחה (אין Web Push בדפדפן הזה)`};
 }
 
 // בדיקה מרוכזת: האם מגיעה תזכורת עכשיו, ואם כן — להציג אותה פעם אחת ביום

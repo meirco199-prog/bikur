@@ -1,5 +1,9 @@
 # ערוץ הכתיבה של ChatGPT ל-AI Council (Issue #25)
 
+> **עודכן (AI_COUNCIL#23):** הערוץ משרת עכשיו את כל הפרויקטים — `project` בהודעה מנתב ל-Issue של הפרויקט (invest → #25 כמו
+> תמיד), עם דדופליקציה וסטטוס לכל משימה. פירוט: [`.github/council/README.md`](../../.github/council/README.md). כל מה שלמטה
+> נשאר תקף ל-invest.
+
 **למה:** מחבר ה-GitHub של ChatGPT הוא קריאה בלבד (`403 Resource not accessible by integration` בכתיבה); את הרשאות האפליקציה
 קובע מי שבנה אותה, לא מי שמתקין אותה.
 
@@ -18,6 +22,8 @@
 ("צור מפתח חדש"). אם מעדיפים סוד קבוע ב-Secrets — `COUNCIL_SECRET` גובר.
 
 ## מה צריך לעשות (פעם אחת)
+> מדריך מעודכן לסכימה v2 (project/type/title/body, getCouncilTasks): [`.github/council/CHATGPT_SETUP.md`](../../.github/council/CHATGPT_SETUP.md).
+
 1. באפליקציה: **הגדרות → ערוץ ה-Council → "הצג מפתח" → "העתק"**.
 2. ב-ChatGPT: GPT מותאם → Configure → **Actions → Import from URL**:
    `https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml`

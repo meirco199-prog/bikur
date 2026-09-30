@@ -51,6 +51,7 @@ ${facts.length ? `דברים שאתם זוכרים משיחות קודמות (ל
 התפריט המשפחתי: בוקר — חלבון (חביתה/טונה/קוטג') עם פיתה או לחמנייה. צהריים — אוכלים טוב, בלי מטוגנים כמו צ'יפס. ביניים — פרי (עדיף) או חטיף בריאות. ערב — עד 19:00, חלבון בלבד (ביצים/טונה/סלט). לפני כל ארוחה 1-2 כוסות מים. שקילה פעם בשבוע. שישי יום צ'יט.
 
 כללי ברזל (בטיחות ילדים — אין לחרוג):
+- עברית בלבד, תקנית וטבעית! בלי מילים מומצאות, בלי שגיאות דקדוק, בלי תעתיק ובלי לערבב אנגלית. משפטים קצרים ופשוטים כמו שמדברים. הקפד/הקפידי על זכר/נקבה נכונים${c.gender === 'f' ? ' (הילדה — לשון נקבה: אכלת, רוצה, תספרי)' : c.gender === 'm' ? ' (הילד — לשון זכר: אכלת, רוצה, תספר)' : ''}. אם אינך בטוח/ה בניסוח — בחר/י ניסוח פשוט יותר.
 - לעולם לא מדברים על קלוריות, דיאטה, הרזיה, "שמן/ה", "נכשלת", "אכלת רע" או ספירה של אוכל.
 - לא ממציאים יעדי משקל ולא מעודדים לאכול פחות. אם עולה נושא רגיש של משקל/גוף — מרגיעים, מחזקים, ומציעים לדבר עם ההורים.
 - הדגש תמיד חיובי: מגוון, חלבון, ירקות ופירות, מים, ארוחות מסודרות, אנרגיה, שינה ותנועה.
@@ -60,7 +61,7 @@ ${facts.length ? `דברים שאתם זוכרים משיחות קודמות (ל
 מה את/ה יודע/ת לעשות (actions):
 כשהילד מספר מה אכל — תמצת כל פריט לארוחה הנכונה. כשאומר משקל חדש — הצע לעדכן. גובה — אותו דבר.
 פורמט התשובה — JSON בלבד, בלי markdown ובלי טקסט מסביב:
-{"say":"מה שאתה אומר בקול (עברית מדוברת, בלי אימוג'ים)","actions":[...],"remember":["עובדה חדשה ששווה לזכור לשיחות הבאות (רק אם באמת יש)"]}
+{"say":"מה שאתה אומר בקול (עברית תקנית ומדוברת בלבד, בלי אימוג'ים ובלי אנגלית)","actions":[...],"remember":["עובדה חדשה ששווה לזכור לשיחות הבאות (רק אם באמת יש)"]}
 סוגי actions:
 - {"type":"addMeal","meal":"breakfast|lunch|snack|dinner","text":"מה נאכל, בקצרה"} — פריט אחד לכל מאכל/מנה. "בבית ספר"/"הפסקה" = breakfast אם בוקר, אחרת snack לפי הקשר.
 - {"type":"addWeight","kg":42.3}
@@ -77,8 +78,36 @@ ${ctx.facts && ctx.facts.length ? `מהשיחות עם הילד: ${ctx.facts.joi
 }
 
 // ---------- הרצת מודל: Claude אם יש מפתח, אחרת Workers AI ----------
+// סדר המודלים החינמיים — לפי איכות העברית: gpt-oss-120b כותב עברית הרבה יותר
+// תקינה מ-Llama; Llama נשאר כגיבוי בלבד.
 
-const WORKERS_AI_MODELS = ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct'];
+const WORKERS_AI_MODELS = [
+  '@cf/openai/gpt-oss-120b',
+  '@cf/google/gemma-3-12b-it',
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/meta/llama-3.1-8b-instruct',
+];
+
+// כל מודל מחזיר צורה קצת אחרת — מחלצים טקסט מכל הצורות המוכרות
+function extractText(r){
+  if (!r) return '';
+  if (typeof r === 'string') return r.trim();
+  if (typeof r.response === 'string' && r.response.trim()) return r.response.trim();
+  if (typeof r.result === 'string' && r.result.trim()) return r.result.trim();
+  if (typeof r.output_text === 'string' && r.output_text.trim()) return r.output_text.trim();
+  if (Array.isArray(r.output)){
+    const parts = [];
+    for (const item of r.output){
+      if (item && item.type === 'message' && Array.isArray(item.content)){
+        for (const c of item.content){
+          if (c && typeof c.text === 'string' && c.type !== 'reasoning_text') parts.push(c.text);
+        }
+      }
+    }
+    if (parts.length) return parts.join('').trim();
+  }
+  return '';
+}
 
 async function runClaude(env, system, messages, maxTokens){
   const model = env.CLAUDE_MODEL || 'claude-opus-5-5';
@@ -105,26 +134,66 @@ async function runClaude(env, system, messages, maxTokens){
   return text;
 }
 
+// תקציב זמן לכל ניסיון — שיחה קולית לא יכולה לחכות חצי דקה למודל תקוע
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('model_timeout')), ms)),
+  ]);
+}
+
 async function runWorkersAI(env, system, messages, maxTokens){
   if (!env.AI) throw new Error('no_ai');
   let lastErr;
   for (const model of WORKERS_AI_MODELS){
-    try {
-      const r = await env.AI.run(model, {
-        messages: [{role: 'system', content: system}, ...messages],
-        max_tokens: maxTokens,
-        temperature: 0.6,
-      });
-      const text = (r && (r.response || r.result || '')).trim();
-      if (text) return text;
-    } catch (e) { lastErr = e; }
+    // gpt-oss הוא מודל חשיבה — בלי הגבלת עומק הוא איטי מדי לשיחה קולית.
+    // מנסים עם חשיבה מקוצרת, ואם השדה לא נתמך — בלעדיו.
+    const attempts = model.includes('gpt-oss')
+      ? [
+          {instructions: system, input: messages.map(m => ({role: m.role, content: m.content})), reasoning: {effort: 'low'}},
+          {instructions: system, input: messages.map(m => ({role: m.role, content: m.content}))},
+        ]
+      : [{
+          messages: [{role: 'system', content: system}, ...messages],
+          max_tokens: maxTokens,
+          temperature: 0.5,
+        }];
+    for (const params of attempts){
+      try {
+        const r = await withTimeout(env.AI.run(model, params), model.includes('gpt-oss') ? 15000 : 10000);
+        const text = extractText(r);
+        if (text) return text;
+        break; // המודל ענה ריק — עוברים למודל הבא, לא לניסיון נוסף באותו מודל
+      } catch (e) { lastErr = e; if (e.message === 'model_timeout') break; }
+    }
   }
   throw lastErr || new Error('ai_failed');
+}
+
+// המוח של רמי: קריאה פנימית (service binding) ל-Worker של רמי, שמחזיק כבר
+// מפתח Claude. ככה התזונאית מדברת באותו מוח בלי להגדיר מפתח נוסף.
+async function runViaRemi(env, system, messages, maxTokens){
+  if (!env.REMI) throw new Error('no_remi');
+  const r = await withTimeout(env.REMI.fetch('https://remi-internal/claude', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({system, messages, max_tokens: maxTokens}),
+  }), 25000);
+  if (!r.ok) throw new Error('remi_' + r.status);
+  const data = await r.json();
+  if (data.stop_reason === 'refusal') throw new Error('remi_refusal');
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  if (!text.trim()) throw new Error('remi_empty');
+  return text;
 }
 
 async function runLLM(env, system, messages, maxTokens = 700){
   if (env.ANTHROPIC_API_KEY){
     try { return await runClaude(env, system, messages, maxTokens); }
+    catch (e) { /* ממשיכים למוח של רמי */ }
+  }
+  if (env.REMI){
+    try { return await runViaRemi(env, system, messages, maxTokens); }
     catch (e) { /* נופלים חזרה ל-Workers AI */ }
   }
   return runWorkersAI(env, system, messages, maxTokens);

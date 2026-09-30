@@ -2427,6 +2427,41 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // שער פנימי לאפליקציות אחיות בחשבון (service binding בלבד — מבחוץ אי אפשר
+    // להגיע ל-Host הזה, בקשות חיצוניות מגיעות תמיד עם הדומיין הציבורי):
+    // מריץ קריאת Claude עם המפתח של רמי, כדי שאפליקציה כמו יומן האוכל תדבר
+    // באותו מוח בלי להגדיר מפתח נוסף. בלי מפתח — 503 והצד השני נופל לגיבוי שלו.
+    if (url.hostname === 'remi-internal') {
+      const jsonResp = (obj, status = 200) =>
+        new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
+      if (url.pathname !== '/claude' || request.method !== 'POST') return jsonResp({ error: 'not_found' }, 404);
+      if (!env.ANTHROPIC_API_KEY) return jsonResp({ error: 'no_key' }, 503);
+      let body;
+      try { body = await request.json(); } catch { body = null; }
+      if (!body || !Array.isArray(body.messages) || !body.messages.length) return jsonResp({ error: 'bad_request' }, 400);
+      const model = env.CLAUDE_MODEL || 'claude-opus-5';
+      const payload = {
+        model,
+        max_tokens: Math.min(Number(body.max_tokens) || 700, 1500),
+        system: String(body.system || '').slice(0, 9000),
+        messages: body.messages.slice(-20).map(m => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: String(m.content || '').slice(0, 1500),
+        })),
+      };
+      if (/opus-5|sonnet-5|fable/.test(model)) payload.output_config = { effort: 'low' };
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      return new Response(await res.text(), { status: res.status, headers: { 'content-type': 'application/json' } });
+    }
+
     // חיבור ה-webhook — מבקרים פעם אחת בדפדפן: /setup?secret=<SECRET>
     if (url.pathname === '/setup') {
       if (url.searchParams.get('secret') !== env.SECRET) return new Response('סוד שגוי', { status: 403 });

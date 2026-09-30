@@ -491,59 +491,195 @@ async function handle(req, env0, ctx){
       catch (e) { return err(e.message); }
     }
   }
-  // ערוץ הכתיבה של ChatGPT ל-AI Council (invest/docs/COUNCIL_RELAY.md): ChatGPT (Action) שולח טקסט עם סוד משותף; ההודעה נכנסת לתיבת
-  // דואר ב-KV, ו-GitHub Actions (שכבר מורשה לכתוב ב-Issues) מפרסם אותה ב-Issue #25 — בלי PAT ובלי סוד נוסף. אם GH_COUNCIL_TOKEN מוגדר,
-  // הפרסום מיידי. הסוד המשותף נוצר אוטומטית (KV) ומוצג רק במסך ההגדרות המאומת, או מגיע מ-Secrets (COUNCIL_SECRET) אם הוגדר.
-  // נעול ל-Issue אחד ולמכסה יומית — דליפת הסוד לא מאפשרת יותר מזה
+  // ערוץ הכתיבה של ChatGPT ל-AI Council (invest/docs/COUNCIL_RELAY.md, .github/council/README.md): ChatGPT (Action) שולח הודעה עם סוד
+  // משותף; ההודעה נכנסת לתיבת דואר ב-KV, ו-GitHub Actions (council-relay.yml, שכבר מורשה לכתוב ב-Issues) מנתב אותה ל-Issue של
+  // הפרויקט (invest → #25 כמו תמיד; food/english/… → ה-Issue הקבוע של הפרויקט) — בלי PAT ובלי סוד נוסף. אם GH_COUNCIL_TOKEN מוגדר,
+  // הפרסום מיידי (רק ל-invest/#25). הסוד המשותף נוצר אוטומטית (KV) ומוצג רק במסך ההגדרות המאומת, או מגיע מ-Secrets (COUNCIL_SECRET).
+  // אבטחה: project מהלקוח אינו הרשאה — הוא רק ניתוב, ומאומת מול רשימת הפרויקטים שהוזרקה בפריסה (COUNCIL_PROJECTS מתוך
+  // .github/council/projects.json); פרויקט לא מוכר נדחה (400) ולא מבוצע כלום. מכסה יומית, דדופליקציה (אותה הודעה = אותה משימה),
+  // ורישום סטטוס לכל משימה (QUEUED → POSTED → RECEIVED → IN_PROGRESS → PR_OPEN → PASS / OWNER_DECISION_REQUIRED / FAILED / …).
   if (r0 === 'council'){
-    const REPO = 'meirco199-prog/bikur', ISSUE = 25, DAILY_MAX = 20, MAX_LEN = 8000, INBOX_MAX = 50;
+    const REPO = 'meirco199-prog/bikur', ISSUE = 25, DAILY_MAX = 20, MAX_LEN = 8000, INBOX_MAX = 50, TASKS_MAX = 200, SEEN_TTL = 7 * 86400;
+    const PROJECTS = String(env.COUNCIL_PROJECTS || 'invest,food,english').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+    const TYPES = ['bug', 'security', 'test', 'regression', 'review', 'question', 'proposal', 'task', 'note'];
+    const STATUSES = ['QUEUED', 'POSTED', 'RECEIVED', 'IN_PROGRESS', 'PR_OPEN', 'PASS', 'OWNER_DECISION_REQUIRED', 'FAILED', 'REJECTED', 'DONE', 'DUPLICATE'];
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET);
     // קריאת הסוד מ-KV סלחנית: ערך שהוזן ידנית בדשבורד של Cloudflare (בלי מרכאות JSON) מתקבל כמו שהוא
     const readSecret = async () => { if (!db.kv) return db.get('council:secret'); const t = await db.kv.get('council:secret', 'text'); if (!t) return null; try { const j = JSON.parse(t); return typeof j === 'string' ? j : String(t).trim(); } catch { return String(t).trim(); } };
     const newSecret = async () => { const b = new Uint8Array(32); crypto.getRandomValues(b); const s = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); await db.put('council:secret', s); return s; };
+    const issues = async () => ({ invest: ISSUE, ...((await db.get('council:issues')) || {}) }); // מספרי ה-Issues לכל פרויקט, כפי שה-relay דיווח
+    const tasks = async () => (await db.get('council:tasks')) || [];
+    const saveTask = async (t) => { const all = (await tasks()).filter((x) => x.id !== t.id); all.push(t); await db.put('council:tasks', all.slice(-TASKS_MAX)); return t; };
+    // MCP (Model Context Protocol) — ChatGPT כ-connector בשיחה רגילה (Developer mode → custom connector), בלי GPT מותאם:
+    // אותם כלים בדיוק (postCouncilComment, getCouncilTasks, …) כעטיפת JSON-RPC מעל הנתיבים הקיימים למטה — אין לוגיקה כפולה.
+    // dual-era: 2026-07-28 (server/discover, בקשות חסרות-מצב עם _meta) וגם 2025-xx (initialize/tools/list/tools/call, ping).
+    // אימות: Bearer = המפתח המשותף, או המפתח בנתיב (/council/mcp/<key>) ל-connector במצב "No authentication" (URL-סודי).
+    if (p1 === 'mcp'){
+      if (req.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+      const wantMcp = env.COUNCIL_SECRET || (await readSecret()) || '';
+      const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+      const sameK = (x, y) => { if (!x || !y || x.length !== y.length) return false; let d = 0; for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i); return d === 0; };
+      const key = sameK(bearer, wantMcp) ? bearer : sameK(p2 || '', wantMcp) ? p2 : '';
+      const rpcErr = (id, code, message, status = 200, data) => json({ jsonrpc: '2.0', id: id ?? null, error: { code, message, ...(data ? { data } : {}) } }, status);
+      if (!wantMcp) return rpcErr(null, -32000, 'ערוץ ה-Council טרם הופעל (המפתח המשותף לא נוצר)', 503);
+      if (!key) return rpcErr(null, -32000, 'unauthorized', 401);
+      const SUPPORTED = ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26'];
+      const SERVER = { name: 'bikur-ai-council', version: '1.0.0' };
+      const INSTRUCTIONS = `AI Council of meirco199-prog/bikur: send tasks/findings to Claude (postCouncilComment), track what Claude did with them (getCouncilTasks), read a project's thread (getCouncilThread). Projects: ${PROJECTS.join(', ')}. When the user says "תשלח לקלוד…" / "send to Claude", call postCouncilComment with the right project (food = nutrition app, english = English learning app, invest = investment platform), a short title, a Markdown body (what, where, why, how to reproduce, what Claude should check) and source "gpt-audit". Never include keys or secrets. Claude verifies every finding against the code before acting and may reject it with evidence.`;
+      const TOOLS = [
+        { name: 'postCouncilComment', title: 'Send a task or finding to Claude (AI Council)', description: `Queue a message to Claude in the AI Council channel of a project. Claude marks it RECEIVED, verifies it against the code, then fixes it in a PR (reviewed by GPT Reviewer), rejects it with evidence, or marks DONE. Projects: ${PROJECTS.join(', ')}. The same message twice returns the existing task (duplicate) instead of a new one.`,
+          inputSchema: { type: 'object', properties: { project: { type: 'string', enum: PROJECTS, description: 'Target project' }, type: { type: 'string', enum: TYPES, description: 'bug/security/test/regression = findings Claude must verify and fix; review/question/proposal/task/note otherwise' }, title: { type: 'string', maxLength: 140 }, body: { type: 'string', description: 'Markdown: what was found, where (file/line), why it matters, how to reproduce, what Claude should check. Max 8000 chars. No secrets.' }, source: { type: 'string', description: 'Origin, e.g. gpt-audit (default chatgpt)' }, idempotency_key: { type: 'string', description: 'Optional: your own id; the same key never creates a second task' } }, required: ['project', 'type', 'title', 'body'], additionalProperties: false },
+          annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilTasks', title: 'Status of tasks sent to Claude', description: 'What happened to messages sent via postCouncilComment: QUEUED → POSTED → RECEIVED → IN_PROGRESS → PR_OPEN → PASS, or REJECTED / DONE / OWNER_DECISION_REQUIRED / FAILED / DUPLICATE. Filter by project or id.',
+          inputSchema: { type: 'object', properties: { project: { type: 'string', enum: PROJECTS }, id: { type: 'string', description: 'Task id (cm_…)' }, limit: { type: 'integer', minimum: 1, maximum: 50, default: 20 } }, additionalProperties: false },
+          annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilProjects', title: 'Known projects, message types and statuses', description: 'Lists the projects that accept council messages, the allowed message types, the task statuses, and each project\'s GitHub Issue number.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilThread', title: 'Latest comments in a project\'s council Issue', description: 'Reads the most recent comments on the project\'s AI Council GitHub Issue: Claude\'s replies and statuses, reports, and messages posted via this channel.',
+          inputSchema: { type: 'object', properties: { project: { type: 'string', enum: PROJECTS, default: 'invest' }, limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 } }, additionalProperties: false },
+          annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+        { name: 'getCouncilStatus', title: 'Channel status', description: 'Quota used today, messages pending in the relay inbox, and the Issue of each project.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+      ];
+      // קריאת כלי = בקשה פנימית לאותם נתיבים (אותה לוגיקה, אותו אימות), בלי לצאת לרשת
+      const callTool = async (name, args = {}) => {
+        const hdr = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'CF-Connecting-IP': req.headers.get('CF-Connecting-IP') || 'mcp' };
+        const sub = (path, init) => handle(new Request(`${url.origin}/council/${path}`, { headers: hdr, ...init }), env0, ctx);
+        const qs = (o) => { const u = new URLSearchParams(); for (const [k, v] of Object.entries(o)) if (v !== undefined && v !== null && v !== '') u.set(k, String(v)); const t = u.toString(); return t ? `?${t}` : ''; };
+        let r;
+        if (name === 'postCouncilComment') r = await sub('comment', { method: 'POST', body: JSON.stringify({ project: args.project, type: args.type, title: args.title, body: args.body, source: args.source || 'chatgpt', ...(args.idempotency_key ? { idempotency_key: args.idempotency_key } : {}) }) });
+        else if (name === 'getCouncilTasks') r = await sub(`tasks${qs({ project: args.project, id: args.id, limit: args.limit })}`);
+        else if (name === 'getCouncilProjects') r = await sub('projects');
+        else if (name === 'getCouncilThread') r = await sub(`thread${qs({ project: args.project, limit: args.limit })}`);
+        else if (name === 'getCouncilStatus') r = await sub('status');
+        else return null;
+        const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+        return { ok: r.ok, data: j };
+      };
+      const meta = (body?.params && body.params._meta) || {};
+      const hdrVer = req.headers.get('MCP-Protocol-Version') || '';
+      const metaVer = meta['io.modelcontextprotocol/protocolVersion'] || '';
+      const ver = hdrVer || metaVer || '';
+      const modern = ver === '2026-07-28' || body?.method === 'server/discover';
+      const id = body?.id; const method = String(body?.method || ''); const params = body?.params || {};
+      if (Array.isArray(body)) return rpcErr(null, -32600, 'batch requests are not supported', 400);
+      if (!method) return rpcErr(id, -32600, 'invalid JSON-RPC request', 400);
+      // אימות כותרות-גוף (2026-07-28): אי-התאמה נדחית; חוסר נסלח (ידידותי ללקוחות ביניים)
+      const hMethod = req.headers.get('Mcp-Method'); if (hMethod && hMethod !== method) return rpcErr(id, -32020, `Header mismatch: Mcp-Method header value '${hMethod}' does not match body value '${method}'`, 400);
+      const hName = req.headers.get('Mcp-Name'); if (hName && !hName.startsWith('=?base64?') && params?.name && hName !== params.name) return rpcErr(id, -32020, `Header mismatch: Mcp-Name header value '${hName}' does not match body value '${params.name}'`, 400);
+      if (hdrVer && metaVer && hdrVer !== metaVer) return rpcErr(id, -32020, `Header mismatch: MCP-Protocol-Version '${hdrVer}' does not match _meta '${metaVer}'`, 400);
+      if (ver && !SUPPORTED.includes(ver)) return rpcErr(id, -32022, `Unsupported protocol version: ${ver}`, 400, { supported: SUPPORTED, requested: ver });
+      const serverMeta = { 'io.modelcontextprotocol/serverInfo': SERVER };
+      const result = (r) => json({ jsonrpc: '2.0', id: id ?? null, result: modern ? { resultType: 'complete', ...r, _meta: serverMeta } : r });
+      if (method === 'server/discover') return result({ supportedVersions: SUPPORTED, capabilities: { tools: {} }, instructions: INSTRUCTIONS, ttlMs: 3600000, cacheScope: 'private' });
+      if (method === 'initialize'){ const reqVer = String(params.protocolVersion || ''); return result({ protocolVersion: SUPPORTED.includes(reqVer) && reqVer !== '2026-07-28' ? reqVer : '2025-06-18', capabilities: { tools: {} }, serverInfo: SERVER, instructions: INSTRUCTIONS }); }
+      if (method === 'notifications/initialized' || method.startsWith('notifications/')) return new Response(null, { status: 202 });
+      if (method === 'ping') return result({});
+      if (method === 'tools/list') return result({ tools: TOOLS, ...(modern ? { ttlMs: 300000, cacheScope: 'private' } : {}) });
+      if (method === 'tools/call'){
+        const name = String(params.name || ''); const args = params.arguments && typeof params.arguments === 'object' ? params.arguments : {};
+        const out = await callTool(name, args);
+        if (!out) return rpcErr(id, -32602, `Unknown tool: ${name}`, modern ? 404 : 200);
+        const isError = !out.ok || out.data?.ok === false;
+        const text = isError ? `Error: ${out.data?.error || JSON.stringify(out.data)}` : JSON.stringify(out.data, null, 1);
+        return result({ content: [{ type: 'text', text }], structuredContent: out.data, isError });
+      }
+      return rpcErr(id, -32601, `Method not found: ${method}`, modern ? 404 : 200);
+    }
     // המפתח למסך ההגדרות (מאומת בלבד): נוצר בפעם הראשונה, rotate מחליף
-    if (p1 === 'secret'){ needAuth(); let s = env.COUNCIL_SECRET || (await readSecret()); if (!env.COUNCIL_SECRET && (!s || (req.method === 'POST' && (body.rotate || q.rotate === '1')))) s = await newSecret(); return json({ ok: true, secret: s, source: env.COUNCIL_SECRET ? 'secret' : 'kv', importUrl: 'https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml', endpoint: `${url.origin}/council/comment`, direct: !!env.GH_COUNCIL_TOKEN, pending: ((await db.get('council:inbox')) || []).length }); }
-    // צד GitHub Actions (סוד ה-cron): קריאת התיבה ואישור פרסום
-    if (p1 === 'inbox' && req.method === 'GET'){ if (!bySecret) needAuth(); return json({ ok: true, issue: ISSUE, items: (await db.get('council:inbox')) || [] }); }
-    if (p1 === 'ack' && req.method === 'POST'){ if (!bySecret) needAuth(); const ids = new Set(Array.isArray(body.ids) ? body.ids : []); const left = ((await db.get('council:inbox')) || []).filter((m) => !ids.has(m.id)); await db.put('council:inbox', left); return json({ ok: true, left: left.length }); }
-    // צד ChatGPT: Bearer = הסוד המשותף
+    if (p1 === 'secret'){ needAuth(); let s = env.COUNCIL_SECRET || (await readSecret()); if (!env.COUNCIL_SECRET && (!s || (req.method === 'POST' && (body.rotate || q.rotate === '1')))) s = await newSecret(); return json({ ok: true, secret: s, source: env.COUNCIL_SECRET ? 'secret' : 'kv', importUrl: 'https://raw.githubusercontent.com/meirco199-prog/bikur/main/invest/docs/council-action.yaml', endpoint: `${url.origin}/council/comment`, direct: !!env.GH_COUNCIL_TOKEN, projects: PROJECTS, pending: ((await db.get('council:inbox')) || []).length }); }
+    // צד GitHub Actions (סוד ה-cron): קריאת התיבה, אישור פרסום (עם מספרי ה-Issues שנפתרו), ועדכון סטטוס משימות מתוך תגובות Claude
+    if (p1 === 'inbox' && req.method === 'GET'){ if (!bySecret) needAuth(); return json({ ok: true, issue: ISSUE, projects: PROJECTS, issues: await issues(), items: (await db.get('council:inbox')) || [] }); }
+    if (p1 === 'ack' && req.method === 'POST'){
+      if (!bySecret) needAuth();
+      const posted = Array.isArray(body.posted) ? body.posted : []; // [{id, url, issue}] — מה שפורסם בפועל
+      const ids = new Set([...(Array.isArray(body.ids) ? body.ids : []), ...posted.map((x) => x.id)]);
+      const left = ((await db.get('council:inbox')) || []).filter((m) => !ids.has(m.id)); await db.put('council:inbox', left);
+      if (body.issues && typeof body.issues === 'object'){ const cur = (await db.get('council:issues')) || {}; for (const [k, v] of Object.entries(body.issues)) if (PROJECTS.includes(k) && Number(v) > 0) cur[k] = Number(v); await db.put('council:issues', cur); }
+      const all = await tasks(); const byId = new Map(all.map((t) => [t.id, t]));
+      for (const x of posted){ const t = byId.get(x.id); if (t && t.status === 'QUEUED'){ t.status = 'POSTED'; t.url = x.url || t.url; t.issue = x.issue || t.issue; t.updatedAt = new Date().toISOString(); } }
+      await db.put('council:tasks', all.slice(-TASKS_MAX));
+      return json({ ok: true, left: left.length });
+    }
+    if (p1 === 'task-status' && req.method === 'POST'){ // Claude מסמן סטטוס בתגובה ב-Issue; ה-relay קורא ומדווח לכאן
+      if (!bySecret) needAuth();
+      const all = await tasks(); const byId = new Map(all.map((t) => [t.id, t])); let n = 0;
+      for (const u of (Array.isArray(body.updates) ? body.updates : []).slice(0, 100)){
+        const t = byId.get(String(u.id || '')); const st = String(u.status || '').toUpperCase();
+        if (!t || !STATUSES.includes(st)) continue;
+        if (t.status !== st || (u.pr && t.pr !== u.pr)){ t.status = st; if (u.pr) t.pr = String(u.pr).slice(0, 200); if (u.url) t.statusUrl = String(u.url).slice(0, 200); if (u.note) t.note = db.redact(String(u.note)).slice(0, 300); t.updatedAt = new Date().toISOString(); n++; }
+      }
+      await db.put('council:tasks', all.slice(-TASKS_MAX));
+      return json({ ok: true, updated: n });
+    }
+    // צד ChatGPT: Bearer = הסוד המשותף (ל-POST /council/comment גם סוד ה-cron מתקבל — לבדיקות קצה-לקצה מ-GitHub Actions בלי לחשוף את מפתח ה-GPT)
     const want = env.COUNCIL_SECRET || (await readSecret()) || '';
-    if (!want) return err('ערוץ ה-Council טרם הופעל: פתח באפליקציה הגדרות → ערוץ ה-Council → "הצג מפתח" (יוצר את הסוד המשותף)', 503);
     const given = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '') || req.headers.get('X-Council-Key') || '';
     const same = (x, y) => { if (!x || !y || x.length !== y.length) return false; let d = 0; for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i); return d === 0; };
-    if (!same(given, want)) return err('unauthorized', 401);
+    const e2e = bySecret && p1 === 'comment' && req.method === 'POST';
+    if (!e2e){
+      if (!want) return err('ערוץ ה-Council טרם הופעל: פתח באפליקציה הגדרות → ערוץ ה-Council → "הצג מפתח" (יוצר את הסוד המשותף)', 503);
+      if (!same(given, want)) return err('unauthorized', 401);
+    }
     const qKey = `council:quota:${today()}`; const used = (await db.get(qKey)) || 0;
     const inbox = (await db.get('council:inbox')) || [];
-    if (p1 === 'status' && req.method === 'GET') return json({ ok: true, repo: REPO, issue: ISSUE, usedToday: used, dailyMax: DAILY_MAX, direct: !!env.GH_COUNCIL_TOKEN, pending: inbox.length });
-    // קריאת השרשור: ChatGPT (ב-GPT עם ה-Action) קורא את התגובות האחרונות ב-Issue #25 בלי מחבר GitHub — הריפו ציבורי, PAT אופציונלי
+    if (p1 === 'status' && req.method === 'GET') return json({ ok: true, repo: REPO, issue: ISSUE, projects: PROJECTS, issues: await issues(), usedToday: used, dailyMax: DAILY_MAX, direct: !!env.GH_COUNCIL_TOKEN, pending: inbox.length });
+    if (p1 === 'projects' && req.method === 'GET') return json({ ok: true, projects: PROJECTS, types: TYPES, statuses: STATUSES, issues: await issues() });
+    // מעקב משימות: מה קרה לכל הודעה שנשלחה (לפי id או לפי project)
+    if (p1 === 'tasks' && req.method === 'GET'){
+      const all = await tasks(); const proj = String(q.project || '').toLowerCase(); const limit = Math.min(50, Math.max(1, Number(q.limit) || 20));
+      const items = all.filter((t) => (!proj || t.project === proj) && (!q.id || t.id === q.id)).slice(-limit).reverse();
+      return json({ ok: true, items, statuses: STATUSES });
+    }
+    // קריאת השרשור: ChatGPT (ב-GPT עם ה-Action) קורא את התגובות האחרונות ב-Issue של הפרויקט בלי מחבר GitHub — הריפו ציבורי, PAT אופציונלי
     if (p1 === 'thread' && req.method === 'GET'){
       const limit = Math.min(20, Math.max(1, Number(q.limit) || 10));
+      const proj = String(q.project || 'invest').toLowerCase(); const map = await issues(); const issue = map[proj];
+      if (!PROJECTS.includes(proj)) return err(`project לא מוכר: ${proj.slice(0, 30)} (מוכרים: ${PROJECTS.join(', ')})`);
+      if (!issue) return err(`ל-${proj} עדיין אין Issue (ייפתח אוטומטית עם ההודעה הראשונה)`, 404);
       const hdr = { Accept: 'application/vnd.github+json', 'User-Agent': 'bikur-council-relay', 'X-GitHub-Api-Version': '2022-11-28', ...(env.GH_COUNCIL_TOKEN ? { Authorization: `Bearer ${env.GH_COUNCIL_TOKEN}` } : {}) };
-      const gh = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE}/comments?per_page=100`, { headers: hdr });
+      const gh = await fetch(`https://api.github.com/repos/${REPO}/issues/${issue}/comments?per_page=100`, { headers: hdr });
       const arr = await gh.json().catch(() => null);
       if (!gh.ok || !Array.isArray(arr)) return err(`GitHub לא החזיר את השרשור (${gh.status})`, 502);
       const kind = (c) => { const b = String(c.body || ''); const bot = /\[bot\]$/.test(c.user?.login || ''); if (bot && b.startsWith('**ChatGPT**')) return 'chatgpt'; if (bot && b.startsWith('<!-- health-report')) return 'health-report'; if (bot) return 'bot'; return 'claude-or-owner'; };
       const items = arr.slice(-limit).map((c) => ({ id: c.id, at: c.created_at, login: c.user?.login || '', kind: kind(c), url: c.html_url, body: String(c.body || '').slice(0, 6000) }));
-      return json({ ok: true, repo: REPO, issue: ISSUE, url: `https://github.com/${REPO}/issues/${ISSUE}`, total: arr.length, items, pending: inbox.map((m) => ({ id: m.id, at: m.at, author: m.author })), note: 'kind=claude-or-owner: תגובות של Claude מתפרסמות מחשבון בעל הריפו (meirco199-prog); kind=chatgpt: הודעות שהגיעו דרך הערוץ הזה' });
+      return json({ ok: true, repo: REPO, project: proj, issue, url: `https://github.com/${REPO}/issues/${issue}`, total: arr.length, items, pending: inbox.filter((m) => m.project === proj).map((m) => ({ id: m.id, at: m.at, author: m.author })), note: 'kind=claude-or-owner: תגובות של Claude מתפרסמות מחשבון בעל הריפו (meirco199-prog); kind=chatgpt: הודעות שהגיעו דרך הערוץ הזה' });
     }
     if (p1 === 'comment' && req.method === 'POST'){
-      const text = String(body.text || '').trim();
-      if (!text) return err('חסר text');
+      // תאימות: {text} בלבד = הודעה חופשית ל-invest (#25), בדיוק כמו קודם. מבנה חדש: {project, type, title, body, source}
+      const legacy = !body.project && !body.body && body.text;
+      const project = String(body.project || 'invest').trim().toLowerCase();
+      if (!/^[a-z][a-z0-9-]{0,30}$/.test(project) || !PROJECTS.includes(project)) return err(`project לא מוכר: "${project.slice(0, 30)}" — הפרויקטים המוכרים: ${PROJECTS.join(', ')} (.github/council/projects.json)`);
+      const type = String(body.type || 'note').trim().toLowerCase(); if (!TYPES.includes(type)) return err(`type לא מוכר: "${type.slice(0, 20)}" — אפשריים: ${TYPES.join(', ')}`);
+      const title = String(body.title || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 140);
+      const source = String(body.source || (e2e ? 'e2e-test' : 'chatgpt')).trim().replace(/[^\p{L}\p{N} _.:/-]/gu, '').slice(0, 60) || 'chatgpt';
+      const text = String(body.body || body.text || '').trim();
+      if (!text) return err('חסר body (או text)');
+      if (!legacy && !title) return err('חסר title');
       if (text.length > MAX_LEN) return err(`הטקסט ארוך מדי (${text.length} > ${MAX_LEN})`);
+      const author = String(body.author || (e2e ? 'E2E test' : 'ChatGPT')).slice(0, 40).replace(/[^\p{L}\p{N} _.-]/gu, '') || 'ChatGPT';
+      // דדופליקציה: אותה הודעה (או אותו idempotency_key) בתוך 7 ימים = אותה משימה, בלי פרסום נוסף ובלי ניצול מכסה
+      const raw = body.idempotency_key ? `key:${String(body.idempotency_key).slice(0, 120)}` : `${project}|${type}|${title}|${text}`;
+      const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)); const hash = [...new Uint8Array(hashBuf)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
+      const seen = await db.get(`council:seen:${hash}`);
+      if (seen) return json({ ok: true, queued: false, duplicate: true, id: seen.id, url: seen.url || null, status: (await tasks()).find((t) => t.id === seen.id)?.status || null, note: 'הודעה זהה כבר התקבלה — לא נוצרה משימה נוספת' });
       if (used >= DAILY_MAX) return err(`מכסת התגובות היומית (${DAILY_MAX}) נוצלה`, 429);
-      const author = String(body.author || 'ChatGPT').slice(0, 40).replace(/[^\p{L}\p{N} _.-]/gu, '') || 'ChatGPT';
-      const md = `**${author}** (דרך ערוץ ה-Council, לא ישירות מהחשבון):\n\n${db.redact(text)}\n\n---\n_Posted via council relay (\`POST /council/comment\`)_`;
-      if (env.GH_COUNCIL_TOKEN){ // פרסום מיידי עם PAT מצומצם (אופציונלי)
+      const id = uid('cm_'); const at = new Date().toISOString();
+      const header = legacy ? '' : `\`project: ${project}\` · \`type: ${type}\` · \`source: ${source}\` · \`id: ${id}\`\n\n### ${db.redact(title)}\n\n`;
+      const md = `**${author}** (דרך ערוץ ה-Council, לא ישירות מהחשבון):\n\n${header}${db.redact(text)}\n\n<!-- council-msg id=${id} project=${project} type=${type} hash=${hash} -->\n---\n_Posted via council relay (\`POST /council/comment\`)_`;
+      const task = { id, at, project, type, title: title || text.slice(0, 80), source, author, hash, status: 'QUEUED', updatedAt: at };
+      if (env.GH_COUNCIL_TOKEN && project === 'invest'){ // פרסום מיידי עם PAT מצומצם (אופציונלי, ל-#25 בלבד)
         const gh = await fetch(`https://api.github.com/repos/${REPO}/issues/${ISSUE}/comments`, { method: 'POST', headers: { Authorization: `Bearer ${env.GH_COUNCIL_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'bikur-council-relay', 'X-GitHub-Api-Version': '2022-11-28' }, body: JSON.stringify({ body: md }) });
         const gj = await gh.json().catch(() => ({}));
         if (!gh.ok){ await db.logError('council', `GitHub ${gh.status}: ${String(gj.message || '').slice(0, 120)}`); return err(`GitHub דחה את התגובה (${gh.status}): ${String(gj.message || '').slice(0, 160)}`, 502); }
-        await db.put(qKey, used + 1, { ttl: 2 * 86400 });
-        return json({ ok: true, queued: false, url: gj.html_url || null, id: gj.id || null, usedToday: used + 1, dailyMax: DAILY_MAX });
+        await db.put(qKey, used + 1, { ttl: 2 * 86400 }); await db.put(`council:seen:${hash}`, { id, url: gj.html_url || null }, { ttl: SEEN_TTL });
+        await saveTask({ ...task, status: 'POSTED', issue: ISSUE, url: gj.html_url || null });
+        return json({ ok: true, queued: false, id, project, url: gj.html_url || null, usedToday: used + 1, dailyMax: DAILY_MAX });
       }
       if (inbox.length >= INBOX_MAX) return err('תיבת הדואר מלאה — ההודעות הקודמות טרם פורסמו', 429);
-      const id = uid('cm_'); inbox.push({ id, at: new Date().toISOString(), author, body: md });
-      await db.put('council:inbox', inbox); await db.put(qKey, used + 1, { ttl: 2 * 86400 });
-      return json({ ok: true, queued: true, id, usedToday: used + 1, dailyMax: DAILY_MAX, note: 'התקבל; יפורסם ב-Issue #25 בריצת GitHub Actions הבאה (בדרך כלל עד ~20–30 דק׳; GitHub לפעמים מאחר יותר)' });
+      inbox.push({ id, at, author, project, type, title: task.title, source, hash, body: md });
+      await db.put('council:inbox', inbox); await db.put(qKey, used + 1, { ttl: 2 * 86400 }); await db.put(`council:seen:${hash}`, { id }, { ttl: SEEN_TTL }); await saveTask(task);
+      return json({ ok: true, queued: true, id, project, type, status: 'QUEUED', usedToday: used + 1, dailyMax: DAILY_MAX, note: `התקבל; ינותב ל-Issue של ${project} בריצת GitHub Actions הבאה (בדרך כלל עד ~20–30 דק׳). מעקב: GET /council/tasks?id=${id}` });
     }
     return err('נתיב לא מוכר בערוץ ה-Council', 404);
   }

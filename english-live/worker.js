@@ -1,9 +1,16 @@
-// english-live — מנפיק session זמני ל-OpenAI Realtime עבור השיעור החי (speech-to-speech).
+// english-live — מנפיק client secret זמני ל-OpenAI Realtime (GA) עבור השיעור החי (speech-to-speech).
 // המפתח האמיתי (OPENAI_API_KEY) חי רק כאן כ-secret של ה-Worker; הלקוח מקבל
-// client_secret קצר-חיים ומתחבר ב-WebRTC ישירות ל-OpenAI — האודיו לא עובר דרכנו.
+// client_secret קצר-חיים (ek_...) ומתחבר ב-WebRTC ישירות ל-OpenAI — האודיו לא עובר דרכנו.
 // בלי המפתח: מחזיר not_configured והאפליקציה נופלת לזרימה הרגילה (STT/TTS של הדפדפן).
+//
+// API (GA, לפי ה-SDK הרשמי openai@7.x): POST /v1/realtime/client_secrets עם {session:{type:'realtime',...}}
+// → {value, expires_at, session}; הלקוח שולח SDP ל-POST /v1/realtime/calls עם Bearer <client_secret>.
 
-const DEFAULT_MODEL = 'gpt-4o-mini-realtime-preview';
+// המודל: ניתן להגדרה ב-env.REALTIME_MODEL. אם המודל המועדף לא קיים בחשבון (400/404 מ-OpenAI),
+// מנסים את הבאים בתור — כך החלפת דור של מודלים לא משביתה את השיעור.
+const MODEL_CANDIDATES = ['gpt-realtime-2.1-mini', 'gpt-realtime-mini', 'gpt-realtime'];
+const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';   // תמלול התלמיד (כתוביות/זיכרון), לא ניקוד הגייה
+const CLIENT_SECRET_TTL_S = 600;                      // הלקוח חייב להתחבר תוך 10 דקות מהנפקה
 const VOICES = { sarah: 'coral', david: 'echo' };
 
 // ---------- הוראות למורה (מקביל ל-PROMPTS.lesson ב-english-ai, עם תוספות לאודיו) ----------
@@ -118,7 +125,7 @@ const TOOLS = [
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 const json = (data, status = 200) =>
@@ -133,10 +140,47 @@ function rateLimited(ip){
   return recent.length > 10; // עד 10 סשנים בדקה למשתמש — session אחד לשיעור, זה הרבה
 }
 
+// בניית בקשת client secret במבנה GA. מיוצא לבדיקות (בלי רשת).
+export function buildClientSecretRequest({ model, teacherId, teacher, topic, profile, studentName, lessonPlan }){
+  return {
+    expires_after: { anchor: 'created_at', seconds: CLIENT_SECRET_TTL_S },
+    session: {
+      type: 'realtime',
+      model,
+      output_modalities: ['audio'],
+      instructions: instructions({ teacher, topic, profile, studentName, lessonPlan }),
+      audio: {
+        input: {
+          // תמלול של התלמיד — לכתוביות, לזיכרון ולמדדים (לא לניקוד הגייה)
+          transcription: { model: TRANSCRIBE_MODEL },
+          // VAD בצד השרת = קטיעה (barge-in) מובנית: כשהתלמיד מדבר המורה נעצר ותגובה נוצרת לבד
+          turn_detection: { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 700,
+            create_response: true, interrupt_response: true },
+        },
+        output: { voice: VOICES[teacherId] || VOICES.sarah },
+      },
+      tools: TOOLS,
+      tool_choice: 'auto',
+      max_output_tokens: 300, // תשובות קצרות — זה שיעור דיבור, לא הרצאה
+    },
+  };
+}
+
+// האם שגיאה מ-OpenAI אומרת "המודל הזה לא זמין" (ואז מנסים מודל אחר) ולא "המפתח/הבקשה פגומים"
+export function isModelUnavailable(status, detail){
+  if (status !== 400 && status !== 404) return false;
+  return /model|not found|does not exist|unsupported|invalid_model|deprecat/i.test(detail || '');
+}
+
 export default {
   async fetch(request, env){
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
     const url = new URL(request.url);
+    // מצב ה-Worker (בלי סודות): מוגדר? איזה מודל מועדף? — לאבחון ולבדיקת smoke
+    if (url.pathname === '/health' && request.method === 'GET'){
+      return json({ ok: true, configured: !!env.OPENAI_API_KEY, api: 'realtime-ga',
+        models: [env.REALTIME_MODEL, ...MODEL_CANDIDATES].filter((m, i, a) => m && a.indexOf(m) === i), transcription: TRANSCRIBE_MODEL });
+    }
     if (request.method !== 'POST') return json({ error: 'method' }, 405);
     if (url.pathname !== '/session') return json({ error: 'not_found' }, 404);
 
@@ -149,45 +193,45 @@ export default {
     try { body = await request.json(); } catch { return json({ error: 'bad_json' }, 400); }
     const teacherId = String(body.teacherId || 'sarah').toLowerCase();
     const teacher = String(body.teacher || (teacherId === 'david' ? 'David' : 'Sarah')).slice(0, 40);
-    const model = env.REALTIME_MODEL || DEFAULT_MODEL;
-
-    const sessionReq = {
-      model,
-      voice: VOICES[teacherId] || VOICES.sarah,
-      modalities: ['audio', 'text'],
-      instructions: instructions({ teacher, topic: body.topic ? String(body.topic).slice(0, 200) : null,
-        profile: body.profile || {}, studentName: body.studentName ? String(body.studentName).slice(0, 40) : null,
-        lessonPlan: body.lessonPlan ? String(body.lessonPlan).slice(0, 12000) : null }),
-      // תמלול של התלמיד — לכתוביות, לזיכרון ולמדדים (לא לניקוד הגייה)
-      input_audio_transcription: { model: 'whisper-1' },
-      // VAD בצד השרת = קטיעה (barge-in) מובנית: כשהתלמיד מדבר המורה נעצר
-      turn_detection: { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 700 },
-      tools: TOOLS,
-      tool_choice: 'auto',
-      temperature: 0.7,
-      max_response_output_tokens: 300, // תשובות קצרות — זה שיעור דיבור, לא הרצאה
+    const base = {
+      teacherId, teacher, topic: body.topic ? String(body.topic).slice(0, 200) : null,
+      profile: body.profile || {}, studentName: body.studentName ? String(body.studentName).slice(0, 40) : null,
+      lessonPlan: body.lessonPlan ? String(body.lessonPlan).slice(0, 12000) : null,
     };
-
-    let r;
-    try {
-      r = await fetch('https://api.openai.com/v1/realtime/sessions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionReq),
-      });
-    } catch { return json({ error: 'upstream' }, 502); }
-    if (!r.ok){
-      const detail = await r.text().catch(() => '');
+    const candidates = [env.REALTIME_MODEL, ...MODEL_CANDIDATES].filter((m, i, a) => m && a.indexOf(m) === i);
+    const tried = [];
+    for (const model of candidates){
+      const req = buildClientSecretRequest({ model, ...base });
+      let r;
+      try {
+        r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(req),
+        });
+      } catch { return json({ error: 'upstream', tried }, 502); }
+      if (r.ok){
+        const data = await r.json();
+        if (!data.value) return json({ error: 'upstream', detail: 'no client secret in response', tried }, 502);
+        return json({
+          client_secret: data.value,
+          expires_at: data.expires_at,
+          model: data.session?.model || model,
+          voice: req.session.audio.output.voice,
+          transcription: TRANSCRIBE_MODEL,
+          api: 'realtime-ga',
+          // WebRTC (GA): הלקוח שולח את ה-SDP offer לכאן עם Bearer <client_secret>
+          webrtc_url: 'https://api.openai.com/v1/realtime/calls',
+          tried,
+        });
+      }
+      const detail = (await r.text().catch(() => '')).slice(0, 300);
       // 401 = מפתח לא תקין; לא מחזירים את התוכן המלא ללקוח
-      return json({ error: r.status === 401 ? 'bad_key' : 'upstream', status: r.status, detail: detail.slice(0, 200) }, 502);
+      if (r.status === 401) return json({ error: 'bad_key', status: 401 }, 502);
+      tried.push({ model, status: r.status, detail: detail.slice(0, 120) });
+      if (!isModelUnavailable(r.status, detail)) return json({ error: 'upstream', status: r.status, detail: detail.slice(0, 200), tried }, 502);
+      // המודל לא זמין — הבא בתור
     }
-    const data = await r.json();
-    return json({
-      client_secret: data.client_secret?.value,
-      expires_at: data.client_secret?.expires_at,
-      model,
-      voice: sessionReq.voice,
-      webrtc_url: `https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`,
-    });
+    return json({ error: 'no_model', tried }, 502);
   },
 };

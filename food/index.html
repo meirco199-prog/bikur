@@ -276,6 +276,15 @@
   .typed-row{display:none;gap:8px;padding:6px 0}
   .typed-row.open{display:flex}
   .typed-row input{background:rgba(255,255,255,.95);border-color:transparent}
+  .turn-btn-box{min-height:64px;display:flex;justify-content:center;align-items:center;padding:2px 0 6px}
+  .turn-btn{
+    border:none;border-radius:999px;cursor:pointer;font-family:inherit;font-weight:900;
+    font-size:1.05rem;padding:15px 30px;min-height:56px;width:min(92%,420px);
+    transition:transform .12s;box-shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  .turn-btn:active{transform:scale(.97)}
+  .turn-btn.done{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+  .turn-btn.myturn{background:rgba(255,255,255,.16);color:#fff;border:2px solid rgba(255,255,255,.35);box-shadow:none}
   .coach-pick{display:flex;gap:12px;justify-content:center;margin:10px 0}
   .coach-pick .cp{
     background:#fff;border:3px solid var(--border);border-radius:22px;padding:8px;cursor:pointer;width:120px;
@@ -303,6 +312,7 @@
 const API = '/api/family';
 const COACH_API = '/api/coach';
 const POLL_MS = 15000;
+const APP_VER = '3.2';
 
 /* ---------- תפריט וחוקים ---------- */
 const MEALS = [
@@ -1086,6 +1096,7 @@ function renderHome(){
       ${badges.map(b=>`<span class="badge-chip">${b}</span>`).join('')}
     </div>`:''}
     <button class="btn secondary block" onclick="setView('today')">🍽️ ליומן המלא של היום</button>
+    <p class="center muted" style="margin-top:14px">גרסה ${APP_VER}</p>
   </div>`;
 }
 
@@ -1389,10 +1400,16 @@ function hebVoice(){
   return hebVoices.find(v=>/google/i.test(v.name)) || hebVoices[0] || null;
 }
 function ttsSupported(){ return 'speechSynthesis' in window; }
+/* מנקים לפני הקראה: אימוג'ים וסימנים שהקול קורא מוזר — משאירים עברית, מספרים ופיסוק */
+function cleanForSpeech(t){
+  return (t||'')
+    .replace(/[^֐-׿a-zA-Z0-9 .,!?:;()"'%׳״-]+/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
 function speakHe(text,{onend=null,onboundary=null}={}){
   if(!ttsSupported()) return false;
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
+  const u=new SpeechSynthesisUtterance(cleanForSpeech(text));
   u.lang='he-IL';
   const v=hebVoice();
   if(v) u.voice=v;
@@ -1466,7 +1483,12 @@ function coachContext(kid){
   };
 }
 async function postCoach(body){
-  const r=await fetch(COACH_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(), 40000);
+  let r;
+  try{
+    r=await fetch(COACH_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:ctrl.signal});
+  }finally{ clearTimeout(timer); }
   if(!r.ok) throw new Error('coach_http_'+r.status);
   const data=await r.json();
   if(data.error) throw new Error(data.error);
@@ -1549,15 +1571,19 @@ function openCall(){
   caps.className='captions';
   caps.appendChild(capCoach); caps.appendChild(capUser);
 
+  const turnBtnBox=document.createElement('div');
+  turnBtnBox.className='turn-btn-box';
+
   overlay.appendChild(top);
   overlay.appendChild(stage);
   overlay.appendChild(pendingBox);
   overlay.appendChild(caps);
+  overlay.appendChild(turnBtnBox);
   overlay.appendChild(typedRow);
   overlay.appendChild(controls);
   document.body.appendChild(overlay);
 
-  call.ui={overlay,capCoach,capUser,statusEl,tile,micBtn,input,typedRow,pendingBox};
+  call.ui={overlay,capCoach,capUser,statusEl,tile,micBtn,input,typedRow,pendingBox,turnBtnBox};
   call.timerInt=setInterval(()=>{
     if(!call) return;
     const s=Math.floor((Date.now()-call.start)/1000);
@@ -1565,6 +1591,20 @@ function openCall(){
   },1000);
 
   if(!sttOK && !call.typedOnly) typedRow.classList.add('open');
+
+  // מבקשים הרשאת מיקרופון מראש — אם נדחתה, עוברים בפירוש למצב כתיבה
+  // (בלי זה זיהוי הדיבור נכשל בשקט והשיחה נראית "תקועה")
+  if(sttOK && navigator.mediaDevices?.getUserMedia){
+    navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{
+      s.getTracks().forEach(t=>t.stop());
+    }).catch(()=>{
+      if(!call) return;
+      call.typedOnly=true;
+      call.ui.typedRow.classList.add('open');
+      setCallStatus('אין הרשאת מיקרופון — אפשר לכתוב 👇','');
+      toast('כדי לדבר בקול: אשרו גישה למיקרופון בהגדרות הדפדפן לאתר הזה');
+    });
+  }
 
   // ממשיכים שיחה מהיום, או מתחילים חדשה
   if(chat.day===todayKey() && (chat.msgs||[]).length){
@@ -1579,6 +1619,37 @@ function setCallStatus(text,cls=''){
   call.ui.statusEl.className='call-status '+cls;
   call.ui.tile.classList.toggle('is-speaking',cls==='speaking');
   call.ui.tile.classList.toggle('is-listening',cls==='listening');
+  // הכפתור הגדול: בזמן הקשבה — "סיימתי לדבר"; בזמן שהיא מדברת — "תורי לדבר"
+  const box=call.ui.turnBtnBox;
+  if(cls==='listening' && !call.typedOnly){
+    box.innerHTML='<button class="turn-btn done" onclick="finishSpeaking()">✅ סיימתי לדבר — עני לי</button>';
+  }else if(cls==='speaking'){
+    box.innerHTML='<button class="turn-btn myturn" onclick="manualInterrupt()">✋ עצרי — תורי לדבר</button>';
+  }else{
+    box.innerHTML='';
+  }
+}
+
+/* הילד סיים לדבר ולוחץ — שולחים מיד את מה שנקלט, גם אם המכשיר עוד לא
+   "סגר" את הזיהוי בעצמו (הבעיה הנפוצה: הזיהוי נשאר פתוח והתשובה לא נשלחת) */
+function finishSpeaking(){
+  if(!call) return;
+  const t=(call.liveTranscript||'').trim();
+  stopRec();
+  if(call.pendingFinish) call.pendingFinish(t);
+}
+
+/* עצירה ידנית של הדיבור שלה — התור עובר לילד מיד */
+function manualInterrupt(){
+  if(!call||!call.saying) return;
+  stopRec();
+  stopSpeaking();
+  if(call.sayFinish) call.sayFinish({interrupted:true});
+  // אם התור כבר ממתין (אישור מהצ'יפים) — פותחים הקשבה; בזרימה הרגילה
+  // הלולאה עושה את זה בעצמה, והמזהה שכבר רץ לא יופעל שוב
+  call.timers.push(setTimeout(()=>{
+    if(call && call.pendingFinish && !call.rec && sttOK && !call.muted && !call.typedOnly) startRecognizer('listen');
+  },80));
 }
 
 function saveChatMsg(role,text){
@@ -1646,22 +1717,29 @@ function applyActions(actions){
   queueSync(); render();
   return {saved,flagged};
 }
-function confirmPending(yes){
-  if(!call||!call.pendingActions) return;
+/* מיישם (או מבטל) פעולות ממתינות ומחזיר את משפט התגובה — בלי לדבר.
+   מי שקורא אחראי להשמיע, כדי שהדיבור לא יתנגש עם ההקשבה. */
+function applyPendingGetAck(yes){
+  if(!call||!call.pendingActions||!call.pendingActions.length) return null;
   const actions=call.pendingActions;
   showPending(null);
-  if(!yes){
-    sayInCall('בסדר, לא רושמת. ספרו לי שוב מה לתקן.');
-    return;
-  }
+  if(!yes) return 'בסדר, לא רשמתי. ספרו לי שוב מה לתקן.';
   const {saved,flagged}=applyActions(actions);
   const ack= flagged>0
     ? 'רשמתי! שמתי לב שמשהו לא לפי התפריט — לא נורא, מחר מיישרים קו. עוד משהו?'
     : 'מעולה, רשמתי ביומן! עוד משהו לספר לי?';
   saveChatMsg('a',ack);
   call.messages.push({role:'assistant',content:'[נרשם ביומן: '+actions.map(describeAction).join(', ')+'] '+ack});
-  sayInCall(ack);
   toast('✓ נשמר ביומן ('+saved+')');
+  return ack;
+}
+/* אישור מהצ'יפים על המסך — קורה בזמן שהמערכת מקשיבה, אז קודם עוצרים את
+   ההקשבה, מדברים, ורק בסוף חוזרים להקשיב */
+function confirmPending(yes){
+  if(!call||!call.pendingActions) return;
+  stopRec();
+  const ack=applyPendingGetAck(yes);
+  if(ack) sayInCall(ack);
 }
 async function sayInCall(text){
   const res=await say(text);
@@ -1706,25 +1784,37 @@ async function mainLoop(){
     if(!call||call.destroyed) return;
     if(!userText||!userText.trim()){
       call.emptyCount++;
-      if(call.emptyCount>=3){ setCallStatus('מוכנה כשתהיו מוכנים — הקישו 🎤 או כתבו',''); continue; }
+      if(call.emptyCount>=3){
+        // אחרי שלוש פעמים של שקט — עוצרים את ההקשבה בצורה מסודרת (לא מסתובבים
+        // בשקט ברקע). הקשה על 🎤 או הקלדה מחדשות את השיחה.
+        call.pausedListen=true;
+        setCallStatus('מוכנה כשתהיו מוכנים — הקישו 🎤 או כתבו ⌨️','');
+        call.avatar.setState('idle');
+        continue;
+      }
       const nudge=['לא שמעתי טוב — אפשר שוב?','קחו את הזמן, אני מקשיבה 😊','עוד פעם? לא קלטתי'][call.emptyCount-1]||'אפשר שוב?';
       await say(nudge);
       continue;
     }
     call.emptyCount=0;
+    call.pausedListen=false;
     call.userTurns++;
-    // אישור/ביטול קולי של פעולות ממתינות
+    // אישור/ביטול קולי של פעולות ממתינות — הכל בתוך הלולאה, בלי מרוצים
     if(call.pendingActions&&call.pendingActions.length){
       if(AFFIRM_RE.test(userText.trim())){
         const rest=userText.trim().replace(AFFIRM_RE,'').trim();
-        confirmPending(true);
-        if(rest.length<4) continue;
-        // יש עוד תוכן אחרי ה"כן" — ממשיכים איתו לשיחה
-        await handleUserText(rest);
+        const ack=applyPendingGetAck(true);
+        if(rest.length>=4){ await handleUserText(rest); continue; }
+        if(ack){
+          const res=await say(ack);
+          if(!call||call.destroyed) return;
+          if(res.interrupted) markInterrupted(ack,res);
+        }
         continue;
       }
       if(NEGATE_RE.test(userText.trim())){
-        confirmPending(false);
+        const ack=applyPendingGetAck(false);
+        if(ack) await say(ack);
         continue;
       }
       showPending(null); // דיבר על משהו אחר — מוותרים על ההצעה הישנה
@@ -1848,6 +1938,7 @@ function getUserTurn(){
       call.pendingFinish(t); return;
     }
     if(call.barged){ call.barged=false; return; } // המזהה כבר מקשיב מהקטיעה
+    if(call.pausedListen) return; // ממתינים בשקט להקשה על 🎤 או להקלדה
     if(sttOK && !call.muted && !call.typedOnly) startRecognizer('listen');
     else setCallStatus('כתבו תשובה ושלחו 👇','');
   });
@@ -1871,10 +1962,11 @@ function startRecognizer(role){
   rec.lang='he-IL'; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
   if(role==='listen'){
     call.avatar.setState('listening');
-    setCallStatus('מקשיבה לך… דברו עכשיו 🎙️','listening');
+    setCallStatus('מקשיבה לך… דברו, ובסוף לחצו "סיימתי" 🎙️','listening');
     call.ui.capUser.textContent='';
+    call.liveTranscript='';
   }
-  let finalText='';
+  let finalText='', lastErr='';
   rec.onresult=(e)=>{
     if(!call||call.rec!==rec) return;
     let interim='';
@@ -1887,23 +1979,40 @@ function startRecognizer(role){
       if(shouldIgnoreWhileSpeaking(text,call.sayingText)) return;
       bargeIn();
     }
+    if(call.recRole==='listen') call.liveTranscript=text;
     call.ui.capUser.textContent=text;
   };
-  rec.onerror=()=>{};
+  rec.onerror=(ev)=>{ lastErr=ev?.error||''; };
   rec.onend=()=>{
     if(!call||call.rec!==rec) return;
     call.rec=null;
     const wasRole=call.recRole;
     if(call.destroyed||call.muted) return;
+    // מיקרופון חסום — עוברים בפירוש למקלדת במקום להסתובב בשקט
+    if(lastErr==='not-allowed'||lastErr==='service-not-allowed'){
+      call.typedOnly=true;
+      call.ui.typedRow.classList.add('open');
+      setCallStatus('אין הרשאת מיקרופון — אפשר לכתוב 👇','');
+      toast('כדי לדבר בקול: אשרו גישה למיקרופון בהגדרות הדפדפן');
+      if(wasRole==='listen'&&call.pendingFinish){ /* נשארים ממתינים להקלדה */ }
+      return;
+    }
+    if(lastErr==='network'){
+      setCallStatus('זיהוי הדיבור צריך אינטרנט — בדקו חיבור, או כתבו 👇','');
+    }
     if(wasRole==='watch'){
       if(call.saying) call.timers.push(setTimeout(()=>{
         if(call?.saying && !call.rec && call.bargeIn) startRecognizer('watch');
       },150));
       return;
     }
-    const t=finalText.trim();
-    if(call.pendingFinish) call.pendingFinish(t);
-    else call.carryText=t;
+    const t=(finalText.trim()||call.liveTranscript||'').trim();
+    // השהיה קטנה לפני סיבוב חוזר — שכישלון מהיר לא יהפוך ללולאה צפופה
+    call.timers.push(setTimeout(()=>{
+      if(!call) return;
+      if(call.pendingFinish) call.pendingFinish(t);
+      else call.carryText=t;
+    }, t?0:350));
   };
   try{ rec.start(); }catch{ if(role==='listen'&&call.pendingFinish) call.pendingFinish(''); }
 }
@@ -1924,6 +2033,13 @@ function stopRec(){
 }
 function toggleMic(){
   if(!call) return;
+  // הקשה על המיקרופון כשההקשבה מושהית — מחדשת אותה (לא משתיקה)
+  if(!call.muted && call.pausedListen && call.pendingFinish && sttOK && !call.typedOnly){
+    call.pausedListen=false;
+    call.emptyCount=0;
+    startRecognizer('listen');
+    return;
+  }
   call.muted=!call.muted;
   call.ui.micBtn.classList.toggle('muted',call.muted);
   call.ui.micBtn.textContent=call.muted?'🔇':'🎤';

@@ -90,8 +90,9 @@ async function sendState(sub, state, force){
     metGoal: state.metGoal,
     due: state.due,
     streak: state.streak,
+    lesson: state.lesson || null,   // השיעור החי שנקבע — השרת דוחף גם אותו
   };
-  const sig = JSON.stringify([payload.tz, payload.time, payload.enabled, payload.lastLesson, payload.metGoal, payload.due]);
+  const sig = JSON.stringify([payload.tz, payload.time, payload.enabled, payload.lastLesson, payload.metGoal, payload.due, payload.lesson]);
   // שולחים כשמשהו השתנה, או לכל היותר פעם בשעה — כדי לא להציף את השרת
   if (!force && sig === lastSent && Date.now() - lastSentAt < 3600e3) return;
   lastSent = sig; lastSentAt = Date.now();
