@@ -149,6 +149,12 @@ Node קטן ("execution bridge") שמדבר עם ה-Worker ב-HTTPS מאומת; 
 (Client Portal Gateway), `lib/agent-broker.js` + מסלולי `/agent/broker[/pending|/fills]` ב-Worker, `scripts/ibkr-bridge.mjs` (רץ ליד ה-Gateway).
 הסימולציה נשארת מקור האמת; הדמה של IBKR ממלא את אותן פקודות והדוח משווה החלקה/מילויים. ממתין: מחשב שדולק (שרת/בית) ו-`BRIDGE_SECRET` — החלטת מאיר.
 
+**עדכון 1/10 — מניות S&P 500 בסריקה** (החלטת מאיר "תוסיף...", AI_COUNCIL#21): `scripts/nightly-sp500.mjs` מריץ את `scanOpportunities` על כל
+מניות המדד (נתונים עד הסשן האחרון בלבד) ושולח את 25 המובילים ל-`POST /agent/stocks` (סוד ה-cron; `GET /agent/stocks?date=` ציבורי).
+`lib/agent-stocks.js` שומר `agent:stocks:<day>` ואת יקום המניות; `engine/instruments.js` רושם מניות כמכשירים דינמיים (class `stock`, בלי
+מינוף, שורט מותר). הסוכן ממזג את המועמדים רק כשהסריקה מאותו סשן; השער והמדיניות ללא שינוי. מניה מוחזקת/ממתינה מתומחרת מ-Twelve Data.
+סדר בלילה (`tick-invest.yml`): הסריקה הלילית → הסוכן, באותה ריצה. בדיקות: `tests/agent-stocks.test.mjs`.
+
 ## שלב ג — פיתוח ובדיקות (מה שאפשר בלי מסחר אמיתי)
 
 סדר, כל פריט = PR + בדיקות + סקירת Council:

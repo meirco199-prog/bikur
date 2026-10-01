@@ -6,7 +6,9 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { analyzeBundle, toSnapshot } from '../engine/pipeline.js';
 import { normalizeCompanyFacts } from '../providers/edgar.js';
-import { pricesCoverLastSession } from '../engine/session.js';
+import { pricesCoverLastSession, lastSessionClose } from '../engine/session.js';
+import { scanOpportunities } from '../engine/opportunities.js';
+import { stockInstrument, stockSector } from '../engine/instruments.js';
 
 const W = process.env.WORKER_URL || 'https://invest-api.meirco199.workers.dev';
 const SECRET = process.env.CRON_SECRET;
@@ -83,6 +85,31 @@ async function facts(symbol){
   await cachePut(`facts-${symbol}`, out); return out;
 }
 
+// מניות ליקום הסוכן (החלטת בעל הריפו 1/10: "תוסיף"): אותו מנוע הזדמנויות של הסוכן, על כל חברות המדד, רק על נתונים עד הסשן
+// האחרון שנסגר (בר תוך-יומי לא נכנס, גם אם הריצה איחרה לשעות המסחר). מומנטום חוצה-נכסים מדורג בין המניות עצמן.
+// נשלחים רק המועמדים המובילים (בלי "זעזוע" שדורש מחקר) — הסוכן ממזג אותם עם שאר היקום והשער מחליט.
+export const STOCK_TOP = 25;
+export function buildStockScan({ rowsBySym = {}, items = [], day, regime = null, top = STOCK_TOP }){
+  const meta = new Map(items.map((a) => [a.symbol, a]));
+  const series = Object.entries(rowsBySym).map(([sym, rows]) => ({ inst: stockInstrument(sym, { name: meta.get(sym)?.name || sym, sector: stockSector(meta.get(sym)?.sector) }), rows: (rows || []).filter((r) => r[0] <= day) }));
+  const res = scanOpportunities({ series, regime, day });
+  const candidates = res.candidates.filter((c) => !c.needsResearch && !c.conflict && c.day === day).slice(0, top);
+  return { day, scanned: res.scanned, summary: res.summary, candidates, universe: items.map((a) => ({ symbol: a.symbol, name: a.name || null, sector: a.sector || null })) };
+}
+async function postStockScan(payload){
+  const r = await getJSON(`${W}/agent/stocks?secret=${encodeURIComponent(SECRET)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, 2, 60000);
+  log(`מניות לסוכן (${payload.day}): נסרקו ${payload.scanned}, מועמדים ${r.candidates} — ${payload.candidates.slice(0, 8).map((c) => `${c.side === 'long' ? '+' : '-'}${c.symbol}(${c.strategy},${c.score})`).join(' ')}`);
+  return r;
+}
+async function stockScanIfMissing(syms, items, regime){
+  const sess = lastSessionClose(new Date()).date;
+  const have = await getJSON(`${W}/agent/stocks?date=${sess}`).catch(() => null);
+  if (have && !have.missing) { log(`סריקת מניות לסוכן ל-${sess} כבר קיימת (${have.candidates?.length || 0} מועמדים)`); return null; }
+  const rowsBySym = {};
+  for (const sym of syms){ try { rowsBySym[sym] = (await prices(sym)).rows.slice(-320); } catch {} }
+  return postStockScan(buildStockScan({ rowsBySym, items, day: sess, regime }));
+}
+
 export async function main(){
   if (!SECRET) throw new Error('חסר CRON_SECRET');
   const day = today();
@@ -99,14 +126,18 @@ export async function main(){
     const have = rank?.date === day ? (rank.universes?.sp500 || 0) : 0;
     const sh = await getJSON(`${W}/shadow/report`).catch(() => null);
     const eligShare = sh?.day === day && sh.n ? (sh.eligible || 0) / sh.n : 0;
-    if (have >= DONE_SHARE * syms.length && eligShare >= 0.5){ log(`הדירוג של ${day} כבר כולל ${have} חברות מדד ו-${Math.round(eligShare * 100)}% כשירות במודל הצל — הסריקה כבר רצה, מדלג`); return { day, skipped: true, have, eligShare }; }
+    if (have >= DONE_SHARE * syms.length && eligShare >= 0.5){
+      log(`הדירוג של ${day} כבר כולל ${have} חברות מדד ו-${Math.round(eligShare * 100)}% כשירות במודל הצל — הסריקה כבר רצה, מדלג`);
+      const st = await stockScanIfMissing(syms, sp.items || [], await getJSON(`${W}/regime`).catch(() => null)).catch((e) => { log('סריקת מניות לסוכן נכשלה:', e.message); return null; });
+      return { day, skipped: true, have, eligShare, stocks: st ? st.candidates : 'exists-or-failed' };
+    }
     if (have >= DONE_SHARE * syms.length) log(`הדירוג של ${day} כולל את המדד אבל רק ${Math.round(eligShare * 100)}% כשירות במודל הצל — רץ שוב ומחליף`);
   }
   const regime = await getJSON(`${W}/regime`).catch(() => null);
   const spy = await prices('SPY'); const qqq = await prices('QQQ').catch(() => null);
   const macro = await getJSON(`${W}/macro/DGS10`).catch(() => null);
   const dgs10Rows = macro?.rows || null;
-  const snaps = []; const errors = [];
+  const snaps = []; const errors = []; const rowsBySym = {};
   const meta = new Map((universe.items || []).map((a) => [a.symbol, a]));
   let i = 0;
   for (const sym of syms){
@@ -114,6 +145,7 @@ export async function main(){
     try {
       const asset = meta.get(sym) || { symbol: sym, name: sym, type: 'stock', assetClass: 'equity', role: 'satellite', sector: (sp.items || []).find((a) => a.symbol === sym)?.sector || null, country: 'US', currency: 'USD' };
       const [px, f] = await Promise.all([prices(sym), facts(sym).catch((e) => ({ missing: true, reason: 'EDGAR: ' + e.message }))]);
+      rowsBySym[sym] = px.rows.slice(-320); // לסריקת המניות של הסוכן (מספיק ל-SMA200 ולמומנטום 12−1)
       const bundle = { asset, prices: px, quote: { missing: true, reason: 'לילה' }, profile: { missing: true, reason: 'לא נמשך ב-Actions' }, facts: f, ratios: { missing: true, reason: 'אין FMP ב-Actions' }, est: { missing: true, reason: 'אין FMP ב-Actions' }, analyst: { missing: true, reason: 'אין FMP ב-Actions' }, news: { missing: true, reason: 'לא נמשך' }, insider: { missing: true, reason: 'לא נמשך' }, etf: { missing: true, reason: 'לא ETF' }, earn: { missing: true, reason: 'תאריכי דוחות מ-FMP (Worker) בלבד' } };
       const a = analyzeBundle(bundle, { regime, benchRows: spy.rows, techRows: asset?.sector === 'Technology' ? qqq?.rows : null, peers: [], dgs10Rows });
       snaps.push(toSnapshot(a));
@@ -137,7 +169,8 @@ export async function main(){
   log(`סיום: ${ok}/${snaps.length} עם ציון; דוחות EDGAR: ${factsOk}/${snaps.length}${Object.keys(factsReasons).length ? ' חסרים: ' + JSON.stringify(factsReasons) : ''}; שגיאות: ${errors.length}; מקורות מחירים: ${JSON.stringify(sourceCounts)} (מקור ראשי ${PRICE_SOURCE}, גיבויים ${fallbacksUsed}/${FALLBACK_MAX})`);
   if (factsOk < 0.5 * snaps.length) console.log('::warning::sp500 nightly: דוחות EDGAR חסרים לרוב החברות — מודלי הצל B/C/D לא כשירים');
   for (const e of errors.slice(0, 15)) log('  ', e.sym, e.msg);
+  const stockScan = await postStockScan(buildStockScan({ rowsBySym, items: sp.items || [], day: lastSessionClose(new Date()).date, regime })).catch((e) => { log('סריקת מניות לסוכן נכשלה:', e.message); return null; });
   await writeFile('.sp500-ran', day).catch(() => {}); // סימון לריצת ה-workflow: הסריקה רצה (→ החלטת המסלול האגרסיבי מחדש)
-  return { day, total: snaps.length, ok, factsOk, written, skipped, errors: errors.length, priceSource: PRICE_SOURCE, sources: sourceCounts, fallbacks: fallbacksUsed };
+  return { day, total: snaps.length, ok, factsOk, written, skipped, errors: errors.length, priceSource: PRICE_SOURCE, sources: sourceCounts, fallbacks: fallbacksUsed, stockCandidates: stockScan?.candidates ?? null };
 }
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) main().then((r) => { console.log(JSON.stringify(r)); }).catch((e) => { console.error('nightly-sp500 failed:', e.message); process.exit(1); });

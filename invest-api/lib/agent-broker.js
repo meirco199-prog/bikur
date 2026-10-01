@@ -5,6 +5,7 @@
 // agent:broker:sync (סנכרון חד-פעמי של פוזיציות קיימות לדמה — החלטת בעל הריפו 29/9).
 import { reconcileFills } from '../engine/ibkr-map.js';
 import { instrumentOf } from '../engine/instruments.js';
+import { registerAgentStocks } from './agent-stocks.js';
 import { round, isNum } from '../engine/util.js';
 
 const exitId = (j) => `agent:${j.day}:exit:${j.symbol}:${j.side}:${String(j.id || '').slice(-6)}`;
@@ -20,6 +21,7 @@ const syncId = (day, p) => `agent:sync:${day}:${p.symbol}:${p.side}`;
 export async function requestBrokerSync(db, { day = null, off = false } = {}){
   if (off){ await db.delete('agent:broker:sync'); return { ok: true, off: true }; }
   const state = await db.get('agent:state');
+  await registerAgentStocks(db, { state });
   const d = /^\d{4}-\d{2}-\d{2}$/.test(String(day || '')) ? day : new Date().toISOString().slice(0, 10);
   const orders = Object.entries(state?.positions || {}).map(([symbol, p]) => {
     const qty = Math.abs(Number(p.qty) || 0); if (!(qty > 0) || !instrumentOf(symbol)) return null;
@@ -36,6 +38,7 @@ export async function brokerPending(db){
   const pending = (await db.get('agent:pending')) || { day: null, orders: [] };
   const sent = (await db.get('agent:broker:sent')) || {};
   const state = await db.get('agent:state');
+  await registerAgentStocks(db, { state, pending }); // מניות: הגשר מקבל class=stock ב-inst ורושם אותן אצלו
   const kill = await db.get('agent:kill');
   const journal = (await db.get('agent:journal')) || [];
   const sync = (await db.get('agent:broker:sync')) || null;

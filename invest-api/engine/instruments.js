@@ -48,7 +48,18 @@ export const AGENT_INSTRUMENTS = Object.freeze([
   fut('ZN~', '10-Year T-Note (proxy)', 'אג"ח 10 שנים', 'bonds', 'IEF', 100),
 ]);
 
-export const instrumentOf = (symbol) => AGENT_INSTRUMENTS.find((i) => i.symbol === symbol) || null;
+// מניות בודדות (S&P 500) — יקום דינמי (החלטת בעל הריפו 1/10: "תוסיף"): לא ברשימה הקבועה כי הסוכן לא מתמחר 500 סדרות
+// מ-Twelve Data; הסריקה שלהן רצה בלילה ב-GitHub Actions (scripts/nightly-sp500.mjs, אותו מנוע scanOpportunities) והמועמדים
+// נשמרים ב-KV (agent:stocks:<day>). כל נקודת כניסה שעובדת עם מצב הסוכן רושמת קודם את המניות הרלוונטיות (lib/agent-stocks.js).
+const GICS = { 'Information Technology': 'tech', 'Health Care': 'health', Financials: 'financials', Energy: 'energy', Materials: 'materials', 'Communication Services': 'comm', 'Consumer Discretionary': 'consumer', 'Consumer Staples': 'staples', Industrials: 'industrials', Utilities: 'utilities', 'Real Estate': 'realestate' };
+export const stockSector = (gics) => GICS[gics] || (gics ? String(gics).toLowerCase().replace(/\s+/g, '-') : 'stocks');
+export const stockInstrument = (symbol, { name = null, nameHe = null, sector = null } = {}) => ({ symbol, name: name || symbol, nameHe: nameHe || name || symbol, class: 'stock', sector: sector || 'stocks', currency: 'USD', exchange: 'SMART', session: 'us', settle: 'trade', units: 1, leverage: 1, margin: STOCK, shortable: true, borrowFee: 0.003, twelvedata: symbol, dynamic: true });
+const STATIC = new Map(AGENT_INSTRUMENTS.map((i) => [i.symbol, i]));
+const DYNAMIC = new Map();
+/** רישום מכשירים דינמיים (מניות). סימבול של היקום הקבוע לא נדרס. מחזיר כמה רשומים */
+export function registerInstruments(list = []){ for (const i of list || []) if (i?.symbol && !STATIC.has(i.symbol)) DYNAMIC.set(i.symbol, i); return DYNAMIC.size; }
+export const dynamicInstruments = () => [...DYNAMIC.values()];
+export const instrumentOf = (symbol) => STATIC.get(symbol) || DYNAMIC.get(symbol) || null;
 export const priceSymbolOf = (inst) => (inst?.proxy || inst?.symbol);   // הסימבול שממנו מגיעים המחירים
 export const AGENT_CLASSES = Object.freeze(['stock', 'etf', 'crypto', 'fx', 'future']);
 

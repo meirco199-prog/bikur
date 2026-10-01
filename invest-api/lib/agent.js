@@ -2,7 +2,8 @@
 // עצירות → שערוך לסגירה, ריבית, חיסול margin → סריקת הזדמנויות → גודל לפי סיכון → שער הפקודות → פקודות ממתינות למחר.
 // מפתחות KV: agent:state, agent:equity, agent:journal, agent:pending, agent:opps:<day>, agent:scan:<day>, agent:kill.
 // אין look-ahead: החלטה בסגירת סשן S, מילוי בפתיחת הסשן הבא (כשהבר שלו קיים). מודל שפה לא נוגע בשום שלב כאן.
-import { AGENT_INSTRUMENTS, instrumentOf, priceSymbolOf } from '../engine/instruments.js';
+import { AGENT_INSTRUMENTS, instrumentOf, priceSymbolOf, dynamicInstruments } from '../engine/instruments.js';
+import { registerAgentStocks } from './agent-stocks.js';
 import { newAccount, fill, valuation, markToMarket, accrue, liquidateIfNeeded, stopExits, simMetrics } from '../engine/margin-sim.js';
 import { scanOpportunities, sizeByRisk, STRATEGIES } from '../engine/opportunities.js';
 import { AGENT_SIM_POLICY } from '../engine/agent-sim-policy.js';
@@ -23,7 +24,7 @@ const nextDayRow = (rows, day) => rows.find((x) => x[0] > day) || null;
 const PRICES_RETRY_SEC = 30 * 60;
 export async function agentPrices(inst, ctx){
   const sym = priceSymbolOf(inst), base = instrumentOf(sym) || inst;
-  const asset = { symbol: sym, currency: 'USD', type: base.class === 'crypto' ? 'crypto' : base.class === 'fx' ? 'fx' : 'etf', twelvedata: base.twelvedata || sym };
+  const asset = { symbol: sym, currency: 'USD', type: base.class === 'crypto' ? 'crypto' : base.class === 'fx' ? 'fx' : base.class === 'stock' ? 'stock' : 'etf', twelvedata: base.twelvedata || sym };
   const c = { ...ctx, asset };
   return cached(ctx.db, `px:${sym}`, TTL.prices, async (ex) => {
     const from = ex?.rows?.length ? ex.rows[ex.rows.length - 1][0].slice(0, 4) + '-01-01' : undefined;
@@ -54,11 +55,16 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   if (!state){ state = newAccount(round(policy.capitalIls / fx, 2), day); state.fxAtStart = fx; state.capitalIls = policy.capitalIls; }
   if (state.lastDay === day && !force) return { phase: 'skipped', reason: `כבר רץ לסשן ${day}`, day };
   if (state.lastDay && state.lastDay > day && !force) return { phase: 'skipped', reason: `המצב כבר מעודכן ל-${state.lastDay}`, day };
+  const pending = (await db.get('agent:pending')) || { day: null, orders: [] };
+  await registerAgentStocks(db, { state, pending });
+  // מניות בודדות מתומחרות רק כשהן מוחזקות או ממתינות למילוי (הסריקה שלהן מגיעה מהלילה); היקום הקבוע — תמיד
+  const stockSyms = [...new Set([...Object.keys(state.positions || {}), ...(pending.orders || []).map((o) => o.symbol)])].filter((s) => instrumentOf(s)?.class === 'stock');
+  const pricedInstruments = [...AGENT_INSTRUMENTS, ...stockSyms.map(instrumentOf)];
 
   // שלב 1 — תמחור (באצ'ים): כל מכשיר צריך סדרה שמכסה את יום ההחלטה
   const scanKey = `agent:scan:${day}`;
   const scan = (await db.get(scanKey)) || { day, done: {}, missing: {}, startedAt: new Date().toISOString() };
-  const priceSyms = [...new Set(AGENT_INSTRUMENTS.map(priceSymbolOf))];
+  const priceSyms = [...new Set(pricedInstruments.map(priceSymbolOf))];
   let fetched = 0;
   for (const sym of priceSyms){
     if (scan.done[sym] || scan.missing[sym]) continue;
@@ -76,11 +82,11 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
 
   // שלב 2 — סדרות עד יום ההחלטה
   const series = [], rowsBySym = {};
-  for (const inst of AGENT_INSTRUMENTS){
+  for (const inst of pricedInstruments){
     const psym = priceSymbolOf(inst); if (scan.missing[psym]) continue;
     const r = await db.get(`px:${psym}`); const rows = (r?.rows || []).filter((x) => x[0] <= day && isNum(x[4]));
     if (!rows.length) continue;
-    rowsBySym[inst.symbol] = rows; series.push({ inst, rows });
+    rowsBySym[inst.symbol] = rows; if (!inst.dynamic) series.push({ inst, rows }); // סריקת מניות — מהלילה, לא כאן
   }
   const closeRow = (sym) => dayOf(rowsBySym[sym] || [], day);
   const priceOf = (sym) => { const r = closeRow(sym); return r && r[0] === day ? r[4] : (r ? r[4] : null); };
@@ -93,7 +99,6 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   const log = (e) => journal.push({ id: uid('ag_'), at: new Date().toISOString(), day, ...e });
 
   // שלב 3 — מילוי פקודות שהוחלטו בסשן הקודם, בפתיחת היום (שער שוב: המצב השתנה מאז ההחלטה)
-  const pending = (await db.get('agent:pending')) || { day: null, orders: [] };
   const fills = [], rejected = [];
   const equityBefore = valuation(state, priceOf, instrumentOf);
   const sentToday = [];
@@ -120,18 +125,23 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   // שלב 5 — סריקת הזדמנויות על כל היקום, גודל לפי סיכון, שער הפקודות → פקודות למחר
   const regime = (await db.get(`regime:${day}`)) || (await db.get(`regime:${(await db.get('cron:state'))?.day || ''}`)) || null;
   const scanRes = scanOpportunities({ series, regime, day });
+  // מניות S&P 500: מועמדים מהסריקה הלילית של אותו סשן בלבד (יום אחר = נתונים של סשן אחר → לא משתמשים)
+  const stockScan = await db.get(`agent:stocks:${day}`);
+  const stockCands = stockScan?.day === day ? (stockScan.candidates || []).filter((c) => c.day === day && instrumentOf(c.symbol) && Object.hasOwn(STRATEGIES, c.strategy)) : [];
+  const allCandidates = [...scanRes.candidates, ...stockCands].sort((a, b) => b.score - a.score);
   const halt = haltState({ policy, account: toGateAccount(state, v, fx, day, equityBefore) });
   const orders = [], gateLog = [];
   const held = new Set(Object.keys(state.positions));
-  for (const c of scanRes.candidates){
+  for (const c of allCandidates){
     if (c.needsResearch || c.conflict) continue;
     const inst = instrumentOf(c.symbol);
     if (held.has(c.symbol)) continue; // פוזיציה קיימת: יציאה רק בעצירה/אינוולידציה (v1)
     if (c.side === 'short' && !inst.shortable) continue;
-    if (freshOf(c.symbol) !== day){ gateLog.push({ symbol: c.symbol, side: c.side, strategy: c.strategy, reasons: [`אין סגירה של ${day} (יש עד ${freshOf(c.symbol)})`] }); continue; }
+    const fresh = c.fromStockScan ? c.day : freshOf(c.symbol);
+    if (fresh !== day){ gateLog.push({ symbol: c.symbol, side: c.side, strategy: c.strategy, reasons: [`אין סגירה של ${day} (יש עד ${fresh})`] }); continue; }
     const qty = sizeByRisk({ equityUsd: v.equityUsd, riskPct: STRATEGIES[c.strategy].riskPct, price: c.price, stop: c.stop, units: inst.units, maxNotionalUsd: v.equityUsd * policy.maxTradeShare * 0.98 / Math.abs(inst.leverage || 1) });
     if (!(qty > 0)){ gateLog.push({ symbol: c.symbol, side: c.side, strategy: c.strategy, reasons: ['גודל פוזיציה קטן מדי לפי תקציב הסיכון'] }); continue; }
-    const o = { symbol: c.symbol, side: c.side === 'long' ? 'buy' : 'short', qty, price: c.price, stop: c.stop, strategy: c.strategy, score: c.score, reason: `${STRATEGIES[c.strategy].label} · ${c.invalidation}`, evidence: c.evidence, horizonDays: c.horizonDays };
+    const o = { symbol: c.symbol, class: inst.class, sector: inst.sector, side: c.side === 'long' ? 'buy' : 'short', qty, price: c.price, stop: c.stop, strategy: c.strategy, score: c.score, reason: `${STRATEGIES[c.strategy].label}${inst.class === 'stock' ? ' · מניה מ-S&P 500' : ''} · ${c.invalidation}`, evidence: c.evidence, horizonDays: c.horizonDays };
     const acct = toGateAccount(state, v, fx, day, equityBefore);
     const g = gateOrder({ order: toGateOrder(o, inst, c.price, fx, day), policy, account: acct, positions: [...toGatePositions(v, fx), ...orders.map((x) => ({ symbol: x.symbol, class: instrumentOf(x.symbol).class, sector: instrumentOf(x.symbol).sector, strategy: x.strategy, qty: x.side === 'buy' ? x.qty : -x.qty, valueIls: x.qty * x.price * instrumentOf(x.symbol).units * Math.abs(instrumentOf(x.symbol).leverage || 1) * fx, pnlIls: 0 }))], capabilities: capabilities(), journal: [...sentToday, ...orders.map((x) => ({ clientOrderId: x.clientOrderId }))], now });
     if (g.allowed){ orders.push({ ...o, clientOrderId: g.clientOrderId, notionalUsd: round(g.notionalIls / fx, 2) }); }
@@ -139,20 +149,21 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
     if (orders.length >= policy.maxOrdersPerDay) break;
   }
   await db.put('agent:pending', { day, decidedAt: new Date().toISOString(), orders });
-  await db.put(`agent:opps:${day}`, { day, scanned: scanRes.scanned, skipped: scanRes.skipped, summary: scanRes.summary, candidates: scanRes.candidates.slice(0, OPPS_KEEP), gateLog, halt, regime: regime?.summary || null }, { ttl: 14 * 86400 });
+  const stocksInfo = { scanned: stockScan?.day === day ? stockScan.scanned || 0 : 0, candidates: stockCands.length, scanDay: stockScan?.day || null };
+  await db.put(`agent:opps:${day}`, { day, scanned: scanRes.scanned, skipped: scanRes.skipped, summary: { ...scanRes.summary, stocks: stocksInfo }, candidates: allCandidates.slice(0, OPPS_KEEP), gateLog, halt, regime: regime?.summary || null }, { ttl: 14 * 86400 });
   // שלב 6 — שמירה: מצב, שורת שווי יומית, יומן
   const equity = ((await db.get('agent:equity')) || []).filter((r) => r[0] !== day);
   equity.push([day, round(v.equityUsd * fx, 0), spy, { equityUsd: v.equityUsd, leverage: v.leverage, byClass: v.byClass, cashUsd: v.cashUsd, fx }]);
   equity.sort((a, b) => (a[0] < b[0] ? -1 : 1));
   await db.put('agent:equity', equity.slice(-EQUITY_MAX));
-  log({ kind: 'day', equityUsd: v.equityUsd, dayPnlUsd: dayPnl, leverage: v.leverage, fills: fills.length, stops: stops.length, liquidations: liq.length, interestUsd: acc.interestUsd, borrowUsd: acc.borrowUsd, candidates: scanRes.candidates.length, ordersForTomorrow: orders.length, halted: halt.halted ? halt.reasons : null });
+  log({ kind: 'day', equityUsd: v.equityUsd, dayPnlUsd: dayPnl, leverage: v.leverage, fills: fills.length, stops: stops.length, liquidations: liq.length, interestUsd: acc.interestUsd, borrowUsd: acc.borrowUsd, candidates: allCandidates.length, stockCandidates: stockCands.length, ordersForTomorrow: orders.length, halted: halt.halted ? halt.reasons : null });
   await db.put('agent:journal', journal.slice(-JOURNAL_MAX));
   await db.put('agent:state', state);
-  return { phase: 'done', day, equityUsd: v.equityUsd, equityIls: round(v.equityUsd * fx, 0), dayPnlUsd: dayPnl, leverage: v.leverage, positions: v.positions.length, fills: fills.length, rejectedFills: rejected.length, stops: stops.length, liquidations: liq.length, interestUsd: acc.interestUsd, borrowUsd: acc.borrowUsd, scanned: scanRes.scanned, candidates: scanRes.summary, ordersForTomorrow: orders.map((o) => `${o.side} ${o.qty} ${o.symbol} (${o.strategy}, ${o.score})`), gateRejections: gateLog.length, halted: halt.halted ? halt.reasons : null, killSwitch: !!policy.killSwitch };
+  return { phase: 'done', day, equityUsd: v.equityUsd, equityIls: round(v.equityUsd * fx, 0), dayPnlUsd: dayPnl, leverage: v.leverage, positions: v.positions.length, fills: fills.length, rejectedFills: rejected.length, stops: stops.length, liquidations: liq.length, interestUsd: acc.interestUsd, borrowUsd: acc.borrowUsd, scanned: scanRes.scanned, stocks: stocksInfo, candidates: scanRes.summary, ordersForTomorrow: orders.map((o) => `${o.side} ${o.qty} ${o.symbol} (${o.strategy}, ${o.score})`), gateRejections: gateLog.length, halted: halt.halted ? halt.reasons : null, killSwitch: !!policy.killSwitch };
 }
 
 // --- המרות לשער הפקודות (השער עובד בשקלים; הסימולציה בדולר) ---
-const capabilities = () => ({ tradable: new Set(AGENT_INSTRUMENTS.map((i) => i.symbol)), classes: new Set(AGENT_INSTRUMENTS.map((i) => i.class)), exchanges: null });
+const capabilities = () => { const all = [...AGENT_INSTRUMENTS, ...dynamicInstruments()]; return { tradable: new Set(all.map((i) => i.symbol)), classes: new Set(all.map((i) => i.class)), exchanges: null }; };
 function toGateOrder(o, inst, price, fx, day){
   const lev = Math.abs(inst.leverage || 1);
   return { symbol: o.symbol, class: inst.class, side: o.side, qty: o.qty, priceRef: price, notionalIls: o.qty * price * inst.units * fx, currency: 'USD', strategy: o.strategy, sector: inst.sector, exchange: inst.exchange, exposureMultiplier: lev, worstCaseLossIls: (o.side === 'buy' && inst.class !== 'future' && lev === 1) ? o.qty * price * inst.units * fx : null, day, decisionVersion: 1, quoteAsOf: day, marketOpen: inst.session === '24x7' || !isNonTradingDay(day), allowAddToLoser: false };
@@ -170,6 +181,8 @@ export async function agentReport(db){
   const equity = (await db.get('agent:equity')) || [];
   const base = { policy: { version: policy.version, mode: policy.mode, hash: policyHash(AGENT_SIM_POLICY), killSwitch: !!policy.killSwitch, killReason: policy.killReason || null, capitalIls: policy.capitalIls, leverage: policy.leverage, shorting: policy.shorting, allowedClasses: policy.allowedClasses, maxDailyLoss: policy.maxDailyLoss, maxDrawdown: policy.maxDrawdown, maxTradeShare: policy.maxTradeShare, maxAssetShare: policy.maxAssetShare, maxClassShare: policy.maxClassShare, maxOrdersPerDay: policy.maxOrdersPerDay }, strategies: Object.fromEntries(Object.entries(STRATEGIES).map(([k, s]) => [k, { label: s.label, horizonDays: s.horizonDays, riskPct: s.riskPct }])), universe: { count: AGENT_INSTRUMENTS.length, byClass: AGENT_INSTRUMENTS.reduce((m, i) => ({ ...m, [i.class]: (m[i.class] || 0) + 1 }), {}) } };
   if (!state) return { missing: true, reason: 'הסוכן עוד לא רץ', ...base };
+  await registerAgentStocks(db, { state });
+  base.universe.stocks = ((await db.get('agent:stocks:universe'))?.items || []).length; // היקום של הלילה (לא הזיכרון המצטבר של ה-isolate)
   const day = state.lastDay;
   const priceOf = (sym) => state.positions[sym]?.lastMark ?? null;
   const v = valuation(state, priceOf, instrumentOf);

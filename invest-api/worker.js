@@ -12,6 +12,7 @@ import { runShadow, shadowReport } from './lib/shadow.js';
 import { runAggressive, aggrReport, executeAggressive } from './lib/aggressive.js';
 import { runAgent, agentReport, setKill } from './lib/agent.js';
 import { brokerPending, recordBroker, brokerReport, requestBrokerSync } from './lib/agent-broker.js';
+import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
 import { AGENT_SIM_POLICY } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
@@ -173,6 +174,11 @@ async function handle(req, env0, ctx){
   if (r0 === 'agent'){
     if (p1 === 'report' || !p1) return json(await agentReport(db));
     if (p1 === 'policy') return json({ policy: AGENT_SIM_POLICY, hash: policyHash(AGENT_SIM_POLICY), kill: (await db.get('agent:kill')) || null });
+    // מניות S&P 500 ליקום הסוכן: הסריקה הלילית (nightly-sp500 ב-Actions) שולחת מועמדים; GET ציבורי
+    if (p1 === 'stocks'){
+      if (req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); try { return json(await recordStockScan(db, body)); } catch (e) { return err('סריקת מניות: ' + e.message, 400); } }
+      return json(await stockScanReport(db, validDate(q.date) ? q.date : null));
+    }
     if (p1 === 'opportunities'){ const day = validDate(q.date) ? q.date : (await db.get('agent:state'))?.lastDay; return json((day && (await db.get(`agent:opps:${day}`))) || { missing: true, day: day || null }); }
     // חיבור לחשבון הדמה של IBKR במצב מראה (invest/docs/IBKR_BRIDGE.md): דוח ציבורי; pending/fills לגשר עם BRIDGE_SECRET (או סוד ה-cron/טוקן)
     if (p1 === 'broker'){
