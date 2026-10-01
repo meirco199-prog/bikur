@@ -7,6 +7,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { IbkrClient } from '../lib/ibkr-client.js';
 import { toIbkrOrder, normalizeBrokerOrder, clipExitToHeld } from '../engine/ibkr-map.js';
+import { registerInstruments, stockInstrument } from '../engine/instruments.js';
 import { nyParts } from '../engine/session.js';
 
 const args = new Set(process.argv.slice(2));
@@ -59,6 +60,8 @@ async function tick(ib, state){
     const today = nyDay();
     // סדר: פקודות הסשן, יציאות, ואז סנכרון חד-פעמי של פוזיציות קיימות (החלטת בעל הריפו 29/9)
     const todo = [...(pend.orders || []).filter((o) => pend.day && pend.day < today), ...(pend.exits || []), ...(pend.sync || [])].filter((o) => !o.sent && !state.sent[o.clientOrderId]);
+    // מניות בודדות (S&P 500) לא ברשימה הקבועה: ה-Worker מסמן inst.class=stock — רושמים כדי שהמיפוי ל-IBKR (STK/SMART) יעבוד
+    registerInstruments(todo.filter((o) => o.inst?.class === 'stock').map((o) => stockInstrument(o.symbol)));
     // יציאות וסנכרון נבדקים מול מה שהדמה מחזיק בפועל (פוזיציה שנפתחה בסימולציה לפני חיבור הגשר לא קיימת בדמה — מכירה שלה הייתה פותחת שורט;
     // סנכרון לא נשלח שוב אם הדמה כבר מחזיק)
     const needHeld = todo.some((o) => o.kind === 'stop' || o.kind === 'liquidation' || o.kind === 'sync');

@@ -24,7 +24,7 @@ export async function render(main){
   let r;
   try { r = await api('/agent/report', { ttl: 30000 }); } catch (e) { main.innerHTML = errorBox(e); return; }
   const P = r.policy || {};
-  const head = `<h1>🤖 הסוכן האוטונומי</h1><div class="muted" style="margin-bottom:.8rem">סימולציית חשבון margin בסגנון IBKR · ${r.universe?.count || 0} מכשירים: ${Object.entries(r.universe?.byClass || {}).map(([k, v]) => `${CLASS_HE[k] || k} ${v}`).join(', ')} · לונג ושורט · מינוף עד פי ${P.leverage?.total || '—'} · ${P.mode === 'simulation' ? 'סימולציה בלבד, לא כסף אמיתי' : esc(P.mode)}</div>`;
+  const head = `<h1>🤖 הסוכן האוטונומי</h1><div class="muted" style="margin-bottom:.8rem">סימולציית חשבון margin בסגנון IBKR · ${r.universe?.count || 0} מכשירים: ${Object.entries(r.universe?.byClass || {}).map(([k, v]) => `${CLASS_HE[k] || k} ${v}`).join(', ')}${r.universe?.stocks ? ` + ${r.universe.stocks} מניות S&P 500 (סריקה לילית)` : ''} · לונג ושורט · מינוף עד פי ${P.leverage?.total || '—'} · ${P.mode === 'simulation' ? 'סימולציה בלבד, לא כסף אמיתי' : esc(P.mode)}</div>`;
   if (r.missing){ main.innerHTML = `<div style="max-width:860px;margin:0 auto">${head}<div class="empty">הסוכן עוד לא רץ. הריצה הראשונה קורית בלילה אחרי סגירת ניו יורק (או בפקודת ops <code>agent-run</code>).</div>${policyCard(P, r.strategies)}</div>`; return; }
   const m = r.metrics || {}; const eq = r.equity || []; const prev = eq[eq.length - 2];
   const status = [r.policy?.killSwitch ? `<span class="tag missing">⛔ kill switch${P.killReason ? ': ' + esc(P.killReason) : ''}</span>` : '', r.halted ? `<span class="tag stale">⏸ עצירה: ${esc(r.halted.join(' · '))}</span>` : '<span class="tag fact">פעיל</span>'].filter(Boolean).join(' ');
