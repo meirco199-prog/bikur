@@ -182,7 +182,7 @@ export async function agentReport(db){
   const base = { policy: { version: policy.version, mode: policy.mode, hash: policyHash(AGENT_SIM_POLICY), killSwitch: !!policy.killSwitch, killReason: policy.killReason || null, capitalIls: policy.capitalIls, leverage: policy.leverage, shorting: policy.shorting, allowedClasses: policy.allowedClasses, maxDailyLoss: policy.maxDailyLoss, maxDrawdown: policy.maxDrawdown, maxTradeShare: policy.maxTradeShare, maxAssetShare: policy.maxAssetShare, maxClassShare: policy.maxClassShare, maxOrdersPerDay: policy.maxOrdersPerDay }, strategies: Object.fromEntries(Object.entries(STRATEGIES).map(([k, s]) => [k, { label: s.label, horizonDays: s.horizonDays, riskPct: s.riskPct }])), universe: { count: AGENT_INSTRUMENTS.length, byClass: AGENT_INSTRUMENTS.reduce((m, i) => ({ ...m, [i.class]: (m[i.class] || 0) + 1 }), {}) } };
   if (!state) return { missing: true, reason: 'הסוכן עוד לא רץ', ...base };
   await registerAgentStocks(db, { state });
-  base.universe.stocks = dynamicInstruments().length;
+  base.universe.stocks = ((await db.get('agent:stocks:universe'))?.items || []).length; // היקום של הלילה (לא הזיכרון המצטבר של ה-isolate)
   const day = state.lastDay;
   const priceOf = (sym) => state.positions[sym]?.lastMark ?? null;
   const v = valuation(state, priceOf, instrumentOf);
