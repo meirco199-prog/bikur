@@ -127,7 +127,7 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   const scanRes = scanOpportunities({ series, regime, day });
   // מניות S&P 500: מועמדים מהסריקה הלילית של אותו סשן בלבד (יום אחר = נתונים של סשן אחר → לא משתמשים)
   const stockScan = await db.get(`agent:stocks:${day}`);
-  const stockCands = stockScan?.day === day ? (stockScan.candidates || []).filter((c) => c.day === day && instrumentOf(c.symbol)) : [];
+  const stockCands = stockScan?.day === day ? (stockScan.candidates || []).filter((c) => c.day === day && instrumentOf(c.symbol) && Object.hasOwn(STRATEGIES, c.strategy)) : [];
   const allCandidates = [...scanRes.candidates, ...stockCands].sort((a, b) => b.score - a.score);
   const halt = haltState({ policy, account: toGateAccount(state, v, fx, day, equityBefore) });
   const orders = [], gateLog = [];

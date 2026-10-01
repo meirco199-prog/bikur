@@ -50,7 +50,7 @@ test('Worker: /agent/stocks — POST רק בסוד ה-cron, יום חובה, מ�
   assert.equal((await call('/agent/stocks?secret=bridge-secret-for-tests', { method: 'POST', body: { day: DAY } })).status, 401, 'סוד הגשר לא מספיק');
   assert.equal((await call('/agent/stocks' + S, { method: 'POST', body: { day: 'x' } })).status, 400);
   const good = { symbol: 'AAA', day: DAY, side: 'long', strategy: 'trend', price: 10, stop: 9, score: 70 };
-  const r = await call('/agent/stocks' + S, { method: 'POST', body: { day: DAY, scanned: 3, candidates: [good, { ...good, symbol: 'BBB', day: '2026-09-21' }, { ...good, symbol: 'CCC', needsResearch: true }, { ...good, symbol: 'bad sym' }, { ...good, symbol: 'DDD', price: 'x' }], universe: [{ symbol: 'AAA', name: 'A', sector: 'Energy' }, { symbol: '???' }] } });
+  const r = await call('/agent/stocks' + S, { method: 'POST', body: { day: DAY, scanned: 3, candidates: [good, { ...good, symbol: 'BBB', day: '2026-09-21' }, { ...good, symbol: 'CCC', needsResearch: true }, { ...good, symbol: 'bad sym' }, { ...good, symbol: 'DDD', price: 'x' }, { ...good, symbol: 'EEE', strategy: 'nope' }, { ...good, symbol: 'FFF', strategy: '__proto__' }], universe: [{ symbol: 'AAA', name: 'A', sector: 'Energy' }, { symbol: '???' }] } });
   assert.equal(r.status, 200, JSON.stringify(r.j)); assert.equal(r.j.candidates, 1); assert.equal(r.j.universe, 1);
   const g = await call(`/agent/stocks?date=${DAY}`); assert.equal(g.j.day, DAY); assert.deepEqual(g.j.candidates.map((c) => c.symbol), ['AAA']); assert.equal(g.j.candidates[0].fromStockScan, true);
   assert.equal((await call('/agent/stocks?date=2026-01-02')).j.missing, true);

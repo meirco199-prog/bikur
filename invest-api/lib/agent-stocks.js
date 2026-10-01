@@ -5,6 +5,7 @@
 // מ-Twelve Data כמו כל מכשיר אחר (מילוי בפתיחה, עצירות, שערוך) — רק הסריקה עצמה מגיעה מבחוץ.
 // מפתחות KV: agent:stocks:<day> (הסריקה של סשן day, 14 יום), agent:stocks:universe (רשימת המניות + סקטור, נדרסת כל לילה).
 import { stockInstrument, stockSector, registerInstruments, instrumentOf } from '../engine/instruments.js';
+import { STRATEGIES } from '../engine/opportunities.js';
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const STOCK_CANDIDATES_MAX = 30;
@@ -19,7 +20,7 @@ export async function recordStockScan(db, body = {}){
   const universe = (Array.isArray(body.universe) ? body.universe : []).slice(0, UNIVERSE_MAX)
     .map((u) => ({ symbol: cleanSym(u?.symbol), name: String(u?.name || '').slice(0, 80) || null, sector: u?.sector ? String(u.sector).slice(0, 40) : null })).filter((u) => u.symbol);
   const candidates = (Array.isArray(body.candidates) ? body.candidates : []).slice(0, STOCK_CANDIDATES_MAX)
-    .filter((c) => cleanSym(c?.symbol) && c.day === day && Number.isFinite(c.price) && Number.isFinite(c.stop) && Number.isFinite(c.score) && (c.side === 'long' || c.side === 'short') && !c.needsResearch)
+    .filter((c) => cleanSym(c?.symbol) && c.day === day && Number.isFinite(c.price) && Number.isFinite(c.stop) && Number.isFinite(c.score) && (c.side === 'long' || c.side === 'short') && Object.hasOwn(STRATEGIES, c.strategy) && !c.needsResearch)
     .map((c) => ({ ...c, class: 'stock', fromStockScan: true }));
   const rec = { day, receivedAt: new Date().toISOString(), scanned: Number(body.scanned) || 0, summary: body.summary || null, candidates };
   await db.put(`agent:stocks:${day}`, rec, { ttl: 14 * 86400 });
