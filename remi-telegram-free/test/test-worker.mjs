@@ -1415,5 +1415,118 @@ console.log('ההיסטוריה במפתח אחסון נפרד (דיאטת CPU �
   check('חיפוש עדיין מוצא בהיסטוריה שפוצלה', r.text.includes('HAREL63663'), r.text.slice(0, 80));
 }
 
+console.log('חיבור CRM של הביטוח:');
+{
+  const CODE = 'Abc123XyZ789qwErTy42';
+  const crmCall = async (path, body, code = CODE, method = 'POST') => {
+    const res = await worker.fetch(new Request('https://remi.example.workers.dev' + path, {
+      method, headers: { Authorization: 'Bearer ' + code, 'Content-Type': 'application/json' },
+      body: method === 'GET' ? undefined : JSON.stringify(body || {}),
+    }), env);
+    return { status: res.status, json: await res.json() };
+  };
+  const ymd = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const tomorrow = ymd(ilMs() + 86400000);
+
+  let r = await crmCall('/crm/sync', { tasks: [] });
+  check('לפני חיבור — 401', r.status === 401, JSON.stringify(r));
+
+  // חיבור: ההודעה עם הקוד נמחקת מהצ'אט ולא נשמרת בהיסטוריה
+  const urls = [];
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (u, o) => { urls.push(String(u)); return prevFetch(u, o); };
+  const linkReq = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { text: 'חבר CRM ' + CODE, message_id: 9001, chat: { id: 111 } } }),
+  });
+  await worker.fetch(linkReq, env);
+  globalThis.fetch = prevFetch;
+  check('"חבר CRM <קוד>" מחבר', sent[sent.length - 1].text.includes('חיברתי את ה-CRM'), sent[sent.length - 1].text);
+  check('  הודעת הקוד נמחקת מהצ\'אט', urls.some(u => u.includes('/deleteMessage')), JSON.stringify(urls.slice(-3)));
+  const histRaw = kv.get('hist') || '';
+  check('  הקוד לא נשמר בהיסטוריה ולא בבוט', !histRaw.includes(CODE) && !kv.get('store').includes(CODE));
+
+  r = await crmCall('/crm/sync', { tasks: [] }, 'WrongCode1234567');
+  check('קוד שגוי — 401', r.status === 401);
+
+  // סנכרון ראשון: שתי משימות, אחת עם יעד מחר
+  r = await crmCall('/crm/sync', { snapshot: true, tasks: [
+    { id: 'c1', client: 'יוסי כהן', title: 'לחדש פוליסת רכב', due: tomorrow },
+    { id: 'c2', client: 'דנה לוי', title: 'להתקשר לגבי תביעה', due: '' },
+  ] });
+  check('סנכרון ראשון מוסיף 2 משימות', r.status === 200 && r.json.added === 2, JSON.stringify(r));
+  let S = JSON.parse(kv.get('store'));
+  const t1 = S.tasks.find(t => t.crmId === 'c1');
+  check('  שם הלקוח בטקסט המשימה + תאריך יעד', !!t1 && t1.text.includes('יוסי כהן — לחדש פוליסת רכב') && t1.text.includes('עד '), JSON.stringify(t1));
+  const rem1 = S.reminders.find(x => x.crmId === 'c1');
+  check('  תזכורת ב-9:00 ביום היעד', !!rem1 && new Date(rem1.at).getHours() === 9 && ymd(rem1.at) === tomorrow, JSON.stringify(rem1));
+  check('  משימה בלי תאריך — בלי תזכורת', !S.reminders.some(x => x.crmId === 'c2'));
+
+  let m = await send('משימות');
+  check('המשימות מה-CRM מופיעות ברשימת המשימות', m.text.includes('יוסי כהן') && m.text.includes('דנה לוי'), m.text);
+
+  // סנכרון חוזר — idempotent; שינוי כותרת = עדכון
+  r = await crmCall('/crm/sync', { snapshot: true, tasks: [
+    { id: 'c1', client: 'יוסי כהן', title: 'לחדש פוליסת רכב ודירה', due: tomorrow },
+    { id: 'c2', client: 'דנה לוי', title: 'להתקשר לגבי תביעה', due: '' },
+  ] });
+  S = JSON.parse(kv.get('store'));
+  check('סנכרון חוזר: אין כפילויות, כותרת מתעדכנת', r.json.added === 0 && r.json.updated === 1 && S.tasks.filter(t => t.crmId).length === 2 && S.tasks.find(t => t.crmId === 'c1').text.includes('ודירה'), JSON.stringify(r.json));
+  check('  תזכורת אחת בלבד למשימה', S.reminders.filter(x => x.crmId === 'c1').length === 1);
+
+  // סימון ✅ ברמי → חוזר ל-CRM, והתזכורת נעלמת
+  const cb = new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callback_query: { id: 'crm1', data: `t:done:${t1.id}`,
+      message: { message_id: 55, text: 'x', chat: { id: 111 } } } }),
+  });
+  await worker.fetch(cb, env);
+  S = JSON.parse(kv.get('store'));
+  check('✅ ברמי מסיר את התזכורת של 9:00', !S.reminders.some(x => x.crmId === 'c1'));
+  r = await crmCall('/crm/sync', { snapshot: true, tasks: [
+    { id: 'c1', client: 'יוסי כהן', title: 'לחדש פוליסת רכב ודירה', due: tomorrow },
+    { id: 'c2', client: 'דנה לוי', title: 'להתקשר לגבי תביעה', due: '' },
+  ] });
+  check('הסנכרון הבא מחזיר ל-CRM שהמשימה בוצעה', r.json.completed.some(x => x.id === 'c1' && x.status === 'done'), JSON.stringify(r.json));
+  check('  והיא לא חוזרת לרשימה למרות שה-CRM עוד מחזיק אותה', !JSON.parse(kv.get('store')).tasks.some(t => t.crmId === 'c1' && !t.done));
+
+  // ביטול ברמי → "cancelled"; ack מנקה
+  const t2 = JSON.parse(kv.get('store')).tasks.find(t => t.crmId === 'c2');
+  await worker.fetch(new Request(`https://remi.example.workers.dev/webhook/${env.SECRET}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callback_query: { id: 'crm2', data: `t:del:${t2.id}`,
+      message: { message_id: 56, text: 'x', chat: { id: 111 } } } }),
+  }), env);
+  r = await crmCall('/crm/sync', { snapshot: true, ack: ['c1'], tasks: [{ id: 'c2', client: 'דנה לוי', title: 'להתקשר לגבי תביעה', due: '' }] });
+  check('❌ ברמי מוחזר כ-cancelled, ו-ack מנקה את הקודם',
+    r.json.completed.length === 1 && r.json.completed[0].id === 'c2' && r.json.completed[0].status === 'cancelled', JSON.stringify(r.json));
+  check('  משימה שבוטלה ברמי לא חוזרת כשה-CRM עדיין מחזיק אותה', !JSON.parse(kv.get('store')).tasks.some(t => t.crmId === 'c2'));
+
+  // snapshot: משימה שנסגרה ב-CRM (נעלמה מהרשימה) מוסרת מרמי
+  await crmCall('/crm/sync', { tasks: [{ id: 'c3', client: 'אבי', title: 'לשלוח הצעה', due: tomorrow }] });
+  r = await crmCall('/crm/sync', { snapshot: true, ack: ['c2'], tasks: [] });
+  S = JSON.parse(kv.get('store'));
+  check('snapshot בלי המשימה = הוסרה מרמי (ועם התזכורת שלה)', r.json.removed === 1 && !S.tasks.some(t => t.crmId === 'c3') && !S.reminders.some(x => x.crmId === 'c3'), JSON.stringify(r.json));
+
+  // בלי snapshot — רשימה חלקית לא מוחקת כלום
+  await crmCall('/crm/sync', { tasks: [{ id: 'c4', client: 'רינה', title: 'לבדוק כיסוי', due: '' }] });
+  r = await crmCall('/crm/sync', { tasks: [] });
+  check('רשימה ריקה בלי snapshot לא מוחקת משימות', r.json.removed === 0 && JSON.parse(kv.get('store')).tasks.some(t => t.crmId === 'c4'));
+
+  r = await crmCall('/crm/status', null, CODE, 'GET');
+  check('/crm/status עובד עם קוד', r.status === 200 && r.json.openTasks >= 1, JSON.stringify(r));
+
+  m = await send('סטטוס CRM');
+  check('"סטטוס CRM" בצ\'אט', m.text.includes('מחובר') && m.text.includes('משימות פתוחות מה-CRM'), m.text);
+
+  // ניתוק: ה-API נחסם והמשימות נשארות כרגילות
+  m = await send('נתק CRM');
+  r = await crmCall('/crm/sync', { tasks: [] });
+  check('אחרי "נתק CRM" — ה-API נחסם והמשימות נשארות', m.text.includes('ניתקתי') && r.status === 401 && JSON.parse(kv.get('store')).tasks.some(t => t.title === 'לבדוק כיסוי' && !t.crmId));
+
+  m = await send('חבר CRM abc');
+  check('קוד קצר מדי נדחה', m.text.includes('לא נראה תקין'), m.text);
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

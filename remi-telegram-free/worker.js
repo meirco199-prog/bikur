@@ -441,6 +441,12 @@ export function parseCommand(raw, now) {
   m = text.match(/^(?:תרגם|תרגמי|targem)(?:\s+לי)?(?:\s+ל(אנגלית|עברית|צרפתית|ספרדית|רוסית|ערבית))?[:\s]+(.+)$/s);
   if (m) return { cmd:'translate', lang: m[1] || 'עברית', text: cleanup(m[2]) };
 
+  // חיבור ל-CRM של הביטוח
+  m = text.match(CRM_LINK_RE);
+  if (m) return { cmd:'crm_link', code: m[1] };
+  if (/^(?:נתק|בטל|הסר)\s+(?:את\s+)?(?:החיבור\s+(?:ל-?)?|ה-?)?crm$/i.test(text)) return { cmd:'crm_unlink' };
+  if (/^(?:סטטוס\s+)?crm\??$/i.test(text)) return { cmd:'crm_status' };
+
   // מזג אוויר וזמני שבת — לפי דרישה (גם בכתיב חסר: "מזג אויר")
   if (/^(?:מה\s+)?(?:ה)?מזג\s*(?:ה)?אוו?יר(?:\s+היום|\s+מחר)?\??$/.test(text)) return { cmd:'weather' };
   if (/^(?:מה\s+)?(?:ה)?תחזית(?:\s+היום|\s+מחר)?\??$/.test(text)) return { cmd:'weather' };
@@ -1101,6 +1107,7 @@ async function deleteQuoted(S, quoted, env) {
   }
   if (best.kind === 'task') {
     S.tasks = S.tasks.filter(t => t !== best.x);
+    crmTaskClosed(S, best.x, 'cancelled');
     return `🗑️ מחקתי את המשימה: "${best.x.text}"`;
   }
   if (best.kind === 'rem') {
@@ -1508,6 +1515,78 @@ async function smartReminderText(env, S, text, now) {
   return null;
 }
 
+// ===== חיבור ל-CRM של הביטוח =====
+// ה-CRM (אפליקציה במחשב) מפיק קוד חיבור; המשתמש שולח לבוט "חבר CRM <קוד>" והבוט שומר רק
+// את ה-SHA-256 של הקוד. מאותו רגע ה-CRM מסנכרן משימות דרך POST /crm/sync (Bearer <קוד>):
+// כל משימה פתוחה ב-CRM נכנסת לרשימת המשימות של רמי עם תזכורת ב-9:00 ביום היעד, וכשהמשתמש
+// מסמן ✅/❌ ברמי — ה-CRM מקבל את זה בסנכרון הבא. פרוטוקול מלא: CRM-API.md
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(str)));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const CRM_CODE_RE = /^[A-Za-z0-9_-]{12,64}$/;
+const CRM_LINK_RE = /^חבר\s+(?:את\s+)?(?:ה-?)?crm\s+(\S+)$/i;
+
+// משימת CRM נסגרה ברמי (בוצעה/בוטלה) — נרשם להחזרה ל-CRM, והתזכורת של 9:00 מוסרת
+function crmTaskClosed(S, t, status) {
+  if (!t || !t.crmId) return;
+  S.reminders = S.reminders.filter(r => r.crmId !== t.crmId);
+  if (!S.crm) return;
+  S.crm.pending = (S.crm.pending || []).filter(x => x.id !== t.crmId);
+  S.crm.pending.push({ id: t.crmId, status });
+}
+
+function crmTaskText(t) {
+  const due = t.due ? ` (עד ${Number(t.due.slice(8))}/${Number(t.due.slice(5, 7))})` : '';
+  return `${t.client ? t.client + ' — ' : ''}${t.title}${due}`;
+}
+
+// סנכרון: מקבל snapshot/upsert מה-CRM ומחזיר מה שנסגר ברמי. S נשמר על ידי המתקשר.
+function applyCrmSync(S, body, nowMs) {
+  const crm = S.crm;
+  const ack = new Set((Array.isArray(body.ack) ? body.ack : []).map(String));
+  crm.pending = (crm.pending || []).filter(x => !ack.has(String(x.id)));
+  const blocked = new Set(crm.pending.map(x => String(x.id))); // נסגרו ברמי וה-CRM עוד לא אישר
+  const incoming = (Array.isArray(body.tasks) ? body.tasks : []).slice(0, 500);
+  const seen = new Set();
+  let added = 0, updated = 0, removed = 0;
+  const today = new Date(nowMs); today.setHours(0, 0, 0, 0);
+  for (const it of incoming) {
+    const id = String(it && it.id || '').slice(0, 64);
+    const title = String(it && it.title || '').trim().slice(0, 200);
+    if (!id || !title) continue;
+    seen.add(id);
+    if (blocked.has(id)) continue;
+    const client = String(it.client || '').trim().slice(0, 80);
+    const dm = String(it.due || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const due = dm ? dm[0] : '';
+    let t = S.tasks.find(x => x.crmId === id);
+    if (!t) {
+      t = { id: S.nextId++, text: '', done: false, created: nowMs, crmId: id };
+      S.tasks.push(t); added++;
+    } else if (t.done) { continue; }
+    else if (t.title !== title || t.client !== client || t.due !== due) updated++;
+    t.title = title; t.client = client; t.due = due; t.text = crmTaskText(t);
+    // תזכורת אחת ב-9:00 ביום היעד (רק אם עוד לא עבר)
+    S.reminders = S.reminders.filter(r => r.crmId !== id);
+    if (dm) {
+      const at = new Date(+dm[1], +dm[2] - 1, +dm[3], 9, 0, 0, 0).getTime();
+      if (at > nowMs) S.reminders.push({ id: S.nextId++, text: `📋 ${t.text}`, at,
+        recurringDaily: false, recurringWeekly: null, crmId: id });
+    }
+  }
+  // snapshot מלא: משימה שנעלמה מה-CRM (נסגרה שם) מוסרת מרמי
+  if (body.snapshot === true) {
+    for (const t of S.tasks.filter(x => x.crmId && !x.done && !seen.has(x.crmId))) {
+      S.tasks = S.tasks.filter(x => x.id !== t.id);
+      S.reminders = S.reminders.filter(r => r.crmId !== t.crmId);
+      removed++;
+    }
+  }
+  crm.lastSync = nowMs;
+  return { added, updated, removed, completed: crm.pending.map(x => ({ id: x.id, status: x.status })) };
+}
+
 // מקבל טקסט, מעדכן את S במקום ומחזיר תשובה (string או {text, doc}); המתקשר שומר ל-KV.
 // רשימת משימות עם כפתורי בחירה מתחת להודעה: ✅ בוצעה / ❌ ביטול / ↩️ לא בוצעה.
 // הפרדה מלאה מהיומן — כאן רק משימות, אף פעם לא פגישות.
@@ -1552,7 +1631,7 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
   // כשהחוקים לא בטוחים (או שזו הודעה קולית מתומללת) — המוח (AI) מקבל את ההגה
   const weak = c.cmd === 'unknown' || c.cmd === 'reminder_missing_time' || c.cmd === 'event_missing_time'
     || c.auto || c.loose || isVoice || !!replyCtx;
-  if (weak && (env?.AI || env?.ANTHROPIC_API_KEY)) {
+  if (weak && !String(c.cmd).startsWith('crm_') && (env?.AI || env?.ANTHROPIC_API_KEY)) {
     const ai = await aiBrain(env, S, text, now, isVoice, replyCtx);
     if (ai) return ai;
   }
@@ -1677,6 +1756,7 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
       const t = openTasks()[c.index - 1];
       if (!t) return 'לא מצאתי משימה עם המספר הזה. כתוב "משימות" לרשימה.';
       t.done = true; t.doneAt = now.getTime();
+      crmTaskClosed(S, t, 'done');
       const left = openTasks().length;
       return `✅ יפה${greet(S) ? ' ' + firstName(S) : ''}! "${t.text}" בוצעה.` + (left ? `\nנשארו ${left} משימות.` : '\nסיימת הכול! 🎉');
     }
@@ -1684,6 +1764,7 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
       const t = openTasks()[c.index - 1];
       if (!t) return 'לא מצאתי משימה עם המספר הזה.';
       S.tasks = S.tasks.filter(x => x.id !== t.id);
+      crmTaskClosed(S, t, 'cancelled');
       return `🗑️ מחקתי את המשימה: "${t.text}"`;
     }
     case 'task_clear_done': {
@@ -1806,6 +1887,25 @@ export async function handleMessage(S, text, now, env, isVoice = false, replyCtx
     case 'shabbat': {
       const sh = await shabbatLine();
       return sh || 'לא הצלחתי להביא כרגע את זמני השבת 😕 נסה שוב עוד רגע.';
+    }
+    case 'crm_link': {
+      if (!CRM_CODE_RE.test(c.code)) return 'קוד החיבור לא נראה תקין 🤔 הוא אמור להיות 12-64 תווים (אותיות ומספרים). העתק אותו מה-CRM בדיוק, בלי רווחים.';
+      S.crm = { hash: await sha256Hex(c.code), linkedAt: now.getTime(), pending: [], lastSync: null };
+      return '🔗 חיברתי את ה-CRM! מחקתי את ההודעה עם הקוד מהצ\'אט (הוא סוד).\nעכשיו ב-CRM לחץ "סנכרן" — כל משימה פתוחה שם תופיע אצלי עם שם הלקוח, עם תזכורת ב-9:00 ביום היעד. וסימון ✅ אצלי יסגור אותה גם ב-CRM.\n(לניתוק: "נתק CRM")';
+    }
+    case 'crm_unlink': {
+      if (!S.crm) return 'ה-CRM לא מחובר כרגע 🙂';
+      for (const t of S.tasks) delete t.crmId; // המשימות נשארות כרגילות
+      S.reminders = S.reminders.map(r => { const { crmId, ...rest } = r; return rest; });
+      delete S.crm;
+      return '🔌 ניתקתי את ה-CRM. המשימות שכבר הגיעו נשארות אצלי כמשימות רגילות, ושום דבר חדש לא ייכנס.';
+    }
+    case 'crm_status': {
+      if (!S.crm) return '🔌 ה-CRM לא מחובר.\nב-CRM הפק קוד חיבור, ושלח לי: חבר CRM <הקוד>';
+      const open = S.tasks.filter(t => t.crmId && !t.done).length;
+      const last = S.crm.lastSync ? fmtDate(S.crm.lastSync, now) : 'עוד לא סונכרן';
+      return `🔗 ה-CRM מחובר.\n📋 משימות פתוחות מה-CRM: ${open}\n🔄 סנכרון אחרון: ${last}` +
+        ((S.crm.pending || []).length ? `\n⏳ ממתינים להחזרה ל-CRM: ${S.crm.pending.length}` : '');
     }
     case 'tehillim_now': {
       const chunks = await tehillimChunks();
@@ -2110,9 +2210,9 @@ async function handleCallback(env, q) {
     const t = S.tasks.find(x => x.id === Number(m[2]));
     if (!t) toast = 'המשימה הזאת כבר לא קיימת';
     else if (m[1] === 'show') toast = `📋 ${t.text}`;
-    else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); toast = `✅ "${t.text}" בוצעה`; }
+    else if (m[1] === 'done') { t.done = true; t.doneAt = ilNow().getTime(); crmTaskClosed(S, t, 'done'); toast = `✅ "${t.text}" בוצעה`; }
     else if (m[1] === 'undo') { t.done = false; delete t.doneAt; toast = `↩️ "${t.text}" חזרה לפתוחות`; }
-    else { S.tasks = S.tasks.filter(x => x.id !== t.id); toast = `❌ "${t.text}" בוטלה ונמחקה מהרשימה`; }
+    else { S.tasks = S.tasks.filter(x => x.id !== t.id); crmTaskClosed(S, t, 'cancelled'); toast = `❌ "${t.text}" בוטלה ונמחקה מהרשימה`; }
     if (m[1] !== 'show') await saveStore(env, S);
   }
   await tgApi(env, 'answerCallbackQuery', { callback_query_id: q.id, text: toast.slice(0, 190) });
@@ -2187,7 +2287,10 @@ async function handleWebhook(env, update) {
   if (!text) return;
 
   // יומן התכתבות — כדי שאפשר יהיה לחפש אחורה
-  S.history = [...(S.history || []), { ts: now.getTime(), text: text.slice(0, 250), mid: msg.message_id }].slice(-200);
+  // קוד חיבור ל-CRM הוא סוד: לא נשמר בהיסטוריה (שמוזנת ל-AI ונחפשת) והודעתו נמחקת מהצ'אט
+  const isCrmLink = CRM_LINK_RE.test(text.trim());
+  S.history = [...(S.history || []), { ts: now.getTime(),
+    text: isCrmLink ? 'חבר CRM ••••' : text.slice(0, 250), mid: msg.message_id }].slice(-200);
 
   // תגובה (reply) על הודעה קודמת — ההודעה המצוטטת היא הקשר חיוני להבנה
   const rt = msg.reply_to_message;
@@ -2213,6 +2316,7 @@ async function handleWebhook(env, update) {
   } else {
     sentOk = await tgSend(env, chatId, voicePrefix + answer);
   }
+  if (isCrmLink) await tgApi(env, 'deleteMessage', { chat_id: chatId, message_id: msg.message_id });
   // כישלון שליחת תשובה — הרובד האחרון שלא היה מנוטר: נרשם לאבחון מרחוק
   if (!sentOk) {
     try {
@@ -2597,6 +2701,30 @@ export default {
       }
       lines.push('', '🕎 תאריך עברי: ' + hebrewDate());
       return new Response(lines.join('\n'), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    }
+
+    // ===== API ל-CRM של הביטוח (ראה CRM-API.md) =====
+    // POST /crm/sync  {tasks:[{id,client,title,due}], snapshot?:true, ack?:[ids]}  Authorization: Bearer <קוד>
+    // GET  /crm/status
+    if (url.pathname === '/crm/sync' || url.pathname === '/crm/status') {
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Content-Type': 'application/json' };
+      const reply = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: cors });
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+      const S = await loadStore(env, { history: false });
+      const code = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+      if (!S.crm || !CRM_CODE_RE.test(code) || (await sha256Hex(code)) !== S.crm.hash)
+        return reply({ ok: false, error: 'unauthorized', hint: 'send "חבר CRM <code>" to the bot first' }, 401);
+      if (url.pathname === '/crm/status') {
+        return reply({ ok: true, openTasks: S.tasks.filter(t => t.crmId && !t.done).length,
+          pending: (S.crm.pending || []).map(x => ({ id: x.id, status: x.status })), lastSync: S.crm.lastSync });
+      }
+      if (request.method !== 'POST') return reply({ ok: false, error: 'POST required' }, 405);
+      let body;
+      try { body = await request.json(); } catch { return reply({ ok: false, error: 'invalid json' }, 400); }
+      const out = applyCrmSync(S, body || {}, ilNow().getTime());
+      await saveStore(env, S);
+      return reply({ ok: true, ...out });
     }
 
     // שעון גיבוי חיצוני: GitHub (או כל שירות) מעיר את הבוט אם השעון של Cloudflare מדלג.
