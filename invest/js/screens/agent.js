@@ -5,7 +5,7 @@ import { esc, fmt, isNum, cls, el, toast } from '../core/util.js';
 import { loading, errorBox, disclaimer } from '../ui/components.js';
 import { lineChart, barChart } from '../ui/chart.js';
 
-const CLASS_HE = { stock: 'מניות', etf: 'ETF', crypto: 'קריפטו', fx: 'מט"ח', future: 'חוזים', bond: 'אג"ח' };
+const CLASS_HE = { stock: 'מניות', etf: 'ETF', crypto: 'קריפטו', fx: 'מט"ח', future: 'חוזים', bond: 'אג"ח', option: 'אופציות' };
 const SIDE_HE = { long: 'לונג', short: 'שורט', buy: 'קנייה', sell: 'מכירה', cover: 'כיסוי' };
 const usd = (v, d = 0) => (isNum(v) ? (v < 0 ? '−' : '') + '$' + fmt.num(Math.abs(v), d) : '—');
 const sec = (title, body, tag = '') => `<section class="card" style="margin-bottom:1rem"><div class="row" style="justify-content:space-between;align-items:baseline"><h2 style="margin:0 0 .5rem">${esc(title)}</h2>${tag ? `<span class="tag">${esc(tag)}</span>` : ''}</div>${body}</section>`;

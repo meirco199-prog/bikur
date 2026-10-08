@@ -23,8 +23,11 @@ test('האגרסיבי מרחיב רק יכולת פעולה; עצירות הה�
   assert.ok(A.maxDailyLoss <= B.maxDailyLoss && A.maxDrawdown <= B.maxDrawdown && A.marginBuffer >= B.marginBuffer);
   assert.ok(A.leverage.total <= B.leverage.total);
   for (const c of Object.keys(B.maxClassShare)) assert.ok(A.maxClassShare[c] <= B.maxClassShare[c], 'סוג ' + c);
-  for (const c of Object.keys(B.leverage.byClass)) assert.equal(A.leverage.byClass[c], B.leverage.byClass[c], 'מינוף לפי סוג ' + c);
-  assert.deepStrictEqual([...A.allowedClasses], [...B.allowedClasses]);
+  for (const c of Object.keys(B.leverage.byClass).filter((k) => k !== 'option')) assert.equal(A.leverage.byClass[c], B.leverage.byClass[c], 'מינוף לפי סוג ' + c);
+  // אופציות (קנייה בלבד, הפרמיה = ההפסד המקסימלי) הן ההרחבה היחידה בסוגי המכשירים; המאוזן נשאר בלי
+  assert.deepStrictEqual([...A.allowedClasses], [...B.allowedClasses, 'option']); assert.ok(!B.allowedClasses.includes('option') && !B.options);
+  assert.deepStrictEqual({ ...A.options }, { enabled: true, premiumBudgetPct: 0.03, maxContractPremiumPct: 0.06, minDte: 30, maxOpen: 3, maxNewPerDay: 1, stopPct: 0.5, exitDte: 2 });
+  assert.equal(A.maxClassShare.option, 0.15); assert.ok(Object.isFrozen(A.options) && Object.isFrozen(A.allowedClasses));
   assert.notEqual(policyHash(A), policyHash(B));
   assert.ok(A.maxTradeShare <= A.maxAssetShare, 'פקודה אחת לא עוברת את תקרת הנכס');
 });

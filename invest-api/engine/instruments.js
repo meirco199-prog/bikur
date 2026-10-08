@@ -71,6 +71,7 @@ export function commissionUsd(inst, qty, price){
     case 'crypto': return Math.max(1.75, notional * 0.0018);
     case 'fx': return Math.max(2, notional * 0.00002);
     case 'future': return q * 0.85;
+    case 'option': return Math.max(1, Math.round(q * 65) / 100);   // IBKR Pro: 0.65$ לחוזה, מינימום 1$
     default: return Math.min(Math.max(1, q * 0.005), notional * 0.01);
   }
 }
@@ -80,6 +81,7 @@ export function slippageRate(inst){
   if (inst.class === 'crypto') return 0.001;
   if (inst.class === 'fx') return 0.0001;
   if (inst.class === 'future') return 0.0002;
+  if (inst.class === 'option') return 0.02;    // spread רחב באופציות: ~2% מהפרמיה לצד אחד (קירוב)
   return Math.abs(inst.leverage || 1) > 1 ? 0.001 : 0.0005;
 }
 // ריבית margin שנתית של IBKR (benchmark + מרווח) — מקורב; borrow fee לשורט לפי המכשיר
