@@ -139,7 +139,7 @@ Node קטן ("execution bridge") שמדבר עם ה-Worker ב-HTTPS מאומת; 
 | סימולציית margin | `engine/margin-sim.js` | מזומן$, לונג/שורט, סילוק יומי לחוזים, ריבית על הלוואה, השאלה, initial/maintenance, נזילות עודפת, חיסול כפוי, עצירות, מדדים |
 | גילוי הזדמנויות | `engine/opportunities.js` | מגמה, מומנטום חוצה-נכסים, חזרה לממוצע, זעזוע (למחקר); ראיות, עצירת ATR, invalidation, גודל לפי סיכון |
 | מדיניות סימולציה | `engine/agent-sim-policy.js` (CODEOWNERS) | מינוף ×3 (מט"ח/חוזים ×5), שורט, כל הסוגים, תקרות, הפסד יומי 4%, drawdown 20%, kill switch |
-| פרופילים | `AGENT_POLICY_PROFILES` | `balanced` (למעלה) ו-`aggressive` (ברירת מחדל מ-8/10: מינוף כולל ×2, תקרות פקודה/נכס/ענף/אסטרטגיה 12/18/40/55%, 20 פקודות ליום, הפסד יומי 3%, drawdown 15%); `POST /agent/profile?profile=balanced` חוזר בלי קוד. AI_COUNCIL#24 |
+| פרופילים | `AGENT_POLICY_PROFILES` | `balanced` (למעלה) ו-`aggressive` (ברירת מחדל מ-8/10: מינוף כולל ×3 (מקסימום; כוח הקנייה של חשבון הדמה), תקרות פקודה/נכס/ענף/אסטרטגיה 12/18/40/55%, 20 פקודות ליום, הפסד יומי 3%, drawdown 15%); `POST /agent/profile?profile=balanced` חוזר בלי קוד. AI_COUNCIL#24 |
 | מחזור יומי | `lib/agent.js` | תמחור בבאצ'ים → מילוי בפתיחה → עצירות → שערוך/ריבית/חיסול → סריקה → שער → פקודות למחר; `agent:*` ב-KV |
 | API | `/agent/report`, `/agent/policy`, `/agent/opportunities`, `POST /agent/run`, `POST /agent/kill` | ריצה מ-`tick-invest.yml` (לילה) ו-ops `agent-run` / `agent-reset` |
 | ממשק | `invest/js/screens/agent.js` + כרטיס ראשון בבית | הון, היום, מינוף, חשיפות לפי סוג/אסטרטגיה, פוזיציות, פקודות למחר, הזדמנויות, דחיות השער, יומן, מדיניות, kill switch |
