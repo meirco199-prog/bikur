@@ -122,6 +122,20 @@ test('סוכן מלא: בפרופיל האגרסיבי נוצרת פקודת א�
   const bal = await call('/agent/policy'); assert.equal(bal.j.profile, 'aggressive');
 });
 
+test('סוכן מלא: אופציה שפקעה או קרובה לפקיעה נסגרת אוטומטית (ערך פנימי / לפני פקיעה) ונרשמת ביומן', async () => {
+  const st = JSON.parse(store.get('agent:state')); const symOld = Object.keys(st.positions).find(isOptionSymbol); assert.ok(symOld, 'יש אופציה פתוחה מהבדיקה הקודמת');
+  const p = parseOptionSymbol(symOld); const pos = st.positions[symOld]; delete st.positions[symOld];
+  const expired = optionSymbol(p.underlying, '2026-09-24', p.right, p.strike), near = optionSymbol(p.underlying, '2026-09-25', p.right, p.strike);
+  st.positions[expired] = { ...pos }; st.positions[near] = { ...pos }; store.set('agent:state', JSON.stringify(st));
+  for (const sym of new Set(AGENT_INSTRUMENTS.map(priceSymbolOf))){ const v = JSON.parse(store.get(`px:${sym}`)); const last = v.rows[v.rows.length - 1]; const o = last[4] * 1.002; v.rows.push(['2026-09-24', o, o * 1.004, o * 0.996, o * 1.001, 2e6]); store.set(`px:${sym}`, JSON.stringify(v)); }
+  const r = await call('/agent/run?secret=cron-secret-for-tests&date=2026-09-24&batch=12', { method: 'POST' }); assert.equal(r.j.phase, 'done', JSON.stringify(r.j));
+  const after = JSON.parse(store.get('agent:state')); assert.ok(!after.positions[expired] && !after.positions[near], 'שתיהן נסגרו');
+  const exits = JSON.parse(store.get('agent:journal')).filter((j) => j.kind === 'option-exit');
+  assert.equal(exits.length, 2, JSON.stringify(exits.map((e) => e.reason)));
+  assert.ok(exits.some((e) => e.symbol === expired && /פקיעה 2026-09-24 \(ערך פנימי\)/.test(e.reason)) && exits.some((e) => e.symbol === near && /לפני פקיעה \(1 ימים\)/.test(e.reason)));
+  const bp = await call('/agent/broker/pending?secret=cron-secret-for-tests'); assert.ok(![...bp.j.orders, ...bp.j.exits, ...bp.j.sync].some((o) => isOptionSymbol(o.symbol)), 'יציאות אופציה לא נשלחות לדמה');
+});
+
 test('פרופיל מאוזן: אין אופציות בכלל', async () => {
   for (const k of [...store.keys()]) if (k.startsWith('agent:')) store.delete(k);
   seedPrices(); const set = await call('/agent/profile?secret=cron-secret-for-tests&profile=balanced', { method: 'POST' }); assert.equal(set.j.profile, 'balanced');
