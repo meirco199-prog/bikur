@@ -32,13 +32,13 @@ export const AGENT_SIM_POLICY = Object.freeze({
 
 // פרופיל אגרסיבי (החלטת מאיר, 8/10/2026: "אני רוצה שהדמה יפעל באופן אגרסיבי"). **סימולציה/דמה בלבד.**
 // מה משתנה: הכושר לפעול — תקרות הפקודה/נכס/אסטרטגיה/ענף ומכסת הפקודות. ב-7/10 החשיפה הייתה 0.84× מול מינוף מותר 3×;
-// החסם היה תקרות האסטרטגיה והענף, לא המינוף. מה מוחמר: הפסד יומי, ירידה מהשיא, margin buffer, מינוף כולל וקריפטו.
+// החסם היה תקרות האסטרטגיה והענף, לא המינוף. מה מוחמר: הפסד יומי, ירידה מהשיא, margin buffer וקריפטו. המינוף הכולל במקסימום (×3, כמו המאוזן — התקרה של חשבון הדמה עצמו).
 // מה לא משתנה: mode=simulation, approval=null, kill switch ושער הפקודות. כסף אמיתי דורש approval עם hash (order-gate.js).
 export const AGENT_SIM_POLICY_AGGRESSIVE = Object.freeze({
   ...AGENT_SIM_POLICY,
   version: 2,
   profile: 'aggressive',
-  leverage: Object.freeze({ ...AGENT_SIM_POLICY.leverage, total: 2.0 }),
+  leverage: AGENT_SIM_POLICY.leverage,  // מקסימום (החלטת מאיר 8/10): ×3 = כוח הקנייה של חשבון הדמה (buyingPower ÷ netLiq ≈ 3.02 ב-7/10); מעבר לכך IBKR דוחה פקודות
   maxTradeShare: 0.12,
   maxAssetShare: 0.18,
   maxSectorShare: 0.40,

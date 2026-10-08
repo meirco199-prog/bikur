@@ -13,7 +13,7 @@ test('הפרופיל האגרסיבי: ערכים נעולים, סימולציה
   assert.equal(A.profile, 'aggressive'); assert.equal(A.mode, 'simulation'); assert.equal(A.approval, null); assert.equal(A.killSwitch, false);
   assert.deepStrictEqual(
     { total: A.leverage.total, trade: A.maxTradeShare, asset: A.maxAssetShare, sector: A.maxSectorShare, strategy: A.maxStrategyShare, crypto: A.maxClassShare.crypto, daily: A.maxDailyLoss, dd: A.maxDrawdown, margin: A.marginBuffer, orders: A.maxOrdersPerDay },
-    { total: 2.0, trade: 0.12, asset: 0.18, sector: 0.40, strategy: 0.55, crypto: 0.10, daily: 0.03, dd: 0.15, margin: 0.30, orders: 20 });
+    { total: 3.0, trade: 0.12, asset: 0.18, sector: 0.40, strategy: 0.55, crypto: 0.10, daily: 0.03, dd: 0.15, margin: 0.30, orders: 20 });
   assert.ok(Object.isFrozen(A) && Object.isFrozen(A.leverage) && Object.isFrozen(A.maxClassShare));
   assert.equal(B.mode, 'simulation'); assert.equal(B.approval, null); assert.equal(B.maxStrategyShare, 0.45, 'המאוזן לא השתנה');
 });
@@ -60,8 +60,9 @@ test('השער: תקרת אסטרטגיה 45% חוסמת במאוזן, 55% מת�
   assert.equal(gate(A, { strategy: 'xmom' }, { account: { ...base, equityIls: 168000 } }).allowed, false);
   // kill switch חוסם הכול
   assert.equal(gate({ ...A, killSwitch: true }, { strategy: 'xmom' }).allowed, false);
-  // מינוף כולל 2.0
-  assert.equal(gate(A, { strategy: 'xmom', notionalIls: 20000 }, { account: { ...base, grossExposureIls: 390000 } }).allowed, false);
+  // מינוף כולל 3.0 (מקסימום): 2.05× מותר, 3.05× נחסם
+  assert.equal(gate(A, { strategy: 'xmom', notionalIls: 20000 }, { account: { ...base, grossExposureIls: 390000 } }).allowed, true);
+  assert.equal(gate(A, { strategy: 'xmom', notionalIls: 20000 }, { account: { ...base, grossExposureIls: 590000 } }).allowed, false);
 });
 
 test('גבול ה-live: מצב live בלי approval תקף נדחה בשני הפרופילים; האגרסיבי לא יכול להיות live בטעות', () => {
