@@ -10,10 +10,10 @@ import { ask } from './lib/ai.js';
 import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
 import { runAggressive, aggrReport, executeAggressive } from './lib/aggressive.js';
-import { runAgent, agentReport, setKill } from './lib/agent.js';
+import { runAgent, agentReport, setKill, agentPolicy, setAgentProfile } from './lib/agent.js';
 import { brokerPending, recordBroker, brokerReport, requestBrokerSync } from './lib/agent-broker.js';
 import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
-import { AGENT_SIM_POLICY } from './engine/agent-sim-policy.js';
+import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
 import { runTracksDecide, runTracksFill, trackReport, tracksCompare } from './lib/tracks.js';
@@ -173,7 +173,7 @@ async function handle(req, env0, ctx){
   // הסוכן האוטונומי הרב-נכסי (סימולציית IBKR, AI_COUNCIL#21): דוח ציבורי; ריצה/איפוס/kill עם סוד ה-cron או טוקן האפליקציה
   if (r0 === 'agent'){
     if (p1 === 'report' || !p1) return json(await agentReport(db));
-    if (p1 === 'policy') return json({ policy: AGENT_SIM_POLICY, hash: policyHash(AGENT_SIM_POLICY), kill: (await db.get('agent:kill')) || null });
+    if (p1 === 'policy'){ const prof = (await agentPolicy(db)).profile || 'balanced'; const policy = AGENT_POLICY_PROFILES[prof]; return json({ profile: prof, policy, hash: policyHash(policy), profiles: Object.keys(AGENT_POLICY_PROFILES), kill: (await db.get('agent:kill')) || null }); }
     // מניות S&P 500 ליקום הסוכן: הסריקה הלילית (nightly-sp500 ב-Actions) שולחת מועמדים; GET ציבורי
     if (p1 === 'stocks'){
       if (req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); try { return json(await recordStockScan(db, body)); } catch (e) { return err('סריקת מניות: ' + e.message, 400); } }
@@ -193,6 +193,7 @@ async function handle(req, env0, ctx){
     }
     const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET);
     if (p1 === 'run' && req.method === 'POST'){ if (!bySecret) needAuth(); try { return json(await runAgent(ctx, { day: validDate(q.date) ? q.date : null, force: q.force === '1', reset: q.reset === '1', batch: Math.min(12, Math.max(1, Number(q.batch) || 6)) })); } catch (e) { await db.logError('agent', e.message); return err('סוכן: ' + e.message, 500); } }
+    if (p1 === 'profile' && req.method === 'POST'){ if (!bySecret) needAuth(); try { return json(await setAgentProfile(db, q.profile || body.profile)); } catch (e) { return err(e.message, 400); } }
     if (p1 === 'kill' && req.method === 'POST'){ if (!bySecret) needAuth(); return json(await setKill(db, { on: !(q.on === '0' || body.on === false), reason: body.reason || q.reason || null })); }
     return err('not found', 404);
   }

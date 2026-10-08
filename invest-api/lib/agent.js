@@ -6,7 +6,7 @@ import { AGENT_INSTRUMENTS, instrumentOf, priceSymbolOf, dynamicInstruments } fr
 import { registerAgentStocks } from './agent-stocks.js';
 import { newAccount, fill, valuation, markToMarket, accrue, liquidateIfNeeded, stopExits, simMetrics } from '../engine/margin-sim.js';
 import { scanOpportunities, sizeByRisk, STRATEGIES } from '../engine/opportunities.js';
-import { AGENT_SIM_POLICY } from '../engine/agent-sim-policy.js';
+import { AGENT_POLICY_PROFILES, DEFAULT_AGENT_PROFILE } from '../engine/agent-sim-policy.js';
 import { gateOrder, policyHash, haltState } from '../engine/order-gate.js';
 import { lastSessionClose, isNonTradingDay, pricesCoverLastSession } from '../engine/session.js';
 import { fetchWithFallback } from '../providers/registry.js';
@@ -32,9 +32,21 @@ export async function agentPrices(inst, ctx){
   }, { merge: (old, fresh) => ({ ...fresh, rows: DB.mergeRows(old.rows, fresh.rows) }), staleIf: (ex, age) => age > PRICES_RETRY_SEC && !pricesCoverLastSession(ex.rows, ex.fetchedAt, ctx.now || new Date()) });
 }
 
+export async function agentProfile(db){
+  const p = (await db.get('agent:profile'))?.profile;
+  return Object.hasOwn(AGENT_POLICY_PROFILES, p) ? p : DEFAULT_AGENT_PROFILE;
+}
+
 export async function agentPolicy(db){
   const kill = await db.get('agent:kill');
-  return kill?.on ? { ...AGENT_SIM_POLICY, killSwitch: true, killReason: kill.reason || null, killAt: kill.at || null } : AGENT_SIM_POLICY;
+  const base = AGENT_POLICY_PROFILES[await agentProfile(db)];
+  return kill?.on ? { ...base, killSwitch: true, killReason: kill.reason || null, killAt: kill.at || null } : base;
+}
+
+export async function setAgentProfile(db, profile){
+  if (!Object.hasOwn(AGENT_POLICY_PROFILES, profile)) throw new Error(`פרופיל לא מוכר: ${profile}`);
+  await db.put('agent:profile', { profile, at: new Date().toISOString() });
+  return { profile, policy: AGENT_POLICY_PROFILES[profile] };
 }
 
 /**
@@ -179,7 +191,7 @@ export async function agentReport(db){
   const policy = await agentPolicy(db);
   const fx = (await db.get('fx:USDILS'))?.rate || 3.7;
   const equity = (await db.get('agent:equity')) || [];
-  const base = { policy: { version: policy.version, mode: policy.mode, hash: policyHash(AGENT_SIM_POLICY), killSwitch: !!policy.killSwitch, killReason: policy.killReason || null, capitalIls: policy.capitalIls, leverage: policy.leverage, shorting: policy.shorting, allowedClasses: policy.allowedClasses, maxDailyLoss: policy.maxDailyLoss, maxDrawdown: policy.maxDrawdown, maxTradeShare: policy.maxTradeShare, maxAssetShare: policy.maxAssetShare, maxClassShare: policy.maxClassShare, maxOrdersPerDay: policy.maxOrdersPerDay }, strategies: Object.fromEntries(Object.entries(STRATEGIES).map(([k, s]) => [k, { label: s.label, horizonDays: s.horizonDays, riskPct: s.riskPct }])), universe: { count: AGENT_INSTRUMENTS.length, byClass: AGENT_INSTRUMENTS.reduce((m, i) => ({ ...m, [i.class]: (m[i.class] || 0) + 1 }), {}) } };
+  const base = { policy: { version: policy.version, mode: policy.mode, profile: policy.profile || 'balanced', hash: policyHash(AGENT_POLICY_PROFILES[policy.profile || 'balanced']), killSwitch: !!policy.killSwitch, killReason: policy.killReason || null, capitalIls: policy.capitalIls, leverage: policy.leverage, shorting: policy.shorting, allowedClasses: policy.allowedClasses, maxDailyLoss: policy.maxDailyLoss, maxDrawdown: policy.maxDrawdown, maxTradeShare: policy.maxTradeShare, maxAssetShare: policy.maxAssetShare, maxClassShare: policy.maxClassShare, maxStrategyShare: policy.maxStrategyShare, maxSectorShare: policy.maxSectorShare, marginBuffer: policy.marginBuffer, maxOrdersPerDay: policy.maxOrdersPerDay }, strategies: Object.fromEntries(Object.entries(STRATEGIES).map(([k, s]) => [k, { label: s.label, horizonDays: s.horizonDays, riskPct: s.riskPct }])), universe: { count: AGENT_INSTRUMENTS.length, byClass: AGENT_INSTRUMENTS.reduce((m, i) => ({ ...m, [i.class]: (m[i.class] || 0) + 1 }), {}) } };
   if (!state) return { missing: true, reason: 'הסוכן עוד לא רץ', ...base };
   await registerAgentStocks(db, { state });
   base.universe.stocks = ((await db.get('agent:stocks:universe'))?.items || []).length; // היקום של הלילה (לא הזיכרון המצטבר של ה-isolate)
