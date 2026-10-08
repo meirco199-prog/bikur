@@ -38,12 +38,14 @@ export const AGENT_SIM_POLICY_AGGRESSIVE = Object.freeze({
   ...AGENT_SIM_POLICY,
   version: 2,
   profile: 'aggressive',
-  leverage: AGENT_SIM_POLICY.leverage,  // מקסימום (החלטת מאיר 8/10): ×3 = כוח הקנייה של חשבון הדמה (buyingPower ÷ netLiq ≈ 3.02 ב-7/10); מעבר לכך IBKR דוחה פקודות
+  leverage: Object.freeze({ ...AGENT_SIM_POLICY.leverage, byClass: Object.freeze({ ...AGENT_SIM_POLICY.leverage.byClass, option: 3.0 }) }), // option: הפרמיה היא ההפסד המקסימלי, אין אשראי עליה — כך שתקרת הסוג לא תחסום אופציה כשהחשבון כבר מנוצל;  // מקסימום (החלטת מאיר 8/10): ×3 = כוח הקנייה של חשבון הדמה (buyingPower ÷ netLiq ≈ 3.02 ב-7/10); מעבר לכך IBKR דוחה פקודות
   maxTradeShare: 0.12,
   maxAssetShare: 0.18,
   maxSectorShare: 0.40,
   maxStrategyShare: 0.55,
-  maxClassShare: Object.freeze({ ...AGENT_SIM_POLICY.maxClassShare, crypto: 0.10 }),
+  allowedClasses: Object.freeze([...AGENT_SIM_POLICY.allowedClasses, 'option']),   // אופציות: קנייה בלבד (engine/options.js), סימולציה בלבד
+  maxClassShare: Object.freeze({ ...AGENT_SIM_POLICY.maxClassShare, crypto: 0.10, option: 0.15 }),
+  options: Object.freeze({ enabled: true, premiumBudgetPct: 0.03, maxContractPremiumPct: 0.06, minDte: 30, maxOpen: 3, maxNewPerDay: 1, stopPct: 0.5, exitDte: 2 }),
   maxDailyLoss: 0.03,
   maxDrawdown: 0.15,
   marginBuffer: 0.30,
