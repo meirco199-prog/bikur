@@ -6,7 +6,8 @@
 // מדריך התקנה: invest/docs/IBKR_BRIDGE.md
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { IbkrClient } from '../lib/ibkr-client.js';
-import { toIbkrOrder, normalizeBrokerOrder, clipExitToHeld } from '../engine/ibkr-map.js';
+import { toIbkrOrder, normalizeBrokerOrder, clipExitToHeld, optionLimit } from '../engine/ibkr-map.js';
+import { isOptionSymbol, parseOptionSymbol } from '../engine/options.js';
 import { registerInstruments, stockInstrument } from '../engine/instruments.js';
 import { nyParts } from '../engine/session.js';
 import { assertPaperAccount } from './paper-guard.mjs';
@@ -65,15 +66,23 @@ async function tick(ib, state){
     registerInstruments(todo.filter((o) => o.inst?.class === 'stock').map((o) => stockInstrument(o.symbol)));
     // יציאות וסנכרון נבדקים מול מה שהדמה מחזיק בפועל (פוזיציה שנפתחה בסימולציה לפני חיבור הגשר לא קיימת בדמה — מכירה שלה הייתה פותחת שורט;
     // סנכרון לא נשלח שוב אם הדמה כבר מחזיק)
-    const needHeld = todo.some((o) => o.kind === 'stop' || o.kind === 'liquidation' || o.kind === 'sync');
+    const needHeld = todo.some((o) => o.kind === 'stop' || o.kind === 'liquidation' || o.kind === 'option-exit' || o.kind === 'sync');
     const held = needHeld ? await ib.positions(acct).catch((e) => { errors.push('positions: ' + e.message); return null; }) : [];
     const skip = (o, reason) => { log('דילוג', o.symbol, reason); state.sent[o.clientOrderId] = { skipped: reason, at: new Date().toISOString() }; sentNow.push({ clientOrderId: o.clientOrderId, orderId: null, symbol: o.symbol, side: o.side, qty: 0, skipped: reason }); saveState(state); };
     for (const o of todo){
       try {
-        const c = state.conids[o.symbol] || (await ib.resolveConid(o.symbol, today)); state.conids[o.symbol] = c;
+        const isOpt = isOptionSymbol(o.symbol);
+        let c = state.conids[o.symbol];
+        if (!c && isOpt){   // אופציה: conid של הבסיס (STK) ← strikes ← info לפי תאריך הפקיעה המדויק
+          const u = parseOptionSymbol(o.symbol).underlying;
+          const uc = state.conids[u] || (await ib.resolveConid(u, today)); state.conids[u] = uc;
+          c = await ib.resolveOptionConid(o.symbol, uc.conid);
+          if (!c.matched) log(o.symbol, 'strike שונה בדמה:', c.strike, c.description || '');
+        } else if (!c) c = await ib.resolveConid(o.symbol, today);
+        state.conids[o.symbol] = c;
         let qty = o.qty;
         const heldQty = () => held.filter((p) => Number(p.conid) === Number(c.conid)).reduce((a, p) => a + (Number(p.qty) || 0), 0);
-        if (o.kind === 'stop' || o.kind === 'liquidation'){
+        if (o.kind === 'stop' || o.kind === 'liquidation' || o.kind === 'option-exit'){
           if (!held) throw new Error('לא ניתן לקרוא פוזיציות מהדמה — היציאה תנוסה בסבב הבא');
           const clip = clipExitToHeld(o, heldQty());
           if (!clip.ok){ skip(o, clip.reason); continue; }
@@ -84,7 +93,14 @@ async function tick(ib, state){
           const h = heldQty(), want = o.side === 'buy' ? o.qty : -o.qty;
           if ((want > 0 && h >= want) || (want < 0 && h <= want)){ skip(o, `הדמה כבר מחזיק ${h} ${o.symbol} — סנכרון מיותר`); continue; }
         }
-        const b = toIbkrOrder({ order: { ...o, qty }, conid: c.conid, acctId: acct });
+        let limitPrice = null;
+        if (isOpt){   // אופציות: LMT בצד ה-ask (קנייה) / ה-bid (מכירה) לפי ציטוט אמיתי; אין ציטוט → ינוסה בסבב הבא (לא מסומן כנשלח)
+          const qt = await ib.optionQuote(c.conid);
+          const lim = optionLimit({ side: o.side, bid: qt.bid, ask: qt.ask, simPrice: o.price });
+          if (!lim.ok){ if (lim.retry) throw new Error(`${lim.reason} (${qt.availability || 'ללא נתונים'}) — ינוסה בסבב הבא`); skip(o, lim.reason); continue; }
+          limitPrice = lim.price; log(o.symbol, 'ציטוט bid', qt.bid, 'ask', qt.ask, '→ LMT', limitPrice, '(מודל', o.price, ')');
+        }
+        const b = toIbkrOrder({ order: { ...o, qty }, conid: c.conid, acctId: acct, limitPrice });
         if (!b.ok){ log('דילוג', o.symbol, b.reason); state.sent[o.clientOrderId] = { skipped: b.reason, at: new Date().toISOString() }; sentNow.push({ clientOrderId: o.clientOrderId, orderId: null, symbol: o.symbol, side: o.side, qty: 0, skipped: b.reason }); continue; }
         if (DRY){ log('DRY', JSON.stringify(b.order)); continue; }
         const r = await ib.placeOrder(acct, b.order);

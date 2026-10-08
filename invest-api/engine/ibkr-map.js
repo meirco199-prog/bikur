@@ -3,6 +3,7 @@
 // כללים: פקודות שוק בלבד (MKT, DAY), כמויות שלמות למניות/ETF/חוזים (IBKR לא מקבל שורט חלקי), 6 ספרות לקריפטו/מט"ח.
 import { instrumentOf } from './instruments.js';
 import { round, isNum } from './util.js';
+import { isOptionSymbol, parseOptionSymbol } from './options.js';
 
 // חוזי micro אמיתיים ל"חוזים הסינתטיים" של הסימולציה. ZN~ הוא אג"ח 10 שנים ב-CBOT (לא micro; חוזה אחד = 100k$ נומינלי)
 const FUT_SPEC = { MES: ['MES', 'CME'], MNQ: ['MNQ', 'CME'], M2K: ['M2K', 'CME'], MGC: ['MGC', 'COMEX'], MCL: ['MCL', 'NYMEX'], MBT: ['MBT', 'CME'], 'ZN~': ['ZN', 'CBOT'] };
@@ -32,6 +33,29 @@ const fmt = (n) => { const s = String(n); return `${s.slice(0, 4)}-${s.slice(4, 
 
 export const IBKR_SIDE = Object.freeze({ buy: 'BUY', sell: 'SELL', short: 'SELL', cover: 'BUY' });
 
+// --- אופציות (קנייה בלבד): הסימבול הפנימי <UNDER>-<YYYYMMDD>-<C|P>-<strike> → חוזה OPT אמיתי ב-IBKR. פקודות LMT בלבד (ספרד רחב) ---
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+/** '2026-11-20' → 'NOV26' (הפורמט של /iserver/secdef/strikes ו-/info) */
+export const optionMonth = (expiry) => { const m = /^(\d{4})-(\d{2})-\d{2}$/.exec(String(expiry || '')); return m ? MONTHS[Number(m[2]) - 1] + m[1].slice(2) : null; };
+/** ציטוט snapshot של IBKR: '14.79' / 'C14.98' (קידומת C = מחיר סגירה קודם, H = halted) → מספר או null */
+export const parseQuoteNum = (v) => { const n = Number(String(v ?? '').replace(/[^0-9.\-]/g, '')); return Number.isFinite(n) && String(v ?? '').trim() !== '' ? n : null; };
+/**
+ * מחיר LMT לפקודת אופציה לפי ציטוט אמיתי: קנייה בצד ה-ask, מכירה בצד ה-bid (כך מתמלאת). קנייה שה-ask שלה גבוה ממחיר המודל של הסימולציה ביותר
+ * מ-maxDeviation נדחית (לא משלמים הרבה מעל מה שהסוכן הניח). אין ציטוט → retry (הפקודה לא מסומנת כנשלחה). אופציה חסרת ערך (bid 0) נמכרת ב-0.01.
+ */
+export function optionLimit({ side, bid, ask, simPrice, maxDeviation = 0.4 } = {}){
+  const buy = side === 'buy' || side === 'cover';
+  if (buy){
+    if (!(ask > 0)) return { ok: false, retry: true, reason: 'אין ask בציטוט' };
+    if (isNum(simPrice) && simPrice > 0 && ask > simPrice * (1 + maxDeviation)) return { ok: false, reason: `ask ${ask} גבוה ממחיר המודל ${simPrice} ביותר מ-${Math.round(maxDeviation * 100)}% — לא קונים` };
+    return { ok: true, price: round(ask, 2) };
+  }
+  if (bid > 0) return { ok: true, price: round(bid, 2) };
+  if (bid === 0 && isNum(ask)) return { ok: true, price: 0.01 };
+  return { ok: false, retry: true, reason: 'אין bid בציטוט' };
+}
+export const OPTION_MAX_NOTIONAL_USD = 15000;   // תקרה קשיחה בגשר לפקודת אופציה אחת בדמה (פרמיה × 100 × חוזים)
+
 /** כמות לפקודה ב-IBKR: שלמים למניות/ETF/חוזים (עיגול למטה), 6 ספרות לקריפטו/מט"ח. 0 = לא ניתן לשלוח */
 export function ibkrQty(inst, qty){
   if (!inst || !(qty > 0)) return 0;
@@ -40,7 +64,15 @@ export function ibkrQty(inst, qty){
 }
 
 /** פקודת הסוכן → גוף פקודה ל-POST /iserver/account/{acct}/orders. מחזיר { ok, order, reason } */
-export function toIbkrOrder({ order, conid, acctId, tif = 'DAY' } = {}){
+export function toIbkrOrder({ order, conid, acctId, tif = 'DAY', limitPrice = null } = {}){
+  if (isOptionSymbol(order?.symbol)){
+    if (!conid) return { ok: false, reason: 'חסר conid' };
+    const side = IBKR_SIDE[order.side]; if (!side) return { ok: false, reason: `צד לא מוכר: ${order.side}` };
+    const quantity = Math.floor((Number(order.qty) || 0) + 1e-9); if (!(quantity > 0)) return { ok: false, reason: `כמות ${order.qty} מתעגלת ל-0 חוזים` };
+    if (!(limitPrice > 0)) return { ok: false, reason: 'אופציה נשלחת רק כפקודת LMT עם מחיר' };
+    if ((side === 'BUY') && limitPrice * 100 * quantity > OPTION_MAX_NOTIONAL_USD) return { ok: false, reason: `פרמיה ${round(limitPrice * 100 * quantity, 0)}$ מעל התקרה ${OPTION_MAX_NOTIONAL_USD}$ לפקודה` };
+    return { ok: true, inst: { class: 'option', units: 100 }, order: { acctId, conid: Number(conid), secType: `${Number(conid)}:OPT`, orderType: 'LMT', price: round(limitPrice, 2), side, quantity, tif, cOID: String(order.clientOrderId || '').slice(0, 64), outsideRTH: false } };
+  }
   const inst = instrumentOf(order?.symbol);
   if (!inst) return { ok: false, reason: `מכשיר לא מוכר: ${order?.symbol}` };
   if (!conid) return { ok: false, reason: 'חסר conid' };
@@ -63,7 +95,7 @@ export const orderIdOf = (resp) => (Array.isArray(resp) ? resp.find((x) => x?.or
  * → { ok, qty, reason }
  */
 export function clipExitToHeld(order = {}, held = 0){
-  const isExit = order.kind === 'stop' || order.kind === 'liquidation';
+  const isExit = order.kind === 'stop' || order.kind === 'liquidation' || order.kind === 'option-exit';
   if (!isExit) return { ok: true, qty: order.qty };
   const h = Number(held) || 0;
   const closingLong = order.side === 'sell', closingShort = order.side === 'cover';
@@ -91,7 +123,7 @@ export function reconcileFills(simFills = [], brokerFills = []){
   const rows = (simFills || []).map((s) => {
     const b = byId.get(s.clientOrderId);
     const slip = b && isNum(b.avgPrice) && isNum(s.price) && s.price ? round((b.avgPrice / s.price - 1) * (s.side === 'buy' || s.side === 'cover' ? 1 : -1), 4) : null; // חיובי = הברוקר יקר יותר לנו
-    let status = 'missing'; if (b){ status = b.filledQty >= ibkrQty(instrumentOf(s.symbol), s.qty) - 1e-9 && b.filledQty > 0 ? 'filled' : (b.filledQty > 0 ? 'partial' : (b.status || 'sent')); }
+    let status = 'missing'; if (b){ status = b.filledQty >= ibkrQty(instrumentOf(s.symbol) || (isOptionSymbol(s.symbol) ? { class: 'option' } : null), s.qty) - 1e-9 && b.filledQty > 0 ? 'filled' : (b.filledQty > 0 ? 'partial' : (b.status || 'sent')); }
     return { id: s.clientOrderId, symbol: s.symbol, side: s.side, simQty: s.qty, simPrice: s.price, brokerQty: b?.filledQty ?? null, brokerPrice: b?.avgPrice ?? null, slipPct: slip, status };
   });
   const extra = [...byId.keys()].filter((id) => !(simFills || []).some((s) => s.clientOrderId === id));

@@ -6,10 +6,11 @@
 import { reconcileFills } from '../engine/ibkr-map.js';
 import { instrumentOf } from '../engine/instruments.js';
 import { registerAgentStocks } from './agent-stocks.js';
-import { isOptionSymbol } from '../engine/options.js';
+import { isOptionSymbol, parseOptionSymbol } from '../engine/options.js';
 import { round, isNum } from '../engine/util.js';
 
-const notOpt = (o) => !isOptionSymbol(o?.symbol);   // אופציות: סימולציה בלבד (שלב א') — לא נשלחות לדמה ולא נכנסות להשוואה
+const notOpt = (o) => !isOptionSymbol(o?.symbol);   // סנכרון חד-פעמי של פוזיציות קיימות לא כולל אופציות (הן נשלחות רק כפקודות מהסוכן)
+const EXIT_KINDS = ['stop', 'liquidation', 'option-exit'];
 const exitId = (j) => `agent:${j.day}:exit:${j.symbol}:${j.side}:${String(j.id || '').slice(-6)}`;
 
 const syncId = (day, p) => `agent:sync:${day}:${p.symbol}:${p.side}`;
@@ -45,9 +46,10 @@ export async function brokerPending(db){
   const journal = (await db.get('agent:journal')) || [];
   const sync = (await db.get('agent:broker:sync')) || null;
   const lastDay = state?.lastDay || null;
-  const exits = journal.filter((j) => (j.kind === 'stop' || j.kind === 'liquidation') && j.day === lastDay).map((j) => ({ clientOrderId: exitId(j), symbol: j.symbol, side: j.side, qty: j.qty, price: j.price, reason: j.reason || j.kind, kind: j.kind, day: j.day }));
-  const mark = (o) => ({ ...o, inst: instrumentOf(o.symbol) ? { class: instrumentOf(o.symbol).class, units: instrumentOf(o.symbol).units } : null, sent: sent[o.clientOrderId] || null });
-  return { mode: 'mirror', day: pending.day || null, decidedAt: pending.decidedAt || null, lastDay, killSwitch: !!kill?.on, killReason: kill?.reason || null, orders: (pending.orders || []).filter(notOpt).map(mark), exits: exits.filter(notOpt).map(mark), sync: (sync?.orders || []).filter(notOpt).map(mark), syncDay: sync?.day || null, sentCount: Object.keys(sent).length };
+  const exits = journal.filter((j) => EXIT_KINDS.includes(j.kind) && j.day === lastDay).map((j) => ({ clientOrderId: exitId(j), symbol: j.symbol, side: j.side, qty: j.qty, price: j.price, reason: j.reason || j.kind, kind: j.kind, day: j.day }));
+  const optInst = (symbol) => { const p = parseOptionSymbol(symbol); return p ? { class: 'option', units: 100, option: p } : null; };   // אופציה: הבסיס/פקיעה/strike לגשר
+  const mark = (o) => ({ ...o, inst: optInst(o.symbol) || (instrumentOf(o.symbol) ? { class: instrumentOf(o.symbol).class, units: instrumentOf(o.symbol).units } : null), sent: sent[o.clientOrderId] || null });
+  return { mode: 'mirror', day: pending.day || null, decidedAt: pending.decidedAt || null, lastDay, killSwitch: !!kill?.on, killReason: kill?.reason || null, orders: (pending.orders || []).map(mark), exits: exits.map(mark), sync: (sync?.orders || []).filter(notOpt).map(mark), syncDay: sync?.day || null, sentCount: Object.keys(sent).length };
 }
 
 /**
@@ -65,8 +67,8 @@ export async function recordBroker(db, body = {}){
   for (const f of body.fills || []){ const k = f.clientOrderId || f.orderId; if (k) fillsById.set(k, { ...(fillsById.get(k) || {}), ...f }); }
   const fills = [...fillsById.values()];
   const journal = (await db.get('agent:journal')) || [];
-  const simFills = journal.filter((j) => j.kind === 'fill' && j.day === day && j.clientOrderId && notOpt(j)).map((j) => ({ clientOrderId: j.clientOrderId, symbol: j.symbol, side: j.side, qty: j.qty, price: j.price }));
-  const simExits = journal.filter((j) => (j.kind === 'stop' || j.kind === 'liquidation') && j.day === day && notOpt(j)).map((j) => ({ clientOrderId: exitId(j), symbol: j.symbol, side: j.side, qty: j.qty, price: j.price }));
+  const simFills = journal.filter((j) => j.kind === 'fill' && j.day === day && j.clientOrderId).map((j) => ({ clientOrderId: j.clientOrderId, symbol: j.symbol, side: j.side, qty: j.qty, price: j.price }));
+  const simExits = journal.filter((j) => EXIT_KINDS.includes(j.kind) && j.day === day).map((j) => ({ clientOrderId: exitId(j), symbol: j.symbol, side: j.side, qty: j.qty, price: j.price }));
   const sync = (await db.get('agent:broker:sync')) || null; // פקודות סנכרון: ההשוואה מול הסימון האחרון בסימולציה (לא מול מחיר כניסה ישן)
   const simSync = (sync?.orders || []).filter((o) => sent[o.clientOrderId]?.day === day).map((o) => ({ clientOrderId: o.clientOrderId, symbol: o.symbol, side: o.side, qty: o.qty, price: o.price }));
   const reconcile = reconcileFills([...simFills, ...simExits, ...simSync], fills);

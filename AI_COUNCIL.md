@@ -714,3 +714,10 @@ english / invest / עתידי) והמערכת תנתב אותה אוטומטית
 **לא נשלח לדמה של IBKR** (הגשר מסנן אופציות — שלב ב': מיפוי conid לפי expiry/strike/right + הרשאות נתונים). מבחינת השער: פרמיה = חשיפה (לא דלתא).
 **Evidence (בדיקות):** `tests/options.test.mjs` (B-S מול ערכי ייחוס ושוויון put-call, פקיעה/סימבולים, סדרת אופציה, מועמדים, מרג'ין/עמלות, מחזור סוכן מלא ופרופיל מאוזן ללא אופציות),
 `tests/agent-profile.test.mjs`. **Risks:** מודל המחיר אינו שוק; ספרד 2% מקורב; פעילות נוספת = עמלות. **Status:** PR פתוח ל-CODEOWNERS (`agent-sim-policy.js`).
+
+### AI_COUNCIL#26: חיבור האופציות לדמה של IBKR — 8/10/2026
+**החלטת בעל הריפו (8/10):** "תחבר". **Evidence מהחשבון (ops `optprobe`, ריצה 37781804404, קריאה בלבד):** SPY → conid 756733, `secdef/strikes` (NOV26: 333 strikes), `secdef/info` מחזיר גם שבועיות (נבחר לפי `maturityDate`), חוזה SPY NOV 20 '26 774 Call = 927880801,
+ציטוט bid 14.79 / ask 14.92 / last 14.98 (6509 `ZBd`: נתונים קפואים לפני פתיחה), `whatif` BUY 1 ללא שגיאה. מחיר המודל (B-S על תנודתיות ממומשת×1.1) קרוב למחיר השוק (~14.6 מול 14.98 לאותו חוזה בקירוב).
+**מה נבנה:** `engine/ibkr-map.js` (חודש, ציטוט, `optionLimit`: קנייה ב-ask/מכירה ב-bid, דחיית ask>מודל+40%, פקודת LMT, תקרה 15,000$), `lib/ibkr-client.js` (`resolveOptionConid`, `optionQuote`), `scripts/ibkr-bridge.mjs`,
+`lib/agent-broker.js` (פקודות/יציאות `option-exit` לגשר עם `inst.option`; סנכרון חד-פעמי לא כולל אופציות). **לא השתנה:** `mode: simulation`, מדיניות, שער, שומר DU, כסף אמיתי.
+**Evidence (בדיקות):** `tests/ibkr.test.mjs` (+2), `tests/options.test.mjs`. **Risks:** פקודה בצד ה-ask עלולה להתמלא יקר מהמודל (נמדד ב-reconcile); אין בדיקה חיה של שליחת פקודה לפני הפעם הראשונה בשוק פתוח — הגשר רושם כל שלב ביומן. **Status:** PR (הקבצים לא CODEOWNERS).
