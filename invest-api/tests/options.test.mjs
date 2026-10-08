@@ -110,7 +110,8 @@ test('סוכן מלא: בפרופיל האגרסיבי נוצרת פקודת א�
   assert.ok(opt, 'פקודת אופציה: ' + JSON.stringify(pend.orders.map((o) => o.symbol)));
   assert.equal(opt.class, 'option'); assert.equal(opt.side, 'buy'); assert.equal(opt.strategy, 'optlong'); assert.ok(opt.symbol.startsWith('GLD-'), opt.symbol); assert.ok(/-C-/.test(opt.symbol));
   const bp = await call('/agent/broker/pending?secret=cron-secret-for-tests'); assert.equal(bp.status, 200);
-  assert.ok(!bp.j.orders.some((o) => isOptionSymbol(o.symbol)) && bp.j.orders.some((o) => o.symbol === 'GLD'), 'אופציות לא נשלחות לדמה; מניות/ETF כן');
+  const bo = bp.j.orders.find((o) => isOptionSymbol(o.symbol)); assert.ok(bo && bp.j.orders.some((o) => o.symbol === 'GLD'), 'הגשר מקבל גם את פקודת האופציה');
+  assert.deepStrictEqual({ c: bo.inst.class, u: bo.inst.units, und: bo.inst.option.underlying, r: bo.inst.option.right }, { c: 'option', u: 100, und: 'GLD', r: 'C' }, 'inst מפורט לגשר לפתרון החוזה');
   for (const sym of new Set(AGENT_INSTRUMENTS.map(priceSymbolOf))){ const v = JSON.parse(store.get(`px:${sym}`)); const last = v.rows[v.rows.length - 1]; const o = last[4] * 1.002; v.rows.push([NEXT, o, o * 1.004, o * 0.996, o * 1.001, 2e6]); store.set(`px:${sym}`, JSON.stringify(v)); }
   const r2 = await call('/agent/run?secret=cron-secret-for-tests&date=2026-09-23&batch=12', { method: 'POST' });
   assert.equal(r2.j.phase, 'done', JSON.stringify(r2.j));
@@ -118,7 +119,7 @@ test('סוכן מלא: בפרופיל האגרסיבי נוצרת פקודת א�
   assert.ok(pos && pos.class === 'option' && pos.side === 'long' && pos.qty >= 1 && pos.units === 100, JSON.stringify(rep.positions.map((p) => p.symbol)));
   assert.ok(rep.equityUsd > 0 && rep.equityUsd < 200000 / 3.7 * 1.05 && rep.equityUsd > 200000 / 3.7 * 0.95, 'שווי סביר ' + rep.equityUsd);
   assert.ok(rep.journal.some((j) => j.kind === 'fill' && isOptionSymbol(j.symbol)), 'מילוי אופציה ביומן');
-  const bp2 = await call('/agent/broker/pending?secret=cron-secret-for-tests'); assert.ok(![...bp2.j.orders, ...bp2.j.exits, ...bp2.j.sync].some((o) => isOptionSymbol(o.symbol)));
+  const bp2 = await call('/agent/broker/pending?secret=cron-secret-for-tests'); assert.ok(![...bp2.j.sync].some((o) => isOptionSymbol(o.symbol)), 'סנכרון חד-פעמי לא כולל אופציות');
   const bal = await call('/agent/policy'); assert.equal(bal.j.profile, 'aggressive');
 });
 
@@ -133,7 +134,8 @@ test('סוכן מלא: אופציה שפקעה או קרובה לפקיעה נס
   const exits = JSON.parse(store.get('agent:journal')).filter((j) => j.kind === 'option-exit');
   assert.equal(exits.length, 2, JSON.stringify(exits.map((e) => e.reason)));
   assert.ok(exits.some((e) => e.symbol === expired && /פקיעה 2026-09-24 \(ערך פנימי\)/.test(e.reason)) && exits.some((e) => e.symbol === near && /לפני פקיעה \(1 ימים\)/.test(e.reason)));
-  const bp = await call('/agent/broker/pending?secret=cron-secret-for-tests'); assert.ok(![...bp.j.orders, ...bp.j.exits, ...bp.j.sync].some((o) => isOptionSymbol(o.symbol)), 'יציאות אופציה לא נשלחות לדמה');
+  const bp = await call('/agent/broker/pending?secret=cron-secret-for-tests'); const xs = bp.j.exits.filter((o) => isOptionSymbol(o.symbol));
+  assert.equal(xs.length, 2, 'יציאות האופציה מועברות לגשר'); assert.ok(xs.every((o) => o.kind === 'option-exit' && o.side === 'sell' && o.inst.class === 'option'));
 });
 
 test('פרופיל מאוזן: אין אופציות בכלל', async () => {

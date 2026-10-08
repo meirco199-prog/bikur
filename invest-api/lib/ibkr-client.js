@@ -1,11 +1,12 @@
 // לקוח דק ל-IBKR Client Portal Web API דרך ה-Gateway המקומי (https://localhost:5000/v1/api). רץ על המחשב/שרת של הגשר, לא ב-Worker.
 // הזרקת fetch מאפשרת בדיקות בלי רשת. כל מתודה מחזירה JSON או זורקת Error עם קוד HTTP והתחלת התשובה.
 // לא שומר סיסמאות: ההתחברות ל-Gateway נעשית פעם אחת בדפדפן (משתמש הדמה + IB Key); הלקוח רק בודק שהסשן חי (tickle).
-import { ibkrContractSpec, pickFrontMonth, needsConfirm, orderIdOf } from '../engine/ibkr-map.js';
+import { ibkrContractSpec, pickFrontMonth, needsConfirm, orderIdOf, optionMonth, parseQuoteNum } from '../engine/ibkr-map.js';
+import { parseOptionSymbol } from '../engine/options.js';
 
 export class IbkrClient {
-  constructor({ base = 'https://localhost:5000/v1/api', fetch: f = globalThis.fetch, timeoutMs = 20000, log = () => {} } = {}){
-    this.base = base.replace(/\/$/, ''); this.fetch = f; this.timeoutMs = timeoutMs; this.log = log; this.conids = new Map();
+  constructor({ base = 'https://localhost:5000/v1/api', fetch: f = globalThis.fetch, timeoutMs = 20000, log = () => {}, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}){
+    this.base = base.replace(/\/$/, ''); this.fetch = f; this.timeoutMs = timeoutMs; this.log = log; this.sleep = sleep; this.conids = new Map();
   }
   async call(method, path, body){
     const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), this.timeoutMs);
@@ -55,6 +56,39 @@ export class IbkrClient {
       conid = Number(hit.conid); detail = { description: hit.description || hit.companyName || null };
     }
     const out = { conid, spec, ...detail }; this.conids.set(symbol, out); return out;
+  }
+
+  /**
+   * חוזה אופציה אמיתי מהסימבול הפנימי (<UNDER>-<YYYYMMDD>-<C|P>-<strike>): strikes ← info, ובחירה לפי תאריך הפקיעה המדויק (info מחזיר גם שבועיות).
+   * strike שאינו נסחר נבחר הקרוב ביותר בטווח 1.5% (matched=false → ההשוואה לסימולציה תציין). underlyingConid = conid של הבסיס (STK).
+   */
+  async resolveOptionConid(symbol, underlyingConid){
+    if (this.conids.has(symbol)) return this.conids.get(symbol);
+    const p = parseOptionSymbol(symbol); if (!p) throw new Error(`סימבול אופציה לא תקין: ${symbol}`);
+    const month = optionMonth(p.expiry); if (!month) throw new Error(`תאריך פקיעה לא תקין: ${p.expiry}`);
+    const st = await this.get(`/iserver/secdef/strikes?conid=${underlyingConid}&sectype=OPT&month=${month}`);
+    const strikes = ((p.right === 'C' ? st?.call : st?.put) || []).map(Number).filter(Number.isFinite);
+    if (!strikes.length) throw new Error(`אין strikes ל-${p.underlying} ${month}`);
+    const strike = strikes.includes(p.strike) ? p.strike : strikes.reduce((b, k) => (Math.abs(k - p.strike) < Math.abs(b - p.strike) ? k : b), strikes[0]);
+    if (Math.abs(strike - p.strike) / p.strike > 0.015) throw new Error(`אין strike קרוב ל-${p.strike} (הקרוב: ${strike})`);
+    const info = await this.get(`/iserver/secdef/info?conid=${underlyingConid}&sectype=OPT&month=${month}&right=${p.right}&strike=${strike}&exchange=SMART`);
+    const want = p.expiry.replace(/-/g, '');
+    const hit = (Array.isArray(info) ? info : []).find((x) => String(x.maturityDate) === want && Number(x.strike) === strike && x.right === p.right);
+    if (!hit?.conid) throw new Error(`לא נמצא חוזה ${p.underlying} ${p.right} ${strike} ${p.expiry}`);
+    const out = { conid: Number(hit.conid), spec: { secType: 'OPT' }, strike, matched: strike === p.strike, description: hit.desc2 || null };
+    this.conids.set(symbol, out); return out;
+  }
+  /** ציטוט אחרון של חוזה: snapshot דורש קריאה ראשונה "מחממת" וקריאה שנייה עם הנתונים. → { bid, ask, last, availability } (ערכים או null) */
+  async optionQuote(conid, { tries = 3, waitMs = 1500 } = {}){
+    let q = { bid: null, ask: null, last: null, availability: null };
+    for (let i = 0; i < tries; i++){
+      const r = await this.get(`/iserver/marketdata/snapshot?conids=${conid}&fields=31,84,86,6509`);
+      const x = Array.isArray(r) ? r[0] : null;
+      if (x) q = { bid: parseQuoteNum(x['84']), ask: parseQuoteNum(x['86']), last: parseQuoteNum(x['31']), availability: x['6509'] || null };
+      if (q.bid !== null || q.ask !== null) return q;
+      await this.sleep(waitMs);
+    }
+    return q;
   }
 
   // --- פקודות ---

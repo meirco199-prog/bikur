@@ -121,3 +121,13 @@ WantedBy=multi-user.target
 - `BRIDGE_SECRET` מאשר רק שני מסלולים (`pending` לקריאה, `fills` לכתיבת דיווח). הוא לא מאפשר להריץ את הסוכן, לשנות מדיניות או לכבות kill switch.
 - הגשר עוצר אם החשבון אינו `DU…` (דמה), ואין עקיפה במשתנה סביבה (`scripts/paper-guard.mjs`, נבדק ב-`tests/paper-guard.test.mjs`). מסחר בחשבון אמיתי הוא החלטה נפרדת של בעל הריפו (approval עם hash ב-`order-gate.js`), לא משהו שהגשר הזה עושה.
 - `NODE_TLS_REJECT_UNAUTHORIZED=0` מופעל אוטומטית רק כשה-Gateway הוא `localhost` (תעודה עצמית). לא לכוון את הגשר ל-Gateway מרוחק.
+
+## אופציות (קנייה בלבד, החלטת בעל הריפו 8/10)
+
+הסוכן קונה call/put על ETF (פרופיל aggressive; `engine/options.js`). הגשר משקף אותן לדמה כפקודות **LMT** על חוזה אמיתי:
+1. הסימבול הפנימי `<UNDER>-<YYYYMMDD>-<C|P>-<strike>` → conid של הבסיס (STK) → `GET /iserver/secdef/strikes` → `GET /iserver/secdef/info` ובחירה לפי תאריך הפקיעה המדויק (info מחזיר גם שבועיות). strike שאינו נסחר → הקרוב ביותר עד 1.5% (נרשם ביומן הגשר), אחרת דילוג.
+2. ציטוט `GET /iserver/marketdata/snapshot` (קריאה ראשונה "מחממת", השנייה עם נתונים). **קנייה ב-ask, מכירה ב-bid.** קנייה שה-ask שלה גבוה ממחיר המודל ביותר מ-40% נדחית; אין ציטוט → הפקודה לא מסומנת כנשלחה וינוסה בסבב הבא.
+3. תקרה קשיחה: פרמיה של פקודת קנייה אחת ≤ 15,000$ (`OPTION_MAX_NOTIONAL_USD`). רק `DU…` (`paper-guard.mjs`).
+4. יציאות (`stop` על 50% פרמיה, `option-exit` לפני פקיעה) נשלחות רק אם הדמה מחזיק את החוזה (אותו כלל כמו בשאר המכשירים), ב-bid.
+5. **המחיר בסימולציה הוא Black-Scholes** והמילוי בדמה הוא ציטוט אמיתי — ההפרש מופיע ב-`reconcile.avgSlipPct` ואינו "טעות", אלא מדידה של דיוק המודל.
+בדיקות: `tests/ibkr.test.mjs`, `tests/options.test.mjs`. בדיקות קריאה בלבד מול החשבון: ops `options` ו-`optprobe` ב-`bridge-install.yml`.

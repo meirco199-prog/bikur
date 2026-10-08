@@ -2,7 +2,7 @@
 // מסלולי ה-Worker (pending/fills/report) והשוואת מילויי הסימולציה למילויי הברוקר. בלי רשת.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ibkrContractSpec, toIbkrOrder, ibkrQty, pickFrontMonth, reconcileFills, normalizeBrokerOrder, needsConfirm, clipExitToHeld } from '../engine/ibkr-map.js';
+import { ibkrContractSpec, toIbkrOrder, ibkrQty, pickFrontMonth, reconcileFills, normalizeBrokerOrder, needsConfirm, clipExitToHeld, optionMonth, parseQuoteNum, optionLimit, OPTION_MAX_NOTIONAL_USD } from '../engine/ibkr-map.js';
 import { IbkrClient } from '../lib/ibkr-client.js';
 import { brokerPending, recordBroker, brokerReport, requestBrokerSync } from '../lib/agent-broker.js';
 import { DB } from '../lib/db.js';
@@ -119,4 +119,45 @@ test('סנכרון חד-פעמי לדמה: פוזיציות קיימות → פ�
   const off = await call('/agent/broker/sync?secret=cron-s&off=1', { method: 'POST' }); assert.equal(off.j.off, true);
   assert.equal((await call('/agent/broker/pending?secret=bridge-s')).j.sync.length, 0, 'ביטול מוחק את הבקשה');
   const db = new DB(null); await db.put('agent:state', { positions: {} }); assert.equal((await requestBrokerSync(db)).count, 0);
+});
+
+test('אופציות ב-IBKR: חודש, ציטוט, מחיר LMT לפי bid/ask, המרת פקודה, יציאה מול פוזיציה', () => {
+  assert.equal(optionMonth('2026-11-20'), 'NOV26'); assert.equal(optionMonth('2027-01-15'), 'JAN27'); assert.equal(optionMonth('nope'), null);
+  assert.equal(parseQuoteNum('14.79'), 14.79); assert.equal(parseQuoteNum('C14.98'), 14.98); assert.equal(parseQuoteNum(''), null); assert.equal(parseQuoteNum(undefined), null); assert.equal(parseQuoteNum('--'), null);
+  assert.deepEqual(optionLimit({ side: 'buy', bid: 14.79, ask: 14.92, simPrice: 17.7 }), { ok: true, price: 14.92 }, 'קנייה בצד ה-ask');
+  assert.deepEqual(optionLimit({ side: 'sell', bid: 14.79, ask: 14.92 }), { ok: true, price: 14.79 }, 'מכירה בצד ה-bid');
+  assert.equal(optionLimit({ side: 'buy', bid: 20, ask: 25, simPrice: 17.7 }).ok, false, 'ask מעל המודל ב-40%+ נדחה'); assert.equal(optionLimit({ side: 'buy', bid: 20, ask: 25, simPrice: 17.7 }).retry, undefined);
+  assert.equal(optionLimit({ side: 'buy', bid: null, ask: null, simPrice: 10 }).retry, true, 'אין ציטוט → retry'); assert.equal(optionLimit({ side: 'sell', bid: null, ask: 1 }).retry, true);
+  assert.deepEqual(optionLimit({ side: 'sell', bid: 0, ask: 0.05 }), { ok: true, price: 0.01 }, 'אופציה חסרת ערך נמכרת ב-0.01');
+  const buy = toIbkrOrder({ order: { symbol: 'SPY-20261120-C-780', side: 'buy', qty: 2, clientOrderId: 'agent:2026-10-08:optlong:SPY-20261120-C-780:buy:v1' }, conid: 927880801, acctId: 'DUT1', limitPrice: 14.92 });
+  assert.equal(buy.ok, true); assert.deepEqual({ t: buy.order.orderType, p: buy.order.price, q: buy.order.quantity, s: buy.order.side, sec: buy.order.secType, tif: buy.order.tif }, { t: 'LMT', p: 14.92, q: 2, s: 'BUY', sec: '927880801:OPT', tif: 'DAY' });
+  assert.equal(toIbkrOrder({ order: { symbol: 'SPY-20261120-C-780', side: 'buy', qty: 2 }, conid: 1, acctId: 'D' }).ok, false, 'אופציה בלי מחיר LMT לא נשלחת');
+  assert.equal(toIbkrOrder({ order: { symbol: 'SPY-20261120-C-780', side: 'buy', qty: 0.4 }, conid: 1, acctId: 'D', limitPrice: 5 }).ok, false);
+  assert.equal(toIbkrOrder({ order: { symbol: 'SPY-20261120-C-780', side: 'buy', qty: 10 }, conid: 1, acctId: 'D', limitPrice: OPTION_MAX_NOTIONAL_USD / 100 }).ok, false, 'פרמיה מעל התקרה הקשיחה');
+  assert.equal(toIbkrOrder({ order: { symbol: 'SPY-20261120-C-780', side: 'sell', qty: 10 }, conid: 1, acctId: 'D', limitPrice: OPTION_MAX_NOTIONAL_USD / 100 }).ok, true, 'התקרה חלה על קנייה בלבד');
+  const ex = { kind: 'option-exit', side: 'sell', symbol: 'SPY-20261120-C-780', qty: 3 };
+  assert.deepEqual(clipExitToHeld(ex, 2), { ok: true, qty: 2, reason: 'כמות נחתכה ל-2 (מוחזק בדמה)' }); assert.equal(clipExitToHeld(ex, 0).ok, false, 'הדמה לא מחזיק → לא פותחים שורט באופציה');
+});
+
+test('לקוח IBKR: פתרון חוזה אופציה (strikes→info, פקיעה מדויקת מבין שבועיות, strike קרוב) וציטוט עם קריאת חימום', async () => {
+  const calls = []; let snap = 0;
+  const f = async (url, opts = {}) => {
+    const u = String(url).replace('https://gw/v1/api', ''); calls.push(u);
+    const ok = (d) => new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (u.startsWith('/iserver/secdef/strikes?conid=756733&sectype=OPT&month=NOV26')) return ok({ call: [770, 774, 780, 790], put: [770, 774, 780, 790] });
+    if (u.startsWith('/iserver/secdef/info?')) {
+      const strike = Number(/strike=([\d.]+)/.exec(u)[1]);
+      return ok([{ conid: 111, strike, right: 'C', maturityDate: '20261106' }, { conid: 222, strike, right: 'C', maturityDate: '20261113' }, { conid: 333, strike, right: 'C', maturityDate: '20261120', desc2: "NOV 20 '26 " + strike + ' Call' }]);
+    }
+    if (u.startsWith('/iserver/marketdata/snapshot?conids=333')) return ok(++snap === 1 ? [{ conid: 333 }] : [{ conid: 333, '31': 'C14.98', '84': '14.79', '86': '14.92', '6509': 'RpB' }]);
+    return new Response('nf', { status: 404 });
+  };
+  const ib = new IbkrClient({ base: 'https://gw/v1/api', fetch: f, sleep: async () => {} });
+  const c = await ib.resolveOptionConid('SPY-20261120-C-780', 756733);
+  assert.equal(c.conid, 333, 'נבחרה הפקיעה של 20/11 ולא השבועיות'); assert.equal(c.strike, 780); assert.equal(c.matched, true);
+  assert.ok(calls.some((u) => /month=NOV26&right=C&strike=780&exchange=SMART/.test(u)));
+  const near = await ib.resolveOptionConid('SPY-20261120-C-778', 756733); assert.equal(near.strike, 780, 'strike לא נסחר → הקרוב ביותר'); assert.equal(near.matched, false);
+  await assert.rejects(() => ib.resolveOptionConid('SPY-20261120-C-900', 756733), /אין strike קרוב/);
+  await assert.rejects(() => ib.resolveOptionConid('SPY', 756733), /סימבול אופציה לא תקין/);
+  const q = await ib.optionQuote(333); assert.deepEqual(q, { bid: 14.79, ask: 14.92, last: 14.98, availability: 'RpB' }); assert.equal(snap, 2, 'קריאת חימום אחת ואז נתונים');
 });
