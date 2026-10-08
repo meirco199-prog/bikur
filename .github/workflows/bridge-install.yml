@@ -13,7 +13,7 @@ on:
         required: true
         default: 'check'
         type: choice
-        options: [install, update, check, restart, stop, logs, debug, diag, options, page, probe, secrets]
+        options: [install, update, check, restart, stop, logs, debug, diag, options, optprobe, page, probe, secrets]
       paper_user:
         description: 'שם משתמש הדמה (Paper Trading Username) — אם ניתן, עוקף את הסוד IBKR_PAPER_USER בהתקנה. לא סוד (הסיסמה נשארת מהסוד)'
         required: false
@@ -79,6 +79,8 @@ jobs:
             update)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge git -C "$H/bikur" pull -q && sudo -u bridge git -C "$H/bikur" log --oneline -1 && systemctl restart bikur-bridge && sleep 3 && systemctl is-active bikur-bridge | sed "s/^/bridge service: /"' ;;
             # בדיקה לקריאה בלבד: האם חשבון הדמה מורשה לאופציות ויש שרשרת ל-SPY (אין פקודות, אין סודות)
             options) cat .github/bridge/options-check.sh | $SSH 'bash -s' ;;
+            # פתרון חוזה אופציה + ציטוט + what-if (קריאה בלבד, לא שולח פקודה)
+            optprobe) cat .github/bridge/options-probe.sh | $SSH 'bash -s' ;;
             stop)    $SSH 'docker stop ibeam >/dev/null; systemctl stop bikur-bridge; echo "stopped: ibeam + bridge"' ;;
             debug)   $SSH 'rm -rf /tmp/ibo; docker cp ibeam:/srv/outputs /tmp/ibo 2>/dev/null || echo "no outputs dir"; ls -la /tmp/ibo 2>/dev/null | tail -20; for f in $(ls -t /tmp/ibo/*.html 2>/dev/null | head -3); do echo "== $f"; grep -oiE "<title>[^<]{0,120}</title>|(error|invalid|incorrect|expired|denied|paper|two.?factor|notification|timeout|maintenance|unavailable)[^<]{0,140}" "$f" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | sort -u | head -40; done; echo "--- ibeam log (login lines)"; docker logs ibeam 2>&1 | grep -iE "login|authenticat|2fa|two|notification|paper|status|error" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | tail -60' ;;
             logs)    $SSH 'journalctl -u bikur-bridge -n 60 --no-pager; echo "--- ibeam"; docker logs --tail 40 ibeam 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
