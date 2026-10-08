@@ -29,3 +29,27 @@ export const AGENT_SIM_POLICY = Object.freeze({
   requireMarketOpen: true,
   killSwitch: false,                  // ניתן להדלקה מבחוץ (KV agent:kill) בלי שינוי קוד
 });
+
+// פרופיל אגרסיבי (החלטת מאיר, 8/10/2026: "אני רוצה שהדמה יפעל באופן אגרסיבי"). **סימולציה/דמה בלבד.**
+// מה משתנה: הכושר לפעול — תקרות הפקודה/נכס/אסטרטגיה/ענף ומכסת הפקודות. ב-7/10 החשיפה הייתה 0.84× מול מינוף מותר 3×;
+// החסם היה תקרות האסטרטגיה והענף, לא המינוף. מה מוחמר: הפסד יומי, ירידה מהשיא, margin buffer, מינוף כולל וקריפטו.
+// מה לא משתנה: mode=simulation, approval=null, kill switch ושער הפקודות. כסף אמיתי דורש approval עם hash (order-gate.js).
+export const AGENT_SIM_POLICY_AGGRESSIVE = Object.freeze({
+  ...AGENT_SIM_POLICY,
+  version: 2,
+  profile: 'aggressive',
+  leverage: Object.freeze({ ...AGENT_SIM_POLICY.leverage, total: 2.0 }),
+  maxTradeShare: 0.12,
+  maxAssetShare: 0.18,
+  maxSectorShare: 0.40,
+  maxStrategyShare: 0.55,
+  maxClassShare: Object.freeze({ ...AGENT_SIM_POLICY.maxClassShare, crypto: 0.10 }),
+  maxDailyLoss: 0.03,
+  maxDrawdown: 0.15,
+  marginBuffer: 0.30,
+  maxOrdersPerDay: 20,
+});
+
+export const AGENT_POLICY_PROFILES = Object.freeze({ balanced: AGENT_SIM_POLICY, aggressive: AGENT_SIM_POLICY_AGGRESSIVE });
+// ברירת המחדל לדמה. חזרה למאוזן בלי שינוי קוד: POST /agent/profile?profile=balanced (KV agent:profile).
+export const DEFAULT_AGENT_PROFILE = 'aggressive';

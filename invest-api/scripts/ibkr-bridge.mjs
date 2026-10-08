@@ -9,6 +9,7 @@ import { IbkrClient } from '../lib/ibkr-client.js';
 import { toIbkrOrder, normalizeBrokerOrder, clipExitToHeld } from '../engine/ibkr-map.js';
 import { registerInstruments, stockInstrument } from '../engine/instruments.js';
 import { nyParts } from '../engine/session.js';
+import { assertPaperAccount } from './paper-guard.mjs';
 
 const args = new Set(process.argv.slice(2));
 const ONCE = args.has('--once'), CHECK = args.has('--check'), DRY = args.has('--dry-run') || process.env.DRY_RUN === '1';
@@ -48,7 +49,7 @@ async function tick(ib, state){
     return;
   }
   const accts = await ib.accounts(); const acct = ACCT_ENV || accts[0]; if (!acct) throw new Error('אין חשבון ב-Gateway (התחברת עם משתמש הדמה?)');
-  if (!/^DU/i.test(acct) && !process.env.ALLOW_LIVE_ACCOUNT){ throw new Error(`החשבון ${acct} לא נראה כחשבון דמה (DU...). הגשר מסרב לעבוד מול חשבון אמיתי.`); }
+  assertPaperAccount(acct);
   const pend = await worker('/agent/broker/pending');
   const sentNow = [];
   if (pend.killSwitch){

@@ -119,5 +119,5 @@ WantedBy=multi-user.target
 
 - אין סיסמאות בשום מקום בקוד: ההתחברות ל-Gateway ידנית בדפדפן עם IB Key. הגשר יודע רק לדבר עם `localhost:5000`.
 - `BRIDGE_SECRET` מאשר רק שני מסלולים (`pending` לקריאה, `fills` לכתיבת דיווח). הוא לא מאפשר להריץ את הסוכן, לשנות מדיניות או לכבות kill switch.
-- הגשר עוצר אם החשבון אינו `DU…` (דמה). כדי לעבוד מול חשבון אמיתי יש להגדיר במפורש `ALLOW_LIVE_ACCOUNT=1` — וזה לא מאושר.
+- הגשר עוצר אם החשבון אינו `DU…` (דמה), ואין עקיפה במשתנה סביבה (`scripts/paper-guard.mjs`, נבדק ב-`tests/paper-guard.test.mjs`). מסחר בחשבון אמיתי הוא החלטה נפרדת של בעל הריפו (approval עם hash ב-`order-gate.js`), לא משהו שהגשר הזה עושה.
 - `NODE_TLS_REJECT_UNAUTHORIZED=0` מופעל אוטומטית רק כשה-Gateway הוא `localhost` (תעודה עצמית). לא לכוון את הגשר ל-Gateway מרוחק.
