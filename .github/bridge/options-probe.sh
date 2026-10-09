@@ -48,6 +48,14 @@ for r in d[:4]: print({k:r.get(k) for k in ("conid","symbol","secType","right","
 ' 2>&1 | head -5
 OC=$(echo "$I" | python3 -c 'import json,sys; d=json.load(sys.stdin); d=d if isinstance(d,list) else [d]; print(d[0].get("conid","") if d else "")' 2>/dev/null)
 echo "conid האופציה: $OC"
+echo "=== 3b. אותו חוזה לפי ה-strike של הסוכן (STRIKE2=${STRIKE2:-147.5})"
+I2=$(curl -sk "$B/iserver/secdef/info?conid=$UC&sectype=OPT&month=$MONTH&right=C&strike=${STRIKE2:-147.5}&exchange=SMART")
+echo "$I2" | head -c 600; echo
+echo "$I2" | python3 -c '
+import json,sys
+d=json.load(sys.stdin); d=d if isinstance(d,list) else [d]
+print("חזרו", len(d), "חוזים · פקיעות:", sorted({str(r.get("maturityDate")) for r in d}), "· strikes:", sorted({r.get("strike") for r in d}), "· rights:", sorted({str(r.get("right")) for r in d}))
+' 2>&1 | head -3
 [ -n "$OC" ] || { echo "לא נמצא חוזה — מפסיקים"; exit 0; }
 echo "=== 4. ציטוט (bid=84 ask=86 last=31 · 6509=זמינות נתונים)"
 curl -sk "$B/iserver/marketdata/snapshot?conids=$OC&fields=31,84,86,6509" >/dev/null; sleep 3
