@@ -6,7 +6,7 @@ B=https://localhost:5000/v1/api
 J='Content-Type: application/json'
 ACCT=$(curl -sk "$B/iserver/accounts" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d.get("accounts") or []; print(a[0] if a else "")' 2>/dev/null)
 echo "חשבון: $ACCT"
-UND=${UND:-SPY}
+UND=${UND:-USO}   # הבדיקה של 9/10: למה USO C 147.5 לפקיעה 20/11 לא נמצא
 echo "=== 1. secdef/search $UND"
 S=$(curl -sk -X POST -H "$J" -d "{\"symbol\":\"$UND\",\"name\":false,\"secType\":\"STK\"}" "$B/iserver/secdef/search")
 CONID=$(echo "$S" | python3 -c '
@@ -43,7 +43,8 @@ echo "$I" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
 d=d if isinstance(d,list) else [d]
-for r in d[:3]: print({k:r.get(k) for k in ("conid","symbol","secType","right","strike","maturityDate","multiplier","exchange","desc2")})
+print("חוזים שחזרו:", len(d), "· פקיעות:", sorted({str(r.get("maturityDate")) for r in d}))
+for r in d[:4]: print({k:r.get(k) for k in ("conid","symbol","secType","right","strike","maturityDate","multiplier","exchange","desc2")})
 ' 2>&1 | head -5
 OC=$(echo "$I" | python3 -c 'import json,sys; d=json.load(sys.stdin); d=d if isinstance(d,list) else [d]; print(d[0].get("conid","") if d else "")' 2>/dev/null)
 echo "conid האופציה: $OC"

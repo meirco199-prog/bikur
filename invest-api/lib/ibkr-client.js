@@ -79,7 +79,7 @@ export class IbkrClient {
     const info = await this.get(`/iserver/secdef/info?conid=${underlyingConid}&sectype=OPT&month=${month}&right=${p.right}&strike=${strike}&exchange=SMART`);
     const want = p.expiry.replace(/-/g, '');
     const hit = (Array.isArray(info) ? info : []).find((x) => String(x.maturityDate) === want && Number(x.strike) === strike && x.right === p.right);
-    if (!hit?.conid) throw new Error(`לא נמצא חוזה ${p.underlying} ${p.right} ${strike} ${p.expiry}`);
+    if (!hit?.conid){ const got = [...new Set((Array.isArray(info) ? info : []).map((x) => String(x.maturityDate)))].sort(); throw new Error(`לא נמצא חוזה ${p.underlying} ${p.right} ${strike} ${p.expiry} (חזרו ${Array.isArray(info) ? info.length : 0} חוזים, פקיעות: ${got.slice(0, 8).join(',') || '—'})`); }
     const out = { conid: Number(hit.conid), spec: { secType: 'OPT' }, strike, matched: strike === p.strike, description: hit.desc2 || null };
     this.conids.set(symbol, out); return out;
   }
