@@ -145,10 +145,11 @@ test('לקוח IBKR: פתרון חוזה אופציה (strikes→info, פקיע�
     const u = String(url).replace('https://gw/v1/api', ''); calls.push(u);
     const ok = (d) => new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } });
     if (u === '/iserver/secdef/search') return ok([{ conid: 756733, symbol: 'SPY', sections: [{ secType: 'STK' }, { secType: 'OPT', months: 'OCT26;NOV26;DEC26' }] }]);
-    if (u.startsWith('/iserver/secdef/strikes?conid=756733&sectype=OPT&month=NOV26')) return ok({ call: [770, 774, 780, 790], put: [770, 774, 780, 790] });
+    if (u.startsWith('/iserver/secdef/strikes?conid=756733&sectype=OPT&month=NOV26')) return ok({ call: [770, 774, 778, 780, 790], put: [770, 774, 778, 780, 790] });
     if (u.startsWith('/iserver/secdef/info?')) {
       const strike = Number(/strike=([\d.]+)/.exec(u)[1]);
-      return ok([{ conid: 111, strike, right: 'C', maturityDate: '20261106' }, { conid: 222, strike, right: 'C', maturityDate: '20261113' }, { conid: 333, strike, right: 'C', maturityDate: '20261120', desc2: "NOV 20 '26 " + strike + ' Call' }]);
+      const weeklies = [{ conid: 111, strike, right: 'C', maturityDate: '20261106' }, { conid: 222, strike, right: 'C', maturityDate: '20261113' }];
+      return ok(strike === 778 ? weeklies : [...weeklies, { conid: 333, strike, right: 'C', maturityDate: '20261120', desc2: "NOV 20 '26 " + strike + ' Call' }]);   // 778: רשום רק בשבועיות (כמו USO 147.5)
     }
     if (u.startsWith('/iserver/marketdata/snapshot?conids=333')) return ok(++snap === 1 ? [{ conid: 333 }] : [{ conid: 333, '31': 'C14.98', '84': '14.79', '86': '14.92', '6509': 'RpB' }]);
     return new Response('nf', { status: 404 });
@@ -159,7 +160,8 @@ test('לקוח IBKR: פתרון חוזה אופציה (strikes→info, פקיע�
   assert.ok(iSearch >= 0 && iSearch < iStrikes, 'secdef/search של הבסיס נקרא לפני strikes (גם כש-conid שמור במטמון)');
   assert.equal(c.conid, 333, 'נבחרה הפקיעה של 20/11 ולא השבועיות'); assert.equal(c.strike, 780); assert.equal(c.matched, true);
   assert.ok(calls.some((u) => /month=NOV26&right=C&strike=780&exchange=SMART/.test(u)));
-  const near = await ib.resolveOptionConid('SPY-20261120-C-778', 756733); assert.equal(near.strike, 780, 'strike לא נסחר → הקרוב ביותר'); assert.equal(near.matched, false);
+  const near = await ib.resolveOptionConid('SPY-20261120-C-778', 756733); assert.equal(near.strike, 780, 'strike רשום רק בשבועיות → הקרוב שקיים בפקיעה המדויקת (לא 774: 780 קרוב יותר ל-778)'); assert.equal(near.matched, false); assert.equal(near.conid, 333);
+  const miss = await ib.resolveOptionConid('SPY-20261120-C-772', 756733); assert.equal(miss.strike, 770, 'strike 772 לא ברשימה → הקרוב ביותר בפקיעה (770 לפני 774: שווי מרחק → הנמוך)');
   await assert.rejects(() => ib.resolveOptionConid('SPY-20261120-C-900', 756733), /אין strike קרוב/);
   await assert.rejects(() => ib.resolveOptionConid('SPY', 756733), /סימבול אופציה לא תקין/);
   await assert.rejects(() => ib.resolveOptionConid('SPY-20270319-C-780', 756733), /אין חודש MAR27 ל-SPY \(יש: OCT26,NOV26,DEC26\)/);

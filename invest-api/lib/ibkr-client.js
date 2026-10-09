@@ -74,12 +74,20 @@ export class IbkrClient {
     const st = await this.get(`/iserver/secdef/strikes?conid=${underlyingConid}&sectype=OPT&month=${month}`);
     const strikes = ((p.right === 'C' ? st?.call : st?.put) || []).map(Number).filter(Number.isFinite);
     if (!strikes.length) throw new Error(`אין strikes ל-${p.underlying} ${month}`);
-    const strike = strikes.includes(p.strike) ? p.strike : strikes.reduce((b, k) => (Math.abs(k - p.strike) < Math.abs(b - p.strike) ? k : b), strikes[0]);
-    if (Math.abs(strike - p.strike) / p.strike > 0.015) throw new Error(`אין strike קרוב ל-${p.strike} (הקרוב: ${strike})`);
-    const info = await this.get(`/iserver/secdef/info?conid=${underlyingConid}&sectype=OPT&month=${month}&right=${p.right}&strike=${strike}&exchange=SMART`);
+    // רשימת ה-strikes היא איחוד של כל הפקיעות בחודש; strike מסוים עשוי לא להיות רשום לפקיעה המדויקת (USO 147.5 קיים בשבועיות, לא ב-20/11).
+    // לכן מנסים את ה-strike המבוקש ואז את הקרובים אליו (עד 1.5%), ובוחרים את הראשון שקיים בפקיעה המבוקשת
+    const near = strikes.filter((k) => Math.abs(k - p.strike) / p.strike <= 0.015).sort((a, b) => Math.abs(a - p.strike) - Math.abs(b - p.strike) || a - b).slice(0, 6);
+    if (!near.length) throw new Error(`אין strike קרוב ל-${p.strike} (הקרוב: ${strikes.reduce((b, k) => (Math.abs(k - p.strike) < Math.abs(b - p.strike) ? k : b), strikes[0])})`);
     const want = p.expiry.replace(/-/g, '');
-    const hit = (Array.isArray(info) ? info : []).find((x) => String(x.maturityDate) === want && Number(x.strike) === strike && x.right === p.right);
-    if (!hit?.conid){ const got = [...new Set((Array.isArray(info) ? info : []).map((x) => String(x.maturityDate)))].sort(); throw new Error(`לא נמצא חוזה ${p.underlying} ${p.right} ${strike} ${p.expiry} (חזרו ${Array.isArray(info) ? info.length : 0} חוזים, פקיעות: ${got.slice(0, 8).join(',') || '—'})`); }
+    let hit = null, strike = null; const seen = new Set();
+    for (const k of near){
+      const info = await this.get(`/iserver/secdef/info?conid=${underlyingConid}&sectype=OPT&month=${month}&right=${p.right}&strike=${k}&exchange=SMART`);
+      const list = Array.isArray(info) ? info : [];
+      list.forEach((x) => seen.add(String(x.maturityDate)));
+      hit = list.find((x) => String(x.maturityDate) === want && Number(x.strike) === k && x.right === p.right);
+      if (hit){ strike = k; break; }
+    }
+    if (!hit?.conid) throw new Error(`לא נמצא חוזה ${p.underlying} ${p.right} ${p.strike} ${p.expiry} (נבדקו strikes ${near.join(',')}; פקיעות שחזרו: ${[...seen].sort().slice(0, 8).join(',') || '—'})`);
     const out = { conid: Number(hit.conid), spec: { secType: 'OPT' }, strike, matched: strike === p.strike, description: hit.desc2 || null };
     this.conids.set(symbol, out); return out;
   }
