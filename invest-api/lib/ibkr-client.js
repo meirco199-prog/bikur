@@ -66,6 +66,11 @@ export class IbkrClient {
     if (this.conids.has(symbol)) return this.conids.get(symbol);
     const p = parseOptionSymbol(symbol); if (!p) throw new Error(`סימבול אופציה לא תקין: ${symbol}`);
     const month = optionMonth(p.expiry); if (!month) throw new Error(`תאריך פקיעה לא תקין: ${p.expiry}`);
+    // IBKR דורש secdef/search של הבסיס באותו סשן לפני strikes/info — conid שמור במטמון של הגשר מדלג עליו (באג 9/10: "אין strikes ל-USO")
+    const sr = await this.post('/iserver/secdef/search', { symbol: p.underlying, name: false, secType: 'STK' }).catch(() => null);
+    const sec = (Array.isArray(sr) ? sr.find((x) => Number(x.conid) === Number(underlyingConid)) : null)?.sections?.find((s) => s.secType === 'OPT');
+    const months = String(sec?.months || '').split(';').filter(Boolean);
+    if (months.length && !months.includes(month)) throw new Error(`אין חודש ${month} ל-${p.underlying} (יש: ${months.slice(0, 6).join(',')})`);
     const st = await this.get(`/iserver/secdef/strikes?conid=${underlyingConid}&sectype=OPT&month=${month}`);
     const strikes = ((p.right === 'C' ? st?.call : st?.put) || []).map(Number).filter(Number.isFinite);
     if (!strikes.length) throw new Error(`אין strikes ל-${p.underlying} ${month}`);

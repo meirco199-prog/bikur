@@ -144,6 +144,7 @@ test('לקוח IBKR: פתרון חוזה אופציה (strikes→info, פקיע�
   const f = async (url, opts = {}) => {
     const u = String(url).replace('https://gw/v1/api', ''); calls.push(u);
     const ok = (d) => new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (u === '/iserver/secdef/search') return ok([{ conid: 756733, symbol: 'SPY', sections: [{ secType: 'STK' }, { secType: 'OPT', months: 'OCT26;NOV26;DEC26' }] }]);
     if (u.startsWith('/iserver/secdef/strikes?conid=756733&sectype=OPT&month=NOV26')) return ok({ call: [770, 774, 780, 790], put: [770, 774, 780, 790] });
     if (u.startsWith('/iserver/secdef/info?')) {
       const strike = Number(/strike=([\d.]+)/.exec(u)[1]);
@@ -154,10 +155,13 @@ test('לקוח IBKR: פתרון חוזה אופציה (strikes→info, פקיע�
   };
   const ib = new IbkrClient({ base: 'https://gw/v1/api', fetch: f, sleep: async () => {} });
   const c = await ib.resolveOptionConid('SPY-20261120-C-780', 756733);
+  const iSearch = calls.indexOf('/iserver/secdef/search'), iStrikes = calls.findIndex((u) => u.startsWith('/iserver/secdef/strikes'));
+  assert.ok(iSearch >= 0 && iSearch < iStrikes, 'secdef/search של הבסיס נקרא לפני strikes (גם כש-conid שמור במטמון)');
   assert.equal(c.conid, 333, 'נבחרה הפקיעה של 20/11 ולא השבועיות'); assert.equal(c.strike, 780); assert.equal(c.matched, true);
   assert.ok(calls.some((u) => /month=NOV26&right=C&strike=780&exchange=SMART/.test(u)));
   const near = await ib.resolveOptionConid('SPY-20261120-C-778', 756733); assert.equal(near.strike, 780, 'strike לא נסחר → הקרוב ביותר'); assert.equal(near.matched, false);
   await assert.rejects(() => ib.resolveOptionConid('SPY-20261120-C-900', 756733), /אין strike קרוב/);
   await assert.rejects(() => ib.resolveOptionConid('SPY', 756733), /סימבול אופציה לא תקין/);
+  await assert.rejects(() => ib.resolveOptionConid('SPY-20270319-C-780', 756733), /אין חודש MAR27 ל-SPY \(יש: OCT26,NOV26,DEC26\)/);
   const q = await ib.optionQuote(333); assert.deepEqual(q, { bid: 14.79, ask: 14.92, last: 14.98, availability: 'RpB' }); assert.equal(snap, 2, 'קריאת חימום אחת ואז נתונים');
 });
