@@ -6,7 +6,7 @@ B=https://localhost:5000/v1/api
 J='Content-Type: application/json'
 ACCT=$(curl -sk "$B/iserver/accounts" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d.get("accounts") or []; print(a[0] if a else "")' 2>/dev/null)
 echo "חשבון: $ACCT"
-UND=${UND:-SPY}
+UND=${UND:-USO}   # הבדיקה של 9/10: למה USO C 147.5 לפקיעה 20/11 לא נמצא
 echo "=== 1. secdef/search $UND"
 S=$(curl -sk -X POST -H "$J" -d "{\"symbol\":\"$UND\",\"name\":false,\"secType\":\"STK\"}" "$B/iserver/secdef/search")
 CONID=$(echo "$S" | python3 -c '
@@ -43,10 +43,19 @@ echo "$I" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
 d=d if isinstance(d,list) else [d]
-for r in d[:3]: print({k:r.get(k) for k in ("conid","symbol","secType","right","strike","maturityDate","multiplier","exchange","desc2")})
+print("חוזים שחזרו:", len(d), "· פקיעות:", sorted({str(r.get("maturityDate")) for r in d}))
+for r in d[:4]: print({k:r.get(k) for k in ("conid","symbol","secType","right","strike","maturityDate","multiplier","exchange","desc2")})
 ' 2>&1 | head -5
 OC=$(echo "$I" | python3 -c 'import json,sys; d=json.load(sys.stdin); d=d if isinstance(d,list) else [d]; print(d[0].get("conid","") if d else "")' 2>/dev/null)
 echo "conid האופציה: $OC"
+echo "=== 3b. אותו חוזה לפי ה-strike של הסוכן (STRIKE2=${STRIKE2:-147.5})"
+I2=$(curl -sk "$B/iserver/secdef/info?conid=$UC&sectype=OPT&month=$MONTH&right=C&strike=${STRIKE2:-147.5}&exchange=SMART")
+echo "$I2" | head -c 600; echo
+echo "$I2" | python3 -c '
+import json,sys
+d=json.load(sys.stdin); d=d if isinstance(d,list) else [d]
+print("חזרו", len(d), "חוזים · פקיעות:", sorted({str(r.get("maturityDate")) for r in d}), "· strikes:", sorted({r.get("strike") for r in d}), "· rights:", sorted({str(r.get("right")) for r in d}))
+' 2>&1 | head -3
 [ -n "$OC" ] || { echo "לא נמצא חוזה — מפסיקים"; exit 0; }
 echo "=== 4. ציטוט (bid=84 ask=86 last=31 · 6509=זמינות נתונים)"
 curl -sk "$B/iserver/marketdata/snapshot?conids=$OC&fields=31,84,86,6509" >/dev/null; sleep 3
