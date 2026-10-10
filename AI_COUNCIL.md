@@ -721,3 +721,11 @@ english / invest / עתידי) והמערכת תנתב אותה אוטומטית
 **מה נבנה:** `engine/ibkr-map.js` (חודש, ציטוט, `optionLimit`: קנייה ב-ask/מכירה ב-bid, דחיית ask>מודל+40%, פקודת LMT, תקרה 15,000$), `lib/ibkr-client.js` (`resolveOptionConid`, `optionQuote`), `scripts/ibkr-bridge.mjs`,
 `lib/agent-broker.js` (פקודות/יציאות `option-exit` לגשר עם `inst.option`; סנכרון חד-פעמי לא כולל אופציות). **לא השתנה:** `mode: simulation`, מדיניות, שער, שומר DU, כסף אמיתי.
 **Evidence (בדיקות):** `tests/ibkr.test.mjs` (+2), `tests/options.test.mjs`. **Risks:** פקודה בצד ה-ask עלולה להתמלא יקר מהמודל (נמדד ב-reconcile); אין בדיקה חיה של שליחת פקודה לפני הפעם הראשונה בשוק פתוח — הגשר רושם כל שלב ביומן. **Status:** PR (הקבצים לא CODEOWNERS).
+
+### AI_COUNCIL#27: גשר לחשבון האמיתי של IBKR (מוכן, כבוי) — 10/10/2026
+**בקשת בעל הריפו (10/10):** "תכין גשר לאמיתי". **Evidence:** IBKR אישרה בכתב (iBot + FAQ הרשמי של חיבור AI) שהקונקטור לא מאפשר מסחר אוטונומי — רק "הוראות" שהמשתמש מאשר (תוקף 7 ימים, Limit/Market בלבד, בלי Stop);
+לכן מסחר אוטומטי בכסף אמיתי אפשרי רק דרך ה-API הפרטי של IBKR מול כניסה של בעל החשבון. **מה נבנה:** `engine/live-limits.js` (מגבלות נעולות + שער חי + התאמת גודל + עצירת הפסד, טהור), `scripts/ibkr-live-bridge.mjs` (גשר נפרד מגשר הדמה, Gateway שני),
+`lib/agent-live.js` + `POST/GET /agent/live/report` (**פרטי**), פעולות `live-install|check|logs|stop|arm|disarm` ב-`bridge-install.yml`, `invest/docs/LIVE_BRIDGE.md`.
+**גבולות:** כבוי כברירת מחדל; הפעלה דורשת שלוש הוכחות (חשבון `U…` תואם, hash של המגבלות, תפוגה ≤45 יום) + אישור טקסטואלי מפורש ב-`live-arm`; ETF בלבד, long בלבד, מזומן בלבד, LMT על ציטוט בזמן אמת, תקרות לפקודה/פוזיציה/הפסד;
+`paper-guard.mjs` ו-`ibkr-bridge.mjs` לא שונו (גשר הדמה ממשיך לסרב לחשבון אמיתי). **Evidence (בדיקות):** `tests/live-bridge.test.mjs` — נעילת ערכים, הפעלה, שער, סבב מלא מול Gateway מדומה (כבוי/מופעל/kill/מחוץ לחלון/מושהה/שורט/חשבון שגוי), הרשאות ה-Worker.
+**לא נבדק / סיכונים:** התחברות IBeam לחשבון אמיתי עם IB Key, חסימת PRIIPs, מנוי נתוני זמן אמת, זיכרון שרת ל-Gateway שני, ושליחת פקודה חיה — הכול גלוי ב-LIVE_BRIDGE.md. **שער:** OWNER_APPROVAL_REQUIRED (כסף אמיתי) — **ה-PR נשאר פתוח**, אין מיזוג בלי אישור מפורש של מאיר.

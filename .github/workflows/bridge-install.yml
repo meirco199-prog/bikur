@@ -13,7 +13,27 @@ on:
         required: true
         default: 'check'
         type: choice
-        options: [install, update, check, restart, stop, logs, debug, diag, options, optprobe, page, probe, secrets]
+        options: [install, update, check, restart, stop, logs, debug, diag, options, optprobe, page, probe, secrets, live-install, live-check, live-logs, live-stop, live-arm, live-disarm]
+      live_account:
+        description: 'live-install בלבד: מספר החשבון האמיתי (U…). לא סוד. הגשר מסרב לכל חשבון אחר'
+        required: false
+        default: ''
+        type: string
+      live_approval:
+        description: 'live-arm בלבד: hash המגבלות (מודפס בהתחלת הלוג של live-check ובדוח /agent/live/report כ-limitsHash). שינוי כלשהו במגבלות מבטל אישור'
+        required: false
+        default: ''
+        type: string
+      live_days:
+        description: 'live-arm בלבד: לכמה ימים להפעיל (1–45). בסיום חוזרים לכבוי אוטומטית'
+        required: false
+        default: '7'
+        type: string
+      live_confirm:
+        description: 'live-arm בלבד: כתוב בדיוק  כסף-אמיתי-מאושר  כדי להפעיל מסחר בכסף אמיתי'
+        required: false
+        default: ''
+        type: string
       paper_user:
         description: 'שם משתמש הדמה (Paper Trading Username) — אם ניתן, עוקף את הסוד IBKR_PAPER_USER בהתקנה. לא סוד (הסיסמה נשארת מהסוד)'
         required: false
@@ -38,15 +58,22 @@ jobs:
       WORKER_URL: https://invest-api.meirco199.workers.dev
       ACTION: ${{ inputs.action }}
       PAPER_USER_OVERRIDE: ${{ inputs.paper_user }}
+      IBKR_LIVE_USER: ${{ secrets.IBKR_LIVE_USER }}
+      IBKR_LIVE_PASSWORD: ${{ secrets.IBKR_LIVE_PASSWORD }}
+      LIVE_ACCOUNT: ${{ inputs.live_account }}
+      LIVE_APPROVAL_IN: ${{ inputs.live_approval }}
+      LIVE_DAYS: ${{ inputs.live_days }}
+      LIVE_CONFIRM: ${{ inputs.live_confirm }}
     steps:
       - uses: actions/checkout@v4
       - name: Which secrets are set (names only)
         run: |
-          for v in SERVER_HOST SSHPASS IBKR_PAPER_USER IBKR_PAPER_PASSWORD BRIDGE_SECRET; do n="$v"; [ "$v" = SSHPASS ] && n=SERVER_ROOT_PASSWORD; if [ -n "${!v}" ]; then echo "✅ $n מוגדר"; else echo "❌ $n חסר"; fi; done
+          for v in SERVER_HOST SSHPASS IBKR_PAPER_USER IBKR_PAPER_PASSWORD BRIDGE_SECRET IBKR_LIVE_USER IBKR_LIVE_PASSWORD; do n="$v"; [ "$v" = SSHPASS ] && n=SERVER_ROOT_PASSWORD; if [ -n "${!v}" ]; then echo "✅ $n מוגדר"; else echo "❌ $n חסר"; fi; done
           [ "$ACTION" != "secrets" ] || exit 0
           miss=""
           for v in SERVER_HOST SSHPASS; do [ -n "${!v}" ] || miss="$miss $v"; done
           if [ "$ACTION" = "install" ]; then for v in IBKR_PAPER_USER IBKR_PAPER_PASSWORD BRIDGE_SECRET; do [ -n "${!v}" ] || miss="$miss $v"; done; fi
+          if [ "$ACTION" = "live-install" ]; then for v in IBKR_LIVE_USER IBKR_LIVE_PASSWORD BRIDGE_SECRET LIVE_ACCOUNT; do [ -n "${!v}" ] || miss="$miss $v"; done; [ -z "$IBKR_LIVE_USER" ] || echo "::add-mask::$IBKR_LIVE_USER"; fi
           if [ -n "$miss" ]; then echo "::error::חסרים Secrets:$miss (Settings → Secrets and variables → Actions)"; exit 1; fi
           [ -z "$IBKR_PAPER_USER" ] || echo "::add-mask::$IBKR_PAPER_USER"
           [ -z "$PAPER_USER_OVERRIDE" ] || echo "משתמש הדמה מהקלט של ההרצה יחליף את הסוד IBKR_PAPER_USER בהתקנה הזו"
@@ -82,6 +109,20 @@ jobs:
             # פתרון חוזה אופציה + ציטוט + what-if (קריאה בלבד, לא שולח פקודה)
             optprobe) cat .github/bridge/options-probe.sh | $SSH 'bash -s' ;;
             stop)    $SSH 'docker stop ibeam >/dev/null; systemctl stop bikur-bridge; echo "stopped: ibeam + bridge"' ;;
+            # --- הגשר לחשבון האמיתי (invest/docs/LIVE_BRIDGE.md). live-install מתקין *כבוי*; רק live-arm (בעל הריפו, עם אישור מפורש) מאפשר שליחת פקודות ---
+            live-install)
+              { printf 'export IB_USER=%q IB_PASS=%q BRIDGE_SECRET=%q WORKER_URL=%q LIVE_ACCOUNT=%q\n' "$IBKR_LIVE_USER" "$IBKR_LIVE_PASSWORD" "$BRIDGE_SECRET" "$WORKER_URL" "$LIVE_ACCOUNT"; cat .github/bridge/live-install.sh; } | $SSH 'bash -s' ;;
+            live-check) $SSH 'echo "host: $(hostname) · $(uptime -p)"; free -m | sed -n 2p; systemctl is-active bikur-live-bridge 2>/dev/null | sed "s/^/live bridge service: /"; docker ps --filter name=ibeam-live --format "ibeam-live: {{.Status}}" 2>/dev/null; curl -sk -X POST https://localhost:5001/v1/api/iserver/auth/status 2>/dev/null | head -c 300; echo; echo "--- armed? (שמות המפתחות בלבד, בלי ערכים רגישים)"; grep -oE "^(LIVE_ACCOUNT|LIVE_APPROVAL|LIVE_ARMED_UNTIL)=" /etc/bikur-bridge/live.env | tr "\n" " "; echo; grep -E "^LIVE_ARMED_UNTIL=" /etc/bikur-bridge/live.env; ls /etc/bikur-bridge/LIVE_OFF 2>/dev/null && echo "קובץ LIVE_OFF קיים — הגשר עצור"; journalctl -u bikur-live-bridge -n 12 --no-pager 2>/dev/null; true' ;;
+            live-logs)  $SSH 'journalctl -u bikur-live-bridge -n 80 --no-pager; echo "--- ibeam-live"; docker logs --tail 40 ibeam-live 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
+            # עצירה מיידית: קובץ LIVE_OFF (הגשר מבטל פקודות פתוחות ולא שולח), עצירת השירות והקונטיינר. אפשר להריץ בכל רגע
+            live-stop)  $SSH 'touch /etc/bikur-bridge/LIVE_OFF; systemctl stop bikur-live-bridge; docker stop ibeam-live >/dev/null 2>&1; echo "stopped: live bridge + ibeam-live (LIVE_OFF נוצר)"' ;;
+            live-disarm) $SSH 'sed -i "/^LIVE_APPROVAL=/d;/^LIVE_ARMED_UNTIL=/d" /etc/bikur-bridge/live.env && systemctl restart bikur-live-bridge && echo "disarmed: הגשר החי חזר למצב כבוי (קריאה בלבד)"' ;;
+            live-arm)
+              [ "$LIVE_CONFIRM" = "כסף-אמיתי-מאושר" ] || { echo "::error::להפעלת מסחר בכסף אמיתי יש לכתוב בדיוק: כסף-אמיתי-מאושר"; exit 1; }
+              [[ "$LIVE_APPROVAL_IN" =~ ^[0-9a-f]{8}-[0-9]+$ ]] || { echo "::error::live_approval חייב להיות ה-hash של המגבלות (למשל 630487b7-335)"; exit 1; }
+              [[ "$LIVE_DAYS" =~ ^[0-9]+$ ]] && [ "$LIVE_DAYS" -ge 1 ] && [ "$LIVE_DAYS" -le 45 ] || { echo "::error::live_days חייב להיות 1–45"; exit 1; }
+              $SSH "rm -f /etc/bikur-bridge/LIVE_OFF; sed -i '/^LIVE_APPROVAL=/d;/^LIVE_ARMED_UNTIL=/d' /etc/bikur-bridge/live.env; printf 'LIVE_APPROVAL=%s\nLIVE_ARMED_UNTIL=%s\n' '$LIVE_APPROVAL_IN' \"\$(date -u -d '+$LIVE_DAYS days' +%Y-%m-%dT%H:%M:%SZ)\" >> /etc/bikur-bridge/live.env; docker start ibeam-live >/dev/null 2>&1; systemctl restart bikur-live-bridge; sleep 3; systemctl is-active bikur-live-bridge | sed 's/^/live bridge service: /'; grep -E '^LIVE_ARMED_UNTIL=' /etc/bikur-bridge/live.env"
+              echo "הופעל. הגשר ישלח פקודות רק אם ה-hash תואם למגבלות בקוד שעל השרת (לבדיקה: live-check, או /agent/live/report → armed)" ;;
             debug)   $SSH 'rm -rf /tmp/ibo; docker cp ibeam:/srv/outputs /tmp/ibo 2>/dev/null || echo "no outputs dir"; ls -la /tmp/ibo 2>/dev/null | tail -20; for f in $(ls -t /tmp/ibo/*.html 2>/dev/null | head -3); do echo "== $f"; grep -oiE "<title>[^<]{0,120}</title>|(error|invalid|incorrect|expired|denied|paper|two.?factor|notification|timeout|maintenance|unavailable)[^<]{0,140}" "$f" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | sort -u | head -40; done; echo "--- ibeam log (login lines)"; docker logs ibeam 2>&1 | grep -iE "login|authenticat|2fa|two|notification|paper|status|error" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | tail -60' ;;
             logs)    $SSH 'journalctl -u bikur-bridge -n 60 --no-pager; echo "--- ibeam"; docker logs --tail 40 ibeam 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
             # IBeam נכשל ב-ERR_CONNECTION_REFUSED מול https://localhost:5000 שבתוך הקונטיינר — כלומר ה-Gateway

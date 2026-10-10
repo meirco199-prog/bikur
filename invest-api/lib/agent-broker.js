@@ -49,7 +49,9 @@ export async function brokerPending(db){
   const exits = journal.filter((j) => EXIT_KINDS.includes(j.kind) && j.day === lastDay).map((j) => ({ clientOrderId: exitId(j), symbol: j.symbol, side: j.side, qty: j.qty, price: j.price, reason: j.reason || j.kind, kind: j.kind, day: j.day }));
   const optInst = (symbol) => { const p = parseOptionSymbol(symbol); return p ? { class: 'option', units: 100, option: p } : null; };   // אופציה: הבסיס/פקיעה/strike לגשר
   const mark = (o) => ({ ...o, inst: optInst(o.symbol) || (instrumentOf(o.symbol) ? { class: instrumentOf(o.symbol).class, units: instrumentOf(o.symbol).units } : null), sent: sent[o.clientOrderId] || null });
-  return { mode: 'mirror', day: pending.day || null, decidedAt: pending.decidedAt || null, lastDay, killSwitch: !!kill?.on, killReason: kill?.reason || null, orders: (pending.orders || []).map(mark), exits: exits.map(mark), sync: (sync?.orders || []).filter(notOpt).map(mark), syncDay: sync?.day || null, sentCount: Object.keys(sent).length };
+  const eqSeries = (await db.get('agent:equity')) || [];
+  const simEquityUsd = eqSeries.length ? (eqSeries[eqSeries.length - 1]?.[3]?.equityUsd ?? null) : null;   // גודל הסימולציה: הגשר החי מתאים לפיו את גודל הפקודות
+  return { mode: 'mirror', simEquityUsd, day: pending.day || null, decidedAt: pending.decidedAt || null, lastDay, killSwitch: !!kill?.on, killReason: kill?.reason || null, orders: (pending.orders || []).map(mark), exits: exits.map(mark), sync: (sync?.orders || []).filter(notOpt).map(mark), syncDay: sync?.day || null, sentCount: Object.keys(sent).length };
 }
 
 /**

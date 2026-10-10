@@ -104,6 +104,9 @@ export class IbkrClient {
     return q;
   }
 
+  /** ציטוט מניה/ETF (אותו snapshot כמו לאופציה) → { bid, ask, last, availability } — availability 'R…' = זמן אמת, 'D…' = מושהה */
+  quote(conid, opts){ return this.optionQuote(conid, opts); }
+
   // --- פקודות ---
   async placeOrder(acct, order, { maxConfirms = 4 } = {}){
     let resp = await this.post(`/iserver/account/${acct}/orders`, { orders: [order] });

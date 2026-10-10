@@ -14,3 +14,7 @@
 /invest-api/engine/order-gate.js             @meirco199-prog
 /invest-api/tests/order-gate.test.mjs        @meirco199-prog
 /invest-api/engine/agent-sim-policy.js       @meirco199-prog
+/invest-api/engine/live-limits.js            @meirco199-prog
+/invest-api/scripts/ibkr-live-bridge.mjs     @meirco199-prog
+/invest-api/tests/live-bridge.test.mjs       @meirco199-prog
+/.github/bridge/live-install.sh              @meirco199-prog
