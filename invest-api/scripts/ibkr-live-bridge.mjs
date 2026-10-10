@@ -139,7 +139,8 @@ async function main(){
   const GW = process.env.IBKR_LIVE_GATEWAY || 'https://localhost:5001/v1/api';
   const INTERVAL = Math.max(30, Number(process.env.INTERVAL_SEC) || 60);
   const STATE_FILE = process.env.LIVE_STATE || `${process.env.HOME || '.'}/.bikur-bridge/live-state.json`;
-  const KILL_FILE = process.env.LIVE_KILL_FILE || '/etc/bikur-bridge/LIVE_OFF';
+  // בתיקיית הבית של משתמש הגשר: /etc/bikur-bridge סגורה (700, root) ולכן ה-process של הגשר לא יכול לראות קובץ שם (נמצא ב-10/10: LIVE_OFF קיים והגשר התעלם ממנו)
+  const KILL_FILE = process.env.LIVE_KILL_FILE || `${process.env.HOME || '.'}/.bikur-bridge/LIVE_OFF`;
   const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
   if (!SECRET){ console.error('חסר BRIDGE_SECRET'); process.exit(1); }
   if (/^https:\/\/(localhost|127\.0\.0\.1)[:/]/.test(GW) && process.env.NODE_TLS_REJECT_UNAUTHORIZED === undefined) process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';

@@ -180,6 +180,8 @@ test('קוד: גשר הדמה לא הוקל, ולגשר החי אין עקיפה
   const lim = readFileSync(new URL('../engine/live-limits.js', import.meta.url), 'utf8');
   assert.ok(/assertPaperAccount\(acct\)/.test(paper) && !/live-limits/.test(paper), 'גשר הדמה נשאר דמה בלבד');
   assert.ok(!/process\.env/.test(lim), 'המגבלות לא קוראות סביבה');
+  assert.ok(!/\/etc\/bikur-bridge\/LIVE_OFF/.test(live), 'קובץ ה-kill לא ב-/etc (סגורה ל-700; משתמש הגשר לא רואה אותו)');
+  assert.ok(/\.bikur-bridge\/LIVE_OFF/.test(live), 'קובץ ה-kill בתיקיית הבית של משתמש הגשר');
   assert.ok(!/ALLOW_|FORCE_|BYPASS|SKIP_(GUARD|LIMITS)/i.test(live), 'אין דגל עקיפה');
   assert.ok(live.indexOf('assertLiveAccount(acct') < live.indexOf("worker('/agent/broker/pending')"), 'בדיקת החשבון לפני משיכת פקודות');
   assert.ok(live.indexOf('gateLiveOrder(') < live.indexOf('ib.placeOrder('), 'כל פקודה עוברת בשער לפני שליחה');
