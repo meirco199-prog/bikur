@@ -39,7 +39,7 @@
 2. `LIVE_APPROVAL` — ה-hash של המגבלות הנוכחיות (`liveHash()`; מודפס בתחילת הלוג ובשדה `limitsHash` בדוח).
 3. `LIVE_ARMED_UNTIL` — תאריך תפוגה, עד 45 יום קדימה. בסיומו הגשר חוזר לכבוי לבד.
 
-עצירה: `live-stop` (יוצר קובץ `LIVE_OFF` — הגשר מבטל פקודות פתוחות ולא שולח), `live-disarm`, ה-kill switch הקיים (`POST /agent/kill`, עוצר גם את הסימולציה),
+עצירה: `live-stop` (יוצר קובץ `~bridge/.bikur-bridge/LIVE_OFF` — הגשר מבטל פקודות פתוחות ולא שולח, ועוצר את שירות הגשר ואת ה-Gateway), `live-disarm`, ה-kill switch הקיים (`POST /agent/kill`, עוצר גם את הסימולציה),
 ביטול ב-IBKR: Client Portal ← Settings ← Manage Third-Party Consents ← Revoke (לקונקטור), או שינוי סיסמה/ניתוק המשתמש של ה-API.
 
 ## התקנה והפעלה (פעולות של בעל הריפו)
