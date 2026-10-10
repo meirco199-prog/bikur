@@ -134,6 +134,25 @@ test('סבב: kill switch, מחוץ לחלון, ציטוט מושהה, שורט/
   assert.equal(ib.placed.length, 0); assert.equal(s.rep.skipped.length, 3);
 });
 
+test('דיווח: כבוי לא מציף את ה-KV (אחת ל-10 דק\'), אבל שינוי/פקודה מדווחים מיד', async () => {
+  const ib = fakeIb(); const h = harness(ib, pend(), okEnv({ LIVE_APPROVAL: undefined })); const state = {};
+  await h.run(state); await h.run(state); await h.run(state);
+  assert.equal(h.reports.length, 1, 'שלושה סבבים זהים → דיווח אחד');
+  const later = await liveTick({ ib, state, worker: async (p, o) => (p === '/agent/live/report' ? (h.reports.push(o.body), {}) : pend()), env: okEnv({ LIVE_APPROVAL: undefined }), now: new Date(NOW.getTime() + 11 * 60000) });
+  assert.equal(h.reports.length, 2, 'אחרי 10 דקות — דיווח');
+  const armed = harness(fakeIb(), pend()); await armed.run({}); assert.equal(armed.reports.length, 1); assert.equal(armed.reports[0].sent.length, 1, 'פקודה מדווחת מיד');
+  assert.equal(later.mode, 'disarmed');
+});
+
+test('kill: מבטל רק פקודות שהגשר שלח, גם כשלא מופעל; פקודה ידנית של הבעלים לא נוגעים בה', async () => {
+  const ib = fakeIb(); const cancelled = [];
+  ib.orders = async () => [{ orderId: 1, order_ref: 'live:mine', status: 'Submitted' }, { orderId: 2, order_ref: null, status: 'Submitted' }, { orderId: 3, order_ref: 'live:old', status: 'Filled' }];
+  ib.cancel = async (a, id) => { cancelled.push(String(id)); };
+  const state = { sent: { 'live:mine': {}, 'live:old': {} } };
+  await harness(ib, pend({ killSwitch: true }), okEnv({ LIVE_APPROVAL: undefined })).run(state);
+  assert.deepEqual(cancelled, ['1']);
+});
+
 test('סבב: עצירת הפסד מקומית ויציאת סימולציה מוכרות את כל מה שמוחזק', async () => {
   const pos = [{ conid: 103, symbol: 'XLE', qty: 3, avgPrice: 25, marketPrice: 20, marketValueUsd: 60, unrealizedUsd: -15 }];   // −20% → עצירת גשר
   const ib = fakeIb({ positions: pos }); const { rep } = await harness(ib, pend({ orders: [] })).run();

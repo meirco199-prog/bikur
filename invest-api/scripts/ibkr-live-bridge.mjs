@@ -27,12 +27,12 @@ export async function liveTick({ ib, state, worker, env = {}, now = new Date(), 
   const auth = await ib.authStatus();
   if (!auth.authenticated){
     const rep = { day, at: now.toISOString(), authenticated: false, armed: false, errors: ['gateway not authenticated — נדרשת התחברות/אישור IB Key'], limitsHash: liveHash() };
-    await worker('/agent/live/report', { method: 'POST', body: rep }).catch((e) => log(e.message));
+    await postReport(rep, { state, worker, now, log });
     return rep;
   }
   if (!/^U\d{5,}$/i.test(String(env.LIVE_ACCOUNT || ''))){   // לא הוגדר חשבון אמיתי מאושר → לא נוגעים באף חשבון
     const rep = { day, at: now.toISOString(), authenticated: true, mode: 'unconfigured', armed: false, armReasons: ['LIVE_ACCOUNT לא הוגדר'], limitsHash: liveHash(), errors: [] };
-    await worker('/agent/live/report', { method: 'POST', body: rep }).catch((e) => log(e.message));
+    await postReport(rep, { state, worker, now, log });
     return rep;
   }
   const accts = await ib.accounts();
@@ -52,7 +52,15 @@ export async function liveTick({ ib, state, worker, env = {}, now = new Date(), 
   if (killed){
     mode = 'killed';
     log('kill switch — מבטל פקודות פתוחות ולא שולח חדשות');
-    if (!dry && arming.armed) await ib.cancelAll(acct).catch((e) => errors.push('cancelAll: ' + e.message));
+    // מבטלים רק פקודות שהגשר עצמו שלח (cOID ב-state.sent) — לא פקודות ידניות של בעל החשבון — וגם כשהגשר לא מופעל (פקודה שנשארה מהפעלה קודמת)
+    if (!dry){
+      try {
+        const mine = new Set(Object.keys(state.sent));
+        const open = (await ib.orders()).map(normalizeBrokerOrder).filter((o) => o.clientOrderId && mine.has(o.clientOrderId) && /submitted|presubmitted|pending/i.test(o.status || ''));
+        for (const o of open) await ib.cancel(acct, o.orderId).catch((e) => errors.push(`cancel ${o.orderId}: ${e.message.slice(0, 80)}`));
+        if (open.length) log('בוטלו', open.length, 'פקודות פתוחות של הגשר');
+      } catch (e) { errors.push('cancel: ' + e.message.slice(0, 120)); }
+    }
   } else if (!arming.armed){ log('כבוי (לא מופעל):', arming.reasons.join(' | ')); }
   else if (!inLiveWindow(now)){ mode = 'armed-outside-window'; }
   else {
@@ -109,8 +117,18 @@ export async function liveTick({ ib, state, worker, env = {}, now = new Date(), 
   const rep = { day, at: now.toISOString(), authenticated: true, account: mask(acct), mode, armed: arming.armed, armReasons: arming.armed ? [] : arming.reasons, killed, limitsHash: liveHash(),
     summary: { equityUsd: equity, cashUsd: cash, unrealizedUsd: Math.round(unrealizedUsd * 100) / 100, dayStartEquityUsd: state.dayStartEquityUsd, hwmUsd: state.hwmUsd, opensToday: state.opensToday || 0 },
     positions: positions.filter((p) => p.qty > 0).map((p) => ({ symbol: p.symbol, qty: p.qty, avgPrice: p.avgPrice, marketPrice: p.marketPrice, unrealizedUsd: p.unrealizedUsd })), sent: sentNow, skipped, fills, errors };
-  await worker('/agent/live/report', { method: 'POST', body: rep }).catch((e) => log('דיווח נכשל:', e.message));
+  await postReport(rep, { state, worker, now, log });
   return rep;
+}
+
+// דיווח ל-Worker בלי להציף את ה-KV (2 כתיבות לדיווח): שולחים רק כשהמצב השתנה, כשיש פקודות/דילוגים/שגיאות, או אחת ל-5 דקות (מופעל) / 10 דקות (כבוי)
+async function postReport(rep, { state, worker, now, log }){
+  const sig = JSON.stringify([rep.mode, rep.armed, rep.killed, rep.authenticated, (rep.errors || []).join('|').slice(0, 300)]);   // אותה שגיאה שחוזרת כל דקה לא נחשבת שינוי
+  const eventful = (rep.sent?.length || 0) + (rep.skipped?.length || 0) > 0;
+  const every = (rep.armed ? 5 : 10) * 60000;
+  if (!eventful && state.lastSig === sig && state.lastReportAt && now.getTime() - Date.parse(state.lastReportAt) < every) return;
+  state.lastSig = sig; state.lastReportAt = now.toISOString();
+  await worker('/agent/live/report', { method: 'POST', body: rep }).catch((e) => log('דיווח נכשל:', e.message));
 }
 
 async function main(){
