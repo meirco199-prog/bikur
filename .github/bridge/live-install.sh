@@ -16,7 +16,7 @@ if [ "$AVAIL" -lt 700 ]; then echo "⚠️ פנוי ${AVAIL}MB בלבד — Gate
 
 say "קבצי הגדרה (600, רק על השרת)"
 mkdir -p /etc/bikur-bridge && chmod 700 /etc/bikur-bridge
-printf 'IBEAM_ACCOUNT=%s\nIBEAM_PASSWORD=%s\nIBEAM_GATEWAY_BASE_URL=https://localhost:5000\nIBEAM_GATEWAY_STARTUP=90\nIBEAM_LOG_LEVEL=INFO\n' "$IB_USER" "$IB_PASS" > /etc/bikur-bridge/ibeam-live.env
+printf 'IBEAM_ACCOUNT=%s\nIBEAM_PASSWORD=%s\nIBEAM_GATEWAY_BASE_URL=https://localhost:5000\nIBEAM_GATEWAY_STARTUP=90\nIBEAM_PAGE_LOAD_TIMEOUT=90\nIBEAM_LOG_LEVEL=INFO\n' "$IB_USER" "$IB_PASS" > /etc/bikur-bridge/ibeam-live.env
 chmod 600 /etc/bikur-bridge/ibeam-live.env
 # live.env: כבוי — אין LIVE_APPROVAL ואין LIVE_ARMED_UNTIL. live-arm מוסיף אותם; live-disarm מסיר
 printf 'WORKER_URL=%s\nBRIDGE_SECRET=%s\nIBKR_LIVE_GATEWAY=https://localhost:5001/v1/api\nLIVE_ACCOUNT=%s\nINTERVAL_SEC=60\n' "$WORKER_URL" "$BRIDGE_SECRET" "$LIVE_ACCOUNT" > /etc/bikur-bridge/live.env
