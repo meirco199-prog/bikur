@@ -13,7 +13,7 @@ on:
         required: true
         default: 'check'
         type: choice
-        options: [install, update, check, restart, stop, logs, debug, diag, options, optprobe, page, probe, secrets, live-install, live-check, live-logs, live-stop, live-arm, live-disarm]
+        options: [install, update, check, restart, stop, logs, debug, diag, options, optprobe, page, probe, secrets, live-install, live-check, live-logs, live-debug, live-stop, live-arm, live-disarm]
       live_account:
         description: 'live-install בלבד: מספר החשבון האמיתי (U…). לא סוד. הגשר מסרב לכל חשבון אחר'
         required: false
@@ -113,6 +113,8 @@ jobs:
             live-install)
               { printf 'export IB_USER=%q IB_PASS=%q BRIDGE_SECRET=%q WORKER_URL=%q LIVE_ACCOUNT=%q\n' "$IBKR_LIVE_USER" "$IBKR_LIVE_PASSWORD" "$BRIDGE_SECRET" "$WORKER_URL" "$LIVE_ACCOUNT"; cat .github/bridge/live-install.sh; } | $SSH 'bash -s' ;;
             live-check) $SSH 'echo "host: $(hostname) · $(uptime -p)"; free -m | sed -n 2p; systemctl is-active bikur-live-bridge 2>/dev/null | sed "s/^/live bridge service: /"; docker ps --filter name=ibeam-live --format "ibeam-live: {{.Status}}" 2>/dev/null; curl -sk -X POST https://localhost:5001/v1/api/iserver/auth/status 2>/dev/null | head -c 300; echo; echo "--- armed? (שמות המפתחות בלבד, בלי ערכים רגישים)"; grep -oE "^(LIVE_ACCOUNT|LIVE_APPROVAL|LIVE_ARMED_UNTIL)=" /etc/bikur-bridge/live.env | tr "\n" " "; echo; grep -E "^LIVE_ARMED_UNTIL=" /etc/bikur-bridge/live.env; ls /etc/bikur-bridge/LIVE_OFF 2>/dev/null && echo "קובץ LIVE_OFF קיים — הגשר עצור"; journalctl -u bikur-live-bridge -n 12 --no-pager 2>/dev/null; true' ;;
+            # אבחון כניסה (קריאה בלבד): מה הדף שה-Gateway ראה כשנתקע בשלב 2FA (כותרות/הודעות מה-HTML של IBeam) + שורות הכניסה מהלוג. בלי סיסמאות
+            live-debug) $SSH 'rm -rf /tmp/ibl; docker cp ibeam-live:/srv/outputs /tmp/ibl 2>/dev/null || echo "no outputs dir"; ls -la /tmp/ibl 2>/dev/null | tail -20; for f in $(ls -t /tmp/ibl/*.html 2>/dev/null | head -3); do echo "== $f"; grep -oiE "<title>[^<]{0,120}</title>|(error|invalid|incorrect|expired|denied|locked|two.?factor|2fa|ib ?key|notification|challenge|approve|timeout|maintenance|unavailable|live|paper)[^<]{0,140}" "$f" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | sort -u | head -40; done; echo "--- ibeam-live log (login lines)"; docker logs ibeam-live 2>&1 | grep -iE "login|authenticat|2fa|two|notification|status|error|trigger|target" | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig" | tail -50' ;;
             live-logs)  $SSH 'journalctl -u bikur-live-bridge -n 80 --no-pager; echo "--- ibeam-live"; docker logs --tail 40 ibeam-live 2>&1 | sed -E "s/(password|passwd)[^ ]*/[REDACTED]/Ig"' ;;
             # עצירה מיידית: קובץ LIVE_OFF (הגשר מבטל פקודות פתוחות ולא שולח), עצירת השירות והקונטיינר. אפשר להריץ בכל רגע
             live-stop)  $SSH 'touch /etc/bikur-bridge/LIVE_OFF; systemctl stop bikur-live-bridge; docker stop ibeam-live >/dev/null 2>&1; echo "stopped: live bridge + ibeam-live (LIVE_OFF נוצר)"' ;;
