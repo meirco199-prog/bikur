@@ -1,1 +1,1 @@
-dump 20261009T1449 agent/broker agent/report
+dump 20261011T1010 agent/stocks agent/opportunities regime reco rank?limit=25 agent/report
