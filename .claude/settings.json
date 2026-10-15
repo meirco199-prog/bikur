@@ -7,7 +7,15 @@
       "Bash(node:*)",
       "Bash(curl:*)",
       "Bash(ssh:*)",
-      "Bash(sshpass:*)"
+      "Bash(sshpass:*)",
+      "Bash(gh:*)",
+      "mcp__Interactive_Brokers_IBKR",
+      "mcp__Claude_Code_Remote",
+      "mcp__github",
+      "mcp__Gmail__send_message",
+      "WebSearch",
+      "WebFetch",
+      "PushNotification"
     ]
   }
 }
