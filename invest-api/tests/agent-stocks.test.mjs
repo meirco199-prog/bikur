@@ -94,7 +94,8 @@ test('סוכן: מועמד מניה מהסריקה הלילית → פקודה �
   store.set('px:NVDA', JSON.stringify({ symbol: 'NVDA', currency: 'USD', source: 'seed', rows: STOCK_ROWS.NVDA, fetchedAt: new Date().toISOString() }));
   for (const sym of new Set(AGENT_INSTRUMENTS.map(priceSymbolOf))) addBar(sym, NEXT);
   addBar('NVDA', NEXT);
-  const r2 = await call(`/agent/run${S}&date=${NEXT}&batch=12`, { method: 'POST' });
+  // מניה ממתינה נוספת (INTC) בלי בר של 23/9 בבדיקה: מקבלת ניסיונות חוזרים (FILL_PRICE_RETRIES) לפני שנדחית — לא נתקעת
+  let r2; for (let i = 0; i < 10; i++){ r2 = await call(`/agent/run${S}&date=${NEXT}&batch=12`, { method: 'POST' }); if (r2.j.phase !== 'pricing') break; assert.deepEqual(r2.j.retrying, ['INTC']); }
   assert.equal(r2.j.phase, 'done', JSON.stringify(r2.j)); assert.equal(r2.j.stocks.candidates, 0, 'אין סריקת מניות ל-23/9 → אין מועמדי מניות חדשים');
   const rep = (await call('/agent/report')).j;
   const pos = rep.positions.find((p) => p.symbol === 'NVDA'); assert.ok(pos && pos.side === 'long' && pos.qty > 0, JSON.stringify(rep.positions.map((p) => p.symbol)));
