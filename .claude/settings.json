@@ -10,6 +10,8 @@
       "Bash(sshpass:*)",
       "Bash(gh:*)",
       "mcp__Interactive_Brokers_IBKR",
+      "mcp__Interactive_Brokers_IBKR__create_order_instruction",
+      "mcp__Interactive_Brokers_IBKR__delete_order_instruction",
       "mcp__Claude_Code_Remote",
       "mcp__github",
       "mcp__Gmail__send_message",
