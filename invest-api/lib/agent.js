@@ -16,6 +16,10 @@ import { DB } from './db.js';
 import { round, isNum, uid } from '../engine/util.js';
 
 const JOURNAL_MAX = 600, EQUITY_MAX = 2000, OPPS_KEEP = 40;
+// מכשיר שפקודה ממתינה תתמלא בו היום: בלי בר של יום המילוי לא מוותרים בניסיון הראשון (כשל רגעי אצל הספק / מכסת דקה) — מנסים שוב
+// בקריאות הבאות של אותו יום. אחרת הפקודה נדחית "אין מחיר פתיחה" בזמן שהגשר כבר ביצע אותה בדמה בפתיחה → פוזיציה יתומה (IT/MTD/MRNA/CSGP 16/10)
+export const FILL_PRICE_RETRIES = 6;
+export const UNWIND_KIND = 'broker-unwind';   // יומן: סגירה בדמה של פקודה שהגשר ביצע והסימולציה לא מילאה (lib/agent-broker.js שולח לגשר)
 const dayOf = (rows, day) => { let r = null; for (const x of rows){ if (x[0] <= day) r = x; else break; } return r; };
 const nextDayRow = (rows, day) => rows.find((x) => x[0] > day) || null;
 
@@ -76,17 +80,27 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   // מניות בודדות מתומחרות רק כשהן מוחזקות או ממתינות למילוי (הסריקה שלהן מגיעה מהלילה); היקום הקבוע — תמיד
   const stockSyms = [...new Set([...Object.keys(state.positions || {}), ...(pending.orders || []).map((o) => o.symbol)])].filter((s) => instrumentOf(s)?.class === 'stock');
   const pricedInstruments = [...AGENT_INSTRUMENTS, ...stockSyms.map(instrumentOf)];
+  // סמלי המחיר שהמילוי של היום תלוי בהם (פקודות ממתינות; אופציה — סדרת הבסיס). מתומחרים ראשונים, לפני מכסת הדקה של הספק נגמרת
+  const fillPriceSyms = new Set((pending.orders || []).map((o) => { const i = instrumentOf(o.symbol); const b = i?.class === 'option' ? instrumentOf(i.underlying) : i; return b ? priceSymbolOf(b) : null; }).filter(Boolean));
 
   // שלב 1 — תמחור (באצ'ים): כל מכשיר צריך סדרה שמכסה את יום ההחלטה
   const scanKey = `agent:scan:${day}`;
   const scan = (await db.get(scanKey)) || { day, done: {}, missing: {}, startedAt: new Date().toISOString() };
-  const priceSyms = [...new Set(pricedInstruments.map(priceSymbolOf))];
+  scan.retry = scan.retry || {};
+  const allPriceSyms = [...new Set(pricedInstruments.map(priceSymbolOf))];
+  const priceSyms = [...allPriceSyms.filter((s) => fillPriceSyms.has(s)), ...allPriceSyms.filter((s) => !fillPriceSyms.has(s))];
   let fetched = 0;
   for (const sym of priceSyms){
     if (scan.done[sym] || scan.missing[sym]) continue;
     const inst = instrumentOf(sym);
     const before = (await db.get(`px:${sym}`))?.fetchedAt || null;   // קריאה לספק נספרת רק אם המטמון באמת התרענן (מכסת דקה של Twelve Data)
     const r = await agentPrices(inst, { ...ctx, now });
+    if (fillPriceSyms.has(sym) && !(r?.rows || []).some((x) => x[0] === day) && (scan.retry[sym] || 0) < FILL_PRICE_RETRIES){
+      scan.retry[sym] = (scan.retry[sym] || 0) + 1;   // נשאר "לא מתומחר" → phase=pricing → ניסיון נוסף בקריאה הבאה
+      if (r?.fetchedAt && r.fetchedAt !== before) fetched++;
+      if (fetched >= batch) break;
+      continue;
+    }
     if (!r || r.missing || !r.rows?.length){ scan.missing[sym] = r?.reason || 'אין נתונים'; continue; }
     scan.done[sym] = r.rows[r.rows.length - 1][0]; // ייתכן שאין עדיין בר של היום אצל הספק — ממשיכים עם מה שיש; הסגירה החסרה נאכפת בשער (requireFreshData)
     if (r.fetchedAt !== before) fetched++;
@@ -94,7 +108,7 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   }
   const left = priceSyms.filter((s) => !scan.done[s] && !scan.missing[s]).length;
   await db.put(scanKey, scan, { ttl: 3 * 86400 });
-  if (left > 0) return { phase: 'pricing', day, left, priced: Object.keys(scan.done).length, missing: Object.keys(scan.missing).length };
+  if (left > 0) return { phase: 'pricing', day, left, priced: Object.keys(scan.done).length, missing: Object.keys(scan.missing).length, retrying: Object.keys(scan.retry).filter((s) => !scan.done[s] && !scan.missing[s]) };
 
   // שלב 2 — סדרות עד יום ההחלטה
   const series = [], rowsBySym = {};
@@ -116,18 +130,31 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   const log = (e) => journal.push({ id: uid('ag_'), at: new Date().toISOString(), day, ...e });
 
   // שלב 3 — מילוי פקודות שהוחלטו בסשן הקודם, בפתיחת היום (שער שוב: המצב השתנה מאז ההחלטה)
-  const fills = [], rejected = [];
+  const fills = [], rejected = [], unwinds = [];
   const equityBefore = valuation(state, priceOf, instrumentOf);
   const sentToday = [];
+  // הגשר (מצב מראה) שולח את pending.orders לדמה בפתיחה, לפני המילוי כאן. פקודה שנשלחה ונדחית כאן — הדמה מחזיק פוזיציה שהסימולציה
+  // לא מחזיקה ואף אחד לא מנהל לה עצירה. הסימולציה נשארת מקור האמת: רושמים סגירה שלה בדמה, והגשר שולח אותה בפתיחה הבאה (חתוכה למה שמוחזק)
+  const brokerSent = (await db.get('agent:broker:sent')) || {};
+  const reject = (o, reasons) => {
+    rejected.push({ ...o, reasons }); log({ kind: 'reject', symbol: o.symbol, side: o.side, strategy: o.strategy, reasons, stage: 'fill', clientOrderId: o.clientOrderId || null });
+    const s = o.clientOrderId ? brokerSent[o.clientOrderId] : null;
+    if (s && !s.skipped && (o.side === 'buy' || o.side === 'short')){
+      const u = { kind: UNWIND_KIND, symbol: o.symbol, side: o.side === 'buy' ? 'sell' : 'cover', qty: o.qty, price: null, strategy: o.strategy, clientOrderId: o.clientOrderId, reason: `הסימולציה לא מילאה (${reasons.join(' · ')}) — סגירת הפוזיציה בדמה` };
+      unwinds.push(u); log(u);
+    }
+  };
   for (const o of pending.orders || []){
     const inst = instrumentOf(o.symbol); const px = openOf(o.symbol);
-    if (!inst || !isNum(px)){ const reasons = [`אין מחיר פתיחה ל-${day} (הסדרה מגיעה עד ${freshOf(o.symbol) || '—'})`]; rejected.push({ ...o, reasons }); log({ kind: 'reject', symbol: o.symbol, side: o.side, strategy: o.strategy, reasons, stage: 'fill' }); continue; }
+    if (!inst || !isNum(px)){ reject(o, [`אין מחיר פתיחה ל-${day} (הסדרה מגיעה עד ${freshOf(o.symbol) || '—'})`]); continue; }
     const v = valuation(state, priceOf, instrumentOf);
     const g = gateOrder({ order: toGateOrder(o, inst, px, fx, day), policy, account: toGateAccount(state, v, fx, day, equityBefore), positions: toGatePositions(v, fx), capabilities: capabilities(), journal: sentToday, now });
-    if (!g.allowed){ rejected.push({ ...o, reasons: g.reasons }); log({ kind: 'reject', symbol: o.symbol, side: o.side, strategy: o.strategy, reasons: g.reasons, stage: 'fill' }); continue; }
+    if (!g.allowed){ reject(o, g.reasons); continue; }
     const f = fill(state, { symbol: o.symbol, side: o.side, qty: o.qty, price: px, day, strategy: o.strategy, sector: inst.sector, stop: o.stop, reason: o.reason }, inst);
-    sentToday.push({ clientOrderId: g.clientOrderId, symbol: o.symbol, side: o.side }); fills.push({ ...f, clientOrderId: g.clientOrderId, decidedDay: pending.day, decisionPrice: o.price, gapPct: o.price ? round(px / o.price - 1, 4) : null });
-    log({ kind: 'fill', ...f, clientOrderId: g.clientOrderId, decidedDay: pending.day, decisionPrice: o.price });
+    // ביומן — המזהה שהגשר שלח לברוקר (של יום ההחלטה), כדי שההשוואה (reconcile) תתאים מילוי-למילוי
+    const cid = o.clientOrderId || g.clientOrderId;
+    sentToday.push({ clientOrderId: g.clientOrderId, symbol: o.symbol, side: o.side }); fills.push({ ...f, clientOrderId: cid, decidedDay: pending.day, decisionPrice: o.price, gapPct: o.price ? round(px / o.price - 1, 4) : null });
+    log({ kind: 'fill', ...f, clientOrderId: cid, decidedDay: pending.day, decisionPrice: o.price });
   }
   // שלב 4 — עצירות (על הנמוך/הגבוה של היום), שערוך לסגירה, ריבית/השאלה, חיסול margin
   // אופציות שפקעו/קרובות לפקיעה נסגרות במחיר השוק (בפקיעה — ערך פנימי); בלי הקצאה. לא משתקף בדמה של IBKR (שלב א' בסימולציה בלבד)
@@ -192,7 +219,7 @@ export async function runAgent(ctx, { day = null, force = false, reset = false, 
   log({ kind: 'day', equityUsd: v.equityUsd, dayPnlUsd: dayPnl, leverage: v.leverage, fills: fills.length, stops: stops.length, liquidations: liq.length, interestUsd: acc.interestUsd, borrowUsd: acc.borrowUsd, candidates: allCandidates.length, stockCandidates: stockCands.length, ordersForTomorrow: orders.length, halted: halt.halted ? halt.reasons : null });
   await db.put('agent:journal', journal.slice(-JOURNAL_MAX));
   await db.put('agent:state', state);
-  return { phase: 'done', day, equityUsd: v.equityUsd, equityIls: round(v.equityUsd * fx, 0), dayPnlUsd: dayPnl, leverage: v.leverage, positions: v.positions.length, fills: fills.length, rejectedFills: rejected.length, stops: stops.length, liquidations: liq.length, interestUsd: acc.interestUsd, borrowUsd: acc.borrowUsd, scanned: scanRes.scanned, stocks: stocksInfo, candidates: scanRes.summary, ordersForTomorrow: orders.map((o) => `${o.side} ${o.qty} ${o.symbol} (${o.strategy}, ${o.score})`), gateRejections: gateLog.length, halted: halt.halted ? halt.reasons : null, killSwitch: !!policy.killSwitch };
+  return { phase: 'done', day, equityUsd: v.equityUsd, equityIls: round(v.equityUsd * fx, 0), dayPnlUsd: dayPnl, leverage: v.leverage, positions: v.positions.length, fills: fills.length, rejectedFills: rejected.length, brokerUnwinds: unwinds.map((u) => `${u.side} ${u.qty} ${u.symbol}`), missingPrices: Object.keys(scan.missing), stops: stops.length, liquidations: liq.length, interestUsd: acc.interestUsd, borrowUsd: acc.borrowUsd, scanned: scanRes.scanned, stocks: stocksInfo, candidates: scanRes.summary, ordersForTomorrow: orders.map((o) => `${o.side} ${o.qty} ${o.symbol} (${o.strategy}, ${o.score})`), gateRejections: gateLog.length, halted: halt.halted ? halt.reasons : null, killSwitch: !!policy.killSwitch };
 }
 
 // --- המרות לשער הפקודות (השער עובד בשקלים; הסימולציה בדולר) ---

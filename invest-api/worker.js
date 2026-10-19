@@ -11,7 +11,7 @@ import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
 import { runAggressive, aggrReport, executeAggressive } from './lib/aggressive.js';
 import { runAgent, agentReport, setKill, agentPolicy, setAgentProfile } from './lib/agent.js';
-import { brokerPending, recordBroker, brokerReport, requestBrokerSync } from './lib/agent-broker.js';
+import { brokerPending, recordBroker, brokerReport, requestBrokerSync, requestOrphanCleanup } from './lib/agent-broker.js';
 import { recordLive, liveReport } from './lib/agent-live.js';
 import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
@@ -190,6 +190,8 @@ async function handle(req, env0, ctx){
       if (p2 === 'fills' && req.method === 'POST'){ try { return json(await recordBroker(db, body)); } catch (e) { await db.logError('agent-broker', e.message); return err('גשר IBKR: ' + e.message, 500); } }
       // סנכרון חד-פעמי של הפוזיציות הקיימות לדמה — רק סוד ה-cron/טוקן (לא BRIDGE_SECRET: הגשר לא יוצר פקודות בעצמו)
       if (p2 === 'sync' && req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); return json(await requestBrokerSync(db, { day: validDate(q.date) ? q.date : null, off: q.off === '1' })); }
+      // סגירה חד-פעמית של פוזיציות יתומות בדמה (מה שהדמה מחזיק והסימולציה לא) — רק סוד ה-cron/טוקן, כמו sync
+      if (p2 === 'orphans' && req.method === 'POST'){ if (!(env.CRON_SECRET && q.secret === env.CRON_SECRET)) needAuth(); return json(await requestOrphanCleanup(db, { day: validDate(q.date) ? q.date : null, off: q.off === '1' })); }
       return err('not found', 404);
     }
     // גשר לחשבון האמיתי (invest/docs/LIVE_BRIDGE.md): הכול פרטי — דיווח מהגשר עם BRIDGE_SECRET/CRON_SECRET, קריאה עם סוד או טוקן. אין GET ציבורי (יתרות אמיתיות)
