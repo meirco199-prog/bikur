@@ -19,6 +19,18 @@ export class Budget {
     if (MINUTE_LIMITS[p]){ const k = `${p}:${Math.floor(Date.now() / 60000)}`; MINUTE.set(k, (MINUTE.get(k) || 0) + n); if (MINUTE.size > 200) MINUTE.clear(); }
     return b[p];
   }
+  // בדיקה+חיוב אטומיים (בתוך ה-isolate): אחרי ה-await היחיד הבדיקה וההגדלה סינכרוניות, כך שקריאות מקבילות
+  // (Promise.all ב-FMP facts = 4 בקשות) לא עוברות כולן את הבדיקה לפני שמישהו חויב. registry בודק canSpend פעם אחת
+  // לכל מתודה, אבל מתודה אחת שולחת כמה בקשות — לכן חריגה של 230 → 232/233 ב-/health (ChatGPT, 19/10)
+  async trySpend(p, n = 1){
+    const b = await this.load();
+    if ((b[p] || 0) + n > (this.limits[p] ?? Infinity)) return false;
+    const ml = MINUTE_LIMITS[p], k = ml ? `${p}:${Math.floor(Date.now() / 60000)}` : null;
+    if (ml && (MINUTE.get(k) || 0) + n > ml) return false;
+    b[p] = (b[p] || 0) + n; this.dirty = true;
+    if (ml){ MINUTE.set(k, (MINUTE.get(k) || 0) + n); if (MINUTE.size > 200) MINUTE.clear(); }
+    return true;
+  }
   // חסימה ליום (נשמרת עם התקציב). בלי symbol: כל ה-endpoint חסום לכל נייר (402 — התוכנית לא כוללת אותו).
   // עם symbol: רק הנייר הזה — Finnhub מחזיר 403 גם על סימבול שה-plan לא מכסה (למשל .TA), וחסימה גלובלית
   // שם הפילה את קונצנזוס האנליסטים גם לניירות אמריקאיים תקינים לשארית היום (AI_COUNCIL#13)

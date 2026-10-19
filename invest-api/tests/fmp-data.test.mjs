@@ -113,3 +113,21 @@ test('תקציב: endpoint שהתוכנית לא כוללת נחסם להיום 
   assert.equal(await b.blocked('fmp', 'profile'), false);
   assert.equal(await b.blocked('fmp', 'earnings', 'AAPL'), true, 'חסימה גלובלית חלה גם כששואלים על נייר ספציפי');
 });
+
+test('תקציב FMP: מתודה עם כמה בקשות מקבילות (facts = 4) לא חורגת מהמכסה היומית', async () => {
+  const { Budget, DAILY_LIMITS } = await import('../lib/budget.js');
+  const { fmp } = await import('../providers/fmp.js');
+  const db = new DB(null); const budget = new Budget(db);
+  const limit = DAILY_LIMITS.fmp;
+  (await budget.load()).fmp = limit - 1; // נשארה בקשה אחת
+  const realFetch = globalThis.fetch; let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }); };
+  try {
+    const ctx = { db, env: { FMP_KEY: 'x' }, budget };
+    await fmp.facts('AAPL', {}, ctx);
+    assert.equal(calls, 1, 'רק בקשה אחת נשלחה — שלוש האחרות נחסמו לפני הרשת');
+    assert.equal((await budget.status()).fmp.used, limit, 'used לא עובר את ה-limit');
+    await assert.rejects(fmp.profile('AAPL', {}, ctx), (e) => e.kind === 'quota');
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = realFetch; }
+});

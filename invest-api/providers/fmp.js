@@ -3,7 +3,7 @@ import { getJSON, num } from '../lib/http.js';
 
 const base = 'https://financialmodelingprep.com/stable';
 async function call(ctx, path, params = {}){
-  await ctx.budget.spend('fmp');
+  if (!(await ctx.budget.trySpend('fmp'))) throw Object.assign(new Error('fmp: תקציב יומי נגמר'), { kind: 'quota' });
   const q = new URLSearchParams({ ...params, apikey: ctx.env.FMP_KEY });
   const r = await getJSON('fmp', `${base}/${path}?${q}`);
   if (r && r['Error Message']) throw new Error('fmp: ' + r['Error Message']);
