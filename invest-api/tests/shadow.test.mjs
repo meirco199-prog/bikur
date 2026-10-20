@@ -209,3 +209,29 @@ test('מודל DF: כיסוי נתונים חסר (לא רק נמוך) הוא fa
     else { assert.equal(byS['S' + i].coverage, null, 'coverage לא מספרי מנורמל ל-null'); assert.equal(byS['S' + i].eligibleDF, false, `S${i}: coverage חסר חייב להיות לא-כשיר, לא כשיר-בהיעדר-מידע`); }
   }
 });
+
+test('מודל צל: מילוי תשואות קדימה נדחה כשהדירוג של היום חלקי (ריצת ה-Worker לפני מיזוג ה-S&P 500) ומתבצע מלא בריצה הכפויה', async () => {
+  const { putSnapsBatch } = await import('../lib/snapstore.js');
+  const { FILL_MIN_COVERAGE } = await import('../lib/shadow.js');
+  const db = new DB(null); const ctx = { db, env: {} };
+  const uni = mk(120).map((r) => ({ ...r, symbol: 'U' + r.symbol.slice(1), open: r.price - 1 }));
+  const spy = (p) => ({ symbol: 'SPY', type: 'etf', price: p, open: p - 1, score: 70, signal: 'HOLD', components: {} });
+  await db.put('meta:mechanical', { symbols: uni.map((r) => r.symbol) });
+  await db.put('idx:snapdays', ['2026-10-16', '2026-10-19']);
+  // יום 1: מסמך מלא (צינור אחיד, 120 חברות)
+  await putSnapsBatch(db, '2026-10-16', uni);
+  await db.put('rank:2026-10-16', { table: [...uni, spy(760)] });
+  assert.equal((await runShadow(ctx, { day: '2026-10-16' })).n, 120);
+  // יום 2, ריצת ה-Worker של ~04:00: בדירוג רק 20 מהחברות (היקום של ה-Worker) — אין מילוי, אין צבירה
+  await db.put('rank:2026-10-19', { table: [...uni.slice(0, 20).map((r) => ({ ...r, price: r.price * 1.01 })), spy(766)] });
+  const early = await runShadow(ctx, { day: '2026-10-19' });
+  assert.equal(early.filled['1'].deferred, true); assert.equal(early.filled['1'].filled, 0); assert.ok(early.filled['1'].coverage < FILL_MIN_COVERAGE);
+  assert.equal((await db.get('shadow:2026-10-16')).fwd['1'], undefined, 'לא נקבע מילוי חלקי');
+  assert.equal(await db.get('shadow:stats'), null, 'בלי כתיבת צבירה');
+  // ~06:00: ה-S&P 500 ממוזג לדירוג וה-shards של היום נכתבו → הריצה הכפויה ממלאת את כל השורות
+  await putSnapsBatch(db, '2026-10-19', uni.map((r) => ({ ...r, price: r.price * 1.01 })));
+  await db.put('rank:2026-10-19', { table: [...uni.map((r) => ({ ...r, price: r.price * 1.01 })), spy(766)] });
+  const full = await runShadow(ctx, { day: '2026-10-19', force: true });
+  assert.equal(full.filled['1'].filled, 120); assert.equal(full.filled['1'].deferred, undefined);
+  assert.equal(summarizeStats(await db.get('shadow:stats')).horizons['1'].models.A.n, 120);
+});
