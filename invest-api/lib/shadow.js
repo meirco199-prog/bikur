@@ -5,6 +5,9 @@ import { estimateRevision, latestRankDay } from './analysis.js';
 import { listShardSnaps } from './snapstore.js';
 import { isNum } from '../engine/util.js';
 
+// חלק השורות במסמך הישן שיש להן מחיר בדירוג של היום — מתחת לזה דוחים את מילוי התשואות קדימה לריצה הבאה של אותו יום
+export const FILL_MIN_COVERAGE = 0.8;
+
 export async function runShadow(ctx, { day = null, force = false } = {}){
   const { db } = ctx;
   day = day || (await latestRankDay(db));
@@ -41,6 +44,11 @@ export async function runShadow(ctx, { day = null, force = false } = {}){
   if (idx >= 0) for (const h of SHADOW_RULES.horizons){
     const then = days[idx - h]; if (!then) continue;
     const old = await db.get(`shadow:${then}`); if (!old || old.fwd?.[h]) continue;
+    // המילוי חד-פעמי (fwd[h] נקבע וגם הצבירה), לכן לא ממלאים מדירוג חלקי: הריצה של ה-Worker אחרי הסריקה (~04:00 UTC) רואה
+    // רק ~160 נכסים, לפני שה-S&P 500 ממוזג לדירוג (~06:00) — אחרת ~70 מתוך ~500 שורות מקבלות תשואה ליום, והשאר אף פעם
+    const priced = old.rows.filter((r) => isNum(priceNow[r.symbol])).length;
+    const coverage = old.rows.length ? priced / old.rows.length : 0;
+    if (coverage < FILL_MIN_COVERAGE){ filled[h] = { day: then, filled: 0, deferred: true, coverage: Math.round(coverage * 1000) / 1000 }; continue; }
     const spyThen = (await db.get(`rank:${then}`))?.table?.find((r) => r.symbol === 'SPY')?.price ?? null;
     // כניסה בפתיחת יום הניתוח הבא אחרי הסיגנל (הסיגנל נוצר בלילה; אי אפשר לקנות בסגירה שעליה הוא נוצר)
     const entryDay = days[idx - h + 1];
@@ -53,7 +61,7 @@ export async function runShadow(ctx, { day = null, force = false } = {}){
     const f = fillForward(old, h, priceNow, { spyNow, spyThen, day, entryOpen, spyEntry, entry940, spyEntry940 });
     if (f.filled){ await db.put(`shadow:${then}`, old); stats = accumulateStats(stats, old, h); filled[h] = { day: then, filled: f.filled, kinds: f.kinds }; }
   }
-  if (Object.keys(filled).length) await db.put('shadow:stats', stats);
+  if (Object.values(filled).some((f) => f.filled)) await db.put('shadow:stats', stats);
   // סדרת התפלגות יומית (מסמך אחד, עד 250 ימים): חלק "קנייה חזקה"/"קנייה", ממוצע וחציון לכל מודל
   if (created){
     const series = (await db.get('shadow:dist')) || [];
