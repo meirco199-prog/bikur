@@ -18,10 +18,15 @@ export function lastSessionClose(now = new Date()){
   return { date, closeMs };
 }
 // האם סדרת מחירים (שורות [date,...]) שנמשכה ב-fetchedAt כבר מכסה את הסגירה האחרונה. minAgeSec: לא לנסות שוב כל רגע אם הספק טרם פרסם את הסגירה
+// שורה של יום S שנמשכה לפני סגירת S היא בר תוך-יומי חלקי, לא סגירה: סדרה שנמשכה ב-14:58 ET ונשארה במטמון "כיסתה" את
+// הסשן, והניתוח הלילי + השערוך ה"סופי" רצו על המחיר של 14:58 (22/10: SPY של 21/10 נרשם 770.68 ואחר כך 773.09, LLY 1267.37 → 1270.75).
 export function pricesCoverLastSession(rows, fetchedAt, now = new Date()){
   const last = rows?.length ? rows[rows.length - 1][0] : null;
   const s = lastSessionClose(now);
-  return !!last && last >= s.date;
+  if (!last || last < s.date) return false;
+  const f = fetchedAt ? Date.parse(fetchedAt) : NaN;
+  if (last === s.date && Number.isFinite(f) && f < s.closeMs) return false;
+  return true;
 }
 
 // חותמת זמן UTC של שעה בניו יורק ביום נתון (למשל 09:40 ET של יום המסחר) — לרישום מילויים של תיקי צל בזמן הסשן ולא בזמן העיבוד

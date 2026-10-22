@@ -16,6 +16,16 @@ test('סשן אחרון שנסגר: לפני 16:00 ET → אתמול; אחרי �
   assert.equal(pricesCoverLastSession([], null), false);
 });
 
+test('סדרה שנמשכה לפני הסגירה: השורה של היום היא בר חלקי — לא מכסה את הסשן עד רענון אחרי 16:00 ET', () => {
+  const now = new Date('2026-10-22T06:18:00Z'); // 02:18 ET חמישי → הסשן האחרון 21/10, נסגר 20:00Z
+  const rows = [['2026-10-20', 1, 1, 1, 1, 0], ['2026-10-21', 1, 1, 1, 1, 0]];
+  assert.equal(pricesCoverLastSession(rows, '2026-10-21T18:58:00Z', now), false); // 14:58 ET — בר חלקי
+  assert.equal(pricesCoverLastSession(rows, '2026-10-21T20:14:00Z', now), true);  // אחרי הסגירה
+  assert.equal(pricesCoverLastSession(rows, null, now), true);                    // בלי חותמת — כמו קודם
+  // במהלך הסשן של 22/10 (S=21/10): סדרה שכבר כוללת בר של היום נמשכה אחרי סגירת 21/10 — השורה של 21/10 סופית
+  assert.equal(pricesCoverLastSession([...rows, ['2026-10-22', 1, 1, 1, 1, 0]], '2026-10-22T14:00:00Z', new Date('2026-10-22T15:00:00Z')), true);
+});
+
 test('מטמון: staleIf מפקיע לפני ה-TTL; בלי staleIf — TTL בלבד', async () => {
   const store = new Map();
   const db = { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, JSON.stringify(v)); } };
