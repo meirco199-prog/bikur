@@ -98,8 +98,9 @@ export function computeMetrics(facts, { price, sharesOut, ratios, marketCap } = 
   const revenue = rev?.value ?? null;
   const netIncome = ni?.value ?? null;
   const fcf = isNum(ocf?.value) ? ocf.value - Math.abs(capex?.value || 0) : null;
-  const totalDebt = debtT?.value ?? debtLT?.value ?? null;
-  const cashV = cash?.value ?? null;
+  // latestInstant מחזיר עובדה גולמית ({end, val, filed…}), לא תוצאת ttm ({value…}) — לכן .val
+  const totalDebt = debtT?.val ?? debtLT?.val ?? null;
+  const cashV = cash?.val ?? null;
   const netDebt = isNum(totalDebt) ? totalDebt - (cashV || 0) : null;
   const sh = sharesOut || shares?.val || null;
   const mcap = marketCap || (isNum(price) && isNum(sh) ? price * sh : null);

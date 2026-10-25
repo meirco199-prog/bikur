@@ -69,3 +69,33 @@ test('fairValue מחזיר טווח (low<high) ו-Margin of Safety', () => {
   assert.ok(fv.methods.length >= 2);
   assert.equal(typeof fv.marginOfSafety, 'number');
 });
+test('computeMetrics קורא מאזן (Cash/TotalDebt/LongTermDebt) מ-.val — netDebt ו-EV = mcap + netDebt', () => {
+  const fy = (end, val) => ({ start: `${end.slice(0, 4)}-01-01`, end, val, filed: `${+end.slice(0, 4) + 1}-02-15`, form: '10-K' });
+  const inst = (end, val) => ({ end, val, filed: `${+end.slice(0, 4) + 1}-02-15`, form: '10-K' });
+  const f = { source: 'EDGAR', series: {
+    Revenue: [fy('2023-12-31', 1000e6), fy('2024-12-31', 1100e6)],
+    NetIncome: [fy('2023-12-31', 100e6), fy('2024-12-31', 120e6)],
+    EBIT: [fy('2023-12-31', 180e6), fy('2024-12-31', 200e6)],
+    DA: [fy('2024-12-31', 50e6)],
+    Cash: [inst('2023-12-31', 80e6), inst('2024-12-31', 150e6)],
+    TotalDebt: [inst('2023-12-31', 600e6), inst('2024-12-31', 650e6)],
+    LongTermDebt: [inst('2024-12-31', 500e6)],
+    Equity: [inst('2024-12-31', 1000e6)],
+    Shares: [inst('2024-12-31', 100e6)],
+  } };
+  const m = computeMetrics(f, { price: 20 });
+  assert.equal(m.cash, 150e6);
+  assert.equal(m.totalDebt, 650e6); // TotalDebt עדיף על LongTermDebt
+  assert.equal(m.netDebt, 500e6);
+  assert.equal(m.marketCap, 2000e6);
+  assert.equal(m.ev, m.marketCap + m.netDebt);
+  assert.equal(m.netDebtToEbitda, 500e6 / 250e6);
+  assert.equal(m.netDebtToEquity, 0.5);
+  assert.equal(m.fields.netDebt.kind, 'derived');
+  // בלי TotalDebt → נופל ל-LongTermDebt; חברת מזומן נטו → netDebt שלילי ו-EV < mcap
+  const g = { ...f, series: { ...f.series, TotalDebt: [], Cash: [inst('2024-12-31', 900e6)] } };
+  const n = computeMetrics(g, { price: 20 });
+  assert.equal(n.totalDebt, 500e6);
+  assert.equal(n.netDebt, -400e6);
+  assert.equal(n.ev, 1600e6);
+});
