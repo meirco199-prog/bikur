@@ -28,17 +28,26 @@ export function normalizeCompanyFacts(json){
   const pick = (obj) => { const units = obj?.units || {}; const k = Object.keys(units).find((u) => /USD|shares|USD\/shares|pure/.test(u)); return units[k] || []; };
   for (const [metric, tags] of Object.entries(TAG_MAP)){
     const out = new Map();
-    for (const tag of tags){
-      const arr = pick(gaap[tag]);
+    // תגית ראשית = זו שהנקודה האחרונה שלה (end) הכי עדכנית; שוויון → סדר הרשימה. "הראשונה עם נתונים" בחרה לעתים
+    // סדרה שהחברה הפסיקה לדווח לפני שנים (Revenues/SalesRevenueNet טרום ASC 606 מול RevenueFromContractWithCustomer…).
+    const ranked = tags.map((tag, i) => {
+      const arr = pick(gaap[tag]).filter((f) => /10-K|10-Q|20-F|40-F|10-KT|10-QT/.test(f.form || ''));
+      return { i, arr, last: arr.reduce((m, f) => (f.end > m ? f.end : m), '') };
+    }).filter((t) => t.arr.length).sort((x, y) => y.last.localeCompare(x.last) || x.i - y.i);
+    // point-in-time: תגיות אחרות נכנסות רק בעובדות שהוגשו לפני ההגשה הראשונה של התגית שאחריהן בדירוג (כמו שהיה ידוע
+    // אז) — כך As-Of/backtest לתאריך שלפני המעבר רואים את הסדרה הישנה, ומאז — רק את הנוכחית (שגוברת גם על תקופות
+    // השוואה לפי "ההגשה האחרונה גוברת"). אין ערבוב תגיות באותה הגשה.
+    let cutoff = null;
+    for (const t of ranked){
+      const arr = cutoff === null ? t.arr : t.arr.filter((f) => (f.filed || '') < cutoff);
       for (const f of arr){
-        if (!/10-K|10-Q|20-F|40-F|10-KT|10-QT/.test(f.form || '')) continue;
         const isShares = metric === 'Shares';
         const e = { end: f.end, val: f.val, filed: f.filed, form: f.form, fy: f.fy, fp: f.fp };
         if (f.start && !isShares) e.start = f.start;
         const key = `${e.start || ''}|${e.end}|${e.val}|${e.filed}`;
         if (!out.has(key)) out.set(key, e);
       }
-      if (out.size) break; // התגית הראשונה עם נתונים מנצחת — עקביות בתוך המטריקה
+      if (arr.length) cutoff = arr.reduce((m, f) => ((f.filed || '') < m ? (f.filed || '') : m), cutoff ?? '9999');
     }
     if (out.size) series[metric] = [...out.values()].sort((a, b) => a.end.localeCompare(b.end) || (a.filed || '').localeCompare(b.filed || ''));
   }
