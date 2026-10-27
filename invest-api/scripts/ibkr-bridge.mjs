@@ -115,7 +115,8 @@ async function tick(ib, state){
   const ours = new Set(Object.keys(state.sent));
   const orders = (await ib.orders().catch((e) => { errors.push('orders: ' + e.message); return []; })).map(normalizeBrokerOrder).filter((o) => o.clientOrderId && ours.has(o.clientOrderId));
   const account = await ib.summary(acct).catch((e) => { errors.push('summary: ' + e.message); return null; });
-  const positions = await ib.positions(acct).catch((e) => { errors.push('positions: ' + e.message); return []; });
+  // קריאה שנכשלה (למשל 503) → null ולא [] — ה-Worker שומר את התמונה האחרונה ומסמן אותה לא מאומתת, במקום "0 פוזיציות" עם חותמת זמן טרייה
+  const positions = await ib.positions(acct).catch((e) => { errors.push('positions: ' + e.message); return null; });
   const rep = await worker('/agent/broker/fills', { method: 'POST', body: { day: nyDay(), status: { authenticated: true, account: acct }, sent: sentNow, fills: orders, account, positions, errors } });
   log('דווח:', JSON.stringify(rep).slice(0, 200));
 }

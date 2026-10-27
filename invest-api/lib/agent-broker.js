@@ -80,7 +80,18 @@ export async function recordBroker(db, body = {}){
   const simSync = (sync?.orders || []).filter((o) => sent[o.clientOrderId]?.day === day).map((o) => ({ clientOrderId: o.clientOrderId, symbol: o.symbol, side: o.side, qty: o.qty, price: o.price }));
   const cleanup = ((await db.get('agent:broker:cleanup'))?.orders || []).filter((o) => sent[o.clientOrderId]?.day === day).map((o) => ({ clientOrderId: o.clientOrderId, symbol: o.symbol, side: o.side, qty: o.qty, price: null }));
   const reconcile = reconcileFills([...simFills, ...simExits, ...simSync, ...cleanup], fills);
-  const rec = { day, updatedAt: new Date().toISOString(), status: body.status || prev.status || null, account: body.account || prev.account || null, positions: Array.isArray(body.positions) ? body.positions : (prev.positions || []), fills, errors: [...(prev.errors || []), ...(body.errors || [])].slice(-30), reconcile };
+  // פוזיציות: רק רשימה שנקראה בהצלחה מחליפה את הקודמת. קריאה שנכשלה (positions=null, או גשר ישן ששולח [] יחד עם שגיאת "positions:")
+  // לא מוחקת את התמונה האחרונה — היא נשמרת עם positionsAt המקורי ו-positionsVerified=false, ויתומות לא מחושבות עליה (brokerReport/findOrphans)
+  const now = new Date().toISOString();
+  const posErr = (body.errors || []).some((e) => /^positions:/.test(String(e)));
+  const posOk = Array.isArray(body.positions) && !posErr;
+  const posTried = body.positions !== undefined || posErr;
+  let last = prev;
+  if (!Array.isArray(prev.positions)){ const lt = await db.get('agent:broker:latest'); if (lt?.day && lt.day !== day) last = (await db.get(`agent:broker:${lt.day}`)) || {}; }   // יום חדש: התמונה האחרונה מהיום הקודם
+  const lastVerified = Array.isArray(last.positions) ? last.positionsVerified !== false : false;
+  const pos = posOk ? { positions: body.positions, positionsAt: now, positionsVerified: true }
+    : { positions: last.positions || [], positionsAt: last.positionsAt || (Array.isArray(last.positions) ? last.updatedAt || null : null), positionsVerified: posTried ? false : lastVerified };
+  const rec = { day, updatedAt: now, status: body.status || prev.status || null, account: body.account || prev.account || null, ...pos, fills, errors: [...(prev.errors || []), ...(body.errors || [])].slice(-30), reconcile };
   await db.put(`agent:broker:${day}`, rec, { ttl: 60 * 86400 });
   await db.put('agent:broker:latest', { day, updatedAt: rec.updatedAt, authenticated: !!body.status?.authenticated, account: body.status?.account || null });
   return { ok: true, day, sent: Object.keys(sent).length, fills: fills.length, reconcile: reconcile.summary };
@@ -96,8 +107,9 @@ export async function brokerReport(db){
   const acct = rec?.account || null;
   const sync = (await db.get('agent:broker:sync')) || null; const sent = (await db.get('agent:broker:sent')) || {};
   const syncInfo = sync ? { day: sync.day, requestedAt: sync.requestedAt, total: (sync.orders || []).length, sent: (sync.orders || []).filter((o) => sent[o.clientOrderId] && !sent[o.clientOrderId].skipped).length, skipped: (sync.orders || []).filter((o) => sent[o.clientOrderId]?.skipped).length } : null;
-  const orphans = rec ? (await findOrphans(db, { positions: rec.positions, state, sent })).orphans : [];
-  return { mode: 'mirror', day: latest.day, updatedAt: latest.updatedAt, staleMinutes: staleMin, authenticated: !!latest.authenticated, account: latest.account || null, broker: acct, simEquityUsd: null, sync: syncInfo, orphans, positions: rec?.positions || [], fills: rec?.fills || [], reconcile: rec?.reconcile || null, errors: rec?.errors || [], sizeRatio: acct && isNum(acct.netLiquidationUsd) && state?.initialUsd ? round(acct.netLiquidationUsd / state.initialUsd, 2) : null };
+  const verified = rec?.positionsVerified !== false;   // רשומות ישנות (בלי השדה) נחשבות מאומתות כמו קודם
+  const orphans = !rec ? [] : verified ? (await findOrphans(db, { positions: rec.positions, state, sent })).orphans : null;
+  return { mode: 'mirror', day: latest.day, updatedAt: latest.updatedAt, staleMinutes: staleMin, authenticated: !!latest.authenticated, account: latest.account || null, broker: acct, simEquityUsd: null, sync: syncInfo, orphans, ...(verified ? {} : { orphansSkipped: 'קריאת הפוזיציות מהדמה נכשלה — מוצגת התמונה האחרונה שנקראה בהצלחה; יתומות לא חושבו' }), positions: rec?.positions || [], positionsAt: rec?.positionsAt || null, positionsVerified: rec ? verified : null, fills: rec?.fills || [], reconcile: rec?.reconcile || null, errors: rec?.errors || [], sizeRatio: acct && isNum(acct.netLiquidationUsd) && state?.initialUsd ? round(acct.netLiquidationUsd / state.initialUsd, 2) : null };
 }
 
 /**
@@ -109,6 +121,7 @@ export async function brokerReport(db){
 export async function findOrphans(db, { positions = null, state = null, sent = null, pending = null } = {}){
   const latest = await db.get('agent:broker:latest');
   const rec = positions ? null : (latest ? await db.get(`agent:broker:${latest.day}`) : null);
+  if (!positions && rec?.positionsVerified === false) return { day: latest?.day || null, updatedAt: latest?.updatedAt || null, orphans: [], unverified: true };   // תמונת פוזיציות לא מאומתת — לא מחשבים יתומות
   const pos = positions || rec?.positions || [];
   const st = state || (await db.get('agent:state')) || { positions: {} };
   const snt = sent || (await db.get('agent:broker:sent')) || {};
@@ -147,6 +160,7 @@ export async function findOrphans(db, { positions = null, state = null, sent = n
 export async function requestOrphanCleanup(db, { day = null, off = false } = {}){
   if (off){ await db.delete('agent:broker:cleanup'); return { ok: true, off: true }; }
   const f = await findOrphans(db);
+  if (f.unverified) return { ok: false, reason: 'קריאת הפוזיציות האחרונה מהדמה נכשלה — אין סגירת יתומות על תמונה לא מאומתת; נסה אחרי דיווח תקין של הגשר', brokerDay: f.day };
   const d = /^\d{4}-\d{2}-\d{2}$/.test(String(day || '')) ? day : new Date().toISOString().slice(0, 10);
   const orders = f.orphans.filter((o) => !o.inFlight).map((o) => ({ clientOrderId: `agent:orphan:${d}:${o.symbol}:${o.side}`, symbol: o.symbol, side: o.side, qty: o.qty, price: null, kind: 'orphan', day: d, reason: `פוזיציה יתומה: בדמה ${o.brokerQty}, בסימולציה ${o.simQty} — סגירת ההפרש` }));
   await db.put('agent:broker:cleanup', { day: d, requestedAt: new Date().toISOString(), brokerDay: f.day, orders });
