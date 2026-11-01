@@ -1,0 +1,52 @@
+# סנכרון ניסוי הדמה "ריזיקות עקרונות" (Issue #189) למסך "ניסוי סיני — דמה 200K$" באפליקציית ההשקעות.
+# הסימולציה רצה מחוץ לריפו ועורכת במקום את תגובת ה-STATE ב-Issue #189 (מתחילה ב-<!-- sinay-paper-state -->).
+# כאן: קוראים את התגובה (GITHUB_TOKEN, קריאה בלבד), ושולחים את ה-JSON ל-POST /sinay/ingest ב-Worker. ה-Worker כותב ל-KV
+# רק כשהמצב השתנה (hash) — ריצה חוזרת/מתוזמנת בלי שינוי לא צורכת כתיבות. מתקבלת רק תגובה של בעל הריפו (ראה
+# invest-api/scripts/sinay-sync.mjs). תוכן התגובה לא מוזרק ל-shell — הוא נקרא מה-API בתוך node.
+name: Sinay paper sync
+
+on:
+  issue_comment:
+    types: [created, edited]
+  schedule:
+    - cron: '23 * * * *'   # גיבוי: אם אירוע העריכה לא הפעיל ריצה. בלי שינוי → אפס כתיבות ל-KV
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: sinay-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # אירוע תגובה: רק Issue #189 (לא PR), רק תגובת ה-STATE, רק מבעל הריפו. תזמון/ידני: תמיד (הסקריפט מסנן בעצמו)
+    if: >-
+      github.event_name != 'issue_comment' || (
+        github.event.issue.number == 189 &&
+        !github.event.issue.pull_request &&
+        github.event.comment.user.login == github.repository_owner &&
+        github.event.comment.author_association == 'OWNER' &&
+        startsWith(github.event.comment.body, '<!-- sinay-paper-state -->')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: invest-api/scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sync state comment → Worker
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          ISSUE: '189'
+          WORKER_URL: https://invest-api.meirco199.workers.dev
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::error::חסר הסוד CRON_SECRET בהגדרות הריפו (Settings → Secrets and variables → Actions)"; exit 1; fi
+          node invest-api/scripts/sinay-sync.mjs
