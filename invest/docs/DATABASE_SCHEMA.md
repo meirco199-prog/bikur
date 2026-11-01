@@ -11,6 +11,7 @@
 | מפתח | ערך | TTL | דריסה |
 |---|---|---|---|
 | `px:{SYM}` | `{symbol, currency, source, asOf, fetchedAt, quality, rows:[[date,o,h,l,c,v]…]}` ממוין עולה; עד 25 שנים | 20h | כן (מיזוג: שורות חדשות נוספות, ישנות לא נמחקות) |
+| `sinay:state` | ניסוי הדמה של Issue #189 (תצוגה בלבד): `{hash, receivedAt, source:{commentId, commentUpdatedAt}, state:{version:1, start, trades[], coins{BTC,ETH,LTC,BCH}}}` — נכתב רק כשה-hash של המצב השתנה (`lib/sinay.js`) | — | כן |
 | `quote:{SYM}` | `{price, change, changePct, high, low, open, prevClose, asOf, source, quality}` | 15m | כן |
 | `profile:{SYM}` | `{name, exchange, type: stock/etf/fund/index/bond, sector, industry, country, currency, marketCap, sharesOut, description, source, asOf}` | 7d | כן |
 | `facts:{SYM}` | EDGAR מנורמל: `{cik, series:{Revenue:[{end, val, filed, form, fy, fp}], NetIncome:[…], EPSDiluted, OCF, Capex, Cash, LongTermDebt, TotalDebt, Equity, Shares, EBIT, DA, Dividends}}` | 7d | כן (מיזוג) |

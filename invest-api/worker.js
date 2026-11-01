@@ -14,6 +14,7 @@ import { runAgent, agentReport, setKill, agentPolicy, setAgentProfile } from './
 import { brokerPending, recordBroker, brokerReport, requestBrokerSync, requestOrphanCleanup } from './lib/agent-broker.js';
 import { recordLive, liveReport } from './lib/agent-live.js';
 import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
+import { ingestSinay, sinayReport, SINAY_KEY } from './lib/sinay.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
@@ -169,6 +170,17 @@ async function handle(req, env0, ctx){
     if (p1 === 'report' || !p1) return json(await aggrReport(db, ctx));
     if (p1 === 'run' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await runAggressive(ctx, { day: q.date || null, force: q.force === '1', reset: q.reset === '1' })); } catch (e) { await db.logError('aggressive', e.message); return err('מסלול אגרסיבי: ' + e.message, 500); } }
     if (p1 === 'execute' && req.method === 'POST'){ const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth(); try { return json(await executeAggressive(ctx, { force: q.force === '1' && !bySecret })); } catch (e) { await db.logError('aggressive-exec', e.message); return err('ביצוע אגרסיבי: ' + e.message, 500); } }
+    return err('not found', 404);
+  }
+  // ניסוי הדמה "ריזיקות עקרונות" (Issue #189): תצוגה בלבד. GET ציבורי = דוח לחשבון 200,000$; POST /sinay/ingest מה-workflow
+  // sinay-sync.yml עם סוד ה-cron — כתיבה ל-KV רק כשהמצב השתנה (lib/sinay.js). לא נוגע בשום מודל או מסלול קיים
+  if (r0 === 'sinay'){
+    if ((!p1 || p1 === 'report') && req.method === 'GET') return json(sinayReport(await db.get(SINAY_KEY)));
+    if (p1 === 'ingest' && req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      const len = +(req.headers.get('Content-Length') || 0);
+      try { return json(await ingestSinay(db, body, { bytes: len || null })); } catch (e) { if (!e.status) await db.logError('sinay', e.message); return err('ניסוי סיני: ' + e.message, e.status || 500); }
+    }
     return err('not found', 404);
   }
   // הסוכן האוטונומי הרב-נכסי (סימולציית IBKR, AI_COUNCIL#21): דוח ציבורי; ריצה/איפוס/kill עם סוד ה-cron או טוקן האפליקציה

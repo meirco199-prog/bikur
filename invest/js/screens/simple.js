@@ -8,11 +8,11 @@ import { lineChart } from '../ui/chart.js';
 let D = null; // נתונים משותפים לכל המסכים הפשוטים (מטמון קצר)
 async function load(){
   const yearAgo = new Date(Date.now() - 370 * 86400000).toISOString().slice(0, 10);
-  const [regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, agent] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null), api('/shadow/report', { ttl: 60000 }).catch(() => null), api('/aggressive/report', { ttl: 60000 }).catch(() => null), api('/prices/TA35.TA?from=' + yearAgo, { ttl: 300000 }).catch(() => null), api('/agent/report', { ttl: 30000 }).catch(() => null)]);
+  const [regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, agent, sinay] = await Promise.all([api('/regime', { ttl: 60000 }), api('/rank', { ttl: 60000 }), api('/watchlist', { ttl: 30000 }), api('/paper', { ttl: 30000 }), api('/reco', { ttl: 60000 }), api('/auto/status', { ttl: 30000 }).catch(() => null), api('/shadow/report', { ttl: 60000 }).catch(() => null), api('/aggressive/report', { ttl: 60000 }).catch(() => null), api('/prices/TA35.TA?from=' + yearAgo, { ttl: 300000 }).catch(() => null), api('/agent/report', { ttl: 30000 }).catch(() => null), api('/sinay', { ttl: 60000 }).catch(() => null)]);
   const table = rank?.table || [];
   const by = new Map(table.map((r) => [r.symbol, r]));
   const usdils = regime?.inputs?.usdils || reco?.usdils || 3.7;
-  return { regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, agent, table, by, usdils, size: settings.get().portfolioSize || 200000 };
+  return { regime, rank, watch, paper, reco, auto, shadow, aggr, ta35, agent, sinay, table, by, usdils, size: settings.get().portfolioSize || 200000 };
 }
 
 // --- מסך הבית בסגנון אפליקציית מסחר: כמה כסף, מה השתנה לפי תקופות, גרף ---
@@ -68,6 +68,15 @@ const agentBlock = () => {
   const badge = g.policy?.killSwitch ? '<span class="tag missing">⛔ נעצר</span>' : g.halted ? '<span class="tag stale">⏸ עצירה</span>' : '';
   return sec('🤖 הסוכן האוטונומי — סימולציית IBKR', hero(g.totalIls, t, t.na ? '' : 'בסגירת ' + fmt.date(g.day)) + `<div class="periods">${tile('היום', t)}${periodsOf(rows).map((x) => tile(x.label, x)).join('')}${tile('מההתחלה', { chg: g.pnlIls, pct: g.pnlPct })}</div><div id="eq-agent" style="margin-top:.8rem"></div>
     <div class="muted" style="font-size:.85rem;margin-top:.5rem">${badge} מינוף ×${fmt.num(g.leverage ?? 0, 2)} · ${pos.length} פוזיציות (${pos.filter((p) => p.side === 'short').length} שורט) · חשיפה: ${Object.entries(g.exposure?.byClass || {}).map(([k, v]) => `${({ stock: 'מניות', etf: 'ETF', crypto: 'קריפטו', fx: 'מט"ח', future: 'חוזים' })[k] || k} ${fmt.pct(v / (g.equityUsd || 1), 0)}`).join(' · ') || 'מזומן בלבד'} · ${pend.length} פקודות למחר${pend.length ? ': ' + pend.slice(0, 4).map((o) => `${o.side === 'short' ? 'שורט' : 'קנייה'} ${o.symbol}`).join(', ') : ''} · <a href="#/agent">הכול על הסוכן</a></div>`, 'לונג/שורט/מינוף · סימולציה');
+};
+// ניסוי סיני — דמה 200K$ (Issue #189): כרטיס קצר בבית, הפירוט ב-#/sinay
+const sinayBlock = () => {
+  const r = D.sinay; if (!r) return '';
+  const usd = (x) => (isNum(x) ? (x < 0 ? '-' : '') + '$' + Math.abs(x).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—');
+  if (r.waiting) return sec('🪙 ניסוי סיני — דמה 200K$', `<div class="empty">ממתין לסנכרון ראשון מהסימולציה. <a href="#/sinay">מה זה</a></div>`, 'סימולציה, בלי כסף אמיתי');
+  const s = r.stats || {};
+  return sec('🪙 ניסוי סיני — דמה 200K$', `<div class="hero"><div class="big">${usd(r.equityUsd)}</div><div class="sub ${cls(r.pnlUsd)}">${r.pnlUsd > 0 ? '+' : ''}${usd(r.pnlUsd)} (${fmt.pct(r.pnlPct, 2, true)}) <small>מאז ${esc(fmt.date(r.start))}</small></div></div>
+    <div class="muted" style="font-size:.85rem;margin-top:.5rem">${s.trades || 0} עסקאות סגורות מתוך ${s.target || 50}${isNum(s.winRate) ? ` · הצלחה ${fmt.pct(s.winRate, 0)}` : ''} · ${(r.openPositions || []).length} פתוחות · ${(r.setups || []).length} דשדושים במעקב${r.stale ? ' · <span class="tag stale">לא עודכן לאחרונה</span>' : ''} · <a href="#/sinay">כל התנועות</a></div>`, 'BTC/ETH/LTC/BCH · סימולציה בלבד');
 };
 const riskWord = (r) => ({ 'נמוך': 'סיכון נמוך', 'בינוני': 'סיכון בינוני', 'גבוה': 'סיכון גבוה' }[r?.riskLevel] || 'סיכון לא ידוע');
 const why = (r) => { // משפט אחד בעברית פשוטה
@@ -170,6 +179,7 @@ const VIEWS = {
     ${autoLine()}
     ${holdings()}
     ${a && !a.missing ? aggrBlock() : ''}
+    ${sinayBlock()}
     ${taCard()}
     ${sec('מצב השוק', mood())}
     ${sec('מה לעשות היום', (sells.length ? sells.map(sellCard).join('') : '') + (buys.length ? buys.slice(0, 3).map((r) => buyCard(r)).join('') + (buys.length > 3 ? `<a class="btn" href="#/buy">עוד ${buys.length - 3} הזדמנויות</a>` : '') : (sells.length ? '' : '<div class="empty">אין היום פעולה מומלצת. לפעמים לא לעשות כלום זו ההחלטה הנכונה.</div>')))}`;
