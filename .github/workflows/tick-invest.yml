@@ -189,7 +189,7 @@ jobs:
           echo "=== agent"; curl -sS --max-time 30 "$W/agent/report" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("missing:", d.get("reason")) if d.get("missing") else (print("day:", d.get("day"), "equity:", d.get("totalIls"), "₪ (", d.get("equityUsd"), "$) pnl:", d.get("pnlPct"), "day:", d.get("dayPnlUsd"), "$ leverage:", d.get("leverage"), "positions:", len(d.get("positions") or []), "kill:", d.get("policy",{}).get("killSwitch"), "halted:", d.get("halted")), print("exposure:", d.get("exposure",{}).get("byClass")), [print("  ", p["side"], p["qty"], "x", p["symbol"], "@", p["avg"], "→", p["price"], "pnl", p["pnlUsd"], "|", p["strategy"]) for p in (d.get("positions") or [])[:12]], print("pending:", [(o["side"], o["qty"], o["symbol"], o["strategy"]) for o in (d.get("pending") or {}).get("orders", [])]), print("opps:", (d.get("opportunities") or {}).get("summary"), "rejections:", len((d.get("opportunities") or {}).get("gateLog") or [])))' || echo "::warning::agent report failed"
           echo "=== cron status"; curl -sS --max-time 30 "$W/cron/status" | head -c 1500; echo
           echo "=== rank"; curl -sS --max-time 30 "$W/rank" | head -c 500; echo
-      # דוח תקינות יומי → תגובה ב-Issue #25 (AI Council). פעם ביום (לפי סמן <!-- health-report YYYY-MM-DD --> בתגובה האחרונה),
+      # דוח תקינות יומי → תגובה ב-Issue #25 (AI Council). פעם ביום (לפי סמן <!-- health-report YYYY-MM-DD --> בתגובה כלשהי מהיום),
       # או בכוח בפקודת ops "health-report". קריאה בלבד מה-API הציבורי; בלי סודות; בלי מודל
       - name: Daily health report → AI Council issue
         if: always()
@@ -202,8 +202,10 @@ jobs:
           CMD=$(cat .github/invest-ops/command 2>/dev/null | head -1 | cut -d" " -f1 || echo cron-run)
           [ "${{ github.event_name }}" = "push" ] || CMD=cron-run
           TODAY=$(date -u +%F)
-          LAST=$(gh api "repos/${{ github.repository }}/issues/$ISSUE/comments?per_page=100" --jq '[.[] | select(.body | startswith("<!-- health-report"))] | last | .body' 2>/dev/null | head -1 || true)
-          if [ "$CMD" != "health-report" ] && echo "$LAST" | grep -q "health-report $TODAY"; then echo "דוח התקינות של $TODAY כבר פורסם — מדלג"; exit 0; fi
+          # בדיקת כפילות: כל התגובות מהיום (since + --paginate). בלי paginate נקרא רק העמוד הראשון (100 התגובות הוותיקות ביותר),
+          # וב-Issue עם יותר מ-100 תגובות הדוח של היום לא נמצא אף פעם → דוח כפול בכל ריצה (ChatGPT, Issue #25, 2/11)
+          POSTED=$(gh api --paginate "repos/${{ github.repository }}/issues/$ISSUE/comments?since=${TODAY}T00:00:00Z&per_page=100" --jq ".[] | select(.body | startswith(\"<!-- health-report $TODAY -->\")) | .id" 2>/dev/null | head -1 || true)
+          if [ "$CMD" != "health-report" ] && [ -n "$POSTED" ]; then echo "דוח התקינות של $TODAY כבר פורסם (תגובה $POSTED) — מדלג"; exit 0; fi
           WORKER_URL="$W" RUN_URL="$RUN_URL" node invest-api/scripts/health-report.mjs > /tmp/health.md || { echo "::warning::health-report נכשל"; exit 0; }
           cat /tmp/health.md
           gh api "repos/${{ github.repository }}/issues/$ISSUE/comments" -f body="$(cat /tmp/health.md)" --silent && echo "פורסם ב-Issue #$ISSUE" || echo "::warning::פרסום הדוח ל-Issue נכשל (הרשאות?)"
