@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../worker.js';
-import { sendTelegram, send as sendAlert } from '../lib/alerts.js';
+import { sendTelegram, send as sendAlert, telegramVia, REMI_MAX } from '../lib/alerts.js';
 import { cleanText, NOTIFY_MAX, NOTIFY_PREFIX, NOTIFY_DEDUPE_TTL } from '../lib/notify.js';
 import { MARKER, isTrustedNotifyComment, extractText, postNotify } from '../scripts/notify-meir.mjs';
 
@@ -121,4 +121,51 @@ test('notify-meir.mjs: postNotify שולח {text} עם הסוד ומחזיר א�
   assert.equal(calls[0].url, 'https://w.test/notify?secret=a%20b');
   assert.deepEqual(JSON.parse(calls[0].opts.body), { text: 'שלום' });
   await assert.rejects(postNotify({ workerUrl: 'https://w.test', secret: 's', text: 'x', fetchImpl: async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }) }), /notify 401: unauthorized/);
+});
+
+// מסלול העוזר האישי: בלי TELEGRAM_* אבל עם service binding בשם REMI → POST https://remi-internal/notify
+function mkRemi(handler = () => new Response(JSON.stringify({ ok: true }), { status: 200 })){
+  const calls = [];
+  return { calls, REMI: { fetch: async (url, opts) => { calls.push({ url: String(url), opts }); return handler(String(url), opts); } } };
+}
+
+test('sendTelegram: בלי TELEGRAM_* ועם REMI — נשלח דרך רמי (plain, בלי fetch ציבורי); TELEGRAM_* גובר', async () => {
+  const remi = mkRemi();
+  await withFetch(okTg, async (calls) => {
+    assert.equal(telegramVia({ REMI: remi.REMI }), 'remi');
+    assert.equal(await sendTelegram({ REMI: remi.REMI }, 'שלום'), 'ok');
+    assert.equal(remi.calls.length, 1);
+    assert.equal(remi.calls[0].url, 'https://remi-internal/notify');
+    assert.equal(remi.calls[0].opts.method, 'POST');
+    assert.deepEqual(JSON.parse(remi.calls[0].opts.body), { text: 'שלום', plain: true });
+    await sendTelegram({ REMI: remi.REMI }, 'x'.repeat(REMI_MAX + 50));
+    assert.equal(JSON.parse(remi.calls[1].opts.body).text.length, REMI_MAX, 'נחתך לתקרה של רמי');
+    assert.equal(calls.length, 0, 'אין קריאה ישירה ל-api.telegram.org');
+    assert.equal(telegramVia({ ...TG, REMI: remi.REMI }), 'direct');
+    assert.equal(await sendTelegram({ ...TG, REMI: remi.REMI }, 'y'), 'ok');
+    assert.equal(calls.length, 1); assert.equal(remi.calls.length, 2, 'TELEGRAM_* מוגדרים → רמי לא נקרא');
+  });
+  assert.equal(telegramVia({ REMI: {} }), null, 'binding בלי fetch לא נחשב');
+});
+
+test('sendTelegram דרך רמי: no_owner / שגיאת רשת → error …', async () => {
+  const noOwner = mkRemi(() => new Response(JSON.stringify({ error: 'no_owner' }), { status: 503 }));
+  assert.equal(await sendTelegram({ REMI: noOwner.REMI }, 'x'), 'error 503 no_owner');
+  const broken = mkRemi(() => { throw new Error('service unavailable'); });
+  assert.equal(await sendTelegram({ REMI: broken.REMI }, 'x'), 'error remi: service unavailable');
+});
+
+test('POST /notify ו-/health דרך רמי: telegram ok, כותרת אחת בלבד, health מדווח telegramVia=remi; ההתראות עוברות דרך רמי', async () => {
+  const remi = mkRemi();
+  const { env } = mkEnv({ REMI: remi.REMI });
+  const r = await (await req(env, '/notify?secret=s3', { text: 'בדיקה: ערוץ ההתראות הישיר מ-Claude לטלגרם עובד ✅' })).json();
+  assert.deepEqual(r, { ok: true, telegram: 'ok' });
+  assert.deepEqual(JSON.parse(remi.calls[0].opts.body), { text: NOTIFY_PREFIX + 'בדיקה: ערוץ ההתראות הישיר מ-Claude לטלגרם עובד ✅', plain: true });
+  const h = await (await req(env, '/health', undefined, 'GET')).json();
+  assert.equal(h.alerts.telegram, true); assert.equal(h.alerts.telegramVia, 'remi');
+  const h0 = await (await req(mkEnv().env, '/health', undefined, 'GET')).json();
+  assert.equal(h0.alerts.telegram, false); assert.equal(h0.alerts.telegramVia, null);
+  const alert = { ts: '2026-11-03T06:00:00.000Z', symbol: 'TEST', type: 'test', label: 'בדיקה', what: 'w', why: 'y', changed: 'c' };
+  assert.deepEqual(await sendAlert({ env: { REMI: remi.REMI } }, alert, ['telegram']), { browser: 'stored', telegram: 'ok' });
+  assert.ok(JSON.parse(remi.calls[1].opts.body).text.startsWith('🔔 בדיקה — TEST'));
 });
