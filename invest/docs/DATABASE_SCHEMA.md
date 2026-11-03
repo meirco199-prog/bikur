@@ -45,6 +45,7 @@
 | `user:watchlist` | `[{symbol, addedAt, note, tags[]}]` |
 | `user:alerts:rules` | `[{id, symbol|'*', type, params, channels[], cooldownH, enabled, createdAt}]` |
 | `alerts:state:{dedupKey}` | `{lastSentAt}` — למניעת spam (TTL = cooldown) |
+| `notify:dedupe:{sha256}` | `{at}` — ערוץ ההודעות הישיר לטלגרם (`POST /notify`, Issue #196): אותו טקסט בתוך 10 דקות לא נשלח שוב (TTL 600 שניות; נכתב רק אחרי שליחה מוצלחת, `lib/notify.js`) |
 | `paper:trades` | `[{id, symbol, side, qty, price, date, reason, signalAtEntry, snapDate, exitPrice?, exitDate?, exitReason?, pnl?, pnlPct?}]` |
 | `paper:equity` | `[[date, equity, benchmark]…]` — עקומת הון יומית (append ב-cron) |
 

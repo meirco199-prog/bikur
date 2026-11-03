@@ -72,16 +72,22 @@ export function formatAlert(a){
   return `🔔 ${a.label || a.type} — ${a.symbol}\n\nמה קרה: ${a.what}\n\nלמה זה חשוב: ${a.why}\n\nמה השתנה: ${a.changed}\n\n(${a.ts.slice(0, 16).replace('T', ' ')} UTC · MODEL SIGNAL, לא ייעוץ)`;
 }
 
+// שליחה לצ'אט הטלגרם של בעל הריפו — משותף להתראות ול-POST /notify (lib/notify.js). מחזיר 'ok' / 'error …' / 'not_configured'.
+// הטוקן לעולם לא נכלל בערך המוחזר (הודעת שגיאה של fetch עלולה להכיל את ה-URL — הטוקן מוחלף ב-***).
+export async function sendTelegram(env, text){
+  if (!(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID)) return 'not_configured';
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }) });
+    return r.ok ? 'ok' : `error ${r.status}`;
+  } catch (e) { return 'error ' + String(e?.message || e).split(String(env.TELEGRAM_BOT_TOKEN)).join('***'); }
+}
+
 export async function send(ctx, alert, channels){
   const res = { browser: 'stored' };
   const text = formatAlert(alert);
   if (channels.includes('telegram')){
-    if (ctx.env.TELEGRAM_BOT_TOKEN && ctx.env.TELEGRAM_CHAT_ID){
-      try {
-        const r = await fetch(`https://api.telegram.org/bot${ctx.env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: ctx.env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }) });
-        res.telegram = r.ok ? 'ok' : `error ${r.status}`;
-      } catch (e) { res.telegram = 'error ' + e.message; }
-    } else res.telegram = 'לא מוגדר (TELEGRAM_BOT_TOKEN/CHAT_ID)';
+    const t = await sendTelegram(ctx.env, text);
+    res.telegram = t === 'not_configured' ? 'לא מוגדר (TELEGRAM_BOT_TOKEN/CHAT_ID)' : t;
   }
   if (channels.includes('email')){
     if (ctx.env.RESEND_KEY && ctx.env.ALERT_EMAIL){

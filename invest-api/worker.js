@@ -15,6 +15,7 @@ import { brokerPending, recordBroker, brokerReport, requestBrokerSync, requestOr
 import { recordLive, liveReport } from './lib/agent-live.js';
 import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
 import { ingestSinay, sinayReport, SINAY_KEY } from './lib/sinay.js';
+import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
 import { getSnap, listSnaps, putSnapsBatch } from './lib/snapstore.js';
@@ -182,6 +183,12 @@ async function handle(req, env0, ctx){
       try { return json(await ingestSinay(db, body, { bytes: len || null })); } catch (e) { if (!e.status) await db.logError('sinay', e.message); return err('ניסוי סיני: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
+  }
+  // ערוץ ישיר מ-Claude לטלגרם של בעל הריפו (Issue #196, workflow notify-meir.yml): סוד ה-cron או טוקן האפליקציה; lib/notify.js
+  if (r0 === 'notify' && !p1){
+    if (req.method !== 'POST') return err('POST בלבד', 405);
+    const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+    try { return json(await notifyOwner(ctx, body)); } catch (e) { if (!e.status) await db.logError('notify', e.message); return err('notify: ' + e.message, e.status || 500); }
   }
   // הסוכן האוטונומי הרב-נכסי (סימולציית IBKR, AI_COUNCIL#21): דוח ציבורי; ריצה/איפוס/kill עם סוד ה-cron או טוקן האפליקציה
   if (r0 === 'agent'){
