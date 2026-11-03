@@ -1,0 +1,52 @@
+# ערוץ ישיר מ-Claude (ומה-Routines המתוזמנות) לצ'אט הטלגרם של מאיר — בלי יומן ובלי ש-Claude מחזיק סוד. חוזה: Issue #196.
+# Claude כותב תגובה ב-Issue #196 שמתחילה בדיוק ב-<!-- notify-meir -->; כאן: מוודאים שהכותב הוא בעל הריפו, מחלצים את הטקסט
+# (בלי חתימת Claude Code) ושולחים ל-POST /notify ב-invest-api עם CRON_SECRET (כמו sinay-sync.yml). ה-Worker שולח לטלגרם
+# (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID של ה-Worker). תוכן התגובה לא מוזרק ל-shell — node קורא אותו מקובץ האירוע.
+# בדיקה ידנית: Run workflow עם text. התוצאה ב-log: "telegram: ok" / "not_configured" / "error …" (שני האחרונים → ריצה אדומה).
+name: Notify Meir (Telegram)
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      text:
+        description: 'טקסט ההודעה (עד 1500 תווים)'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify-meir
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    # אירוע תגובה: רק Issue #196 (לא PR), רק מבעל הריפו, רק עם הסמן בתחילת התגובה (הסקריפט בודק שוב)
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        github.event.issue.number == 196 &&
+        !github.event.issue.pull_request &&
+        github.event.comment.user.login == github.repository_owner &&
+        github.event.comment.author_association == 'OWNER' &&
+        startsWith(github.event.comment.body, '<!-- notify-meir -->')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: invest-api/scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Send to Telegram via invest-api /notify
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          WORKER_URL: https://invest-api.meirco199.workers.dev
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          TEXT: ${{ inputs.text }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::error::חסר הסוד CRON_SECRET בהגדרות הריפו (Settings → Secrets and variables → Actions)"; exit 1; fi
+          node invest-api/scripts/notify-meir.mjs
