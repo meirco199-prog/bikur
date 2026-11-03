@@ -5,7 +5,7 @@ import { resolveEnv, keysStatus, setKey, isAuthed } from './lib/keys.js';
 import { Budget } from './lib/budget.js';
 import { providerStatus } from './providers/registry.js';
 import { PaperBroker } from './lib/broker.js';
-import { evaluateAlerts, ALERT_TYPES, send as sendAlert } from './lib/alerts.js';
+import { evaluateAlerts, ALERT_TYPES, send as sendAlert, telegramVia } from './lib/alerts.js';
 import { ask } from './lib/ai.js';
 import { runAutopilot, autoStatus } from './lib/autopilot.js';
 import { runShadow, shadowReport } from './lib/shadow.js';
@@ -152,7 +152,7 @@ async function handle(req, env0, ctx){
     const budget = await ctx.budget.status();
     const cron = await db.get('cron:state');
     const errors = await db.recentErrors(10);
-    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : env.APP_TOKEN_SHA256 ? 'token' : 'OPEN (הגדר APP_TOKEN!)', keys: await keysStatus(env0, db), ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', kvWriteLimitHit, alerts: { telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors });
+    return json({ ok: true, version: VERSION, time: new Date().toISOString(), providers: providerStatus(env), budget, cron, snapshotDays: ((await db.get('idx:snapdays')) || []).slice(-5), auth: env.APP_TOKEN ? 'token' : env.APP_TOKEN_SHA256 ? 'token' : 'OPEN (הגדר APP_TOKEN!)', keys: await keysStatus(env0, db), ai: env.ANTHROPIC_API_KEY ? 'anthropic' : env.AI ? 'workers-ai' : 'none', kv: env.INVEST ? 'bound' : 'MISSING', kvWriteLimitHit, alerts: { telegram: !!telegramVia(env), telegramVia: telegramVia(env), email: !!(env.RESEND_KEY && env.ALERT_EMAIL) }, recentErrors: errors });
   }
   if (r0 === 'keys'){
     needAuth();

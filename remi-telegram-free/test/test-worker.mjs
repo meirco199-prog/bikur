@@ -1528,5 +1528,31 @@ console.log('חיבור CRM של הביטוח:');
   check('קוד קצר מדי נדחה', m.text.includes('לא נראה תקין'), m.text);
 }
 
+console.log('\nשער פנימי — POST /notify (הודעה מ-Claude לבעלים, service binding בלבד):');
+{
+  const call = (body, host = 'remi-internal', e = env, method = 'POST') => worker.fetch(new Request(`https://${host}/notify`, {
+    method, headers: { 'Content-Type': 'application/json' }, body: method === 'POST' ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+  }), e);
+  const owner = JSON.parse(kv.get('store')).ownerChatId;
+  let n0 = sent.length;
+  let r = await call({ text: '  בדיקה\r\nשורה\u0007  ' });
+  let m = sent[sent.length - 1];
+  check('נשלח לצ\'אט הבעלים עם כותרת, טקסט מנוקה', r.status === 200 && (await r.json()).ok === true && sent.length === n0 + 1 && m.chat_id === owner && m.text === '🤖 הודעה מ-Claude\n\nבדיקה\nשורה', JSON.stringify(m));
+  r = await call({ text: '🔔 התראה מעוצבת', plain: true });
+  check('plain=true — בלי כותרת נוספת', r.status === 200 && sent[sent.length - 1].text === '🔔 התראה מעוצבת', sent[sent.length - 1].text);
+  n0 = sent.length;
+  const bad = [];
+  for (const b of [{}, { text: 5 }, { text: '   ' }, { text: 'a'.repeat(4001) }, 'not json']) bad.push((await call(b)).status);
+  check('גוף לא תקין → 400 בלי שליחה', bad.every(s => s === 400) && sent.length === n0, bad.join(','));
+  r = await call({ text: 'x' }, 'remi-internal', env, 'GET');
+  check('GET לא מקבל', r.status === 404 && sent.length === n0);
+  r = await call({ text: 'מבחוץ' }, 'remi.example.workers.dev');
+  check('מהדומיין הציבורי אין /notify', !sent.slice(n0).some(x => x.text && x.text.includes('מבחוץ')), String(r.status));
+  const kv2 = new Map();
+  const env2 = { ...env, DATA: { get: async k => kv2.get(k) ?? null, put: async (k, v) => { kv2.set(k, v); } } };
+  r = await call({ text: 'x' }, 'remi-internal', env2);
+  check('בלי בעלים → 503 no_owner', r.status === 503 && (await r.json()).error === 'no_owner' && sent.length === n0);
+}
+
 console.log(`\n${passed} עברו, ${failed} נכשלו`);
 process.exit(failed ? 1 : 0);

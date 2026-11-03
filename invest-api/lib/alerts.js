@@ -73,9 +73,24 @@ export function formatAlert(a){
 }
 
 // שליחה לצ'אט הטלגרם של בעל הריפו — משותף להתראות ול-POST /notify (lib/notify.js). מחזיר 'ok' / 'error …' / 'not_configured'.
+// שני מסלולים: (1) TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID של ה-Worker — כמו תמיד; (2) אחרת, service binding בשם REMI (ה-Worker
+// של העוזר האישי, remi-telegram-free) → POST https://remi-internal/notify — רמי שולח לצ'אט הבעלים עם הטוקן שלו, כך שאין סוד
+// טלגרם נוסף בשום מקום. plain=true: הטקסט כבר מעוצב כאן, רמי לא מוסיף כותרת.
 // הטוקן לעולם לא נכלל בערך המוחזר (הודעת שגיאה של fetch עלולה להכיל את ה-URL — הטוקן מוחלף ב-***).
+export const telegramVia = (env) => (env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID ? 'direct' : typeof env?.REMI?.fetch === 'function' ? 'remi' : null);
+export const REMI_MAX = 4000;
+
 export async function sendTelegram(env, text){
-  if (!(env?.TELEGRAM_BOT_TOKEN && env?.TELEGRAM_CHAT_ID)) return 'not_configured';
+  const via = telegramVia(env);
+  if (!via) return 'not_configured';
+  if (via === 'remi'){
+    try {
+      const r = await env.REMI.fetch('https://remi-internal/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: String(text).slice(0, REMI_MAX), plain: true }) });
+      if (r.ok) return 'ok';
+      const j = await r.json().catch(() => ({}));
+      return `error ${r.status}${typeof j.error === 'string' ? ' ' + j.error.slice(0, 60) : ''}`;
+    } catch (e) { return 'error remi: ' + String(e?.message || e).slice(0, 200); }
+  }
   try {
     const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }) });
     return r.ok ? 'ok' : `error ${r.status}`;

@@ -2538,6 +2538,21 @@ export default {
     if (url.hostname === 'remi-internal') {
       const jsonResp = (obj, status = 200) =>
         new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
+      // הודעה ישירה מ-Claude לבעלים (invest-api → POST /notify, Issue #196 בריפו): נשלחת לצ'אט הבעלים בטלגרם עם הטוקן של רמי,
+      // כך שאין צורך בסוד טלגרם נוסף בשום מקום. בלי בעלים (/start עוד לא נשלח) — 503 no_owner.
+      // גוף: {text, plain?}. עד 4000 תווים (מתחת לתקרה של טלגרם, 4096) — invest-api עצמו מגביל את /notify ל-1500 ומוסיף כותרת;
+      // plain=true = הטקסט כבר מעוצב אצל השולח (התראות/notify של invest-api) ולא מוסיפים לו כותרת שנייה
+      if (url.pathname === '/notify' && request.method === 'POST') {
+        let body;
+        try { body = await request.json(); } catch { body = null; }
+        if (!body || typeof body.text !== 'string' || body.text.length > 4000) return jsonResp({ error: 'bad_request' }, 400);
+        const text = body.text.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g, '').trim();
+        if (!text) return jsonResp({ error: 'bad_request' }, 400);
+        const S = await loadStore(env, { history: false });
+        if (S.ownerChatId === null || S.ownerChatId === undefined) return jsonResp({ error: 'no_owner' }, 503);
+        const ok = await tgSend(env, S.ownerChatId, body.plain === true ? text : '🤖 הודעה מ-Claude\n\n' + text);
+        return ok ? jsonResp({ ok: true }) : jsonResp({ error: 'telegram_failed' }, 502);
+      }
       if (url.pathname !== '/claude' || request.method !== 'POST') return jsonResp({ error: 'not_found' }, 404);
       if (!env.ANTHROPIC_API_KEY) return jsonResp({ error: 'no_key' }, 503);
       let body;

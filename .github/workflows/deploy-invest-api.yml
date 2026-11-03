@@ -86,7 +86,10 @@ jobs:
             "compatibility_date": "2025-01-01",
             "bindings": [
               {"type": "kv_namespace", "name": "INVEST", "namespace_id": sys.argv[1]},
-              {"type": "ai", "name": "AI"}
+              {"type": "ai", "name": "AI"},
+              # העוזר האישי (Worker בשם remi): שער פנימי https://remi-internal/notify — ערוץ הטלגרם לבעל הריפו בלי סוד טלגרם
+              # נוסף (lib/alerts.js → sendTelegram; Issue #196). אותו binding כמו ב-deploy-food.yml
+              {"type": "service", "name": "REMI", "service": "remi", "environment": "production"}
             ] + plain,
             "keep_bindings": ["secret_text"]
           }))

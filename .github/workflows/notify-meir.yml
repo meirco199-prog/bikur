@@ -1,7 +1,7 @@
 # ערוץ ישיר מ-Claude (ומה-Routines המתוזמנות) לצ'אט הטלגרם של מאיר — בלי יומן ובלי ש-Claude מחזיק סוד. חוזה: Issue #196.
 # Claude כותב תגובה ב-Issue #196 שמתחילה בדיוק ב-<!-- notify-meir -->; כאן: מוודאים שהכותב הוא בעל הריפו, מחלצים את הטקסט
 # (בלי חתימת Claude Code) ושולחים ל-POST /notify ב-invest-api עם CRON_SECRET (כמו sinay-sync.yml). ה-Worker שולח לטלגרם
-# (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID של ה-Worker). תוכן התגובה לא מוזרק ל-shell — node קורא אותו מקובץ האירוע.
+# (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID של ה-Worker אם הוגדרו, אחרת דרך העוזר האישי — service binding REMI → remi-internal/notify). תוכן התגובה לא מוזרק ל-shell — node קורא אותו מקובץ האירוע.
 # בדיקה ידנית: Run workflow עם text. התוצאה ב-log: "telegram: ok" / "not_configured" / "error …" (שני האחרונים → ריצה אדומה).
 name: Notify Meir (Telegram)
 
