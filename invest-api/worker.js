@@ -15,6 +15,7 @@ import { brokerPending, recordBroker, brokerReport, requestBrokerSync, requestOr
 import { recordLive, liveReport } from './lib/agent-live.js';
 import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
 import { ingestSinay, sinayReport, SINAY_KEY } from './lib/sinay.js';
+import { runSinayLive } from './lib/sinay-live.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -181,6 +182,11 @@ async function handle(req, env0, ctx){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       const len = +(req.headers.get('Content-Length') || 0);
       try { return json(await ingestSinay(db, body, { bytes: len || null })); } catch (e) { if (!e.status) await db.logError('sinay', e.message); return err('ניסוי סיני: ' + e.message, e.status || 500); }
+    }
+    // הרצה ידנית של מנוע הדמה החי (lib/sinay-live.js) — ה-cron מריץ אותו לבד כל 5 דקות (בפועל מעבד רק כשנסגר נר חדש)
+    if (p1 === 'run' && req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      try { return json(await runSinayLive(ctx, { force: q.force === '1', notify: q.notify !== '0' })); } catch (e) { await db.logError('sinay-live', e.message); return err('דמה קריפטו: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }
@@ -754,6 +760,8 @@ export default {
   },
   async scheduled(event, env, ec){
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
+    // דמה קריפטו בזמן אמת — ראשון ובנפרד, כדי שתקלה בעיבוד המניות לא תעכב התראה (lib/sinay-live.js)
+    try { await runSinayLive(ctx); } catch (e) { await ctx.db.logError('sinay-live', e.message); }
     try {
       const r = await cronStep(ctx);
       if (r?.finalized){ try { await runShadow(ctx); await runAggressive(ctx); await runTracksDecide(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); }

@@ -1,8 +1,11 @@
 // ניסוי הדמה "ריזיקות עקרונות" (amit.sinay, Issue #189) — מסלול תצוגה בלבד.
-// הסימולציה עצמה רצה מחוץ לריפו (משימה מתוזמנת כל 6 שעות) ומפרסמת את מצבה המלא כבלוק JSON בתגובה ב-Issue #189.
+// מ-5/11/2026 המנוע עצמו רץ בתוך ה-Worker כל 15 דקות (lib/sinay-live.js + engine/sinay-rules.js) וכותב לאותו מפתח.
+// עד אז: הסימולציה רצה מחוץ לריפו (משימה מתוזמנת כל 6 שעות) ופרסמה את מצבה המלא כבלוק JSON בתגובה ב-Issue #189.
 // .github/workflows/sinay-sync.yml קורא את התגובה ושולח אותה ל-POST /sinay/ingest; כאן: אימות קפדני, שמירה ב-KV רק כשהתוכן
 // השתנה (hash — מכסת הכתיבות של KV), ודוח לחשבון דמה של 200,000$ (ארבעה מטבעות × 50,000$, בלי מינוף, כניסה בשלישים).
 // לא משנה שום מודל, כלל, יקום או מסלול קיים. אין כאן פקודות, ואין קשר לברוקר.
+
+import { sideLevels, LIFE_BARS } from '../engine/sinay-rules.js';
 
 export const SINAY_KEY = 'sinay:state';
 export const SINAY_ISSUE_URL = 'https://github.com/meirco199-prog/bikur/issues/189';
@@ -11,7 +14,8 @@ export const ACCOUNT_USD = 200000;
 export const SLOT_USD = ACCOUNT_USD / COINS.length; // 50,000$ לכל מטבע
 export const FEE = 0.0005; // 0.05% לכל צד (כלל 8 ב-Issue #189)
 export const MAX_BYTES = 256 * 1024;
-const MAX_TRADES = 2000, MAX_HIST = 400, STALE_H = 13; // המשימה רצה כל 6 שעות; יותר מ-13 שעות בלי עדכון = "ישן"
+const MAX_TRADES = 2000, MAX_HIST = 400, STALE_H = 13; // המשימה החיצונית רצה כל 6 שעות; יותר מ-13 שעות בלי עדכון = "ישן"
+const STALE_H_LIVE = 1.25; // המנוע ב-Worker מעבד כל נר של 15 דקות; last_t = תחילת הנר האחרון → יותר משעה ורבע = תקלה
 // אמצע "הטווח הטבעי" לכל מטבע (כלל 1): BTC 1.2–2.0, ETH 1.5–2.5, LTC/BCH 1.8–3.0 — רמת הכניסה הראשונה (כלל 3)
 export const NATURAL_RANGE = { BTC: [0.012, 0.020], ETH: [0.015, 0.025], LTC: [0.018, 0.030], BCH: [0.018, 0.030] };
 const WHY = ['סטופ', 'יעד EMA50', 'זמן (24 שעות)'];
@@ -106,6 +110,8 @@ export async function ingestSinay(db, body, { bytes = null, now = new Date() } =
   if (body.commentUpdatedAt !== undefined){ if (!isIso(body.commentUpdatedAt)) fail('commentUpdatedAt'); source.commentUpdatedAt = body.commentUpdatedAt; }
   const hash = await sha256(JSON.stringify(state));
   const prev = await db.get(SINAY_KEY);
+  // מאז שהמנוע רץ בתוך ה-Worker (lib/sinay-live.js) הוא מקור האמת — תגובה ישנה ב-Issue #189 לא דורסת אותו
+  if (prev?.source?.engine === 'worker') return { ok: true, changed: false, ignored: true, reason: 'המנוע רץ ב-Worker (sinay-live)', trades: prev.state?.trades?.length ?? 0, feed: prev.source.feed || null, lastRunAt: prev.source.lastRunAt || null };
   if (prev?.hash === hash) return { ok: true, changed: false, hash, trades: state.trades.length };
   await db.put(SINAY_KEY, { hash, receivedAt: now.toISOString(), source, state });
   return { ok: true, changed: true, hash, trades: state.trades.length };
@@ -139,7 +145,7 @@ export function realizedCurve(start, trades, slot = SLOT_USD, base = ACCOUNT_USD
 
 // הדוח לחשבון של 200,000$: פונקציה טהורה של המצב השמור
 export function sinayReport(stored, { now = new Date() } = {}){
-  const base = { track: 'sinay', title: 'ניסוי סיני — דמה 200K$', accountUsd: ACCOUNT_USD, slotUsd: SLOT_USD, coins: COINS, feePerSide: FEE, issueUrl: SINAY_ISSUE_URL, paper: true, disclaimer: 'סימולציה בלבד — בלי כסף אמיתי. הכללים קפואים (Issue #189).' };
+  const base = { track: 'sinay', title: 'קריפטו — דמה 200K$', accountUsd: ACCOUNT_USD, slotUsd: SLOT_USD, coins: COINS, feePerSide: FEE, issueUrl: SINAY_ISSUE_URL, paper: true, disclaimer: 'סימולציה בלבד — בלי כסף אמיתי. הכללים קפואים (Issue #189).' };
   if (!stored?.state) return { ...base, missing: true, waiting: true, note: 'ממתין לסנכרון ראשון מ-Issue #189', equityUsd: ACCOUNT_USD, pnlUsd: 0, pnlPct: 0, trades: [], openPositions: [], setups: [], equityCurve: [] };
   const s = stored.state;
   const trades = s.trades.map((t) => ({ ...t, usdScaled: r2(t.net_pct / 100 * SLOT_USD) }));
@@ -156,6 +162,11 @@ export function sinayReport(stored, { now = new Date() } = {}){
     perCoin[sym] = { trades: ct.length, pnlUsd: r2(ct.reduce((x, t) => x + t.usdScaled, 0)), wins: ct.filter((t) => t.net_pct > 0).length };
     if (!c) continue;
     lastUpdate = later(lastUpdate, later(c.last_t, c.mark?.[0] || null));
+    // מצב המטבע במילים פשוטות למסך: בפוזיציה / דשדוש פעיל (מחכה לנגיעה) / מחכה לדשדוש (כמה רחב הטווח של 12 השעות האחרונות)
+    const w = c.hist.length ? (Math.max(...c.hist.map((b) => b[0])) / Math.min(...c.hist.map((b) => b[1])) - 1) : null;
+    perCoin[sym].status = c.pos ? 'position' : c.setup ? 'setup' : 'waiting';
+    perCoin[sym].mark = c.mark?.[1] ?? null; perCoin[sym].markAt = c.mark?.[0] || null;
+    perCoin[sym].range12h = isNum(w) ? r4(w) : null; perCoin[sym].rangeNeeded = NATURAL_RANGE[sym][0];
     if (c.pos){
       const p = c.pos, markPx = c.mark?.[1] ?? null;
       const u = unrealized(p, markPx);
@@ -165,14 +176,17 @@ export function sinayReport(stored, { now = new Date() } = {}){
       openPositions.push({ sym, side: p.side, filledThirds: p.fills.length, fills: p.fills, levels: p.lv, avg: isNum(avg) ? r4(avg) : null, stop: p.stop, ema: c.ema, start: p.start, ageBars: p.age, mark: markPx, markAt: c.mark?.[0] || null, unrealizedUsd: r2(u), notionalUsd: r2(SLOT_USD / 3 * p.fills.length) });
     } else if (c.setup){
       const [rLo, rHi] = NATURAL_RANGE[sym], mid = (rLo + rHi) / 2;
-      setups.push({ sym, hi: c.setup.hi, lo: c.setup.lo, ageBars: c.setup.age, widthPct: r4(c.setup.hi / c.setup.lo - 1), nextShort: r4(c.setup.hi * (1 + mid)), nextLong: r4(c.setup.lo * (1 - mid)), naturalRange: [rLo, rHi], mark: c.mark?.[1] ?? null });
+      const S = sideLevels(sym, c.setup.hi, 1), L = sideLevels(sym, c.setup.lo, -1);
+      setups.push({ sym, hi: c.setup.hi, lo: c.setup.lo, ageBars: c.setup.age, barsLeft: Math.max(0, LIFE_BARS + 1 - c.setup.age), widthPct: r4(c.setup.hi / c.setup.lo - 1), nextShort: r4(c.setup.hi * (1 + mid)), nextLong: r4(c.setup.lo * (1 - mid)), shortLevels: S.lv.map(r4), shortStop: r4(S.stop), longLevels: L.lv.map(r4), longStop: r4(L.stop), naturalRange: [rLo, rHi], mark: c.mark?.[1] ?? null });
     }
   }
   const equity = ACCOUNT_USD + realized + unreal;
   const ageH = lastUpdate ? (now.getTime() - Date.parse(lastUpdate)) / 3600e3 : null;
+  const live = stored.source?.engine === 'worker';
   return {
     ...base,
-    start: s.start, lastUpdate, receivedAt: stored.receivedAt || null, stale: isNum(ageH) && ageH > STALE_H, ageHours: isNum(ageH) ? r2(ageH) : null,
+    engine: live ? 'worker' : 'external', feed: stored.source?.feed || (live ? null : 'ibkr-paxos'), lastRunAt: stored.source?.lastRunAt || null, updateEvery: live ? '15 דקות' : '6 שעות',
+    start: s.start, lastUpdate, receivedAt: stored.receivedAt || null, stale: isNum(ageH) && ageH > (live ? STALE_H_LIVE : STALE_H), ageHours: isNum(ageH) ? r2(ageH) : null,
     equityUsd: r2(equity), pnlUsd: r2(equity - ACCOUNT_USD), pnlPct: r4((equity - ACCOUNT_USD) / ACCOUNT_USD),
     realizedUsd: r2(realized), unrealizedUsd: r2(unreal),
     stats: { trades: trades.length, wins: wins.length, losses: losses.length, winRate: trades.length ? r4(wins.length / trades.length) : null, avgWinUsd: r2(mean(wins.map((t) => t.usdScaled))), avgLossUsd: r2(mean(losses.map((t) => t.usdScaled))), maxDrawdown: curve.maxDrawdown, maxDrawdownUsd: curve.maxDrawdownUsd, target: 50 },
