@@ -5,19 +5,19 @@ import { $, esc, debounce } from './core/util.js';
 import { pollAlerts } from './screens/alerts.js';
 
 const ROUTES = {
-  '': () => import('./screens/simple.js'), today: () => import('./screens/simple.js'), buy: () => import('./screens/simple.js'), sell: () => import('./screens/simple.js'), mine: () => import('./screens/simple.js'), pro: () => import('./screens/simple.js'), more: () => import('./screens/more.js'), explain: () => import('./screens/explain.js'), dashboard: () => import('./screens/dashboard.js'), search: () => import('./screens/search.js'), asset: () => import('./screens/asset.js'), watchlist: () => import('./screens/watchlist.js'),
+  '': () => import('./screens/sinay.js'), crypto: () => import('./screens/sinay.js'), today: () => import('./screens/simple.js'), buy: () => import('./screens/simple.js'), sell: () => import('./screens/simple.js'), mine: () => import('./screens/simple.js'), pro: () => import('./screens/simple.js'), more: () => import('./screens/more.js'), explain: () => import('./screens/explain.js'), dashboard: () => import('./screens/dashboard.js'), search: () => import('./screens/search.js'), asset: () => import('./screens/asset.js'), watchlist: () => import('./screens/watchlist.js'),
   opportunities: () => import('./screens/opportunities.js'), portfolio: () => import('./screens/portfolio.js'), signals: () => import('./screens/signals.js'), regime: () => import('./screens/regime.js'), backtest: () => import('./screens/backtest.js'),
   agent: () => import('./screens/agent.js'), asof: () => import('./screens/asof.js'), paper: () => import('./screens/paper.js'), alerts: () => import('./screens/alerts.js'), assistant: () => import('./screens/assistant.js'), settings: () => import('./screens/settings.js'), tracks: () => import('./screens/tracks.js'), sinay: () => import('./screens/sinay.js'),
 };
-const NAV = [['', '🏠 היום'], ['agent', '🤖 הסוכן האוטונומי'], ['buy', '🟢 לקנות'], ['sell', '🔴 למכור'], ['mine', '💼 התיק שלי'], ['more', '⋯ עוד'], ['sep', 'עוד'], ['search', '🔍 חיפוש'], ['watchlist', '⭐ מעקב'], ['explain', '📖 איך זה עובד'], ['assistant', '🤖 שאל את המערכת'], ['settings', '⚙️ הגדרות'], ['sep', 'מקצועי'], ['pro', '🔬 פירוט המסלולים'], ['dashboard', '📊 תמונת מצב מלאה'], ['opportunities', '🎯 הזדמנויות'], ['signals', '🚦 סיגנלים'], ['portfolio', '📐 בניית תיק'], ['regime', '🌡️ מצב השוק'], ['backtest', '🧪 בדיקה היסטורית'], ['asof', '⏳ מסע בזמן'], ['paper', '🧾 תיק וירטואלי'], ['tracks', '🧪 השוואת מסלולים'], ['sinay', '🪙 ניסוי סיני — דמה 200K$'], ['alerts', '🔔 התראות']];
-const BOTTOM = [['', '🏠', 'היום'], ['agent', '🤖', 'הסוכן'], ['buy', '🟢', 'לקנות'], ['sell', '🔴', 'למכור'], ['more', '⋯', 'עוד']];
+const NAV = [['crypto', '🪙 קריפטו — דמה'], ['today', '🏠 היום'], ['agent', '🤖 הסוכן האוטונומי'], ['buy', '🟢 לקנות'], ['sell', '🔴 למכור'], ['mine', '💼 התיק שלי'], ['more', '⋯ עוד'], ['sep', 'עוד'], ['search', '🔍 חיפוש'], ['watchlist', '⭐ מעקב'], ['explain', '📖 איך זה עובד'], ['assistant', '🤖 שאל את המערכת'], ['settings', '⚙️ הגדרות'], ['sep', 'מקצועי'], ['pro', '🔬 פירוט המסלולים'], ['dashboard', '📊 תמונת מצב מלאה'], ['opportunities', '🎯 הזדמנויות'], ['signals', '🚦 סיגנלים'], ['portfolio', '📐 בניית תיק'], ['regime', '🌡️ מצב השוק'], ['backtest', '🧪 בדיקה היסטורית'], ['asof', '⏳ מסע בזמן'], ['paper', '🧾 תיק וירטואלי'], ['tracks', '🧪 השוואת מסלולים'], ['alerts', '🔔 התראות']];
+const BOTTOM = [['crypto', '🪙', 'קריפטו'], ['today', '🏠', 'היום'], ['agent', '🤖', 'הסוכן'], ['mine', '💼', 'התיק'], ['more', '⋯', 'עוד']];
 
 function parse(){ const h = location.hash.replace(/^#\/?/, ''); const [path, qs] = h.split('?'); const parts = path.split('/'); const params = Object.fromEntries(new URLSearchParams(qs || '')); if (parts[0] === 'asset' && parts[1]) params.symbol = decodeURIComponent(parts[1]); if (['buy', 'sell', 'mine', 'today', 'pro'].includes(parts[0])) params.view = parts[0]; return { route: parts[0] || '', params }; }
 async function navigate(){
   const { route, params } = parse();
   document.getElementById('overlay').innerHTML = ''; // מודל פתוח לא נשאר בין מסכים
   $('#sidenav').classList.remove('open');
-  document.querySelectorAll('.sidenav a, .bottombar a').forEach((a) => a.classList.toggle('active', a.dataset.r === (route === 'today' ? '' : route)));
+  document.querySelectorAll('.sidenav a, .bottombar a').forEach((a) => a.classList.toggle('active', a.dataset.r === (route === '' || route === 'sinay' ? 'crypto' : route)));
   const main = $('#main');
   const loader = ROUTES[route];
   if (!loader){ main.innerHTML = '<div class="empty">הדף לא נמצא</div>'; return; }

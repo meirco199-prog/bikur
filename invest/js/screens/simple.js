@@ -73,10 +73,10 @@ const agentBlock = () => {
 const sinayBlock = () => {
   const r = D.sinay; if (!r) return '';
   const usd = (x) => (isNum(x) ? (x < 0 ? '-' : '') + '$' + Math.abs(x).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—');
-  if (r.waiting) return sec('🪙 ניסוי סיני — דמה 200K$', `<div class="empty">ממתין לסנכרון ראשון מהסימולציה. <a href="#/sinay">מה זה</a></div>`, 'סימולציה, בלי כסף אמיתי');
+  if (r.waiting) return sec('🪙 קריפטו — דמה', `<div class="empty">ממתין לסנכרון ראשון מהסימולציה. <a href="#/crypto">מה זה</a></div>`, 'סימולציה, בלי כסף אמיתי');
   const s = r.stats || {};
-  return sec('🪙 ניסוי סיני — דמה 200K$', `<div class="hero"><div class="big">${usd(r.equityUsd)}</div><div class="sub ${cls(r.pnlUsd)}">${r.pnlUsd > 0 ? '+' : ''}${usd(r.pnlUsd)} (${fmt.pct(r.pnlPct, 2, true)}) <small>מאז ${esc(fmt.date(r.start))}</small></div></div>
-    <div class="muted" style="font-size:.85rem;margin-top:.5rem">${s.trades || 0} עסקאות סגורות מתוך ${s.target || 50}${isNum(s.winRate) ? ` · הצלחה ${fmt.pct(s.winRate, 0)}` : ''} · ${(r.openPositions || []).length} פתוחות · ${(r.setups || []).length} דשדושים במעקב${r.stale ? ' · <span class="tag stale">לא עודכן לאחרונה</span>' : ''} · <a href="#/sinay">כל התנועות</a></div>`, 'BTC/ETH/LTC/BCH · סימולציה בלבד');
+  return sec('🪙 קריפטו — דמה', `<div class="hero"><div class="big">${usd(r.equityUsd)}</div><div class="sub ${cls(r.pnlUsd)}">${r.pnlUsd > 0 ? '+' : ''}${usd(r.pnlUsd)} (${fmt.pct(r.pnlPct, 2, true)}) <small>מאז ${esc(fmt.date(r.start))}</small></div></div>
+    <div class="muted" style="font-size:.85rem;margin-top:.5rem">${s.trades || 0} עסקאות סגורות מתוך ${s.target || 50}${isNum(s.winRate) ? ` · הצלחה ${fmt.pct(s.winRate, 0)}` : ''} · ${(r.openPositions || []).length} פתוחות · ${(r.setups || []).length} דשדושים במעקב${r.stale ? ' · <span class="tag stale">לא עודכן לאחרונה</span>' : ''} · <a href="#/crypto">כל התנועות</a></div>`, 'BTC/ETH/LTC/BCH · סימולציה בלבד');
 };
 const riskWord = (r) => ({ 'נמוך': 'סיכון נמוך', 'בינוני': 'סיכון בינוני', 'גבוה': 'סיכון גבוה' }[r?.riskLevel] || 'סיכון לא ידוע');
 const why = (r) => { // משפט אחד בעברית פשוטה

@@ -12,6 +12,11 @@ const realFetch = globalThis.fetch;
 if (process.env.SEED !== '0'){
   const db = new DB(kv); const ctx = { env, db, budget: new Budget(db) };
   await db.put('user:watchlist', [{ symbol: 'NVDA', addedAt: '2026-09-01', note: 'בדיקה' }, { symbol: 'AAPL', addedAt: '2026-09-01' }]);
+  // דמה קריפטו: המצב מ-fixture ההתאמה ל-paper.py + דשדוש פעיל ב-LTC ופוזיציה פתוחה ב-BTC (למסך #/crypto)
+  { const fs = await import('node:fs'); const fx = JSON.parse(fs.readFileSync(new URL('../fixtures-sinay-parity.json', import.meta.url))); const st = fx.expected;
+    st.coins.LTC.setup = { hi: st.coins.LTC.mark[1] * 1.004, lo: st.coins.LTC.mark[1] * 0.996, age: 20 };
+    const b = st.coins.BTC, m = b.mark[1]; b.pos = { side: 'long', sg: -1, lv: [m * 1.001, m * 0.997, m * 0.993], fills: [m * 1.001], stop: m * 0.98, start: b.last_t, age: 6, ref: m * 1.017 };
+    await db.put('sinay:state', { hash: 'seed', receivedAt: new Date().toISOString(), source: { engine: 'worker', feed: 'coinbase', lastRunAt: new Date().toISOString() }, state: st }); }
   const r = await cronStep(ctx, { batch: 300 }); console.log('seeded', r.done, 'finalized', r.finalized);
   const { runShadow } = await import('../../lib/shadow.js'); console.log('shadow', JSON.stringify((await runShadow(ctx)).agreement));
   const { runAggressive, executeAggressive } = await import('../../lib/aggressive.js'); console.log('aggressive', JSON.stringify((await runAggressive(ctx)).totalIls), 'exec', JSON.stringify((await executeAggressive(ctx)).filled?.length));
