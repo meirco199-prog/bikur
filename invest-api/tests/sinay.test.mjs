@@ -168,6 +168,11 @@ test('HTTP: GET /sinay ציבורי; POST /sinay/ingest דורש סוד ולא �
   assert.equal(rep.stats.trades, 0);
   assert.equal((await req('/sinay/report')).status, 200);
   assert.equal((await req('/sinay/nope')).status, 404);
+  // הרצה ידנית של המנוע החי — אותה הגנה כמו ingest (סוד ה-cron או טוקן האפליקציה); בלי אימות = 401 בלי שום כתיבה
+  const p1 = puts();
+  assert.equal((await req('/sinay/run', { method: 'POST' })).status, 401);
+  assert.equal((await req('/sinay/run?secret=wrong', { method: 'POST' })).status, 401);
+  assert.equal(puts() - p1, 0);
 });
 
 test('sinay-sync: רק תגובת STATE של בעל הריפו מתקבלת; חילוץ בלוק ה-JSON', async () => {
