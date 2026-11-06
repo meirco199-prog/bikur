@@ -1,7 +1,9 @@
 // מסלול "עמית" בזמן אמת (engine/amit-rules.js): סקאלפ ביטקוין על נרות דקה, רץ ב-cron של ה-Worker (כל 5 דקות) ליד
 // דמה "ריזיקות עקרונות". נרות מ-Coinbase (גיבוי Kraken, בלי מפתחות). סימולציה בלבד: אין פקודות, אין ברוקר, אין כסף אמיתי.
-// מכסת KV (1,000 כתיבות ביום בתוכנית החינמית): כותבים רק כשנפתחה/נסגרה עסקה, פעם בשעה, או בסיכום היומי — ועד 150 ביום.
-// בריצה שלא נכתבה לא הולך לאיבוד כלום: המצב השמור + 300 הנרות האחרונים (5 שעות) משחזרים בדיוק את אותו מצב בריצה הבאה.
+// מכסת KV (1,000 כתיבות ביום בתוכנית החינמית): כותבים כשנפתחה/נסגרה עסקה (עד 150 ביום), פעם בשעה (עד 24) ובסיכום היומי (1)
+// — כלומר עד ~175 ביום, ותקרה קשיחה של 180 לכל סוגי הכתיבה (גם הרצה ידנית). השמירה השעתית לא נחסמת במכסת האירועים, ולכן
+// בריצה שלא נכתבה לא הולך לאיבוד כלום: המצב השמור (לכל היותר בן שעה) + 300 הנרות האחרונים (5 שעות) משחזרים בדיוק את אותו מצב.
+// חור אמיתי בנתונים (מקור לא זמין יותר מ-5 שעות) נספר ב-meta.gaps, והדוח מסמן את התוצאות כחלקיות.
 // טלגרם: סיכום יומי אחד (בערב), לא הודעה על כל עסקה — בסקאלפ יכולות להיות עשרות עסקאות ביום.
 import { AMIT, warmAmit, processAmit, amitUnrealized, bands } from '../engine/amit-rules.js';
 import { closedBars, parseCoinbase, parseKraken, getJson } from './sinay-live.js';
@@ -9,7 +11,8 @@ import { sendTelegram } from './alerts.js';
 
 export const AMIT_KEY = 'amit:state';
 const FEED_ERR_KEY = 'amit:feederr';
-const SAVE_EVERY_MS = 3600e3, MAX_WRITES_DAY = 150, SUMMARY_HOUR_IL = 21, STALE_MIN = 20;
+export const SAVE_EVERY_MS = 3600e3, MAX_EVENT_WRITES_DAY = 150, MAX_WRITES_DAY = 180, SUMMARY_HOUR_IL = 21;
+const STALE_MIN = 20;
 const r2 = (x) => (Number.isFinite(x) ? Math.round(x * 100) / 100 : null);
 const r4 = (x) => (Number.isFinite(x) ? Math.round(x * 10000) / 10000 : null);
 const usd = (x) => (x < 0 ? '-' : '+') + '$' + Math.abs(Math.round(x)).toLocaleString('en-US');
@@ -63,7 +66,7 @@ export async function runAmitLive(ctx, { fetchFn = fetch, now = new Date(), forc
   }
   const { day, hour } = ilParts(nowMs);
   const meta = stored?.meta && prev ? { ...stored.meta } : { savedAt: null, writesDay: day, writes: 0, gaps: 0, summaryDay: null };
-  if (meta.writesDay !== day){ meta.writesDay = day; meta.writes = 0; }
+  if (meta.writesDay !== day){ meta.writesDay = day; meta.writes = 0; meta.eventWrites = 0; }
   let state, r = { trades: [], events: [] };
   if (!prev) state = warmAmit(bars);
   else {
@@ -75,10 +78,13 @@ export async function runAmitLive(ctx, { fetchFn = fetch, now = new Date(), forc
   const summaryDue = notify && hour >= SUMMARY_HOUR_IL && meta.summaryDay !== day && !!prev;
   const moved = r.events.length > 0;
   const hourly = !meta.savedAt || nowMs - Date.parse(meta.savedAt) >= SAVE_EVERY_MS;
-  const underCap = meta.writes < MAX_WRITES_DAY;
-  if (!(force || !prev || summaryDue || hourly || (moved && underCap))) return { ok: true, saved: false, feed, events: r.events.length };
+  const eventsOk = (meta.eventWrites || 0) < MAX_EVENT_WRITES_DAY;
+  const want = force || !prev || summaryDue || hourly || (moved && eventsOk);
+  // תקרה קשיחה לכל הכתיבות ביום (חוץ מהשמירה הראשונה של מצב חדש) — גם force, גם שעתית, גם סיכום
+  if (!want || (prev && meta.writes >= MAX_WRITES_DAY)) return { ok: true, saved: false, feed, events: r.events.length, capped: (moved && !eventsOk) || !!want };
   let telegram = null;
   if (summaryDue){ telegram = await sendTelegram(ctx.env, formatSummary(state, day)); meta.summaryDay = day; }
+  if (moved && !(force || summaryDue || hourly)) meta.eventWrites = (meta.eventWrites || 0) + 1;
   meta.savedAt = now.toISOString(); meta.writes += 1;
   await ctx.db.put(AMIT_KEY, { savedAt: meta.savedAt, meta, source: { feed, lastRunAt: now.toISOString(), fallbackErrors: errors.length ? errors : undefined }, state });
   return { ok: true, saved: true, feed, events: r.events.length, newTrades: r.trades.length, telegram };
@@ -104,7 +110,7 @@ export function amitReport(stored, { now = new Date() } = {}){
   const ageMin = s.last_t ? (now.getTime() - Date.parse(s.last_t)) / 60e3 : null;
   return {
     ...base, start: s.start, lastBar: s.last_t, mark, feed: stored.source?.feed || null, lastRunAt: stored.source?.lastRunAt || null,
-    stale: Number.isFinite(ageMin) && ageMin > STALE_MIN + 60, ageMinutes: r2(ageMin), gaps: stored.meta?.gaps || 0,
+    stale: Number.isFinite(ageMin) && ageMin > STALE_MIN + 60, ageMinutes: r2(ageMin), gaps: stored.meta?.gaps || 0, partial: (stored.meta?.gaps || 0) > 0,
     equityUsd: r2(equity), pnlUsd: r2(equity - P.account), pnlPct: r4((equity - P.account) / P.account),
     realizedUsd: r2(a.netUsd), unrealizedUsd: r2(u), grossUsd: r2(a.grossUsd), feesUsd: r2(a.feesUsd),
     stats: { trades: a.n, wins: a.wins, losses, winRate: a.n ? r4(a.wins / a.n) : null, avgWinUsd: r2(avgWin), avgLossUsd: r2(avgLoss), breakevenWinRate: r4(breakeven), maxDrawdownUsd: r2(-a.maxDdUsd), target: 50 },

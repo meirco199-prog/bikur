@@ -113,6 +113,7 @@ function amitSection(a){
     ${posTxt}
     <div class="muted" style="font-size:.88rem">${s.trades} עסקאות · ${s.wins} הצלחות${isNum(s.winRate) ? ` (${fmt.pct(s.winRate, 0)})` : ''}${be} · רווח ממוצע ${usdS(s.avgWinUsd)} · הפסד ממוצע ${usdS(s.avgLossUsd)} · עמלות ששולמו ${usd0(a.feesUsd)}</div>
     ${a.stale ? '<div style="color:var(--warn,#f5a524)">⚠ לא עודכן לאחרונה</div>' : ''}
+    ${a.partial ? `<div style="color:var(--warn,#f5a524)">⚠ חור בנתונים (${a.gaps} פעמים המקור לא היה זמין יותר מ-5 שעות) — התוצאות חלקיות</div>` : ''}
     ${rows ? `<div style="overflow-x:auto;margin-top:.5rem"><table><thead><tr><th>#</th><th>כיוון</th><th>נסגרה</th><th class="num">כניסה</th><th class="num">יציאה</th><th>סיבה</th><th class="num">דק׳</th><th class="num">עמלות</th><th class="num">נטו</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
     ${rules}</section>`;
 }
