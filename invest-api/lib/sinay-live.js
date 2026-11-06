@@ -1,10 +1,10 @@
 // דמה קריפטו בזמן אמת: מנוע "ריזיקות עקרונות" (engine/sinay-rules.js, כללים קפואים גרסה 1) רץ בתוך ה-Worker ב-cron.
 // כל ~15 דקות (רק כשנסגר נר חדש): נרות 15 דקות מ-API ציבורי (Coinbase, גיבוי Kraken — בלי מפתחות), עיבוד, שמירה ב-KV
-// (אותו מפתח sinay:state שמסך "קריפטו" קורא), והתראת טלגרם על כל דשדוש חדש / כניסה / מילוי שליש / יציאה.
+// (אותו מפתח sinay:state שמסך "קריפטו" קורא). טלגרם: בלי הודעה על כל אירוע (החלטת מאיר, 6/11/2026: "אין צורך בהתראות על
+// הקריפטו מלבד סיכום יום") — השורות של המסלול הזה נכנסות לסיכום הקריפטו היומי שנשלח מ-lib/amit-live.js אחרי 21:00.
 // סימולציה בלבד: אין כאן פקודות, אין ברוקר ואין כסף אמיתי.
 import { runPaper, BAR_MS, CAT } from '../engine/sinay-rules.js';
 import { validateState, sha256, SINAY_KEY, SLOT_USD } from './sinay.js';
-import { sendTelegram } from './alerts.js';
 
 export const COINS = Object.keys(CAT);
 const UA = { 'User-Agent': 'bikur-invest/1.0 (paper)', Accept: 'application/json' };
@@ -101,14 +101,27 @@ export function formatEvent(ev, { state, nowMs = Date.now() } = {}){
   return null;
 }
 
+// לא בשימוש בטלגרם מאז 6/11/2026 (רק סיכום יומי); נשאר לבדיקות ולהצגה עתידית של אירוע בודד
 export function formatMessage(events, opts){
   const parts = events.map((e) => formatEvent(e, opts)).filter(Boolean);
   if (!parts.length) return null;
   return `📝 דמה קריפטו (בלי כסף אמיתי)\n\n${parts.join('\n\n')}\n\ninvest → 🪙 קריפטו`.slice(0, 3900);
 }
 
+// שורות למסלול הזה בסיכום הקריפטו היומי. isDay(iso) → האם העסקה נסגרה ביום המסוכם (שעון ישראל)
+export function sinayDayLines(state, isDay){
+  if (!state?.trades) return [];
+  const all = state.trades, today = all.filter((t) => t.close && isDay(t.close));
+  const sum = (a) => a.reduce((x, t) => x + t.net_pct / 100 * SLOT_USD, 0);
+  const open = Object.entries(state.coins || {}).filter(([, c]) => c?.pos).map(([sym, c]) => `${sym} ${SIDE[c.pos.side]} (${c.pos.fills.length}/3)`);
+  return [`📝 דמה "ריזיקות עקרונות" (200K$, בלי כסף אמיתי)`,
+    today.length ? `היום: ${today.length} עסקאות, ${today.filter((t) => t.net_pct > 0).length} הצלחות, נטו ${usd(sum(today))}` : 'היום: לא היו עסקאות',
+    `מצטבר: ${all.length} עסקאות, ${all.filter((t) => t.net_pct > 0).length} הצלחות, נטו ${usd(sum(all))}`,
+    ...(open.length ? [`פתוח עכשיו: ${open.join(' · ')}`] : [])];
+}
+
 // ---------- ריצה אחת (מ-scheduled של ה-Worker) ----------
-export async function runSinayLive(ctx, { fetchFn = fetch, now = new Date(), force = false, notify = true } = {}){
+export async function runSinayLive(ctx, { fetchFn = fetch, now = new Date(), force = false } = {}){
   const nowMs = now.getTime();
   const stored = await ctx.db.get(SINAY_KEY);
   const prev = stored?.state || null;
@@ -125,10 +138,6 @@ export async function runSinayLive(ctx, { fetchFn = fetch, now = new Date(), for
   const hash = await sha256(JSON.stringify(state));
   if (stored?.hash === hash) return { ok: true, changed: false, feed };
   await ctx.db.put(SINAY_KEY, { hash, receivedAt: now.toISOString(), source: { engine: 'worker', feed, lastRunAt: now.toISOString(), fallbackErrors: errors.length ? errors : undefined }, state });
-  let telegram = null;
-  if (notify && r.events.length){
-    const text = formatMessage(r.events, { state, nowMs });
-    if (text) telegram = await sendTelegram(ctx.env, text);
-  }
-  return { ok: true, changed: true, feed, events: r.events.length, newTrades: r.trades.length, telegram };
+  // בלי טלגרם על כל אירוע — רק בסיכום היומי (sinayDayLines ב-lib/amit-live.js)
+  return { ok: true, changed: true, feed, events: r.events.length, newTrades: r.trades.length };
 }

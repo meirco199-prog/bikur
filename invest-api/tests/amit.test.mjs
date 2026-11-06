@@ -179,7 +179,7 @@ test('סיכום טלגרם יומי אחד אחרי 21:00 בישראל', async 
     const e2 = Date.parse('2026-11-06T19:05:30Z'); // 21:05
     const r = await runAmitLive(ctx, { fetchFn: mockFetch({}, e2), now: new Date(e2) });
     assert.equal(r.telegram, 'ok'); assert.equal(sent.length, 1);
-    assert.match(sent[0], /מסלול עמית — סיכום יום/); assert.match(sent[0], /בלי כסף אמיתי/);
+    assert.match(sent[0], /קריפטו — סיכום יום/); assert.match(sent[0], /מסלול עמית/); assert.match(sent[0], /בלי כסף אמיתי/);
     const e3 = Date.parse('2026-11-06T19:15:30Z');
     await runAmitLive(ctx, { fetchFn: mockFetch({}, e3), now: new Date(e3) });
     assert.equal(sent.length, 1, 'פעם אחת ביום');
@@ -199,6 +199,11 @@ test('amitReport: ממתין; ואחרי עסקאות — סטטיסטיקה, א
   assert.ok(Math.abs(r.realizedUsd - s.agg.netUsd) < 1e-9);
   assert.equal(r.stale, false); assert.equal(r.trades[0].n, 1);
   assert.match(formatSummary(s, '2026-11-06'), /היום: 1 עסקאות, 1 הצלחות/);
+  // סיכום קריפטו אחד לשני המסלולים: שורות "ריזיקות עקרונות" נוספות כשיש מצב שמור
+  const sin = { trades: [{ sym: 'ETH', side: 'short', close: '2026-11-06T12:00:00Z', net_pct: 0.5 }], coins: {} };
+  const both = formatSummary(s, '2026-11-06', sin);
+  assert.match(both, /ריזיקות עקרונות/); assert.match(both, /היום: 1 עסקאות, 1 הצלחות, נטו \+\$250/);
+  assert.doesNotMatch(formatSummary(s, '2026-11-06'), /ריזיקות עקרונות/);
 });
 
 test('POST /amit/run בלי אימות = 401; GET /amit = דוח ציבורי', async () => {
