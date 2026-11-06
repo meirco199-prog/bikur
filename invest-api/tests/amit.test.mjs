@@ -211,3 +211,39 @@ test('POST /amit/run בלי אימות = 401; GET /amit = דוח ציבורי', 
   const j = await g.json();
   assert.equal(j.track, 'amit'); assert.equal(j.paper, true);
 });
+
+test('מכסת כתיבות: עד 150 כתיבות של אירועים; השעתית ממשיכה; תקרה קשיחה של 180 לכל סוג כתיבה (גם force)', async () => {
+  const db = new DB(null), ctx = { db, env: {} };
+  const drop = (ms) => (ms === Date.parse('2026-11-06T12:20:00Z') ? -0.005 : ms > Date.parse('2026-11-06T12:20:00Z') ? -0.0015 : 0);
+  await runAmitLive(ctx, { fetchFn: mockFetch({ shape: drop }, NOW), now: new Date(NOW) });
+  const setMeta = async (m) => { const st = await db.get(AMIT_KEY); st.meta = { ...st.meta, ...m }; await db.put(AMIT_KEY, st); };
+  // מכסת האירועים מלאה, השמירה האחרונה לפני 10 דקות: אירוע לא נשמר (ישוחזר מהמצב השמור בריצה הבאה)
+  const tA = Date.parse('2026-11-06T12:40:30Z');
+  await setMeta({ eventWrites: 150, writes: 150, savedAt: new Date(tA - 600e3).toISOString() });
+  const r1 = await runAmitLive(ctx, { fetchFn: mockFetch({ shape: drop }, tA), now: new Date(tA) });
+  assert.ok(r1.events >= 1); assert.equal(r1.saved, false); assert.equal(r1.capped, true);
+  // אחרי שעה: השמירה השעתית עוקפת את מכסת האירועים — כולל העסקה מהריצה הקודמת
+  const tB = tA + 3600e3;
+  const r2 = await runAmitLive(ctx, { fetchFn: mockFetch({ shape: drop }, tB), now: new Date(tB) });
+  assert.equal(r2.saved, true);
+  const saved = await db.get(AMIT_KEY);
+  assert.ok(saved.state.trades.length >= 1 || saved.state.pos, 'העסקה לא אבדה');
+  // תקרה קשיחה: 180 כתיבות היום — לא כותבים גם בשעתית וגם ב-force
+  await setMeta({ writes: 180, savedAt: new Date(tB - 2 * 3600e3).toISOString() });
+  const tC = tB + 120e3;
+  assert.equal((await runAmitLive(ctx, { fetchFn: mockFetch({ shape: drop }, tC), now: new Date(tC) })).saved, false);
+  assert.equal((await runAmitLive(ctx, { fetchFn: mockFetch({ shape: drop }, tC), now: new Date(tC), force: true })).saved, false);
+  assert.equal((await db.get(AMIT_KEY)).meta.writes, 180);
+});
+
+test('חור בנתונים (יותר מ-5 שעות בלי מצב שמור) נספר והדוח מסמן תוצאות חלקיות', async () => {
+  const db = new DB(null), ctx = { db, env: {} };
+  await runAmitLive(ctx, { fetchFn: mockFetch({ amp: 0 }, NOW), now: new Date(NOW) });
+  const later = NOW + 8 * 3600e3;
+  const r = await runAmitLive(ctx, { fetchFn: mockFetch({ amp: 0 }, later), now: new Date(later) });
+  assert.equal(r.saved, true);
+  const stored = await db.get(AMIT_KEY);
+  assert.equal(stored.meta.gaps, 1);
+  const rep = amitReport(stored, { now: new Date(later) });
+  assert.equal(rep.partial, true); assert.equal(rep.gaps, 1);
+});
