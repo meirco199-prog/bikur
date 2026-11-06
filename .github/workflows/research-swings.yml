@@ -1,0 +1,25 @@
+# מחקר (זמני, ענף בלבד): גלים, סטופים ויעדים על S&P 500 + המניות של מאיר, 10 שנים של נרות יומיים מ-Yahoo.
+# רץ רק כשקובץ הבקשה בענף של Claude משתנה. התוצאות (טבלאות בלבד) נכתבות חזרה לענף. לא נוגע ב-main, בחשבון או במסחר.
+name: Research swings (temporary)
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: ['.github/research/swings/request']
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -q numpy pandas lxml
+      - name: Research
+        run: python3 .github/research/swings/run.py && cat .github/research/swings/out/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/research/swings/out
+          git commit -m "ops: research swings results" && git pull --rebase -q && git push
