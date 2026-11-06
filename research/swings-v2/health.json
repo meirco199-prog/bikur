@@ -1,0 +1,379 @@
+{
+ "ok": true,
+ "version": "1.0.0",
+ "time": "2026-11-06T16:39:28.384Z",
+ "providers": [
+  {
+   "id": "eodhd",
+   "available": true,
+   "supports": [
+    "prices"
+   ],
+   "key": "מוגדר"
+  },
+  {
+   "id": "marketstack",
+   "available": false,
+   "supports": [
+    "prices"
+   ],
+   "key": "חסר"
+  },
+  {
+   "id": "stooq",
+   "available": false,
+   "supports": [
+    "prices"
+   ],
+   "key": "לא נדרש"
+  },
+  {
+   "id": "twelvedata",
+   "available": true,
+   "supports": [
+    "prices",
+    "quote"
+   ],
+   "key": "מוגדר"
+  },
+  {
+   "id": "tiingo",
+   "available": false,
+   "supports": [
+    "prices"
+   ],
+   "key": "חסר"
+  },
+  {
+   "id": "finnhub",
+   "available": true,
+   "supports": [
+    "quote",
+    "profile",
+    "ratios",
+    "analyst",
+    "news",
+    "insider",
+    "earnings",
+    "peers"
+   ],
+   "key": "מוגדר"
+  },
+  {
+   "id": "fmp",
+   "available": true,
+   "supports": [
+    "profile",
+    "ratios",
+    "facts",
+    "estimates",
+    "targets",
+    "analyst",
+    "etf",
+    "screener",
+    "prices",
+    "insider",
+    "earnings"
+   ],
+   "key": "מוגדר"
+  },
+  {
+   "id": "alphavantage",
+   "available": true,
+   "supports": [
+    "prices",
+    "profile",
+    "ratios",
+    "analyst",
+    "news",
+    "insider",
+    "etf",
+    "earnings",
+    "movers"
+   ],
+   "key": "מוגדר"
+  },
+  {
+   "id": "fred",
+   "available": true,
+   "supports": [
+    "macro"
+   ],
+   "key": "מוגדר"
+  },
+  {
+   "id": "edgar",
+   "available": true,
+   "supports": [
+    "facts",
+    "filings",
+    "cik"
+   ],
+   "key": "לא נדרש"
+  },
+  {
+   "id": "boi",
+   "available": true,
+   "supports": [
+    "fx"
+   ],
+   "key": "לא נדרש"
+  }
+ ],
+ "budget": {
+  "alphavantage": {
+   "used": 24,
+   "limit": 24
+  },
+  "fmp": {
+   "used": 230,
+   "limit": 230
+  },
+  "finnhub": {
+   "used": 240,
+   "limit": 5000
+  },
+  "stooq": {
+   "used": 0,
+   "limit": 2000
+  },
+  "edgar": {
+   "used": 9,
+   "limit": 3000
+  },
+  "fred": {
+   "used": 11,
+   "limit": 2000
+  },
+  "boi": {
+   "used": 1,
+   "limit": 200
+  },
+  "eodhd": {
+   "used": 18,
+   "limit": 18
+  },
+  "twelvedata": {
+   "used": 165,
+   "limit": 700
+  },
+  "tiingo": {
+   "used": 0,
+   "limit": 900
+  },
+  "marketstack": {
+   "used": 0,
+   "limit": 3
+  }
+ },
+ "cron": {
+  "day": "2026-11-06",
+  "done": 161,
+  "queueLeft": 0,
+  "finalized": true,
+  "errors": [],
+  "at": "2026-11-06T04:26:32.924Z",
+  "log": [
+   "SAE.TA: missing — אין מחירים: eodhd: תקציב יומי נגמר | fmp: לא כלול בתוכנית (נבדק היום) | alphavantage: תקציב יומי נגמר",
+   "ELAL.TA: missing — אין מחירים: eodhd: תקציב יומי נגמר | fmp: לא כלול בתוכנית (נבדק היום) | alphavantage: תקציב יומי נגמר",
+   "universe: wikipedia 503 (+0/−0, ממתינות 0)",
+   "finalized: 159 snapshots (130 analyzed), 16 buy signals"
+  ]
+ },
+ "snapshotDays": [
+  "2026-11-02",
+  "2026-11-03",
+  "2026-11-04",
+  "2026-11-05",
+  "2026-11-06"
+ ],
+ "auth": "token",
+ "keys": [
+  {
+   "name": "TWELVEDATA_KEY",
+   "label": "Twelve Data (מחירים יומיים + quote) — חינם 800/יום",
+   "set": true,
+   "source": "app",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "TIINGO_KEY",
+   "label": "Tiingo (מחירים יומיים) — חינם",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "MARKETSTACK_KEY",
+   "label": "Marketstack (בורסת תל אביב) — חינם 100/חודש",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "FINNHUB_KEY",
+   "label": "Finnhub (quote, אנליסטים, חדשות) — חינם",
+   "set": true,
+   "source": "app",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "FMP_KEY",
+   "label": "FMP (screener, תחזיות, יעדי מחיר) — חינם 250/יום",
+   "set": true,
+   "source": "app",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "ALPHAVANTAGE_KEY",
+   "label": "Alpha Vantage (סנטימנט, ETF, insider) — חינם 25/יום",
+   "set": true,
+   "source": "app",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "FRED_KEY",
+   "label": "FRED (מאקרו, VIX, ריבית) — חינם",
+   "set": true,
+   "source": "app",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "EODHD_KEY",
+   "label": "EODHD (בורסת ת\"א) — בתשלום",
+   "set": true,
+   "source": "app",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "TELEGRAM_BOT_TOKEN",
+   "label": "Telegram bot token",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "TELEGRAM_CHAT_ID",
+   "label": "Telegram chat id",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "RESEND_KEY",
+   "label": "Resend (אימייל) API key",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "ALERT_EMAIL",
+   "label": "כתובת אימייל להתראות",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "ANTHROPIC_API_KEY",
+   "label": "Anthropic API key (עוזר AI; אחרת Workers AI)",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "EDGAR_UA",
+   "label": "User-Agent ל-SEC (שם + אימייל)",
+   "set": true,
+   "source": "secret",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "CRON_BATCH",
+   "label": "נכסים לכל הפעלת cron",
+   "set": true,
+   "source": "secret",
+   "masked": "[redacted by research script]"
+  },
+  {
+   "name": "STOOQ_ENABLED",
+   "label": "Stooq (1 = מופעל; חסום לרוב מ-Cloudflare)",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "COUNCIL_SECRET",
+   "label": "AI Council — סוד משותף לערוץ הכתיבה של ChatGPT (POST /council/comment)",
+   "set": false,
+   "source": null,
+   "masked": ""
+  },
+  {
+   "name": "GH_COUNCIL_TOKEN",
+   "label": "AI Council — GitHub PAT מצומצם (bikur בלבד, Issues: write) לפרסום תגובות ב-Issue #25",
+   "set": false,
+   "source": null,
+   "masked": ""
+  }
+ ],
+ "ai": "workers-ai",
+ "kv": "bound",
+ "kvWriteLimitHit": null,
+ "alerts": {
+  "telegram": true,
+  "telegramVia": "remi",
+  "email": false
+ },
+ "recentErrors": [
+  {
+   "ts": "2026-11-06T01:05:59.535Z",
+   "where": "eodhd.prices(ORL.TA)",
+   "msg": "eodhd: HTTP 404 Ticker Not Found."
+  },
+  {
+   "ts": "2026-11-06T01:06:01.398Z",
+   "where": "eodhd.prices(ENLT.TA)",
+   "msg": "eodhd: HTTP 404 Ticker Not Found."
+  },
+  {
+   "ts": "2026-11-06T01:06:02.952Z",
+   "where": "eodhd.prices(SPEN.TA)",
+   "msg": "eodhd: HTTP 404 Ticker Not Found."
+  },
+  {
+   "ts": "2026-11-06T01:11:05.710Z",
+   "where": "eodhd.prices(BEZQ.TA)",
+   "msg": "eodhd: HTTP 404 Ticker Not Found."
+  },
+  {
+   "ts": "2026-11-06T01:11:09.711Z",
+   "where": "eodhd.prices(AZRG.TA)",
+   "msg": "eodhd: HTTP 404 Ticker Not Found."
+  },
+  {
+   "ts": "2026-11-06T01:11:11.654Z",
+   "where": "eodhd.prices(PHOE.TA)",
+   "msg": "eodhd: HTTP 404 Ticker Not Found."
+  },
+  {
+   "ts": "2026-11-06T03:46:10.696Z",
+   "where": "twelvedata.prices(MGIC)",
+   "msg": "twelvedata: HTTP 404 {\"code\":404,\"message\":\"**symbol** or **figi** parameter is missing or invalid. Please provide a valid symbol according t"
+  },
+  {
+   "ts": "2026-11-06T03:56:03.562Z",
+   "where": "twelvedata.prices(CYBR)",
+   "msg": "twelvedata: HTTP 404 {\"code\":404,\"message\":\"This symbol is available starting with the Pro or Venture plan. Consider upgrading now at https:/"
+  },
+  {
+   "ts": "2026-11-06T12:30:55.318Z",
+   "where": "sinay-live",
+   "msg": "coinbase: HTTP 429 | kraken: kraken: EGeneral:Too many requests"
+  },
+  {
+   "ts": "2026-11-06T16:30:54.925Z",
+   "where": "sinay-live",
+   "msg": "coinbase: HTTP 429 | kraken: kraken: EGeneral:Too many requests"
+  }
+ ]
+}
