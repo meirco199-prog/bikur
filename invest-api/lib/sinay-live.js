@@ -13,12 +13,12 @@ const FEED_ERR_KEY = 'sinay:feederr';
 const iso = (sec) => new Date(sec * 1000).toISOString().replace('.000Z', 'Z');
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 
-// רק נרות שנסגרו (תחילת הנר + 15 דקות ≤ עכשיו), בסדר עולה, בלי כפילויות, OHLC תקין
-export function closedBars(rows, nowMs){
+// רק נרות שנסגרו (תחילת הנר + אורך הנר ≤ עכשיו; ברירת מחדל 15 דקות), בסדר עולה, בלי כפילויות, OHLC תקין
+export function closedBars(rows, nowMs, barMs = BAR_MS){
   const seen = new Set(), out = [];
   for (const r of rows.slice().sort((a, b) => a[0] - b[0])){
     const [sec, o, h, l, c] = r;
-    if (!isNum(sec) || seen.has(sec) || sec * 1000 + BAR_MS > nowMs) continue;
+    if (!isNum(sec) || seen.has(sec) || sec * 1000 + barMs > nowMs) continue;
     if (![o, h, l, c].every((x) => isNum(x) && x > 0) || h < l || h < Math.max(o, c) - 1e-9 || l > Math.min(o, c) + 1e-9) continue;
     seen.add(sec); out.push([iso(sec), o, h, l, c]);
   }
@@ -38,7 +38,7 @@ export function parseKraken(j){
   return j.result[k].map((r) => [Number(r[0]), Number(r[1]), Number(r[2]), Number(r[3]), Number(r[4])]);
 }
 
-async function getJson(fetchFn, url){
+export async function getJson(fetchFn, url){
   const r = await fetchFn(url, { headers: UA });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();

@@ -17,6 +17,14 @@ if (process.env.SEED !== '0'){
     st.coins.LTC.setup = { hi: st.coins.LTC.mark[1] * 1.004, lo: st.coins.LTC.mark[1] * 0.996, age: 20 };
     const b = st.coins.BTC, m = b.mark[1]; b.pos = { side: 'long', sg: -1, lv: [m * 1.001, m * 0.997, m * 0.993], fills: [m * 1.001], stop: m * 0.98, start: b.last_t, age: 6, ref: m * 1.017 };
     await db.put('sinay:state', { hash: 'seed', receivedAt: new Date().toISOString(), source: { engine: 'worker', feed: 'coinbase', lastRunAt: new Date().toISOString() }, state: st }); }
+  // מסלול עמית: שתי עסקאות (יעד + סטופ) ופוזיציה פתוחה — מהמנוע עצמו, על נרות דקה מלאכותיים
+  { const { newAmit, processAmit } = await import('../../engine/amit-rules.js'); const s = newAmit(), t0 = Date.now() - 100 * 60e3;
+    const B = (i, o, h, l, c) => [new Date(t0 + i * 60e3).toISOString().replace(/\.\d+Z$/, 'Z'), o, h, l, c];
+    const calm = (K) => Array.from({ length: 20 }, (_, i) => { const c = 75000 + (i % 2 ? 40 : -40); return B(K + i, c, c + 10, c - 10, c); });
+    processAmit(s, calm(0)); processAmit(s, [B(20, 75000, 75000, 74900, 74950), B(21, 74950, 75200, 74940, 75150)]); // יעד
+    processAmit(s, calm(22)); processAmit(s, [B(42, 75000, 75000, 74600, 74650)]); // נכנס ונעצר באותו נר
+    processAmit(s, calm(43)); processAmit(s, calm(63)); processAmit(s, [B(83, 75000, 75000, 74905, 74960)]); // פוזיציה פתוחה
+    await db.put('amit:state', { savedAt: new Date().toISOString(), meta: { gaps: 0 }, source: { feed: 'coinbase', lastRunAt: new Date().toISOString() }, state: s }); }
   const r = await cronStep(ctx, { batch: 300 }); console.log('seeded', r.done, 'finalized', r.finalized);
   const { runShadow } = await import('../../lib/shadow.js'); console.log('shadow', JSON.stringify((await runShadow(ctx)).agreement));
   const { runAggressive, executeAggressive } = await import('../../lib/aggressive.js'); console.log('aggressive', JSON.stringify((await runAggressive(ctx)).totalIls), 'exec', JSON.stringify((await executeAggressive(ctx)).filled?.length));

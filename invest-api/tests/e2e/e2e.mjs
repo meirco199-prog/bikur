@@ -23,7 +23,7 @@ const check = async (name, hash, mustHave, action) => {
   await page.screenshot({ path: `/tmp/claude-0/-home-user-bikur/4339afcd-f01b-5f35-b439-92a20b519276/scratchpad/shot-${name}.png`, fullPage: false });
 };
 await check('buy', '#/buy', ['מה יש לי'], async () => { const t0 = await page.textContent('#main'); if (!t0.includes('מה לקנות')) errors.push('[buy] title missing'); const b = await page.$('[data-buy]'); if (b){ await b.click(); await page.waitForTimeout(400); const modals = await page.$$eval('.modal', (a) => a.length); if (modals !== 1) errors.push('[today] modals opened: ' + modals); await page.locator('.modal #ok').last().click(); await page.waitForTimeout(1000); const t = await page.textContent('#main'); if (!t.includes('מה יש לי') || !t.includes('מזומן פנוי')) errors.push('[buy→mine] paper buy not shown'); } });
-await check('crypto', '#/', ['קריפטו — דמה', 'מה קורה עכשיו', 'בעסקה: לונג 1/3', 'דשדוש פעיל — מחכים לנגיעה', 'מחכים לדשדוש', 'בדרך לכסף אמיתי', 'יומן עסקאות', 'סטופ']);
+await check('crypto', '#/', ['קריפטו — דמה', 'מה קורה עכשיו', 'בעסקה: לונג 1/3', 'דשדוש פעיל — מחכים לנגיעה', 'מחכים לדשדוש', 'בדרך לכסף אמיתי', 'יומן עסקאות', 'סטופ', 'מסלול עמית — סקאלפ ביטקוין', 'בעסקה: לונג', '🎯 יעד', '🛑 סטופ']);
 await check('today', '#/today', ['הכסף שלי', 'חשבון התרגול', 'היום', 'שבוע', 'חודש', 'שנה', 'מההתחלה', 'האחזקות שלי', 'מסלול אגרסיבי', 'תל אביב', 'מצב השוק', 'מה לעשות היום'], async () => { const tiles = await page.$$eval('.ptile', (a) => a.length); if (tiles < 12) errors.push('[today] period tiles: ' + tiles); });
 await check('sell', '#/sell', ['מה למכור']);
 await check('shadow', '#/pro', ['מודל צל', 'הישן (A)', 'יחסי-ענף (B)', 'הסכמה בפעולה', 'התפלגות היום', 'אגרסיבי מסונן']);

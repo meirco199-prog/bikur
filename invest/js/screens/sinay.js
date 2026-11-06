@@ -90,19 +90,48 @@ function journal(list){
   </tbody></table></div>`;
 }
 
+// 🧪 מסלול עמית (GET /amit): סקאלפ ביטקוין על נרות דקה — הכללים מצילומי המסך שלו (רצועות בולינגר, סטופ, עמלות)
+const WHY_A = { 'סטופ': '🛑 סטופ', 'יעד': '🎯 יעד' };
+function amitSection(a){
+  if (!a) return '';
+  const p = a.params || {};
+  const head = `<h3 style="margin:0 0 .3rem">🧪 מסלול עמית — סקאלפ ביטקוין <span class="muted" style="font-size:.85rem">נרות דקה · דמה</span></h3>`;
+  const rules = `<details style="margin-top:.5rem"><summary class="muted">הכללים (מצילומי המסך של עמית, 6/11)</summary><ul style="line-height:1.6;margin:.4rem 0 0">
+    <li>פוזיציה ${usd0(p.notionalUsd)} (כמו בסרטון: 2.534 ביטקוין), בטחון ${usd0(p.marginUsd)}, חשבון ${usd0(p.accountUsd)}.</li>
+    <li><b>כניסה:</b> המחיר נוגע ברצועת בולינגר (20, 2) של גרף הדקה — בתחתונה קונים (לונג), בעליונה מוכרים (שורט). כמו הסימונים B ו-S על הגרף שלו.</li>
+    <li><b>יציאה:</b> נגיעה ברצועה הנגדית · סטופ −${p.slPct}% · אחרי ${p.maxMins} דקות בכל מקרה.</li>
+    <li>עמלות כמו בדוח שלו: ${p.makerPct}% לפקודה מוגבלת (כניסה, יעד), ${p.takerPct}% לפקודה מיידית (סטופ, זמן).</li>
+    <li><span class="muted">מה שלא ידוע: גודל העסקה משתנה אצלו (8K$–190K$) — קבענו 190K$ כמו בסרטון; הוא סוחר גם במטבעות אחרים — כאן רק ביטקוין.</span></li></ul></details>`;
+  if (a.waiting) return `<section class="card" style="margin:1rem 0;border-inline-start:4px solid #7c3aed">${head}<div class="muted">${esc(a.note || 'ממתין לריצה ראשונה')}</div>${rules}</section>`;
+  const s = a.stats || {};
+  const pos = a.openPosition;
+  const posTxt = pos ? `<div style="margin:.4rem 0"><b>בעסקה: ${esc(SIDE[pos.side])}</b> מ-${px(pos.entry)} · יעד (רצועה נגדית) ${px(pos.target)} · סטופ ${px(pos.sl)} · ${pos.mins} דק׳ · פתוח <b class="${cls(pos.unrealizedUsd)}">${usdS(pos.unrealizedUsd)}</b></div>` : `<div class="muted" style="margin:.4rem 0">אין עסקה פתוחה — מחכים לנגיעה ברצועה.</div>`;
+  const be = isNum(s.breakevenWinRate) ? ` · צריך ${fmt.pct(s.breakevenWinRate, 0)} כדי לא להפסיד` : '';
+  const rows = (a.trades || []).slice(0, 12).map((t) => `<tr><td>${t.n}</td><td>${esc(SIDE[t.side] || t.side)}</td><td class="muted" style="font-size:.8rem">${esc(fmt.dt(t.close))}</td><td class="num">${px(t.entry)}</td><td class="num">${px(t.exit)}</td><td>${esc(WHY_A[t.why] || t.why)}</td><td class="num">${t.mins}</td><td class="num muted">${usd0(t.fees_usd)}</td><td class="num ${cls(t.net_usd)}"><b>${usdS(t.net_usd)}</b></td></tr>`).join('');
+  return `<section class="card" style="margin:1rem 0;border-inline-start:4px solid #7c3aed">${head}
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:baseline"><span style="font-size:1.5rem;font-weight:700">${usd0(a.equityUsd)}</span><span class="${cls(a.pnlUsd)}">${usdS(a.pnlUsd)} (${fmt.pct(a.pnlPct, 2, true)})</span><span class="muted" style="font-size:.85rem">מתוך ${usd0(p.accountUsd)} · היום ${a.today?.trades || 0} עסקאות, ${ltr(usdS(a.today?.netUsd))}</span></div>
+    ${posTxt}
+    <div class="muted" style="font-size:.88rem">${s.trades} עסקאות · ${s.wins} הצלחות${isNum(s.winRate) ? ` (${fmt.pct(s.winRate, 0)})` : ''}${be} · רווח ממוצע ${usdS(s.avgWinUsd)} · הפסד ממוצע ${usdS(s.avgLossUsd)} · עמלות ששולמו ${usd0(a.feesUsd)}</div>
+    ${a.stale ? '<div style="color:var(--warn,#f5a524)">⚠ לא עודכן לאחרונה</div>' : ''}
+    ${rows ? `<div style="overflow-x:auto;margin-top:.5rem"><table><thead><tr><th>#</th><th>כיוון</th><th>נסגרה</th><th class="num">כניסה</th><th class="num">יציאה</th><th>סיבה</th><th class="num">דק׳</th><th class="num">עמלות</th><th class="num">נטו</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
+    ${rules}</section>`;
+}
+
 export async function render(main){
   main.innerHTML = loading();
   let r;
-  try { r = await api('/sinay', { ttl: 30000 }); } catch (e) { main.innerHTML = errorBox(e); return; }
+  let amit = null;
+  try { [r, amit] = await Promise.all([api('/sinay', { ttl: 30000 }), api('/amit', { ttl: 30000 }).catch(() => null)]); } catch (e) { main.innerHTML = errorBox(e); return; }
   const dis = disclaimer('דמה בלבד — בלי כסף אמיתי ובלי פקודות לברוקר. הכללים קפואים (Issue #189).');
   const link = `<a href="${esc(r.issueUrl)}" target="_blank" rel="noopener">הכללים המלאים ב-Issue #189</a>`;
-  if (r.waiting){ main.innerHTML = `<div style="max-width:900px;margin:0 auto"><h1>🪙 קריפטו — דמה</h1>${dis}<div class="empty">${esc(r.note || 'ממתין לריצה ראשונה')}. ${link}</div></div>`; return; }
+  if (r.waiting){ main.innerHTML = `<div style="max-width:900px;margin:0 auto"><h1>🪙 קריפטו — דמה</h1>${dis}<div class="empty">${esc(r.note || 'ממתין לריצה ראשונה')}. ${link}</div>${amitSection(amit)}</div>`; return; }
   const coins = r.coins || Object.keys(r.perCoin || {});
   main.innerHTML = `<div style="max-width:900px;margin:0 auto">${head(r)}${dis}
     ${(r.notes || []).length ? `<div class="card" style="margin:.6rem 0;border-color:var(--warn,#f5a524)">${r.notes.map((n) => `<div>⚠️ ${esc(n)}</div>`).join('')}</div>` : ''}
     ${hero(r)}
     <h3 style="margin:1rem 0 .5rem">מה קורה עכשיו</h3>
     <div class="grid g2" style="gap:.6rem">${coins.map((s) => coinCard(s, r.perCoin?.[s], r)).join('')}</div>
+    ${amitSection(amit)}
     ${readiness(r)}
     ${HOW}
     <div class="grid g4" style="margin:1rem 0">
