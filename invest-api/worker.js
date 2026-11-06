@@ -187,7 +187,7 @@ async function handle(req, env0, ctx){
     // הרצה ידנית של מנוע הדמה החי (lib/sinay-live.js) — ה-cron מריץ אותו לבד כל 5 דקות (בפועל מעבד רק כשנסגר נר חדש)
     if (p1 === 'run' && req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
-      try { return json(await runSinayLive(ctx, { force: q.force === '1', notify: q.notify !== '0' })); } catch (e) { await db.logError('sinay-live', e.message); return err('דמה קריפטו: ' + e.message, e.status || 500); }
+      try { return json(await runSinayLive(ctx, { force: q.force === '1' })); } catch (e) { await db.logError('sinay-live', e.message); return err('דמה קריפטו: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }

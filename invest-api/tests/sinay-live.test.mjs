@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { runPaper, processCoin, sideLevels, CAT, BAR_MS } from '../engine/sinay-rules.js';
-import { closedBars, parseCoinbase, parseKraken, fetchBars, dueToRun, runSinayLive, formatEvent, formatMessage } from '../lib/sinay-live.js';
+import { closedBars, parseCoinbase, parseKraken, fetchBars, dueToRun, runSinayLive, formatEvent, formatMessage, sinayDayLines } from '../lib/sinay-live.js';
 import { ingestSinay, sinayReport, validateState, SINAY_KEY } from '../lib/sinay.js';
 import { DB } from '../lib/db.js';
 
@@ -157,7 +157,7 @@ test('runSinayLive: שני המקורות נופלים → לא נוגעים ב�
   assert.equal((await db.get('log:err')).length, errs1, 'לא נרשמה שגיאה כפולה');
 });
 
-test('runSinayLive: אירוע מסחר → הודעת טלגרם אחת עם הרמות, אחרי שהמצב נשמר', async () => {
+test('runSinayLive: אירוע מסחר → המצב נשמר, ובלי הודעת טלגרם (רק בסיכום היומי)', async () => {
   // מצב שבו BTC בדשדוש פעיל, והנר הבא נוגע ברמת השורט הראשונה
   const db = new DB(null);
   const st = { version: 1, start: '2026-11-04T00:00:00Z', trades: [], coins: {} };
@@ -176,9 +176,8 @@ test('runSinayLive: אירוע מסחר → הודעת טלגרם אחת עם ה
   };
   await withTelegram(async (sent) => {
     const r = await runSinayLive({ db, env: tgEnv() }, { fetchFn: spike, now: new Date(later) });
-    assert.equal(r.changed, true); assert.equal(r.telegram, 'ok');
-    assert.equal(sent.length, 1);
-    assert.match(sent[0], /דמה קריפטו/); assert.match(sent[0], /BTC: נכנסנו לשורט — שליש 1\/3/);
+    assert.equal(r.changed, true); assert.ok(r.events >= 1); assert.equal(r.telegram, undefined);
+    assert.equal(sent.length, 0, 'אין הודעה על כל אירוע');
     const saved = await db.get(SINAY_KEY);
     assert.equal(saved.state.coins.BTC.pos.side, 'short');
     assert.equal(saved.state.coins.BTC.pos.fills.length, 1);
@@ -217,4 +216,14 @@ test('formatEvent: יציאה כוללת אחוז, דולרים על 50K$ ומצ
   assert.match(txt, /\+\$200 על 50K\$/);
   assert.match(txt, /מצטבר: 1 עסקאות, 1 הצלחות/);
   assert.equal(formatMessage([], {}), null);
+});
+
+test('sinayDayLines: שורות לסיכום היומי — היום, מצטבר ופוזיציות פתוחות', () => {
+  const tr = (close, net_pct) => ({ sym: 'BTC', side: 'long', close, net_pct });
+  const st = { trades: [tr('2026-11-05T10:00:00Z', 0.4), tr('2026-11-06T10:00:00Z', -0.2)], coins: { ETH: { pos: { side: 'short', fills: [1, 2] } }, BTC: { pos: null } } };
+  const lines = sinayDayLines(st, (iso) => iso.startsWith('2026-11-06')).join('\n');
+  assert.match(lines, /היום: 1 עסקאות, 0 הצלחות, נטו -\$100/);
+  assert.match(lines, /מצטבר: 2 עסקאות, 1 הצלחות, נטו \+\$100/);
+  assert.match(lines, /פתוח עכשיו: ETH שורט \(2\/3\)/);
+  assert.deepEqual(sinayDayLines(null, () => true), []);
 });

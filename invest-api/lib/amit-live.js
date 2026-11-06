@@ -4,9 +4,11 @@
 // — כלומר עד ~175 ביום, ותקרה קשיחה של 180 לכל סוגי הכתיבה (גם הרצה ידנית). השמירה השעתית לא נחסמת במכסת האירועים, ולכן
 // בריצה שלא נכתבה לא הולך לאיבוד כלום: המצב השמור (לכל היותר בן שעה) + 300 הנרות האחרונים (5 שעות) משחזרים בדיוק את אותו מצב.
 // חור אמיתי בנתונים (מקור לא זמין יותר מ-5 שעות) נספר ב-meta.gaps, והדוח מסמן את התוצאות כחלקיות.
-// טלגרם: סיכום יומי אחד (בערב), לא הודעה על כל עסקה — בסקאלפ יכולות להיות עשרות עסקאות ביום.
+// טלגרם: סיכום קריפטו יומי אחד (בערב) לשני מסלולי הדמה — עמית ו"ריזיקות עקרונות" — ולא הודעה על כל עסקה
+// (החלטת מאיר, 6/11/2026: "אין צורך בהתראות על הקריפטו מלבד סיכום יום").
 import { AMIT, warmAmit, processAmit, amitUnrealized, bands } from '../engine/amit-rules.js';
-import { closedBars, parseCoinbase, parseKraken, getJson } from './sinay-live.js';
+import { closedBars, parseCoinbase, parseKraken, getJson, sinayDayLines } from './sinay-live.js';
+import { SINAY_KEY } from './sinay.js';
 import { sendTelegram } from './alerts.js';
 
 export const AMIT_KEY = 'amit:state';
@@ -40,16 +42,17 @@ export async function fetchBars1m({ fetchFn = fetch, nowMs = Date.now() } = {}){
   return { bars: null, feed: null, errors };
 }
 
-export function formatSummary(state, day){
+export function formatSummary(state, day, sinayState = null){
   const today = (state.trades || []).filter((t) => t.close && t.close.length && dayOf(t.close) === day);
   const net = today.reduce((x, t) => x + t.net_usd, 0), fees = today.reduce((x, t) => x + t.fees_usd, 0);
   const wins = today.filter((t) => t.net_usd > 0).length, a = state.agg;
-  const lines = [`🧪 מסלול עמית — סיכום יום (דמה, בלי כסף אמיתי)`,
+  const lines = [`🪙 קריפטו — סיכום יום (דמה, בלי כסף אמיתי)`, `🧪 מסלול עמית (סקאלפ ביטקוין)`,
     today.length ? `היום: ${today.length} עסקאות, ${wins} הצלחות, נטו ${usd(net)} (מזה עמלות ${usd(-fees)})` : 'היום: לא היו עסקאות',
     `מצטבר: ${a.n} עסקאות, ${a.wins} הצלחות, נטו ${usd(a.netUsd)} · עמלות ${usd(-a.feesUsd)}`,
     `חשבון: ${Math.round(AMIT.account + a.netUsd).toLocaleString('en-US')}$ מתוך ${AMIT.account.toLocaleString('en-US')}$ · פוזיציה ${AMIT.notional.toLocaleString('en-US')}$`];
   if (state.pos) lines.push(`פתוח עכשיו: ${state.pos.side === 'long' ? 'לונג' : 'שורט'} מ-${Math.round(state.pos.entry).toLocaleString('en-US')}`);
-  return `${lines.join('\n')}\n\ninvest → 🪙 קריפטו`;
+  const sl = sinayDayLines(sinayState, (iso) => dayOf(iso) === day);
+  return `${lines.join('\n')}${sl.length ? '\n\n' + sl.join('\n') : ''}\n\ninvest → 🪙 קריפטו`;
 }
 const dayOf = (iso) => ilParts(Date.parse(iso)).day;
 
@@ -83,7 +86,10 @@ export async function runAmitLive(ctx, { fetchFn = fetch, now = new Date(), forc
   // תקרה קשיחה לכל הכתיבות ביום (חוץ מהשמירה הראשונה של מצב חדש) — גם force, גם שעתית, גם סיכום
   if (!want || (prev && meta.writes >= MAX_WRITES_DAY)) return { ok: true, saved: false, feed, events: r.events.length, capped: (moved && !eventsOk) || !!want };
   let telegram = null;
-  if (summaryDue){ telegram = await sendTelegram(ctx.env, formatSummary(state, day)); meta.summaryDay = day; }
+  if (summaryDue){
+    let sinay = null; try { sinay = (await ctx.db.get(SINAY_KEY))?.state || null; } catch { sinay = null; }
+    telegram = await sendTelegram(ctx.env, formatSummary(state, day, sinay)); meta.summaryDay = day;
+  }
   if (moved && !(force || summaryDue || hourly)) meta.eventWrites = (meta.eventWrites || 0) + 1;
   meta.savedAt = now.toISOString(); meta.writes += 1;
   await ctx.db.put(AMIT_KEY, { savedAt: meta.savedAt, meta, source: { feed, lastRunAt: now.toISOString(), fallbackErrors: errors.length ? errors : undefined }, state });
