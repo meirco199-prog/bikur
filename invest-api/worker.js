@@ -16,6 +16,7 @@ import { recordLive, liveReport } from './lib/agent-live.js';
 import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
 import { ingestSinay, sinayReport, SINAY_KEY } from './lib/sinay.js';
 import { runSinayLive } from './lib/sinay-live.js';
+import { runAmitLive, amitReport, AMIT_KEY } from './lib/amit-live.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -187,6 +188,15 @@ async function handle(req, env0, ctx){
     if (p1 === 'run' && req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       try { return json(await runSinayLive(ctx, { force: q.force === '1', notify: q.notify !== '0' })); } catch (e) { await db.logError('sinay-live', e.message); return err('דמה קריפטו: ' + e.message, e.status || 500); }
+    }
+    return err('not found', 404);
+  }
+  // מסלול "עמית" (דמה, סקאלפ ביטקוין על נרות דקה — lib/amit-live.js): GET ציבורי = דוח; POST /amit/run = הרצה ידנית (סוד ה-cron)
+  if (r0 === 'amit'){
+    if ((!p1 || p1 === 'report') && req.method === 'GET') return json(amitReport(await db.get(AMIT_KEY)));
+    if (p1 === 'run' && req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      try { return json(await runAmitLive(ctx, { force: q.force === '1', notify: q.notify !== '0' })); } catch (e) { await db.logError('amit-live', e.message); return err('מסלול עמית: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }
@@ -762,6 +772,7 @@ export default {
     const ctx = await makeCtx(env, ec.waitUntil.bind(ec));
     // דמה קריפטו בזמן אמת — ראשון ובנפרד, כדי שתקלה בעיבוד המניות לא תעכב התראה (lib/sinay-live.js)
     try { await runSinayLive(ctx); } catch (e) { await ctx.db.logError('sinay-live', e.message); }
+    try { await runAmitLive(ctx); } catch (e) { await ctx.db.logError('amit-live', e.message); } // מסלול עמית (דמה, נרות דקה)
     try {
       const r = await cronStep(ctx);
       if (r?.finalized){ try { await runShadow(ctx); await runAggressive(ctx); await runTracksDecide(ctx); } catch (e) { await ctx.db.logError('shadow', e.message); } await runAutopilot(ctx, { trigger: 'cron' }); }
