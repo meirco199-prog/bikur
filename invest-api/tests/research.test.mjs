@@ -178,3 +178,10 @@ test('R ביחס לתקציב הסיכון המתוכנן: מילוי חלקי �
   const [t2] = execute(ctxOf(mk(400000)), [limitLong()], { coin: 'BTC', risk: { riskUsd: 100 } });
   assert.equal(t2.budget, 100);
 });
+
+test('Funding אחרי סוף הנתונים: עלות קבועה לזנב (הערת GPT ב-#215)', () => {
+  const m = [bar(0, 100.2, 100.3, 99.9, 100), ...flat(600, 100, 1)];
+  const f = Array.from({ length: 5 }, (_, h) => ({ t: T0 + h * 3600e3, rate: 0 })); // נתונים רק עד T0+4h, שיעור 0
+  const [t] = execute(ctxOf(m), [limitLong({ holdMs: 8 * 3600e3 })], { coin: 'BTC', funding: f });
+  assert.ok(Math.abs(t.funding - N400 * 1e-4 * 3 / 8) < 1e-6, 'T0+5h → T0+8h בעלות קבועה');
+});

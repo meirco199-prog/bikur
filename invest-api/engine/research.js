@@ -214,6 +214,7 @@ function fundingCost(funding, side, notional, t0, t1, C){
   if (!funding || !funding.length){ return notional * C.fundingBpsPer8h / 1e4 * (t1 - t0) / (8 * 3600e3); }
   let s = 0; for (let k = lastLE(funding, t0, (f) => f.t) + 1; k < funding.length && funding[k].t <= t1; k++) s += side * funding[k].rate * notional;
   if (t0 < funding[0].t) s += notional * C.fundingBpsPer8h / 1e4 * (Math.min(t1, funding[0].t) - t0) / (8 * 3600e3); // לפני תחילת הנתונים: עלות קבועה
+  const last = funding.at(-1).t; if (t1 > last + 3600e3) s += notional * C.fundingBpsPer8h / 1e4 * (t1 - Math.max(t0, last + 3600e3)) / (8 * 3600e3); // אחרי סוף הנתונים (הערת GPT, #215)
   return s;
 }
 
