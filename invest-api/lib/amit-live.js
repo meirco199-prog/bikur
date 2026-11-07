@@ -12,6 +12,7 @@ import { SINAY_KEY } from './sinay.js';
 import { sendTelegram } from './alerts.js';
 
 export const AMIT_KEY = 'amit:state';
+export const AMITBOT_KEY = 'amitbot:report'; // דוח הבוט בחשבון הדמו של Bybit (scripts/bybit-amit-bot.mjs), כל שעתיים
 const FEED_ERR_KEY = 'amit:feederr';
 export const SAVE_EVERY_MS = 3600e3, MAX_EVENT_WRITES_DAY = 150, MAX_WRITES_DAY = 180, SUMMARY_HOUR_IL = 21;
 const STALE_MIN = 20;
@@ -42,7 +43,32 @@ export async function fetchBars1m({ fetchFn = fetch, nowMs = Date.now() } = {}){
   return { bars: null, feed: null, errors };
 }
 
-export function formatSummary(state, day, sinayState = null){
+// דוח מהבוט (POST /amit/bot, סוד הגשר): נשמר כמו שהוא אחרי בדיקה. תקרת כתיבות: לא יותר מפעם ב-20 דקות, חוץ משינוי מצב עצירה
+const num = (x) => (Number.isFinite(Number(x)) ? Number(x) : null);
+export function cleanBotReport(b){
+  if (!b || typeof b !== 'object' || b.v !== 1 || !/^\d{4}-\d{2}-\d{2}$/.test(String(b.day))) throw Object.assign(new Error('דוח בוט לא תקין'), { status: 400 });
+  const part = (x) => ({ n: Math.max(0, Math.round(num(x?.n) || 0)), wins: Math.max(0, Math.round(num(x?.wins) || 0)), netUsd: num(x?.netUsd) ?? 0 });
+  const pos = b.pos && ['long', 'short'].includes(b.pos.side) ? { side: b.pos.side, size: num(b.pos.size), entry: num(b.pos.entry) } : null;
+  return { v: 1, day: b.day, startedAt: typeof b.startedAt === 'string' ? b.startedAt.slice(0, 30) : null, equity: num(b.equity), today: part(b.today), total: part(b.total),
+    pos, halt: ['daily', 'stop'].includes(b.halt) ? b.halt : null, lastError: b.lastError ? String(b.lastError).slice(0, 200) : null };
+}
+export async function recordAmitBot(db, body, { now = new Date() } = {}){
+  const rep = cleanBotReport(body), prev = await db.get(AMITBOT_KEY);
+  if (prev && prev.halt === rep.halt && now.getTime() - Date.parse(prev.receivedAt) < 20 * 60e3) return { ok: true, saved: false, throttled: true };
+  await db.put(AMITBOT_KEY, { ...rep, receivedAt: now.toISOString() });
+  return { ok: true, saved: true };
+}
+export function botLines(rep, nowMs){
+  if (!rep) return [];
+  const ageH = (nowMs - Date.parse(rep.receivedAt)) / 3600e3;
+  return [`🤖 בוט בחשבון הדמו של Bybit (אותם כללים, פקודות אמיתיות על כסף וירטואלי)`,
+    rep.today.n ? `היום: ${rep.today.n} עסקאות, ${rep.today.wins} הצלחות, נטו ${usd(rep.today.netUsd)}` : 'היום: לא היו עסקאות',
+    `מצטבר: ${rep.total.n} עסקאות, ${rep.total.wins} הצלחות, נטו ${usd(rep.total.netUsd)}${rep.equity ? ` · הון ${Math.round(rep.equity).toLocaleString('en-US')}$` : ''}`,
+    ...(rep.halt ? [rep.halt === 'daily' ? '⛔ נעצר היום: מגבלת הפסד יומית (1,000$)' : '⏸️ עצור ידנית'] : []),
+    ...(ageH > 3 ? [`⚠️ אין דיווח מהבוט ${Math.round(ageH)} שעות — כנראה לא רץ`] : [])];
+}
+
+export function formatSummary(state, day, sinayState = null, botRep = null, nowMs = Date.now()){
   const today = (state.trades || []).filter((t) => t.close && t.close.length && dayOf(t.close) === day);
   const net = today.reduce((x, t) => x + t.net_usd, 0), fees = today.reduce((x, t) => x + t.fees_usd, 0);
   const wins = today.filter((t) => t.net_usd > 0).length, a = state.agg;
@@ -51,8 +77,8 @@ export function formatSummary(state, day, sinayState = null){
     `מצטבר: ${a.n} עסקאות, ${a.wins} הצלחות, נטו ${usd(a.netUsd)} · עמלות ${usd(-a.feesUsd)}`,
     `חשבון: ${Math.round(AMIT.account + a.netUsd).toLocaleString('en-US')}$ מתוך ${AMIT.account.toLocaleString('en-US')}$ · פוזיציה ${AMIT.notional.toLocaleString('en-US')}$`];
   if (state.pos) lines.push(`פתוח עכשיו: ${state.pos.side === 'long' ? 'לונג' : 'שורט'} מ-${Math.round(state.pos.entry).toLocaleString('en-US')}`);
-  const sl = sinayDayLines(sinayState, (iso) => dayOf(iso) === day);
-  return `${lines.join('\n')}${sl.length ? '\n\n' + sl.join('\n') : ''}\n\ninvest → 🪙 קריפטו`;
+  const sl = sinayDayLines(sinayState, (iso) => dayOf(iso) === day), bl = botLines(botRep, nowMs);
+  return `${lines.join('\n')}${bl.length ? '\n\n' + bl.join('\n') : ''}${sl.length ? '\n\n' + sl.join('\n') : ''}\n\ninvest → 🪙 קריפטו`;
 }
 const dayOf = (iso) => ilParts(Date.parse(iso)).day;
 
@@ -87,8 +113,8 @@ export async function runAmitLive(ctx, { fetchFn = fetch, now = new Date(), forc
   if (!want || (prev && meta.writes >= MAX_WRITES_DAY)) return { ok: true, saved: false, feed, events: r.events.length, capped: (moved && !eventsOk) || !!want };
   let telegram = null;
   if (summaryDue){
-    let sinay = null; try { sinay = (await ctx.db.get(SINAY_KEY))?.state || null; } catch { sinay = null; }
-    telegram = await sendTelegram(ctx.env, formatSummary(state, day, sinay)); meta.summaryDay = day;
+    let sinay = null, bot = null; try { sinay = (await ctx.db.get(SINAY_KEY))?.state || null; bot = await ctx.db.get(AMITBOT_KEY); } catch { sinay = sinay || null; }
+    telegram = await sendTelegram(ctx.env, formatSummary(state, day, sinay, bot, nowMs)); meta.summaryDay = day;
   }
   if (moved && !(force || summaryDue || hourly)) meta.eventWrites = (meta.eventWrites || 0) + 1;
   meta.savedAt = now.toISOString(); meta.writes += 1;
