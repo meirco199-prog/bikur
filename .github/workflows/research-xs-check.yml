@@ -1,0 +1,23 @@
+# זמני (ops): בדיקות המשך ל"3 המטבעות החזקים" (scripts/research-xs-check.mjs) — יום החלפה, drift, בלי ZEC, 5 מטבעות, יקום מורחב. מחקר בלבד.
+name: research-xs-check
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-xs-check.yml]
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/cache@v4
+        with: { path: daily-data.json.gz, key: research-daily-2016-2026-11-07-v1 }
+      - uses: actions/cache@v4
+        with: { path: extra-data.json.gz, key: research-daily-extra-2016-2026-11-07-v1 }
+      - name: data (אם המטמון לא זמין)
+        run: '[ -f daily-data.json.gz ] || node invest-api/scripts/research-daily.mjs --start 2016-01-01 --end 2026-11-07 --data daily-data.json.gz > /dev/null'
+      - name: run
+        run: node invest-api/scripts/research-xs-check.mjs --data daily-data.json.gz --extra extra-data.json.gz --out research-xs-check.md

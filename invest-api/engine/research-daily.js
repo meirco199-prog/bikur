@@ -31,7 +31,8 @@ const vol = (C, n, d) => { if (d < n) return NaN; let s = 0, s2 = 0; for (let i 
 
 // ---------- אסטרטגיות: (A, d, state) → משקלות יעד לכל מטבע (סכום |w| ≤ 1). מתבצעות בפתיחת d+1 ----------
 // כל אסטרטגיה: { id, family, perp (לונג/שורט בחוזה), weights(A, d, st) }
-export function strategies(coins){
+// rebalDow (בקשה 8/11 אחרי הערת GPT): יום קבוע בשבוע (UTC, 0 = ראשון) להחלפת המומנטום בין מטבעות, כמו במעקב ה-Paper. ברירת מחדל: d % 7 (כל 7 ימים מתחילת הנתונים)
+export function strategies(coins, { rebalDow = null } = {}){
   const K = coins.length, iB = coins.indexOf('BTC'), iE = coins.indexOf('ETH');
   const live = (A, k, d, need) => d >= need && Number.isFinite(A.C[k][d - need]) && Number.isFinite(A.C[k][d]);
   const ew = (A, d, f, need) => { const act = []; for (let k = 0; k < K; k++) if (live(A, k, d, need)) act.push(k); const w = new Array(K).fill(0); if (!act.length) return w; for (const k of act){ const s = f(k); if (s) w[k] = s / act.length; } return w; };
@@ -59,7 +60,8 @@ export function strategies(coins){
   // 4. מומנטום בין מטבעות: פעם בשבוע — K החזקים לפי תשואת L ימים (ספוט). גרסה עם מסנן: רק כש-BTC מעל הממוצע של 200 יום
   for (const L of [14, 28, 56]) for (const top of [3, 5]) for (const filt of [false, true]){
     S.push({ id: `XS${L}-top${top}${filt ? '-f200' : ''}`, family: 'xsmom', weights: (A, d, st) => {
-      if (st.w && d % 7 !== 0) return st.w;
+      const reb = rebalDow === null ? d % 7 === 0 : new Date(A.days[d]).getUTCDay() === rebalDow;
+      if (st.w && !reb) return st.w;
       const r = []; for (let k = 0; k < K; k++) if (live(A, k, d, Math.max(L, 60))){ const x = ret(A.C[k], L, d); if (Number.isFinite(x)) r.push([k, x]); }
       const w = new Array(K).fill(0);
       if (!(filt && !(A.C[iB][d] > sma(A.C[iB], 200, d)))){ r.sort((a, b) => b[1] - a[1]); const pick = r.slice(0, top).filter((x) => x[1] > 0); for (const [k] of pick) w[k] = 1 / top; }
@@ -84,14 +86,24 @@ export function strategies(coins){
 // leverage > 1 (בקשת מאיר 7/11: "תריץ את הבדיקה במינוף ×1.5 ו-×2"): המשקלות כפול המינוף, הביצוע בחוזה (עמלת חוזה + Funding על כל
 // הנוציונל), וחיסול: אם במהלך היום (שפל/שיא) ההון יורד מתחת לביטחונות המינימליים (mmr × החשיפה) — ההון מתאפס והסדרה נעצרת.
 // liqBy: 'low' = לפי השפל של היום בבורסה (מחמיר: גם "פתיל" חריג של בורסה אחת); 'close' = לפי הסגירה (מקל: מחיר הסימון בחוזים מבוסס מדד של כמה בורסות)
-export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low' } = {}){
+// drift (8/11, אחרי הערת GPT): המשקלות זזים עם המחירים בין החלפות, ומחליפים רק כשהאות משתנה — כמו תיק אמיתי ומעקב ה-Paper.
+// ברירת המחדל (false) = משקלי יעד קבועים כל יום בלי עלות איזון (ההתנהגות המקורית; התוצאות הקודמות לא משתנות).
+export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low', drift = false } = {}){
   const { coins, days, O, C, H, L: LO } = A, K = coins.length, out = [], st = {}, perp = !!strat.perp || leverage > 1;
   let liquidated = null, liqInfo = null;
   const slip = (k) => (cost.slipBps[coins[k]] ?? cost.slipOther) / 1e4;
-  let w = new Array(K).fill(0), entries = 0;
+  let w = new Array(K).fill(0), entries = 0, prevRaw = null;
+  const same = (a, b) => a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) < 1e-12);
   for (let d = 1; d < days.length; d++){
     // יום d: בפתיחה מבצעים את מה שהוחלט בסגירת d−1
-    let tgt = strat.weights(A, d - 1, st).map((x) => (Number.isFinite(x) ? x : 0));
+    const raw = strat.weights(A, d - 1, st).map((x) => (Number.isFinite(x) ? x : 0));
+    let tgt = raw.slice(), wo = w;
+    if (drift){ // המשקלות בפתיחה אחרי תנועת הלילה; אות שלא השתנה → לא נוגעים בתיק
+      let nt = 0; const g = w.map((x, k) => { const q = C[k][d - 1], o = O[k][d]; const m = Number.isFinite(q) && Number.isFinite(o) ? o / q : 1; nt += x * (m - 1); return x * m; });
+      wo = g.map((x) => x / (1 + nt));
+      if (prevRaw && same(raw, prevRaw)) tgt = wo.slice();
+    }
+    prevRaw = raw;
     if (volTarget > 0){ const pv = portVol(A, tgt, d - 1); if (pv > 0) tgt = tgt.map((x) => x * Math.min(1, volTarget / pv)); }
     const gross = tgt.reduce((s, x) => s + Math.abs(x), 0); if (gross > 1) tgt = tgt.map((x) => x / gross); // בלי מינוף
     if (leverage !== 1) tgt = tgt.map((x) => x * leverage);
@@ -103,7 +115,7 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
       r += w[k] * (o / c0 - 1) + tgt[k] * (c / o - 1); // הלילה עם המשקל הישן, היום עם החדש
       night += w[k] * (o / c0 - 1);
       if (tgt[k]){ const ext = liqBy === 'close' ? c : tgt[k] > 0 ? LO?.[k]?.[d] : H?.[k]?.[d]; if (Number.isFinite(ext)) worst += tgt[k] * (ext / o - 1); }
-      const dw = Math.abs(tgt[k] - w[k]); turn += dw;
+      const dw = Math.abs(tgt[k] - wo[k]); turn += dw;
       if (!w[k] && tgt[k]) entries += 1;
       cst += dw * ((perp ? cost.perpBps : cost.spotBps) / 1e4 + slip(k)) * costMult;
       if (perp && tgt[k]){
@@ -119,7 +131,8 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
       break;
     }
     out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo });
-    w = tgt;
+    if (drift){ let dr = 0; const v = tgt.map((x, k) => { const o = O[k][d], c = C[k][d], m = x && Number.isFinite(o) && Number.isFinite(c) ? c / o : 1; dr += x * (m - 1); return x * m; }); w = v.map((x) => x / (1 + dr)); }
+    else w = tgt;
   }
   return { series: out, entries, liquidated, liqInfo };
 }

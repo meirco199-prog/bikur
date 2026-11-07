@@ -72,3 +72,16 @@ test('מינוף: ×2 מכפיל את התשואה היומית, בחוזה (ע�
   assert.ok(r.liquidated); assert.equal(dstats(r.series).total, -1);
   assert.equal(runDaily(A, s, { leverage: 1.5 }).liquidated, null, '×1.5: ירידה של 60% = הפסד 90%, עדיין לא חיסול');
 });
+
+test('drift: אות קבוע → אין מסחר אחרי הכניסה, והתיק = קנה-והחזק של כל רגל (המשקלות זזים עם המחירים); rebalDow: החלפה רק ביום ראשון', () => {
+  const A = align({ BTC: series(60, (i) => 100 * 1.02 ** i), ETH: series(60, (i) => 50 * 0.99 ** i) });
+  const s = { id: 'half', family: 'x', weights: () => [0.5, 0.5] }, { series: r } = runDaily(A, s, { drift: true });
+  assert.ok(r.slice(1).every((x) => x.turn < 1e-12), 'אין איזון אחרי הכניסה');
+  const eq = r.reduce((e, x) => e * (1 + x.gross), 1), bh = 0.5 * A.C[0][59] / A.O[0][1] + 0.5 * A.C[1][59] / A.O[1][1];
+  assert.ok(Math.abs(eq - bh) / bh < 2e-3, `${eq} ≠ ${bh}`); // תשואה מצטברת = חצי-חצי קנה והחזק (בקירוב של סכימת לילה+יום)
+  const { series: r0 } = runDaily(A, s); assert.ok(Math.abs(r0.reduce((e, x) => e * (1 + x.gross), 1) - bh) / bh > 5e-3, 'בלי drift = איזון יומי (שונה)');
+  let x = 100, seed = 9; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647), mk = () => { x = 100; return series(300, () => (x *= Math.exp((rnd() - 0.48) * 0.05))); };
+  const B = align({ BTC: mk(), ETH: mk(), SOL: mk(), ADA: mk(), LTC: mk() });
+  const xs = strategies(B.coins, { rebalDow: 0 }).find((q) => q.id === 'XS14-top3'), st = {}; let prev = null;
+  for (let d = 70; d < 300; d++){ const w = xs.weights(B, d, st); if (prev && w !== prev) assert.equal(new Date(B.days[d]).getUTCDay(), 0); prev = w; }
+});
