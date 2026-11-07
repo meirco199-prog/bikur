@@ -54,3 +54,15 @@ test('recost: Maker 2bp לכל צד במקום העלות המקורית; hstats
   assert.ok(Math.abs(recost(d, { mult: 2 })[0].net - 0.006) < 1e-12);
   const h = hstats(d); assert.equal(h.edgeBps, 50); assert.equal(h.costBps, 10);
 });
+
+test('עסקאות: סכום ה-pnl של כל העסקאות = סכום התשואות היומיות פחות עלויות ו-Funding; tstats מחשב Profit Factor ותוחלת', async () => {
+  const { tstats } = await import('../engine/research-hourly.js');
+  const A = alignH({ BTC: walk(24 * 60), ETH: walk(24 * 60), SOL: walk(24 * 60), ADA: walk(24 * 60), LTC: walk(24 * 60), DOGE: walk(24 * 60), XRP: walk(24 * 60), DOT: walk(24 * 60) });
+  for (const id of ['VBO0.3-BE', 'EMA12-48-EW-LS', 'REV4-r4-LS', 'DCH24-12-EW']){
+    const s = strategies(A).find((x) => x.id === id), { daily, trades } = runBars(A, s);
+    const a = daily.reduce((t, x) => t + x.gross - x.cost - x.fund, 0), b = trades.reduce((t, x) => t + x.pnl, 0);
+    assert.ok(Math.abs(a - b) < 1e-9, `${id}: ${a} ≠ ${b}`); assert.ok(trades.length > 0, id);
+  }
+  const st = tstats([{ t: 0, w: 0.5, pnl: 0.01, bars: 3 }, { t: 1, w: 0.5, pnl: -0.005, bars: 1 }, { t: 2, w: 1, pnl: 0.01, bars: 2 }]);
+  assert.equal(st.n, 3); assert.equal(st.pf, 3); assert.equal(st.winRate, 0.67); assert.equal(st.expPct, 0.67); // (2% − 1% + 1%) / 3
+});

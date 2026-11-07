@@ -4,7 +4,7 @@
 // שימוש: node invest-api/scripts/research-hourly.mjs [--start 2019-01-01] [--end 2026-11-07] [--data h.json.gz] [--out r.md] [--show-test]
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { alignH, strategies, runBars, recost, hstats, HCOST, HOUR } from '../engine/research-hourly.js';
+import { alignH, strategies, runBars, recost, hstats, tstats, HCOST, HOUR } from '../engine/research-hourly.js';
 import { dstats, dscore } from '../engine/research-daily.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
@@ -63,9 +63,9 @@ async function main(){
   const OOS = SHOW_TEST ? P.test : P.val;
   const S = strategies(A, F), res = new Map(), t0 = Date.now();
   for (const s of S){
-    const { daily } = runBars(A, s, { funding: F });
+    const { daily, trades } = runBars(A, s, { funding: F });
     const mk = recost(daily, { bpsPerTurn: HCOST.makerBps });
-    res.set(s.id, { s, daily, st: Object.fromEntries(Object.entries(P).map(([k, p]) => [k, dstats(daily, p)])), hs: Object.fromEntries(Object.entries(P).map(([k, p]) => [k, hstats(daily, p)])),
+    res.set(s.id, { s, daily, ts: Object.fromEntries(Object.entries(P).map(([k, p]) => [k, tstats(trades, p)])), st: Object.fromEntries(Object.entries(P).map(([k, p]) => [k, dstats(daily, p)])), hs: Object.fromEntries(Object.entries(P).map(([k, p]) => [k, hstats(daily, p)])),
       c15: dstats(recost(daily, { mult: 1.5 }), OOS), c2: dstats(recost(daily, { mult: 2 }), OOS), maker: dstats(mk, OOS), makerTrain: dstats(mk, P.train), gross: dstats(daily.map((x) => ({ ...x, net: x.gross })), OOS),
       byYear: Object.fromEntries([...new Set(days.map((t) => new Date(t).getUTCFullYear()))].map((y) => [y, dstats(daily, { from: Date.UTC(y, 0, 1), to: Date.UTC(y + 1, 0, 1) })])) });
   }
@@ -105,6 +105,13 @@ async function main(){
     if (p === 'test' && !SHOW_TEST){ L.push(`| ${x.fam} | \`${x.best.s.id}\` | מבחן | 🔒 | | | | | | |`); continue; }
     const s = x.best.st[p], h = x.best.hs[p];
     L.push(`| ${x.fam} | \`${x.best.s.id}\` | ${pn} | ${pct(s.cagr)} | ${fs(s.sharpe)} ${fci(s.ci)} | ${pct(-s.maxDD)} | ${pct(h.exposure)} | ${h.entriesYr} | ${bp(h.edgeBps)} | ${pct(-s.costTotal)} |`);
+  }
+  L.push('', '## עסקאות — נציג כל משפחה (אחרי עמלות, החלקה ו-Funding; באחוזים מגודל הפוזיציה)');
+  L.push('| גרסה | תקופה | עסקאות | ביום (לכל מטבע) | הצלחה | Profit Factor | תוחלת לעסקה | רווח ממוצע | הפסד ממוצע | החזקה ממוצעת (שעות) |', '|---|---|---|---|---|---|---|---|---|---|');
+  for (const x of report) for (const [pn, p] of [['אימון', 'train'], ['אימות', 'val'], ['מבחן', 'test']]){
+    if (p === 'test' && !SHOW_TEST) continue;
+    const q = x.best.ts[p], days_ = x.best.st[p].n || 1, nc = x.best.s.id.includes('-BE') ? 2 : A.coins.length;
+    L.push(`| \`${x.best.s.id}\` | ${pn} | ${q.n} | ${q.n ? (q.n / days_ / nc).toFixed(2) : '—'} | ${q.n ? pct(q.winRate) : '—'} | ${q.pf ?? '—'} | ${q.n ? `${q.expPct >= 0 ? '+' : '−'}${Math.abs(q.expPct).toFixed(2)}%` : '—'} | ${q.avgWinPct != null ? `+${q.avgWinPct.toFixed(2)}%` : '—'} | ${q.avgLossPct != null ? `−${Math.abs(q.avgLossPct).toFixed(2)}%` : '—'} | ${q.avgBars ?? '—'} |`);
   }
   L.push('', '## פסיקה');
   L.push(`| משפחה | גרסה | Walk-Forward (מחוץ למדגם) | ${oosName}: לפני עלויות / עלויות ×1.5 / ×2 / Maker (שארפ) | פסיקה | למה |`, '|---|---|---|---|---|---|');

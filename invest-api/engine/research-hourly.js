@@ -178,12 +178,13 @@ export function strategies(A, funding = {}){
 }
 
 // ---------- הרצה: תיק לפי נרות, מסוכם לסדרה יומית (UTC) ----------
-// מחזיר daily = [{t (יום), gross, cost, fund, net (מורכב בתוך היום), turn, exp (ממוצע), ent (כניסות)}] — אותו מבנה כמו runDaily
+// מחזיר daily = [{t (יום), gross, cost, fund, net (מורכב בתוך היום), turn, exp (ממוצע), ent (כניסות)}] — אותו מבנה כמו runDaily,
+// ו-trades = [{t (כניסה), coin, dir, w (משקל בכניסה), pnl (חלק מההון, אחרי עלויות ו-Funding, בלי ריבית דריבית), bars}]
 export function runBars(A, strat, { funding = {}, costMult = 1, C: cost = HCOST } = {}){
   const { coins, T, O, C } = A, K = coins.length, N = T.length, st = {}, perp = !!strat.perp;
   const slip = (k) => (cost.slipBps[coins[k]] ?? cost.slipOther) / 1e4;
   const longFundBar = cost.longFundBpsDay / 1e4 * (A.step / DAY);
-  const daily = []; let w = new Array(K).fill(0), entries = 0;
+  const daily = [], trades = [], open = new Array(K).fill(null); let w = new Array(K).fill(0), entries = 0;
   let curDay = null, eq = 1, g = 0, cs = 0, fu = 0, tu = 0, ex = 0, nb = 0, en = 0;
   const flush = () => { if (curDay !== null) daily.push({ t: curDay, gross: g, cost: cs, fund: fu, net: eq - 1, turn: tu, exp: nb ? ex / nb : 0, ent: en }); };
   for (let i = 1; i < N; i++){
@@ -194,19 +195,31 @@ export function runBars(A, strat, { funding = {}, costMult = 1, C: cost = HCOST 
     let r = 0, cst = 0, fund = 0, turn = 0;
     for (let k = 0; k < K; k++){
       const c0 = C[k][i - 1], o = O[k][i], c = C[k][i];
-      if (!(Number.isFinite(c0) && Number.isFinite(o) && Number.isFinite(c))){ tgt[k] = 0; continue; }
-      r += w[k] * (o / c0 - 1) + tgt[k] * (c / o - 1);
+      if (!(Number.isFinite(c0) && Number.isFinite(o) && Number.isFinite(c))){ tgt[k] = 0; if (open[k]){ trades.push(open[k]); open[k] = null; } continue; }
+      const night = w[k] * (o / c0 - 1), day = tgt[k] * (c / o - 1), rate = (cost.perpBps / 1e4 + slip(k)) * costMult;
+      r += night + day;
       const dw = Math.abs(tgt[k] - w[k]); turn += dw;
-      if (tgt[k] && Math.sign(tgt[k]) !== Math.sign(w[k])){ entries += 1; en += 1; } // כניסה חדשה או היפוך כיוון
-      cst += dw * (cost.perpBps / 1e4 + slip(k)) * costMult;
-      if (perp && tgt[k]){ const f = funding[coins[k]]?.get(T[i]); fund += f !== undefined ? tgt[k] * f : (tgt[k] > 0 ? tgt[k] * longFundBar : 0); }
+      const flip = tgt[k] && Math.sign(tgt[k]) !== Math.sign(w[k]);
+      if (flip){ entries += 1; en += 1; } // כניסה חדשה או היפוך כיוון
+      cst += dw * rate;
+      let fk = 0;
+      if (perp && tgt[k]){ const f = funding[coins[k]]?.get(T[i]); fk = f !== undefined ? tgt[k] * f : (tgt[k] > 0 ? tgt[k] * longFundBar : 0); fund += fk; }
+      // מעקב עסקאות (לכל מטבע): הלילה + עלות היציאה לעסקה הישנה; הכניסה, היום וה-Funding לחדשה
+      let tr = open[k];
+      if (tr){ tr.pnl += night; if (!tgt[k] || flip){ tr.pnl -= Math.abs(w[k]) * rate; trades.push(tr); tr = open[k] = null; } }
+      if (tgt[k]){
+        if (!tr) tr = open[k] = { t: T[i], coin: coins[k], dir: Math.sign(tgt[k]), w: Math.abs(tgt[k]), pnl: -Math.abs(tgt[k]) * rate, bars: 0 };
+        else tr.pnl -= dw * rate;
+        tr.pnl += day - fk; tr.bars += 1;
+      }
     }
     const net = r - cst - fund;
     eq *= 1 + net; g += r; cs += cst; fu += fund; tu += turn; ex += tgt.reduce((s, x) => s + Math.abs(x), 0); nb += 1;
     w = tgt;
   }
   flush();
-  return { daily, entries };
+  for (const tr of open) if (tr) trades.push({ ...tr, openAtEnd: true });
+  return { daily, entries, trades };
 }
 
 // תרחיש עלות אחר בלי הרצה מחדש: עלות = turn × perBpsSide (למשל Maker 0.02% בלי החלקה), או כפולה של העלות המקורית
@@ -219,4 +232,14 @@ export function hstats(daily, { from = -Infinity, to = Infinity } = {}){
   const s = daily.filter((x) => x.t >= from && x.t < to), n = s.length; if (!n) return { n: 0 };
   const sum = (f) => s.reduce((a, x) => a + f(x), 0), turn = sum((x) => x.turn), r1 = (x) => Math.round(x * 10) / 10;
   return { n, edgeBps: turn ? r1(sum((x) => x.gross) / turn * 1e4) : null, costBps: turn ? r1(sum((x) => x.cost) / turn * 1e4) : null, entriesYr: Math.round(sum((x) => x.ent) / n * 365), exposure: Math.round(sum((x) => x.exp) / n * 100) / 100 };
+}
+
+// מדדי עסקאות לתקופה (לפי זמן הכניסה): אחוז הצלחה, Profit Factor (סך הרווחים / סך ההפסדים, אחרי עלויות), תוחלת לעסקה
+// (באחוזים מגודל הפוזיציה), רווח ממוצע / הפסד ממוצע, ומשך החזקה ממוצע בנרות. עסקה שעוד פתוחה בסוף הנתונים לא נספרת.
+export function tstats(trades, { from = -Infinity, to = Infinity } = {}){
+  const s = trades.filter((x) => !x.openAtEnd && x.t >= from && x.t < to), n = s.length; if (!n) return { n: 0 };
+  const pos = s.map((x) => x.pnl / x.w), win = pos.filter((x) => x > 0), loss = pos.filter((x) => x <= 0);
+  const sw = win.reduce((a, b) => a + b, 0), sl = -loss.reduce((a, b) => a + b, 0), r2 = (x) => Math.round(x * 100) / 100;
+  return { n, winRate: r2(win.length / n), pf: sl > 0 ? r2(sw / sl) : null, expPct: r2(pos.reduce((a, b) => a + b, 0) / n * 100),
+    avgWinPct: win.length ? r2(sw / win.length * 100) : null, avgLossPct: loss.length ? r2(-sl / loss.length * 100) : null, avgBars: Math.round(s.reduce((a, x) => a + x.bars, 0) / n) };
 }

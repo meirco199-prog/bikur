@@ -1,4 +1,4 @@
-# זמני (ops): שיטות קריפטו קצרות טווח על נרות שעה מ-2019 (scripts/research-hourly.mjs). מחקר בלבד. MODE=dev → המבחן מוסתר; final → --show-test
+# זמני (ops): שיטות קריפטו קצרות טווח על נרות שעה מ-2019 (scripts/research-hourly.mjs), כולל מדדי עסקאות (Profit Factor, תוחלת). מחקר בלבד. MODE=dev → המבחן מוסתר; final → --show-test
 name: research-hourly
 on:
   push:
