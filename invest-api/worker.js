@@ -17,6 +17,7 @@ import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
 import { ingestSinay, sinayReport, SINAY_KEY } from './lib/sinay.js';
 import { runSinayLive } from './lib/sinay-live.js';
 import { runAmitLive, amitReport, recordAmitBot, AMIT_KEY, AMITBOT_KEY, AMITBOT2_KEY } from './lib/amit-live.js';
+import { recordPaper, XSPAPER_KEY } from './lib/xsmom-paper.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -203,6 +204,15 @@ async function handle(req, env0, ctx){
     if (p1 === 'run' && req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       try { return json(await runAmitLive(ctx, { force: q.force === '1', notify: q.notify !== '0' })); } catch (e) { await db.logError('amit-live', e.message); return err('מסלול עמית: ' + e.message, e.status || 500); }
+    }
+    return err('not found', 404);
+  }
+  // מעקב Paper למומנטום בין מטבעות (lib/xsmom-paper.js): GET /xsmom ציבורי = המצב; POST /xsmom = עדכון יומי מ-Actions (scripts/xsmom-paper.mjs) עם סוד ה-cron
+  if (r0 === 'xsmom' && !p1){
+    if (req.method === 'GET') return json((await db.get(XSPAPER_KEY)) || null);
+    if (req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      try { return json(await recordPaper(db, body)); } catch (e) { if (!e.status) await db.logError('xsmom-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }
