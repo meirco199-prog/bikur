@@ -1,0 +1,21 @@
+# זמני (ops): המומנטום בין מטבעות במינוף ×1/×1.5/×2/×3 (scripts/research-leverage.mjs) על אותם נתונים יומיים של research-daily. מחקר בלבד.
+name: research-leverage
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-leverage.yml]
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/cache@v4
+        with: { path: daily-data.json.gz, key: research-daily-2016-2026-11-07-v1 }
+      - name: data (אם המטמון לא זמין)
+        run: '[ -f daily-data.json.gz ] || node invest-api/scripts/research-daily.mjs --start 2016-01-01 --end 2026-11-07 --data daily-data.json.gz > /dev/null'
+      - name: run
+        run: node invest-api/scripts/research-leverage.mjs --data daily-data.json.gz --out research-leverage.md
