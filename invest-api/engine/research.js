@@ -148,6 +148,7 @@ export function* signals(ctx, s){
   const T = ctx.tf[s.tf], { bars, bb, atr: A } = T, tfMs = TF_MIN[s.tf] * 60e3, holdMs = (s.holdBars || HOLD[s.tf]) * tfMs;
   const lowest = (i, n) => { let m = Infinity; for (let j = Math.max(0, i - n + 1); j <= i; j++) m = Math.min(m, bars[j].l); return m; };
   const highest = (i, n) => { let m = -Infinity; for (let j = Math.max(0, i - n + 1); j <= i; j++) m = Math.max(m, bars[j].h); return m; };
+  let pend = null; // flash/reclaim: אירוע קריסה שמחכה לנר היפוך
   for (let i = 60; i < bars.length - 1; i++){
     if (!Number.isFinite(bb.mid[i]) || !Number.isFinite(A[i])) continue;
     const b = bars[i], band = (side, which) => which === 'mid' ? bb.mid[i] : side > 0 ? bb.up[i] : bb.lo[i];
@@ -187,6 +188,30 @@ export function* signals(ctx, s){
       const lo0 = b.l, hi0 = b.h;
       legs = [{ side: sd, type: 'limit', price, stop: () => (up ? lo0 * 0.999 : hi0 * 1.001), target: () => (up ? hi0 : lo0), cancelAt: up ? hi0 : lo0, minRR: 0, tpMaker: true }];
       validMs = 4 * tfMs;
+    } else if (s.family === 'flash'){
+      // קנייה בקריסה חדה (סרטון של עמית, 7/11: FARTCOIN נפל ~8% עם זינוק נפח, קנייה מדורגת בתוך הנפילה, חזרה למעלה).
+      // אירוע: השפל של הנר נמוך ב-drop% לפחות מהשיא של n הנרות הקודמים, הנפח ≥ volX × ממוצע 48 הנרות הקודמים, והסגירה עדיין
+      // בחצי התחתון של הנפילה. לונג בלבד (חיסולי לונגים).
+      const pre = highest(i - 1, s.n), drop = (pre - b.l) / pre * 100;
+      let avgV = 0; for (let j = i - 48; j < i; j++) avgV += bars[j].v; avgV /= 48;
+      const evt = drop >= s.drop && avgV > 0 && b.v >= s.volX * avgV && b.c < pre * (1 - s.drop / 200);
+      if (s.mode === 'ladder'){
+        // שלוש פקודות ממתינות מתחת לסגירה (1.5% / 3% / 5%, משקלות 1:2:3), סטופ stopPct מתחת לסגירה, יעד: חצי/כל הדרך חזרה לשיא
+        if (!evt) continue;
+        const tgt = s.target === 'full' ? pre : b.c + 0.5 * (pre - b.c), w = [1, 2, 3], tot = 6;
+        legs = [{ side: 1, type: 'ladder', rungs: [0.015, 0.03, 0.05].map((k, q) => ({ price: b.c * (1 - k), w: w[q] / tot })), stopPx: b.c * (1 - s.stopPct / 100), targetPx: tgt }];
+        validMs = 24 * tfMs;
+      } else {
+        // reclaim: אחרי האירוע מחכים עד 6 נרות לנר ירוק ראשון → כניסה בשוק; סטופ מתחת לשפל הקריסה; יעד חצי/כל הדרך לשיא
+        if (evt && !pend){ pend = { low: b.l, pre, until: i + 6 }; continue; }
+        if (!pend) continue;
+        pend.low = Math.min(pend.low, b.l);
+        if (i > pend.until){ pend = null; continue; }
+        if (!(b.c > b.o)) continue;
+        const lowX = pend.low, preX = pend.pre, stopPx = lowX * 0.995, tgt = s.target === 'full' ? preX : lowX + 0.5 * (preX - lowX);
+        pend = null;
+        legs = [{ side: 1, type: 'market', stop: () => stopPx, target: () => tgt, minRR: 0, tpMaker: true, maxStop: s.maxStopPct }];
+      }
     } else if (s.family === 'donchian'){
       // מגמה (לא מעמית): פריצת ערוץ של n נרות, סטופ נגרר ATR, בלי יעד
       const hh = highest(i - 1, s.n), ll = lowest(i - 1, s.n);
@@ -474,3 +499,7 @@ export const BASES = Object.freeze([
   // השוואה (לא מעמית): פריצה עם סטופ 1.5 ATR, יעד 2R/3R — לבדוק אם יש בכלל יתרון שעובר עלויות בנתונים האלה
   ...['15m', '1h'].flatMap((tf) => [2, 3].map((R) => ({ id: `X-breakout-${tf}-${R}R`, exp: 0, family: 'breakout', tf, stop: { atr: 1.5 }, target: R }))),
 ]);
+
+// קנייה בקריסות חדות (סרטון של עמית, 7/11): נפרד מ-BASES (רץ ב-scripts/research-flash.mjs על נרות 5 דקות, מטבעות קטנים ותנודתיים)
+export const FLASH_BASES = Object.freeze([3, 12].flatMap((n) => [5, 8, 12].flatMap((drop) => ['ladder', 'reclaim'].flatMap((mode) => ['half', 'full'].map((target) =>
+  ({ id: `F-${mode}-n${n}-d${drop}-${target}`, exp: 30, family: 'flash', tf: '5m', n, drop, volX: 3, mode, target, stopPct: 8, maxStopPct: 25, holdBars: 288, stop: {} }))))));

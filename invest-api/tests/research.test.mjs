@@ -185,3 +185,23 @@ test('Funding אחרי סוף הנתונים: עלות קבועה לזנב (הע
   const [t] = execute(ctxOf(m), [limitLong({ holdMs: 8 * 3600e3 })], { coin: 'BTC', funding: f });
   assert.ok(Math.abs(t.funding - N400 * 1e-4 * 3 / 8) < 1e-6, 'T0+5h → T0+8h בעלות קבועה');
 });
+
+test('קריסה חדה (FLASH_BASES): אירוע עם נפח ×3 → reclaim נכנס אחרי נר ירוק, יעד חצי מהנפילה; ladder ממלא שלבים בתוך הנפילה', async () => {
+  const { FLASH_BASES } = await import('../engine/research.js');
+  const M5 = 5 * 60e3, mk = (i, o, h, l, c, v = 1e6) => ({ t: T0 + i * M5, o, h, l, c, v });
+  const bars = [];
+  for (let i = 0; i < 300; i++) bars.push(mk(i, 100, 100.05, 99.95, 100));
+  bars.push(mk(300, 100, 100, 90, 91, 1e7));          // קריסה: 10% מתחת לשיא, נפח ×10
+  bars.push(mk(301, 91, 91.5, 88, 89, 5e6));          // ממשיך למטה (ממלא שלבים בגרסה המדורגת)
+  bars.push(mk(302, 89, 92, 88.5, 91.8, 4e6));        // נר ירוק → אות reclaim
+  bars.push(mk(303, 91.8, 93, 91.5, 92.8, 3e6));
+  for (let i = 304; i < 330; i++) bars.push(mk(i, 93 + (i - 304) * 0.2, 93.3 + (i - 304) * 0.2, 92.9 + (i - 304) * 0.2, 93.2 + (i - 304) * 0.2, 2e6));
+  const ctx = prepare(bars, { baseMin: 5 });
+  const rec = FLASH_BASES.find((b) => b.id === 'F-reclaim-n12-d8-half'), lad = FLASH_BASES.find((b) => b.id === 'F-ladder-n12-d8-half');
+  const [r] = execute(ctx, signals(ctx, rec), { coin: 'SOL', risk: { maxStopPct: 25 } });
+  assert.ok(r, 'יש עסקת reclaim'); assert.equal(r.side, 1); assert.equal(r.entry, 91.8); assert.equal(r.why, 'יעד');
+  assert.ok(Math.abs(r.exit - (88 + 0.5 * (100.05 - 88))) < 1e-9, 'יעד = חצי מהנפילה מהשפל');
+  const [l] = execute(ctx, signals(ctx, lad), { coin: 'SOL', risk: { maxStopPct: 25 } });
+  assert.ok(l, 'יש עסקה מדורגת'); assert.match(l.why, /^יעד \(2\/3/); assert.equal(l.fT, 0);
+  assert.equal(FLASH_BASES.length, 24);
+});
