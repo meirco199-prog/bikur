@@ -70,7 +70,7 @@ test('Funding: ברירת מחדל 1bp ל-8 שעות כעלות; נתונים ש
   const m = [bar(0, 100.2, 100.3, 99.9, 100), ...flat(600, 100, 1)];
   const [t] = execute(ctxOf(m), [limitLong({ holdMs: 8 * 3600e3 })], { coin: 'BTC' });
   assert.equal(t.why, 'זמן'); assert.ok(Math.abs(t.funding - N400 * 1e-4) < 1e-6);
-  const f = Array.from({ length: 8 }, (_, h) => ({ t: T0 + (h + 1) * 3600e3, rate: 0.0001 }));
+  const f = Array.from({ length: 9 }, (_, h) => ({ t: T0 + h * 3600e3, rate: 0.0001 }));
   const [t2] = execute(ctxOf(m), [limitLong({ holdMs: 8 * 3600e3 })], { coin: 'BTC', funding: f });
   assert.ok(Math.abs(t2.funding - 8 * 0.0001 * N400) < 1e-6);
 });
@@ -116,7 +116,7 @@ test('קצה לקצה על הליכה אקראית: כל הבסיסים רצים
   let x = 100, seed = 3; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const m1 = Array.from({ length: 12 * 1440 }, (_, i) => { const o = x; x *= 1 + (rnd() - 0.5) * 0.003; return bar(i, o, Math.max(o, x) * (1 + rnd() * 6e-4), Math.min(o, x) * (1 - rnd() * 6e-4), x, 3e6 * (0.5 + rnd())); });
   const ctx = prepare(m1);
-  assert.equal(BASES.length, 64); assert.equal(new Set(BASES.map((b) => b.id)).size, 64);
+  assert.equal(BASES.length, 72); assert.equal(new Set(BASES.map((b) => b.id)).size, 72);
   for (const b of BASES){ const tr = execute(ctx, signals(ctx, b), { coin: 'SOL' }); for (const t of tr) assert.ok(Number.isFinite(t.net) && t.fees >= 0 && t.risk > 0 && t.tExit > t.tEntry, b.id); }
   const s = stats(execute(ctx, signals(ctx, BASES[0]), { coin: 'SOL' }));
   assert.ok(s.n > 100 && !(s.ciRGross[0] > 0) && s.net < 0);
@@ -154,4 +154,18 @@ test('מגבלת עסקאות ליום + דרגת עמלות + מכפיל איז
   const s = stats([x], { feeTier: { maker: 1.4, taker: 3.5 } });
   assert.ok(Math.abs(s.net - (100 - (14 + 35) - 15)) < 1e-6);
   assert.equal(stats([x]).breakEvenCost, 1.11);
+});
+
+test('בסיס 5 דקות + מגמה ארוכת טווח: סטופ נגרר, בלי יעד, Funding קבוע לפני תחילת הנתונים', () => {
+  // עלייה הדרגתית ואז ירידה חדה: פריצת ערוץ יומי → לונג, יציאה בסטופ הנגרר
+  const m5 = []; let x = 100;
+  for (let i = 0; i < 200 * 288; i++){ const day = Math.floor(i / 288); x = day < 150 ? 100 * (1 + 0.004 * Math.max(0, day - 100)) * (1 + 0.002 * Math.sin(i / 7)) : x * 0.9995; m5.push({ t: T0 + i * 5 * M, o: x, h: x * 1.001, l: x * 0.999, c: x, v: 1e8 }); }
+  const ctx = prepare(m5, { baseMin: 5 });
+  assert.equal(ctx.tf['1m'], undefined); assert.equal(ctx.tf['1d'].bars.length, 200);
+  const b = BASES.find((q) => q.id === 'T-donchian-1d-20-long');
+  const f = [{ t: T0 + 180 * 86400e3, rate: 0.0001 }];
+  const tr = execute(ctx, signals(ctx, b), { coin: 'BTC', funding: f });
+  assert.ok(tr.length >= 1); const t = tr[0];
+  assert.equal(t.side, 1); assert.equal(t.why, 'סטופ נגרר'); assert.ok(t.gross > 0 && t.tExit > T0 + 150 * 86400e3);
+  assert.ok(t.funding > 0, 'לפני 180 יום אין נתוני Funding → עלות קבועה');
 });
