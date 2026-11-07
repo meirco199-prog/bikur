@@ -61,3 +61,18 @@ test('Worker: cleanVbo דוחה דוח זר; שורות בסיכום היומי'
   assert.match(formatSummary(s, '2026-02-19', null, null, T0 + 50 * DAY, null, null, rep), /⚡ מעקב Paper/);
   assert.equal(VBOPAPER_KEY, 'paper:vbo');
 });
+
+test('שעה שחסרה ל-BTC מעובדת ל-ETH; נר 23:00 חסר → יוצאים במחיר האחרון הידוע (הערת GPT ב-#221)', () => {
+  const bars = mk(), from = T0 + 25 * DAY;
+  const prev = { ...newState(T0, VBO), lastHour: iso(from - HOUR), startDay: '2026-01-26', btcStart: bars.BTC[599].c };
+  const full = step(prev, bars).state;
+  const ethTrade = full.trades.find((x) => x.coin === 'ETH'); assert.ok(ethTrade, 'צריך עסקת ETH לבדיקה');
+  const tIn = Date.parse(ethTrade.in) - HOUR, tOut = Date.parse(ethTrade.out) - HOUR; // נר ההחלטה ונר 23:00 של אותה עסקה
+  const holes = { BTC: bars.BTC.filter((b) => b.t !== tIn && b.t !== tOut), ETH: bars.ETH };
+  const r = step(prev, holes).state, e2 = r.trades.find((x) => x.in === ethTrade.in);
+  assert.ok(e2, 'הכניסה ל-ETH לא פוספסה כשנר ה-BTC חסר'); assert.equal(e2.out, ethTrade.out);
+  // ETH חסר בנר 23:00 → יציאה בשעה הנכונה, במחיר הסגירה האחרון של ETH
+  const holes2 = { BTC: bars.BTC, ETH: bars.ETH.filter((b) => b.t !== tOut) };
+  const e3 = step(prev, holes2).state.trades.find((x) => x.in === ethTrade.in);
+  assert.equal(e3.out, ethTrade.out); assert.equal(e3.exit, bars.ETH.find((b) => b.t === tOut - HOUR).c);
+});

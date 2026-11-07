@@ -59,14 +59,15 @@ export function newState(nowMs = Date.now(), P = VBO){
 export function step(prev, bars, P = VBO){
   const s = prev && prev.v === P.version && prev.id === P.id ? JSON.parse(JSON.stringify(prev)) : newState(Date.now(), P);
   const { by, hours } = index(bars, P), B = by.BTC;
-  const btcHours = hours.filter((t) => B?.m.has(t));
+  // ציר הזמן = איחוד השעות של כל המטבעות (כמו alignH במנוע המחקר): שעה שחסרה ל-BTC עדיין מעובדת ל-ETH (הערת GPT ב-#221)
   const first = s.lastHour === null;
-  const todo = first ? btcHours.slice(-1) : btcHours.filter((t) => t > Date.parse(s.lastHour));
+  const todo = first ? hours.slice(-1) : hours.filter((t) => t > Date.parse(s.lastHour));
   const rate = (P.perpBps + P.slipBps) / 1e4, fundHour = P.longFundBpsDay / 1e4 / 24;
   const events = [];
   for (const t of todo){
     const end = t + HOUR, hour = new Date(t).getUTCHours();
-    if (first){ s.startDay = iso(end).slice(0, 10); s.btcStart = B.m.get(t).c; }
+    if (first) s.startDay = iso(end).slice(0, 10);
+    if (!s.btcStart && B?.m.get(t)) s.btcStart = B.m.get(t).c; // מדד ההשוואה מתחיל בנר ה-BTC הראשון שיש
     for (const c of P.coins){
       const X = by[c], b = X.m.get(t), p = s.pos[c];
       if (p && b){ // שערוך שעתי + Funding
@@ -74,10 +75,10 @@ export function step(prev, bars, P = VBO){
         s.equity += g - f; s.fundUsd += f; p.fund += f; p.notional *= b.c / p.last; p.last = b.c;
       }
       if (first) continue; // בנר הראשון רק מתחילים למדוד
-      if (p && hour === 23 && b){ // יציאה בסוף היום
+      if (p && hour === 23){ // יציאה בסוף היום — גם אם נר 23:00 של המטבע חסר (אז במחיר האחרון הידוע, כמו המילוי קדימה במנוע המחקר)
         const cost = p.notional * rate; s.equity -= cost; s.costsUsd += cost;
         const pnl = p.notional - p.usdIn - p.costIn - cost - p.fund;
-        const tr = { coin: c, in: p.t, out: iso(end), entry: p.entry, exit: b.c, usd: r2(p.usdIn), pnlUsd: r2(pnl), pnlPct: r4(pnl / p.usdIn) };
+        const tr = { coin: c, in: p.t, out: iso(end), entry: p.entry, exit: p.last, usd: r2(p.usdIn), pnlUsd: r2(pnl), pnlPct: r4(pnl / p.usdIn) };
         s.trades.push(tr); events.push({ type: 'exit', ...tr }); delete s.pos[c];
         continue;
       }
@@ -91,7 +92,7 @@ export function step(prev, bars, P = VBO){
         events.push({ type: 'entry', coin: c, at: iso(end), price: b.c, trig: q.trig, usd: r2(usd) });
       }
     }
-    if (B.m.get(t)) s.btcEquity = s.startUsd * B.m.get(t).c / s.btcStart;
+    if (B?.m.get(t) && s.btcStart) s.btcEquity = s.startUsd * B.m.get(t).c / s.btcStart;
     if (hour === 23) s.daily.push({ day: iso(t).slice(0, 10), equity: r2(s.equity), btc: r2(s.btcEquity) });
     s.lastHour = iso(t);
   }
