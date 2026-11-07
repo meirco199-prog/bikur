@@ -169,3 +169,12 @@ test('בסיס 5 דקות + מגמה ארוכת טווח: סטופ נגרר, ב�
   assert.equal(t.side, 1); assert.equal(t.why, 'סטופ נגרר'); assert.ok(t.gross > 0 && t.tExit > T0 + 150 * 86400e3);
   assert.ok(t.funding > 0, 'לפני 180 יום אין נתוני Funding → עלות קבועה');
 });
+
+test('R ביחס לתקציב הסיכון המתוכנן: מילוי חלקי לא מנפח את התוחלת', () => {
+  const mk = (v) => [bar(0, 100.2, 100.3, 99.9, 100, v), bar(1, 100, 101.1, 99.95, 101, 1e9), ...flat(3, 101, 2)];
+  const [t] = execute(ctxOf(mk(400000)), [limitLong()], { coin: 'BTC' }); // חצי מילוי: סיכון בפועל 200$
+  assert.equal(t.budget, 400); assert.ok(Math.abs(t.r - t.net / 400) < 1e-12);
+  const s = stats([t]); assert.ok(Math.abs(s.expR - Math.round(t.net / 400 * 1000) / 1000) < 1e-9);
+  const [t2] = execute(ctxOf(mk(400000)), [limitLong()], { coin: 'BTC', risk: { riskUsd: 100 } });
+  assert.equal(t2.budget, 100);
+});

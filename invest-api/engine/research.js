@@ -319,8 +319,11 @@ export function execute(ctx, sigs, opt = {}){
   function finish(acc, t){
     const funding = fundingCost(opt.funding, t.side, acc.N, t.tEntry, t.tExit, C), fees = acc.fM + acc.fT;
     const net = acc.gross - fees - acc.spread - acc.slip - funding;
+    // R = ביחס לתקציב הסיכון המתוכנן לעסקה (riskUsd), לא לסיכון שהתמלא בפועל: אחרת עסקה שהתמלאה חלקית (כניסה מדורגת, מילוי חלקי)
+    // מקבלת משקל R מנופח, ותוחלת R יכולה להיות חיובית כשהדולרים שליליים (נמצא בריצת הפיתוח, לפני פתיחת המבחן).
+    const budget = R.riskUsd;
     return { coin, ...t, exit: t.exit ?? acc.lastPx, notional: acc.N, gross: acc.gross, fees, fM: acc.fM, fT: acc.fT, spread: acc.spread, slip: acc.slip, funding, net,
-      r: t.risk > 0 ? net / t.risk : 0, rGross: t.risk > 0 ? acc.gross / t.risk : 0 };
+      budget, r: net / budget, rGross: acc.gross / budget };
   }
   // כניסה מדורגת: כל שלב פקודה ממתינה (PostOnly, תור, מילוי חלקי לפי מחזור); סטופ ויעד משותפים; הסיכון הכולל אם כל השלבים
   // התמלאו = riskUsd. יעד לפני מילוי ראשון → ביטול. מחזיר עסקה, או { until } אם לא התמלא כלום.
@@ -372,7 +375,8 @@ export function stats(trades, { from = -Infinity, to = Infinity, costMult = 1, c
   const t = trades.filter((x) => x.tEntry >= from && x.tEntry < to).sort((a, b) => a.tExit - b.tExit);
   const feeOf = (x) => (feeTier && x.fM !== undefined ? x.fM * feeTier.maker / COST.makerBps + x.fT * feeTier.taker / COST.takerBps : x.fees);
   const net = (x) => x.gross - costMult * (feeOf(x) + x.spread + x.slip) - x.funding;
-  const n = t.length, nets = t.map(net), rs = t.map((x, i) => (x.risk > 0 ? nets[i] / x.risk : 0)), rg = t.map((x) => x.rGross);
+  const unit = (x) => x.budget || x.risk; // תקציב הסיכון המתוכנן (עסקאות ישנות בלי budget: הסיכון בפועל)
+  const n = t.length, nets = t.map(net), rs = t.map((x, i) => (unit(x) > 0 ? nets[i] / unit(x) : 0)), rg = t.map((x) => (unit(x) > 0 ? x.gross / unit(x) : 0));
   let eq = 0, peak = 0, dd = 0, win = 0, loss = 0;
   for (const v of nets){ eq += v; peak = Math.max(peak, eq); dd = Math.max(dd, peak - eq); if (v > 0) win += v; else loss -= v; }
   const sum = (f) => t.reduce((s, x) => s + f(x), 0);
