@@ -19,7 +19,7 @@ jobs:
       - name: run
         run: |
           MODE=$(tr -d '[:space:]' < .github/research/mode)
-          FLAG=""; [ "$MODE" = "final" ] && FLAG="--show-test"
+          FLAG=""; [ "${MODE#final}" != "$MODE" ] && FLAG="--show-test"
           node invest-api/scripts/research-daily.mjs --start 2016-01-01 --end 2026-11-07 --data daily-data.json.gz --out research-daily.md $FLAG
       - uses: actions/upload-artifact@v4
         with: { name: research-daily, path: 'research-daily.md' }

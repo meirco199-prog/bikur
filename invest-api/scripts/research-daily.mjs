@@ -116,9 +116,10 @@ async function main(){
   // בדיקת עמידות (רק כשהמבחן פתוח): בלי כל מטבע בתורו — האם התוצאה תלויה במטבע אחד (הטיית שורדים / מזל)?
   if (SHOW_TEST){
     L.push('', '## עמידות: תקופת המבחן בלי כל מטבע בתורו (לגרסאות שעברו / מבטיחות)');
-    L.push('| גרסה | שארפ מלא | שארפ מינימלי (בלי…) | תשואה שנתית מינימלית | בלי BTC+ETH בלבד? |', '|---|---|---|---|---|');
+    L.push('| גרסה | שארפ מלא | שארפ מינימלי (בלי…) | תשואה שנתית מינימלית | רק BTC+ETH |', '|---|---|---|---|---|');
     for (const x of report.filter((y) => /✅|🟡/.test(y.v[0]))){
-      const loo = A.coins.map((c) => { const bars = Object.fromEntries(Object.entries(d.bars).filter(([k]) => k !== c)), A2 = align(bars), s2 = strategies(A2.coins).find((q) => q.id === x.best.s.id); return { c, st: s2 ? dstats(runDaily(A2, s2, { funding: F }).series, P.test) : null }; }).filter((q) => q.st && q.st.sharpe !== null);
+      const needsBtc = /f200|BTC/.test(x.best.s.id); // המסנן נשען על BTC — לא מוציאים אותו
+      const loo = A.coins.filter((c) => !(needsBtc && c === 'BTC')).map((c) => { const bars = Object.fromEntries(Object.entries(d.bars).filter(([k]) => k !== c)), A2 = align(bars), s2 = strategies(A2.coins).find((q) => q.id === x.best.s.id); return { c, st: s2 ? dstats(runDaily(A2, s2, { funding: F }).series, P.test) : null }; }).filter((q) => q.st && q.st.sharpe !== null);
       const worst = loo.sort((a, b) => a.st.sharpe - b.st.sharpe)[0], minC = loo.reduce((m, q) => Math.min(m, q.st.cagr), Infinity);
       const majors = Object.fromEntries(Object.entries(d.bars).filter(([k]) => k === 'BTC' || k === 'ETH')), A3 = align(majors), s3 = strategies(A3.coins).find((q) => q.id === x.best.s.id);
       const m3 = s3 ? dstats(runDaily(A3, s3, { funding: F }).series, P.test) : null;
