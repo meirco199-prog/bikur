@@ -10,8 +10,12 @@
 import { createHmac } from 'node:crypto';
 import { AMIT, bands } from './amit-rules.js';
 
+// גרסה 2 (7/11/2026, אחרי 3 עסקאות בדמו: −57$, +15$, −321$): העמלות בחשבון רגיל ב-Bybit (0.02% לפקודה ממתינה, 0.055% לפקודה
+//   מיידית — נמדד מהעסקאות עצמן) גדולות מהתנועה עד היעד כשהרצועות צרות (0.05%–0.13% בגרף דקה ביום שקט). מאיר: "צריך לשנות משהו".
+//   1. נכנסים רק כשרוחב הרצועות ≥ 0.35% מהמחיר (היעד שווה כמה פעמים את העמלה). 2. כניסה ב-PostOnly בלבד — תמיד בעמלה הנמוכה;
+//   אם המחיר כבר עבר את הרצועה, הבורסה דוחה את הפקודה במקום לבצע אותה בעמלה הגבוהה.
 export const BOT = Object.freeze({
-  version: 1, symbol: 'BTCUSDT', category: 'linear',
+  version: 2, symbol: 'BTCUSDT', category: 'linear', minWidthPct: 0.35,
   base: 'https://api-demo.bybit.com',      // חשבון הדמו בלבד. אין בקוד הזה כתובת של החשבון האמיתי
   market: 'https://api.bybit.com',         // נרות (מחירי השוק האמיתי, כמו בדמו של Bybit)
   notional: AMIT.notional, slPct: AMIT.slPct, maxMins: AMIT.maxBars, bbN: AMIT.bbN, bbK: AMIT.bbK,
@@ -52,7 +56,7 @@ export function levels(closes, P = BOT){
   const c = closes.slice(-P.bbN), b = bands(c, P.bbK), last = c.at(-1);
   const zone = last < b.lo ? 'below' : last > b.up ? 'above' : 'in';
   const buy = Number(pxDown(b.lo, P)), sell = Number(pxUp(b.up, P));
-  return { zone, lo: b.lo, up: b.up, mid: b.mid,
+  return { zone, lo: b.lo, up: b.up, mid: b.mid, widthPct: (b.up - b.lo) / b.mid * 100,
     buy: { price: buy, sl: Number(pxRound(buy * (1 - P.slPct / 100), P)) },
     sell: { price: sell, sl: Number(pxRound(sell * (1 + P.slPct / 100), P)) } };
 }
@@ -90,9 +94,10 @@ export function decide(s, P = BOT){
   for (const o of mine.filter((x) => isEntry(x, P))) out.push({ type: 'cancel', orderId: o.orderId });
   const L = levels(s.closes, P);
   if (!L || L.zone !== 'in') return out; // רק אחרי סגירה בתוך הרצועות — נגיעה טרייה
+  if (L.widthPct < P.minWidthPct) return out; // רצועות צרות: הרווח עד היעד לא מכסה את העמלות (גרסה 2)
   for (const [k, side] of [['buy', 'Buy'], ['sell', 'Sell']]){
     const x = L[k];
-    out.push({ type: 'place', order: { side, orderType: 'Limit', qty: qtyFor(x.price, P), price: pxRound(x.price, P), timeInForce: 'GTC',
+    out.push({ type: 'place', order: { side, orderType: 'Limit', qty: qtyFor(x.price, P), price: pxRound(x.price, P), timeInForce: 'PostOnly',
       stopLoss: pxRound(x.sl, P), slTriggerBy: 'LastPrice', tpslMode: 'Full', slOrderType: 'Market', orderLinkId: `${P.tag}-e-${k}-${s.barT}` } });
   }
   return out;

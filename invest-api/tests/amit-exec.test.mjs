@@ -8,7 +8,7 @@ import { recordAmitBot, cleanBotReport, botLines, formatSummary, AMITBOT_KEY } f
 import { DB } from '../lib/db.js';
 
 const NOW = Date.parse('2026-11-07T08:00:30Z');
-const flat = (n = 20, x = 76000) => Array.from({ length: n }, (_, i) => x + (i % 2 ? 20 : -20)); // סגירה אחרונה בתוך הרצועות
+const flat = (n = 20, x = 76000, a = 150) => Array.from({ length: n }, (_, i) => x + (i % 2 ? a : -a)); // סגירה אחרונה בתוך הרצועות; רוחב ≈ 0.79%
 
 test('רק חשבון הדמו: הכתובת קבועה ל-api-demo, ואין כתובת של החשבון האמיתי לשליחת פקודות', () => {
   assert.equal(BOT.base, 'https://api-demo.bybit.com');
@@ -46,7 +46,7 @@ test('decide שטוח + נר חדש בתוך הרצועות → שתי פקוד�
 });
 
 test('decide שטוח: סגירה מחוץ לרצועות → אין כניסה (רק נגיעה טרייה); בלי נר חדש → לא נוגעים בפקודות הכניסה', () => {
-  const out = [...flat(19), 76500];
+  const out = [...flat(19), 76800];
   assert.equal(levels(out).zone, 'above');
   const old = [{ orderId: 'x', orderLinkId: 'amit-e-buy-1' }];
   assert.deepEqual(decide({ pos: null, orders: old, closes: out, newBar: true, nowMs: NOW, barT: 2 }), [{ type: 'cancel', orderId: 'x' }]);
@@ -136,7 +136,7 @@ test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כ
     const u = new URL(url), body = opts.body ? JSON.parse(opts.body) : null;
     calls.push({ host: u.host, path: u.pathname, body });
     const ok = (result) => Response.json({ retCode: 0, retMsg: 'OK', result });
-    if (u.pathname === '/v5/market/kline'){ const now = Date.now(), t0 = Math.floor(now / 60e3) * 60e3; return Response.json({ result: { list: Array.from({ length: 30 }, (_, i) => [String(t0 - i * 60e3), '1', '1', '1', String(76000 + (i % 2 ? 20 : -20))]) } }); }
+    if (u.pathname === '/v5/market/kline'){ const now = Date.now(), t0 = Math.floor(now / 60e3) * 60e3; return Response.json({ result: { list: Array.from({ length: 30 }, (_, i) => [String(t0 - i * 60e3), '1', '1', '1', String(76000 + (i % 2 ? 150 : -150))]) } }); }
     assert.equal(u.host === 'api-demo.bybit.com' || u.host === 'invest-api.meirco199.workers.dev', true, 'רק דמו או ה-Worker: ' + u.host);
     if (u.pathname === '/v5/position/list') return ok({ list: pos ? [pos] : [] });
     if (u.pathname === '/v5/order/realtime') return ok({ list: orders });
@@ -166,4 +166,27 @@ test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כ
     assert.ok(calls.some((c) => c.path === '/v5/order/cancel-all'));
     assert.equal(close.body.orderType, 'Market'); assert.equal(close.body.reduceOnly, true); assert.equal(close.body.side, 'Sell'); assert.equal(close.body.qty, '2.501');
   } finally { globalThis.fetch = orig; Date.now = realNow; }
+});
+
+test('גרסה 2: רצועות צרות (< 0.35%) → אין כניסה; רחבות → כניסה ב-PostOnly (תמיד בעמלה הנמוכה)', () => {
+  assert.equal(BOT.version, 2); assert.equal(BOT.minWidthPct, 0.35);
+  const narrow = flat(20, 76000, 20); // רוחב ≈ 0.1% — כמו היום בבוקר
+  assert.ok(levels(narrow).widthPct < 0.35 && levels(narrow).zone === 'in');
+  const old = [{ orderId: 'x', orderLinkId: 'amit-e-buy-1' }];
+  assert.deepEqual(decide({ pos: null, orders: old, closes: narrow, newBar: true, nowMs: NOW, barT: 3 }), [{ type: 'cancel', orderId: 'x' }], 'מבטלים כניסות ישנות ולא שולחים חדשות');
+  const wide = decide({ pos: null, orders: [], closes: flat(), newBar: true, nowMs: NOW, barT: 3 });
+  assert.equal(wide.length, 2); assert.ok(levels(flat()).widthPct >= 0.35);
+  assert.ok(wide.every((a) => a.order.timeInForce === 'PostOnly'));
+  // היעד (reduce-only) נשאר GTC — אם המחיר כבר עבר אותו, עדיף לצאת מאשר לדחות
+  const tp = decide({ pos: { side: 'long', size: '2.5', entry: 75700, sinceMs: NOW }, orders: [], closes: flat(), newBar: true, nowMs: NOW, barT: 4 }).find((a) => a.type === 'place');
+  assert.equal(tp.order.timeInForce, 'GTC');
+});
+
+test('גרסה 2 — גבול הסף 0.35%: ממש מעל → כניסה, ממש מתחת → אין', () => {
+  // רוחב = 4·a/mid (סטיית תקן של סדרה מתחלפת ±a היא a) → a = 0.35%·76000/4 = 66.5
+  const above = flat(20, 76000, 66.6), below = flat(20, 76000, 66.4);
+  assert.ok(levels(above).widthPct >= 0.35 && levels(below).widthPct < 0.35);
+  const a = decide({ pos: null, orders: [], closes: above, newBar: true, nowMs: NOW, barT: 5 });
+  assert.equal(a.length, 2); assert.ok(a.every((x) => x.order.timeInForce === 'PostOnly'));
+  assert.deepEqual(decide({ pos: null, orders: [], closes: below, newBar: true, nowMs: NOW, barT: 5 }), []);
 });
