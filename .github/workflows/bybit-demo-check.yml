@@ -1,0 +1,38 @@
+# בדיקה זמנית (ops): האם מפתח הדמו של Bybit קיים ועובד — קריאה בלבד, בלי פקודות. לא מדפיס מפתחות.
+name: bybit-demo-check
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/bybit-demo-check.yml]
+permissions: { contents: read }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check demo key (read-only)
+        env:
+          K: ${{ secrets.BYBIT_DEMO_API_KEY }}
+          S: ${{ secrets.BYBIT_DEMO_API_SECRET }}
+        run: |
+          node - <<'JS'
+          const crypto = require('crypto');
+          const K = process.env.K || '', S = process.env.S || '';
+          console.log('key present:', K.length > 0, '| secret present:', S.length > 0);
+          if (!K || !S) process.exit(0);
+          const base = 'https://api-demo.bybit.com';
+          async function get(path, qs){
+            const ts = String(Date.now()), rw = '10000';
+            const sign = crypto.createHmac('sha256', S).update(ts + K + rw + qs).digest('hex');
+            const r = await fetch(`${base}${path}?${qs}`, { headers: { 'X-BAPI-API-KEY': K, 'X-BAPI-TIMESTAMP': ts, 'X-BAPI-RECV-WINDOW': rw, 'X-BAPI-SIGN': sign } });
+            const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {}
+            return { status: r.status, j, head: j ? null : t.slice(0, 200) };
+          }
+          (async () => {
+            const a = await get('/v5/user/query-api', '');
+            console.log('query-api http', a.status, 'retCode', a.j?.retCode, a.j?.retMsg, a.head || '');
+            if (a.j?.result){ const x = a.j.result; console.log('readOnly', x.readOnly, '| permissions', JSON.stringify(x.permissions), '| ips', JSON.stringify(x.ips), '| expiredAt', x.expiredAt, '| unified', x.uta); }
+            const b = await get('/v5/account/wallet-balance', 'accountType=UNIFIED');
+            console.log('wallet http', b.status, 'retCode', b.j?.retCode, b.j?.retMsg, b.head || '');
+            const acc = b.j?.result?.list?.[0]; if (acc) console.log('totalEquity', acc.totalEquity, '| availableBalance', acc.totalAvailableBalance);
+          })().catch((e) => console.log('error', String(e).slice(0, 200)));
+          JS
