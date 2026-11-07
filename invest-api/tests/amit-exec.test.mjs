@@ -125,10 +125,10 @@ test('POST /amit/bot בלי סוד = 401; עם סוד הגשר = נשמר; GET /
   assert.equal(r.status, 200); assert.equal((await r.json()).saved, true);
 });
 
-test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כניסה → ביטול הנגדית + דיווח; STOP → ביטול הכול וסגירה', async () => {
+test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כניסה → ביטול הנגדית + דיווח; STOP1 → ביטול הכול וסגירה', async () => {
   process.env.BYBIT_DEMO_API_KEY = 'k'; process.env.BYBIT_DEMO_API_SECRET = 's'; process.env.BRIDGE_SECRET = 'b';
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bot-')); process.env.BOT_STOP = path.join(dir, 'STOP'); process.env.BOT_STATE = path.join(dir, 's.json');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bot-')); process.env.BOT_STOP = path.join(dir, 'STOP'); process.env.BOT_STOP1 = path.join(dir, 'STOP1'); process.env.BOT_STATE = path.join(dir, 's.json');
   const { tick } = await import('../scripts/bybit-amit-bot.mjs?t=' + Date.now());
   let pos = null, orders = [], calls = [];
   const orig = globalThis.fetch;
@@ -159,8 +159,8 @@ test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כ
     pos = { side: 'Buy', size: '2.501', avgPrice: '75960', unrealisedPnl: '-50' }; orders = orders.filter((o) => o.side === 'Sell'); calls = [];
     await tick(state, mem);
     assert.ok(calls.some((c) => c.path === '/v5/order/cancel'), 'ביטול הנגדית'); assert.ok(state.posSinceMs > 0);
-    // STOP → ביטול הכול + סגירה בשוק reduce-only
-    fs.writeFileSync(process.env.BOT_STOP, ''); orders.push({ orderId: 'tp', orderLinkId: 'amit-tp-1' }); calls = [];
+    // STOP1 (עצירת בוט 1 בלבד) → ביטול הכול + סגירה בשוק reduce-only
+    fs.writeFileSync(process.env.BOT_STOP1, ''); orders.push({ orderId: 'tp', orderLinkId: 'amit-tp-1' }); calls = [];
     await tick(state, mem);
     const close = calls.find((c) => c.path === '/v5/order/create');
     assert.ok(calls.some((c) => c.path === '/v5/order/cancel-all'));

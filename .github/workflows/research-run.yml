@@ -1,0 +1,25 @@
+# זמני (ops): הרצת מסגרת הניסויים של מסלול עמית (engine/research.js) על שנה של נרות דקה, 5 מטבעות. מחקר בלבד — אין פקודות ואין מפתחות.
+# .github/research/mode: dev = תקופת המבחן מוסתרת; final = ריצה אחת בסוף עם --show-test.
+name: research-run
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-run.yml, .github/research/mode]
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/cache@v4
+        with: { path: research-data.json.gz, key: research-data-2026-11-07-365-v1 }
+      - name: run
+        run: |
+          MODE=$(tr -d '[:space:]' < .github/research/mode)
+          FLAG=""; [ "$MODE" = "final" ] && FLAG="--show-test"
+          node --max-old-space-size=6144 invest-api/scripts/research-backtest.mjs --end 2026-11-07 --days 365 --data research-data.json.gz --out research.md --json research.json $FLAG
+      - uses: actions/upload-artifact@v4
+        with: { name: research, path: 'research.md' }
