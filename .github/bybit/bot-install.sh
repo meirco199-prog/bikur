@@ -44,6 +44,9 @@ mkdir -p "$H/.bikur-bybit" && chown bridge:bridge "$H/.bikur-bybit"
 for s in bybit-amit-bot.mjs bybit-amit2-bot.mjs; do
   sudo -u bridge bash -c "set -a; . /etc/bikur-bybit/bot.env; set +a; cd '$H/bikur' && node invest-api/scripts/$s --check" || { echo "⚠️ בדיקת החיבור ל-Bybit נכשלה ($s) — השירותים לא הופעלו"; exit 1; }
 done
-systemctl daemon-reload && systemctl enable -q bikur-bybit bikur-bybit2 && systemctl restart bikur-bybit bikur-bybit2
+# בוט 1 עצור ומבוטל אם קיים STOP1 (פעולה stop1) — התקנה מחדש לא מחזירה אותו
+systemctl daemon-reload && systemctl enable -q bikur-bybit2
+if [ -f "$H/.bikur-bybit/STOP1" ]; then systemctl disable -q bikur-bybit 2>/dev/null || true; else systemctl enable -q bikur-bybit; fi
+for s in bikur-bybit bikur-bybit2; do systemctl is-enabled -q "$s" && systemctl restart "$s"; done
 sleep 8
 for s in bikur-bybit bikur-bybit2; do systemctl is-active "$s" | sed "s/^/$s: /"; journalctl -u "$s" -n 8 --no-pager; done

@@ -13,6 +13,8 @@ const REPORT_SECRET = process.env.BRIDGE_SECRET || '';
 const HOME = process.env.HOME || '.';
 const STATE_FILE = process.env.BOT_STATE || `${HOME}/.bikur-bybit/state.json`;
 const STOP_FILE = process.env.BOT_STOP || `${HOME}/.bikur-bybit/STOP`;
+// עצירה של בוט 1 בלבד (7/11/2026, אחרי AI_COUNCIL#30: "אם בוט 1 לא רלוונטי תעצור"): בוט 2 ממשיך
+const STOP1_FILE = process.env.BOT_STOP1 || `${HOME}/.bikur-bybit/STOP1`;
 const POLL_MS = 5000, PNL_EVERY_MS = 60e3, REPORT_EVERY_MS = 2 * 3600e3, RW = '10000';
 const log = (...a) => console.log(new Date().toISOString().slice(5, 19), ...a);
 
@@ -75,7 +77,7 @@ export async function tick(state, mem){
   if (now - (mem.pnlAt || 0) >= PNL_EVERY_MS){ await syncTrades(state); mem.pnlAt = now; }
   const realizedToday = state.trades.filter((x) => ilDay(x.t) === day).reduce((s, x) => s + x.pnl, 0);
   if (state.haltDay !== day && dailyHalt(realizedToday, pos?.unrealized, BOT)){ state.haltDay = day; log('⛔ מגבלת הפסד יומית — עוצרים עד מחר'); mem.reportNow = true; }
-  const halt = existsSync(STOP_FILE) ? 'stop' : state.haltDay === day ? 'daily' : null;
+  const halt = existsSync(STOP_FILE) || existsSync(STOP1_FILE) ? 'stop' : state.haltDay === day ? 'daily' : null;
   if (halt !== mem.lastHalt){ mem.lastHalt = halt; mem.reportNow = true; if (halt) log('מצב עצירה:', halt); else log('פעיל'); }
   let closes = mem.closes || [], newBar = false, barT = state.lastBarT;
   const minute = Math.floor(now / 60e3);
