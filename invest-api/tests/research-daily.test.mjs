@@ -60,3 +60,15 @@ test('dstats: שארפ שנתי עם טווח ביטחון, ירידה מקסי�
   assert.ok(st.sharpe > 0 && st.ci[0] < st.sharpe && st.ci[1] > st.sharpe && st.maxDD > 0.007 && st.maxDD < 0.01);
   assert.equal(dscore(dstats(s.slice(0, 200))), null); assert.equal(dscore(st), st.ci[0]);
 });
+
+test('מינוף: ×2 מכפיל את התשואה היומית, בחוזה (עמלה + Funding על כל הנוציונל); ירידה תוך-יומית גדולה → חיסול והון אפס', () => {
+  const up = align({ BTC: series(60, (i) => 100 * 1.01 ** i) });
+  const s = strategies(up.coins).find((x) => x.id === 'BH-BTC');
+  const r1 = runDaily(up, s).series, r2 = runDaily(up, s, { leverage: 2 }).series;
+  assert.ok(Math.abs(r2[10].gross - 2 * r1[10].gross) < 1e-12); assert.ok(Math.abs(r2[10].fund - 2 * 3e-4) < 1e-12);
+  // יום עם שפל של −60% → במינוף ×2 החשיפה מוחקת את ההון
+  const crash = series(40, (i) => 100); crash[20] = { ...crash[20], l: 40 };
+  const A = align({ BTC: crash }), r = runDaily(A, s, { leverage: 2 });
+  assert.ok(r.liquidated); assert.equal(dstats(r.series).total, -1);
+  assert.equal(runDaily(A, s, { leverage: 1.5 }).liquidated, null, '×1.5: ירידה של 60% = הפסד 90%, עדיין לא חיסול');
+});
