@@ -93,12 +93,13 @@ function journal(list){
 // 🧪 מסלול עמית (GET /amit): סקאלפ ביטקוין על נרות דקה — הכללים מצילומי המסך שלו (רצועות בולינגר, סטופ, עמלות)
 const WHY_A = { 'סטופ': '🛑 סטופ', 'יעד': '🎯 יעד' };
 // הבוט בחשבון הדמו של Bybit (אותם כללים, פקודות אמיתיות על כסף וירטואלי) — דוח מהשרת כל שעתיים
-function botBlock(b){
-  if (!b) return `<div class="muted" style="font-size:.85rem;margin:.4rem 0">🤖 בוט Bybit (חשבון דמו): עוד לא דיווח.</div>`;
+const BOT_NAME = { 1: 'בוט 1 — ביטקוין, נרות דקה, נגיעה ברצועה', 2: 'בוט 2 — ETH, נרות 15 דקות, חציה וחזרה לרצועה' };
+function botBlock(b, n = 1){
+  if (!b) return `<div class="muted" style="font-size:.85rem;margin:.4rem 0">🤖 ${BOT_NAME[n]} (חשבון הדמו של Bybit): עוד לא דיווח.</div>`;
   const ageH = (Date.now() - Date.parse(b.receivedAt)) / 3600e3;
   const pos = b.pos ? ` · בעסקה: ${esc(SIDE[b.pos.side] || b.pos.side)} ${esc(String(b.pos.size))} BTC מ-${px(b.pos.entry)}` : '';
   return `<div style="margin:.5rem 0;padding:.5rem .6rem;border:1px dashed var(--border,#444);border-radius:8px">
-    <b>🤖 בוט בחשבון הדמו של Bybit</b> <span class="muted" style="font-size:.8rem">אותם כללים · פקודות אמיתיות · כסף וירטואלי · מגבלת הפסד יומית 1,000$</span>
+    <b>🤖 ${BOT_NAME[n]}</b> <span class="muted" style="font-size:.8rem">חשבון הדמו של Bybit · פקודות אמיתיות · כסף וירטואלי · מגבלת הפסד יומית 1,000$</span>
     <div style="font-size:.9rem;margin-top:.25rem">היום ${b.today.n} עסקאות, <b class="${cls(b.today.netUsd)}">${usdS(b.today.netUsd)}</b> · מצטבר ${b.total.n} עסקאות (${b.total.wins} הצלחות), <b class="${cls(b.total.netUsd)}">${usdS(b.total.netUsd)}</b>${isNum(b.equity) ? ` · הון ${usd0(b.equity)}` : ''}${pos}</div>
     ${b.halt ? `<div style="color:var(--warn,#f5a524)">${b.halt === 'daily' ? '⛔ נעצר להיום — מגבלת הפסד יומית' : '⏸️ עצור ידנית'}</div>` : ''}
     ${ageH > 3 ? `<div style="color:var(--warn,#f5a524)">⚠ אין דיווח ${Math.round(ageH)} שעות</div>` : ''}</div>`;
@@ -121,7 +122,8 @@ function amitSection(a){
   const be = isNum(s.breakevenWinRate) ? ` · צריך ${fmt.pct(s.breakevenWinRate, 0)} כדי לא להפסיד` : '';
   const rows = (a.trades || []).slice(0, 12).map((t) => `<tr><td>${t.n}</td><td>${esc(SIDE[t.side] || t.side)}</td><td class="muted" style="font-size:.8rem">${esc(fmt.dt(t.close))}</td><td class="num">${px(t.entry)}</td><td class="num">${px(t.exit)}</td><td>${esc(WHY_A[t.why] || t.why)}</td><td class="num">${t.mins}</td><td class="num muted">${usd0(t.fees_usd)}</td><td class="num ${cls(t.net_usd)}"><b>${usdS(t.net_usd)}</b></td></tr>`).join('');
   return `<section class="card" style="margin:1rem 0;border-inline-start:4px solid #7c3aed">${head}
-    ${'bot' in a ? botBlock(a.bot) : ''}
+    ${'bot' in a ? botBlock(a.bot, 1) : ''}
+    ${'bot2' in a ? botBlock(a.bot2, 2) : ''}
     <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:baseline"><span style="font-size:1.5rem;font-weight:700">${usd0(a.equityUsd)}</span><span class="${cls(a.pnlUsd)}">${usdS(a.pnlUsd)} (${fmt.pct(a.pnlPct, 2, true)})</span><span class="muted" style="font-size:.85rem">מתוך ${usd0(p.accountUsd)} · היום ${a.today?.trades || 0} עסקאות, ${ltr(usdS(a.today?.netUsd))}</span></div>
     ${posTxt}
     <div class="muted" style="font-size:.88rem">${s.trades} עסקאות · ${s.wins} הצלחות${isNum(s.winRate) ? ` (${fmt.pct(s.winRate, 0)})` : ''}${be} · רווח ממוצע ${usdS(s.avgWinUsd)} · הפסד ממוצע ${usdS(s.avgLossUsd)} · עמלות ששולמו ${usd0(a.feesUsd)}</div>
