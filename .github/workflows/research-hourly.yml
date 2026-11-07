@@ -5,7 +5,7 @@ on:
     branches: [claude/investment-research-platform-thffd8]
     paths: [.github/workflows/research-hourly.yml]
 permissions: { contents: read }
-env: { MODE: dev }
+env: { MODE: final }
 jobs:
   run:
     runs-on: ubuntu-latest
