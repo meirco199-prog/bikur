@@ -6,10 +6,12 @@
 // פרוטוקול: תקופת המבחן (20% האחרונים) מוסתרת כברירת מחדל. ריצה עם --show-test נעשית פעם אחת, בסוף, בלי לשנות קוד אחריה.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { prepare, signals, execute, stats, score, greedyFilters, verdict, BASES, FILTERS, COST, RISK } from '../engine/research.js';
+import { prepare, signals, execute, stats, score, greedyFilters, verdict, BASES, FILTERS, COST, RISK, TF_MIN } from '../engine/research.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
-const END = Date.parse(`${arg('--end', '2026-11-07')}T00:00:00Z`), DAYS = Math.min(400, Math.max(30, Number(arg('--days', 365))));
+const END = Date.parse(`${arg('--end', '2026-11-07')}T00:00:00Z`), DAYS = Math.min(2000, Math.max(30, Number(arg('--days', 365))));
+// --base 5: נרות בסיס של 5 דקות (בדיקה של שנים; רק אסטרטגיות של 15 דקות ומעלה). --min-trades: מינימום עסקאות לבחירה
+const BASE = Number(arg('--base', 1)), MIN_TRADES = Number(arg('--min-trades', 60));
 const DATA = arg('--data', ''), OUT = arg('--out', ''), JSON_OUT = arg('--json', ''), SHOW_TEST = process.argv.includes('--show-test');
 const COINS = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA'], DAY = 86400e3, START = END - DAYS * DAY;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -23,10 +25,10 @@ async function getJson(url, init = {}, tries = 6){
   }
 }
 async function coinbase(coin){
-  const out = new Map(), step = 300 * 60e3;
+  const out = new Map(), step = 300 * BASE * 60e3;
   for (let s = START; s < END; s += step){
     const e = Math.min(s + step, END);
-    const j = await getJson(`https://api.exchange.coinbase.com/products/${coin}-USD/candles?granularity=60&start=${new Date(s).toISOString()}&end=${new Date(e).toISOString()}`);
+    const j = await getJson(`https://api.exchange.coinbase.com/products/${coin}-USD/candles?granularity=${BASE * 60}&start=${new Date(s).toISOString()}&end=${new Date(e).toISOString()}`);
     for (const r of j || []){ const t = r[0] * 1000; if (t >= START && t < END) out.set(t, [t, +r[3], +r[2], +r[1], +r[4], +r[5] * +r[4]]); } // t,o,h,l,c, מחזור בדולרים
     await sleep(110);
   }
@@ -46,7 +48,7 @@ async function loadData(){
   if (DATA && existsSync(DATA)){ log(`נתונים מהמטמון: ${DATA}`); return JSON.parse(gunzipSync(readFileSync(DATA))); }
   const d = { start: START, end: END, bars: {}, funding: {} };
   for (let i = 0; i < COINS.length; i += 2){
-    await Promise.all(COINS.slice(i, i + 2).map(async (c) => { d.bars[c] = await coinbase(c); log(`${c}: ${d.bars[c].length} נרות דקה (${(d.bars[c].length / (DAYS * 1440) * 100).toFixed(1)}%)`); }));
+    await Promise.all(COINS.slice(i, i + 2).map(async (c) => { d.bars[c] = await coinbase(c); log(`${c}: ${d.bars[c].length} נרות של ${BASE} דק׳ (${(d.bars[c].length / (DAYS * 1440 / BASE) * 100).toFixed(1)}%)`); }));
   }
   for (const c of COINS){ try { d.funding[c] = await funding(c); log(`${c}: ${d.funding[c].length} רשומות Funding`); } catch (e) { d.funding[c] = []; log(`${c}: Funding לא זמין (${e.message}) — עלות קבועה ${COST.fundingBpsPer8h}bp ל-8 שעות`); } }
   if (DATA) writeFileSync(DATA, gzipSync(JSON.stringify(d)));
@@ -56,7 +58,7 @@ async function loadData(){
 // ---------- תקופות ----------
 const dayAt = (k) => START + Math.round(DAYS * k) * DAY;
 const P = { train: { from: START, to: dayAt(0.6) }, val: { from: dayAt(0.6), to: dayAt(0.8) }, test: { from: dayAt(0.8), to: END }, dev: { from: START, to: dayAt(0.8) } };
-const FOLD_TRAIN = 120, FOLD_TEST = 30;
+const FOLD_TRAIN = Math.round(DAYS * 0.33), FOLD_TEST = Math.round(DAYS * 0.082); // שנה: 120/30 ימים; 5 שנים: 603/150
 const folds = []; for (let d = FOLD_TRAIN; START + (d + 1) * DAY <= P.dev.to; d += FOLD_TEST) folds.push({ train: { from: START + (d - FOLD_TRAIN) * DAY, to: START + d * DAY }, test: { from: START + d * DAY, to: Math.min(START + (d + FOLD_TEST) * DAY, P.dev.to) } });
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
 
@@ -69,7 +71,7 @@ const fPF = (x) => (x === Infinity ? '∞' : x ?? '—');
 async function main(){
   const d = await loadData(), ctx = {}, fund = {};
   for (const c of COINS){
-    ctx[c] = prepare(d.bars[c].map((r) => ({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5] })));
+    ctx[c] = prepare(d.bars[c].map((r) => ({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5] })), { baseMin: BASE });
     fund[c] = (d.funding[c] || []).map(([t, rate]) => ({ t, rate }));
   }
   for (const c of COINS) ctx[c].btc = ctx.BTC; // מסנן מגמת ביטקוין
@@ -81,7 +83,9 @@ async function main(){
   // 1. כל הבסיסים בלי מסנן (עסקאות נשמרות) + כל מסנן יחיד (סטטיסטיקה בלבד, הרצה מדויקת)
   const res = new Map(); // key → { base, filters, trades?, s: {train, val, test, dev} }
   const t0 = Date.now();
-  for (const b of BASES){
+  const SCORE = { minTrades: MIN_TRADES }, sc = (x) => score(x, SCORE);
+  const RUN_BASES = BASES.filter((b) => TF_MIN[b.tf] >= 3 * BASE || TF_MIN[b.tf] === 1 && BASE === 1); // על נרות 5 דק׳: רק 15 דק׳ ומעלה
+  for (const b of RUN_BASES){
     for (const F of [[], ...FILTERS.map((f) => [f])]){
       const tr = run(b, F), key = F.length ? `${b.id}+${F.join('+')}` : b.id;
       res.set(key, { key, base: b, filters: F, trades: F.length ? null : tr, s: { train: st(tr, P.train), val: st(tr, P.val), test: st(tr, P.test), dev: st(tr, P.dev) } });
@@ -94,7 +98,7 @@ async function main(){
   const keysWhere = (pred) => [...res.values()].filter(pred).map((r) => r.key);
   const isExp = (r, ...e) => e.includes(r.base.exp);
   const groups = [
-    { id: 'E1', name: 'קבוצות ביקורת (הבוטים המקוריים)', keys: ['C1-bot1', 'C2-bot2'], fixed: true },
+    { id: 'E1', name: 'קבוצות ביקורת (הבוטים המקוריים)', keys: ['C1-bot1', 'C2-bot2'].filter((k) => res.has(k)), fixed: true },
     { id: 'E3', name: 'גרסאות 5 ו-15 דקות', keys: keysWhere((r) => isExp(r, 3) && !r.filters.length) },
     { id: 'E4', name: 'גרסת שעה (+ תיקון אחרי תנופה)', keys: keysWhere((r) => isExp(r, 4) && !r.filters.length) },
     { id: 'E5', name: 'רק בכיוון המגמה (1H + 4H)', keys: keysWhere((r) => isExp(r, 3, 4, 9) && r.filters.join() === 'trend') },
@@ -104,21 +108,23 @@ async function main(){
     { id: 'E10', name: 'כניסה מדורגת 1:2:3 בפקודות ממתינות', keys: keysWhere((r) => isExp(r, 10) && !r.filters.length) },
     { id: 'E11', name: 'מסנני מפגש: נפח ×2, EMA50/200/VWAP, מגמת ביטקוין', keys: keysWhere((r) => isExp(r, 3, 4, 9, 10, 12) && r.filters.length === 1 && ['rvol2', 'conf', 'btc'].includes(r.filters[0])) },
     { id: 'E12', name: 'כניסה ממתינה בלבד, עד 3 ביום, מימוש חלקי + ריצה', keys: keysWhere((r) => isExp(r, 12) && !r.filters.length) },
+    { id: 'T', name: 'שיטות מגמה ארוכות טווח (לא מעמית)', keys: keysWhere((r) => isExp(r, 20) && !r.filters.length) },
     { id: 'X', name: 'השוואה: פריצה (לא מעמית)', keys: keysWhere((r) => isExp(r, 0) && r.filters.length <= 1 && (!r.filters.length || r.filters[0] === 'trend')) },
   ];
   const pickBest = (keys) => {
-    const scored = keys.map((k) => ({ k, sc: score(res.get(k).s.train) })).filter((x) => x.sc !== null).sort((a, b) => b.sc - a.sc);
+    const scored = keys.map((k) => ({ k, sc: sc(res.get(k).s.train) })).filter((x) => x.sc !== null).sort((a, b) => b.sc - a.sc);
     if (scored.length) return { key: scored[0].k, ok: true };
-    const fb = keys.filter((k) => res.get(k).s.train.n >= 30).sort((a, b) => (res.get(b).s.train.ciR?.[0] ?? -9) - (res.get(a).s.train.ciR?.[0] ?? -9));
+    const fb = keys.filter((k) => res.get(k).s.train.n >= Math.min(30, MIN_TRADES)).sort((a, b) => (res.get(b).s.train.ciR?.[0] ?? -9) - (res.get(a).s.train.ciR?.[0] ?? -9));
     return { key: fb[0] || keys[0], ok: false };
   };
   // 3. ניסוי 8: בוט סלקטיבי — מסננים נבחרים בחמדנות על האימון לכל בסיס, ואז הבסיס עם הציון הגבוה; הרצה מדויקת של הצירוף
-  const sel = BASES.filter((b) => b.exp !== 1).map((b) => ({ b, g: greedyFilters(baseTrades(b.id), { ...P.train, coins: COINS }) })).filter((x) => x.g.score !== null).sort((a, b) => b.g.score - a.g.score);
+  const AMIT_BASES = RUN_BASES.filter((b) => ![1, 0, 20].includes(b.exp)); // הסלקטיבי: רק גרסאות של עמית (לא ביקורת, לא השוואה)
+  const sel = AMIT_BASES.map((b) => ({ b, g: greedyFilters(baseTrades(b.id), { ...P.train, coins: COINS }, SCORE) })).filter((x) => x.g.score !== null).sort((a, b) => b.g.score - a.g.score);
   if (sel.length){
     const { b, g } = sel[0], tr = run(b, g.filters), key = `${b.id}+${g.filters.join('+') || 'בלי מסנן'}`;
     res.set(key, { key, base: b, filters: g.filters, trades: tr, s: { train: st(tr, P.train), val: st(tr, P.val), test: st(tr, P.test), dev: st(tr, P.dev) } });
     groups.push({ id: 'E8', name: 'בוט סלקטיבי (מסננים שהוכיחו שיפור באימון)', keys: [key], fixed: true });
-  } else groups.push({ id: 'E8', name: 'בוט סלקטיבי', keys: [], fixed: true, none: 'אף צירוף לא עמד בתנאי המינימום באימון (60 עסקאות, 3/5 מטבעות, ציון מוגדר)' });
+  } else groups.push({ id: 'E8', name: 'בוט סלקטיבי', keys: [], fixed: true, none: `אף צירוף לא עמד בתנאי המינימום באימון (${MIN_TRADES} עסקאות, 3/5 מטבעות)` });
 
   // 4. Walk-Forward על תקופת הפיתוח: בכל קפל בוחרים (בסיס + מסננים חמדניים) לפי 120 ימי אימון, ומודדים ב-30 הימים שאחריהם.
   //    לכל קבוצה בנפרד (בתוך מועמדי הקבוצה), ולתהליך הסלקטיבי כולו. קירוב: מסנן = תת-קבוצה של עסקאות הבסיס.
@@ -126,20 +132,20 @@ async function main(){
   const wfFor = (cands) => {
     const oos = [], picks = [];
     for (const f of folds){
-      const sc = cands.map((c) => ({ c, sc: score(st(c.trades, f.train)) })).filter((x) => x.sc !== null).sort((a, b) => b.sc - a.sc);
-      if (!sc.length){ picks.push('—'); continue; }
-      picks.push(sc[0].c.key); oos.push(...sc[0].c.trades.filter((x) => x.tEntry >= f.test.from && x.tEntry < f.test.to));
+      const ss = cands.map((c) => ({ c, sc: sc(st(c.trades, f.train)) })).filter((x) => x.sc !== null).sort((a, b) => b.sc - a.sc);
+      if (!ss.length){ picks.push('—'); continue; }
+      picks.push(ss[0].c.key); oos.push(...ss[0].c.trades.filter((x) => x.tEntry >= f.test.from && x.tEntry < f.test.to));
     }
     return { st: st(oos, { from: folds[0]?.test.from, to: folds.at(-1)?.test.to }), picks };
   };
   const wf = {};
   for (const g of groups){
     if (g.id === 'E8'){
-      const cands = BASES.filter((b) => b.exp !== 1).map((b) => ({ key: b.id, trades: baseTrades(b.id) }));
+      const cands = AMIT_BASES.map((b) => ({ key: b.id, trades: baseTrades(b.id) }));
       // סלקטיבי: בכל קפל — מסננים חמדניים לכל בסיס על אימון הקפל
       const oos = [], picks = [];
       for (const f of folds){
-        const s = cands.map((c) => ({ c, g: greedyFilters(c.trades, { ...f.train, coins: COINS }) })).filter((x) => x.g.score !== null).sort((a, b) => b.g.score - a.g.score);
+        const s = cands.map((c) => ({ c, g: greedyFilters(c.trades, { ...f.train, coins: COINS }, SCORE) })).filter((x) => x.g.score !== null).sort((a, b) => b.g.score - a.g.score);
         if (!s.length){ picks.push('—'); continue; }
         const { c, g: gg } = s[0]; picks.push(`${c.key}+${gg.filters.join('+') || '∅'}`);
         oos.push(...c.trades.filter((x) => gg.filters.every((ff) => x.feat[ff]) && x.tEntry >= f.test.from && x.tEntry < f.test.to));
@@ -184,18 +190,18 @@ async function main(){
 
   // ---------- דוח ----------
   const L = [];
-  const C1 = res.get('C1-bot1').s, C2 = res.get('C2-bot2').s;
-  L.push(`# מסגרת ניסויים — מסלול עמית: ${DAYS} ימים, ${COINS.join('/')}, ${iso(START)} → ${iso(END)}`);
+  const C1 = res.get('C1-bot1')?.s, C2 = res.get('C2-bot2')?.s;
+  L.push(`# מסגרת ניסויים — מסלול עמית: ${DAYS} ימים (נרות בסיס ${BASE} דק׳), ${COINS.join('/')}, ${iso(START)} → ${iso(END)}`);
   L.push(`אימון ${iso(P.train.from)}→${iso(P.train.to)} · אימות ${iso(P.val.from)}→${iso(P.val.to)} · מבחן ${iso(P.test.from)}→${iso(P.test.to)} ${SHOW_TEST ? '(**נפתח**)' : '(🔒 מוסתר)'} · Walk-Forward: ${folds.length} קפלים של ${FOLD_TRAIN} ימי אימון → ${FOLD_TEST} ימי בדיקה.`);
   L.push(`עלויות: עמלות ${COST.makerBps}/${COST.takerBps}bp (ממתינה/מיידית), חצי מרווח ${JSON.stringify(COST.halfSpreadBps)}bp, החלקה ${JSON.stringify(COST.slipBps)}bp, Funding: ${fundingSrc}. מילוי ממתינה: חציה ב-${COST.penBps}bp, עד ${COST.partRate * 100}% ממחזור הדקה, מינימום ${COST.minFill * 100}%. סיכון ${RISK.riskUsd}$ לעסקה, חשיפה עד ${RISK.maxNotional.toLocaleString('en-US')}$ (בלי הגדלת מינוף).`, '');
   L.push('## 0. שער: האם לאסטרטגיה המקורית יש תוחלת חיובית לפני עלויות?');
   L.push('| ביקורת | תקופה | עסקאות | תוחלת ברוטו (R) | טווח 95% | תוחלת נטו (R) | טווח 95% |', '|---|---|---|---|---|---|---|');
-  for (const [nm, s] of [['בוט 1', C1], ['בוט 2', C2]]) for (const [pn, p] of [['אימון', 'train'], ['פיתוח (אימון+אימות)', 'dev'], ...(SHOW_TEST ? [['מבחן', 'test']] : [])]) L.push(`| ${nm} | ${pn} | ${s[p].n} | ${fR(s[p].expRGross)} | ${fCI(s[p].ciRGross)} | ${fR(s[p].expR)} | ${fCI(s[p].ciR)} |`);
+  for (const [nm, s] of [['בוט 1', C1], ['בוט 2', C2]].filter((x) => x[1])) for (const [pn, p] of [['אימון', 'train'], ['פיתוח (אימון+אימות)', 'dev'], ...(SHOW_TEST ? [['מבחן', 'test']] : [])]) L.push(`| ${nm} | ${pn} | ${s[p].n} | ${fR(s[p].expRGross)} | ${fCI(s[p].ciRGross)} | ${fR(s[p].expR)} | ${fCI(s[p].ciR)} |`);
   const gate = (s) => (s.dev.ciRGross && s.dev.ciRGross[1] < 0 ? 'שלילית בביטחון — אין יתרון גם לפני עלויות' : s.dev.ciRGross && s.dev.ciRGross[0] > 0 ? 'חיובית בביטחון לפני עלויות' : 'לא מובהקת — לא ניתן לשלול אפס');
-  L.push('', `**בוט 1:** ${gate(C1)}. **בוט 2:** ${gate(C2)}. (R = רווח/הפסד ביחס לסיכון של העסקה; ‎−1R = סטופ מלא.)`, '');
+  L.push('', `${C1 ? `**בוט 1:** ${gate(C1)}. ` : '**בוט 1:** לא נבדק בריצה הזו (נרות בסיס של 5 דקות). '}**בוט 2:** ${gate(C2)}. (R = רווח/הפסד ביחס לסיכון של העסקה; ‎−1R = סטופ מלא.)`, '');
 
   L.push('**הניסויים:** ' + groups.map((g) => `${g.id} — ${g.name}`).join(' · '), '');
-  L.push('## 1. נציג כל ניסוי (נבחר לפי אימון בלבד: הגבול התחתון של תוחלת נטו ב-R, מינימום 60 עסקאות, רווח ב-3/5 מטבעות)');
+  L.push(`## 1. נציג כל ניסוי (נבחר לפי אימון בלבד: הגבול התחתון של תוחלת נטו ב-R, מינימום ${MIN_TRADES} עסקאות, רווח ב-3/5 מטבעות)`);
   const head = '| ניסוי | גרסה | תקופה | עסקאות | הצלחה | ברוטו | עמלות | מרווח+החלקה | Funding | **נטו** | תוחלת $ | תוחלת R [95%] | PF | ירידה מקס׳ | נטו ליום [95%] |';
   L.push(head, '|' + '---|'.repeat(15));
   for (const f of finals){

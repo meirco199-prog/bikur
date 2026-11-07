@@ -21,19 +21,21 @@ export const COST = Object.freeze({
   penBps: 1, partRate: 0.1, minFill: 0.25,                              // מילוי פקודה ממתינה
 });
 export const RISK = Object.freeze({ riskUsd: 400, maxNotional: 190000, minStopPct: 0.15, maxStopPct: 3.5 });
-export const TF_MIN = Object.freeze({ '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240 });
-const HOLD = { '1m': 60, '5m': 48, '15m': 32, '1h': 24, '4h': 12 };             // יציאת זמן: מספר נרות של טווח הזמן
+export const TF_MIN = Object.freeze({ '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440 });
+const HOLD = { '1m': 60, '5m': 48, '15m': 32, '1h': 24, '4h': 12, '1d': 60 };             // יציאת זמן: מספר נרות של טווח הזמן
 const DAY = 86400e3;
 
 // ---------- נתונים ומדדים ----------
 
 // נרות דקה [{t,o,h,l,c,v}] (v = מחזור בדולרים) → טווח זמן גדול יותר. מקבלים קבוצה עם לפחות חצי מהדקות (ב-Coinbase דקה בלי
 // עסקאות פשוט חסרה). t = תחילת הנר, end = סופו.
-export function aggregate(m1, tf){
+// baseMin: אורך נר הבסיס בדקות (1 = נרות דקה; 5 = בדיקה ארוכת טווח על נרות 5 דקות)
+export function aggregate(m1, tf, baseMin = 1){
   const m = TF_MIN[tf], ms = m * 60e3;
-  if (m === 1){ for (const b of m1) b.end = b.t + 60e3; return m1; } // בלי העתקה (זיכרון: שנה של נרות דקה)
+  if (m < baseMin) return null;
+  if (m === baseMin){ for (const b of m1) b.end = b.t + ms; return m1; } // בלי העתקה (זיכרון: שנה של נרות דקה)
   const out = []; let cur = null, n = 0;
-  const flush = () => { if (cur && n >= m / 2) out.push(cur); };
+  const flush = () => { if (cur && n >= m / baseMin / 2) out.push(cur); };
   for (const b of m1){
     const k = Math.floor(b.t / ms) * ms;
     if (!cur || cur.t !== k){ flush(); cur = { t: k, end: k + ms, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v || 0 }; n = 1; continue; }
@@ -85,13 +87,14 @@ export function trailingDailyThreshold(times, values, lookbackDays = 30, minDays
 }
 
 // כל מה שהאותות והמסננים צריכים, לכל מטבע ולכל טווח זמן. m1 = נרות דקה עם v במחזור דולרי.
-export function prepare(m1){
-  const ctx = { m1, t1: Float64Array.from(m1, (b) => b.t), tf: {} };
+export function prepare(m1, { baseMin = 1 } = {}){
+  const ctx = { m1, t1: Float64Array.from(m1, (b) => b.t), tf: {}, baseMs: baseMin * 60e3 };
   for (const tf of Object.keys(TF_MIN)){
-    const bars = aggregate(m1, tf), bb = rollingBands(bars), a = atr(bars), e50 = ema(bars, 50);
+    const bars = aggregate(m1, tf, baseMin); if (!bars) continue;
+    const bb = rollingBands(bars), a = atr(bars), e50 = ema(bars, 50);
     const atrPct = Float64Array.from(bars, (b, i) => a[i] / b.c * 100), bbw = Float64Array.from(bars, (b, i) => (bb.up[i] - bb.lo[i]) / bb.mid[i] * 100);
     const ends = bars.map((b) => b.end);
-    ctx.tf[tf] = { bars, bb, atr: a, ema50: e50, atrPct, bbw, ends,
+    ctx.tf[tf] = { bars, bb, atr: a, ema50: e50, atrPct, bbw, ends, emaN: (n) => (ctx.tf[tf]['ema' + n] ||= ema(bars, n)),
       thrAtr: trailingDailyThreshold(ends, atrPct), thrBbw: trailingDailyThreshold(ends, bbw) };
   }
   // מפגש רמות (גל 2): EMA200 ו-VWAP יומי (מעוגן לחצות UTC) על נרות 15 דקות
@@ -135,7 +138,8 @@ export const FILTERS = Object.freeze(['trend', 'atr', 'vol', 'rvol', 'liq', 'ses
 //        validMs (לפקודה ממתינה), holdMs, be (הזזת סטופ לכניסה בחצי הדרך), feat: { long: {...}, short: {...} } }
 
 const stopFromPct = (pct) => (side, entry) => entry * (1 - side * pct / 100);
-function targetFn(spec, bandTgt){ // spec: 'opp' | 'mid' | מספר R
+function targetFn(spec, bandTgt){ // spec: 'opp' | 'mid' | מספר R | 'none' (בלי יעד — יציאה בסטופ נגרר)
+  if (spec === 'none') return (side) => side * Infinity;
   if (typeof spec === 'number') return (side, entry, stop) => entry + side * spec * Math.abs(entry - stop);
   return (side) => bandTgt(side, spec);
 }
@@ -154,7 +158,7 @@ export function* signals(ctx, s){
       // מבנה שוק: מעבר לשפל/שיא של 10 הנרות האחרונים, ‏0.1 ATR מרווח
       return (sd, entry) => sd > 0 ? Math.min(lowest(i, 10), entry) - 0.1 * A[i] : Math.max(highest(i, 10), entry) + 0.1 * A[i];
     };
-    const leg = (side, type, price) => ({ side, type, price, stop: stopOf(side), target: targetFn(s.target, (sd, w) => band(sd, w)), minRR: s.minRR || 0, tpMaker: !s.tpTaker });
+    const leg = (side, type, price) => ({ side, type, price, stop: stopOf(side), target: targetFn(s.target, (sd, w) => band(sd, w)), minRR: s.minRR || 0, tpMaker: !s.tpTaker, maxStop: s.maxStopPct });
     let legs = null, validMs = 0;
     const mk = (side) => {
       if (s.ladder){ // כניסה מדורגת: פקודות ממתינות מהרמה הראשונה ועד קרוב לסטופ, משקלות s.ladder (למשל 1:2:3)
@@ -183,6 +187,14 @@ export function* signals(ctx, s){
       const lo0 = b.l, hi0 = b.h;
       legs = [{ side: sd, type: 'limit', price, stop: () => (up ? lo0 * 0.999 : hi0 * 1.001), target: () => (up ? hi0 : lo0), cancelAt: up ? hi0 : lo0, minRR: 0, tpMaker: true }];
       validMs = 4 * tfMs;
+    } else if (s.family === 'donchian'){
+      // מגמה (לא מעמית): פריצת ערוץ של n נרות, סטופ נגרר ATR, בלי יעד
+      const hh = highest(i - 1, s.n), ll = lowest(i - 1, s.n);
+      if (b.c > hh) legs = [mk(1)]; else if (b.c < ll && !s.longOnly) legs = [mk(-1)]; else continue;
+    } else if (s.family === 'emacross'){
+      const f = T.emaN(s.fast), sl = T.emaN(s.slow);
+      if (!Number.isFinite(sl[i - 1])) continue;
+      if (f[i - 1] <= sl[i - 1] && f[i] > sl[i]) legs = [mk(1)]; else if (f[i - 1] >= sl[i - 1] && f[i] < sl[i] && !s.longOnly) legs = [mk(-1)]; else continue;
     } else if (s.family === 'breakout'){
       // השוואה (לא מעמית): פריצת שיא/שפל של 20 נרות קודמים
       const hh = highest(i - 1, 20), ll = lowest(i - 1, 20);
@@ -192,7 +204,7 @@ export function* signals(ctx, s){
     }
     // המאפיינים מחושבים רק כשצריך (אות שמגיע בזמן פוזיציה פתוחה מדולג בלי לחשב)
     const fi = i; let fl = null, fs = null;
-    yield { t: b.end, legs, validMs, holdMs, be: !!s.be, partial: s.partial || null, maxPerDay: s.maxPerDay || 0, feat: { get long(){ return fl ||= features(ctx, s.tf, fi, 1); }, get short(){ return fs ||= features(ctx, s.tf, fi, -1); } } };
+    yield { t: b.end, legs, validMs, holdMs, be: !!s.be, trailDist: s.trail ? s.trail * A[i] : 0, partial: s.partial || null, maxPerDay: s.maxPerDay || 0, feat: { get long(){ return fl ||= features(ctx, s.tf, fi, 1); }, get short(){ return fs ||= features(ctx, s.tf, fi, -1); } } };
   }
 }
 
@@ -201,6 +213,7 @@ export function* signals(ctx, s){
 function fundingCost(funding, side, notional, t0, t1, C){
   if (!funding || !funding.length){ return notional * C.fundingBpsPer8h / 1e4 * (t1 - t0) / (8 * 3600e3); }
   let s = 0; for (let k = lastLE(funding, t0, (f) => f.t) + 1; k < funding.length && funding[k].t <= t1; k++) s += side * funding[k].rate * notional;
+  if (t0 < funding[0].t) s += notional * C.fundingBpsPer8h / 1e4 * (Math.min(t1, funding[0].t) - t0) / (8 * 3600e3); // לפני תחילת הנתונים: עלות קבועה
   return s;
 }
 
@@ -209,7 +222,7 @@ function fundingCost(funding, side, notional, t0, t1, C){
 export function execute(ctx, sigs, opt = {}){
   const C = { ...COST, ...(opt.cost || {}) }, R = { ...RISK, ...(opt.risk || {}) }, coin = opt.coin || 'BTC';
   const hs = (C.halfSpreadBps[coin] ?? 1) / 1e4, sl = (C.slipBps[coin] ?? 2) / 1e4, pen = C.penBps / 1e4, filters = opt.filters || [];
-  const { m1, t1 } = ctx, trades = [];
+  const { m1, t1 } = ctx, trades = [], bm = ctx.baseMs || 60e3;
   let busy = -Infinity; const perDay = new Map();
   for (const sg of sigs){
     if (sg.t < busy) continue;
@@ -238,7 +251,7 @@ export function execute(ctx, sigs, opt = {}){
         const hit = live.filter((L) => (L.side > 0 ? b.l <= L.price * (1 - pen) : b.h >= L.price * (1 + pen)));
         if (!hit.length) continue;
         hit.sort((x, y) => Math.abs(b.o - x.price) - Math.abs(b.o - y.price)); // שתיהן באותה דקה: הקרובה לפתיחה ראשונה, השנייה מבוטלת
-        const L = hit[0], stop = L.stop(L.side, L.price), N = sizeFor(L.price, stop);
+        const L = hit[0], stop = L.stop(L.side, L.price), N = sizeFor(L.price, stop, L.maxStop);
         if (!N) { live.splice(live.indexOf(L), 1); continue; }
         const frac = Math.min(1, C.partRate * (b.v || 0) / N.notional);
         if (frac < C.minFill) continue; // מחזור דל: נשארים בתור
@@ -254,14 +267,14 @@ export function execute(ctx, sigs, opt = {}){
   }
   return trades;
 
-  function sizeFor(entry, stop){
+  function sizeFor(entry, stop, maxStop = R.maxStopPct){
     let dist = Math.abs(entry - stop) / entry * 100;
-    if (!(dist > 0) || dist > R.maxStopPct) return null;
+    if (!(dist > 0) || dist > maxStop) return null;
     dist = Math.max(dist, R.minStopPct);
     return { dist, notional: Math.min(R.riskUsd / (dist / 100), R.maxNotional) };
   }
   function open(L, entryMid, stop0, j, maker, frac){
-    const S = sizeFor(entryMid, stop0); if (!S) return null;
+    const S = sizeFor(entryMid, stop0, L.maxStop); if (!S) return null;
     const side = L.side;
     if (!(side * (entryMid - stop0) > 0)) return null; // סטופ בצד הלא נכון
     const stop = Math.abs(entryMid - stop0) / entryMid * 100 < R.minStopPct ? entryMid * (1 - side * R.minStopPct / 100) : stop0; // סטופ מינימלי
@@ -284,16 +297,17 @@ export function execute(ctx, sigs, opt = {}){
     if (long ? b0.l <= stop : b0.h >= stop){ out(stop, false, rem); rem = 0; why = 'סטופ'; } // נר הכניסה: רק סטופ
     else for (k = p.j + 1; k < m1.length; k++){
       const b = m1[k];
-      if (long ? b.l <= stop : b.h >= stop){ out(long ? Math.min(stop, b.o) : Math.max(stop, b.o), false, rem); rem = 0; why = be ? 'סטופ בכניסה' : 'סטופ'; break; }
+      if (long ? b.l <= stop : b.h >= stop){ out(long ? Math.min(stop, b.o) : Math.max(stop, b.o), false, rem); rem = 0; why = be ? 'סטופ בכניסה' : sg.trailDist > 0 && stop !== p.stop ? 'סטופ נגרר' : 'סטופ'; break; }
       const thr = (px, mk) => (long ? b.h >= px * (1 + (mk ? pen : 0)) : b.l <= px * (1 - (mk ? pen : 0)));
       if (part && rem === 1 && thr(part.tp, true)){ out(part.tp, true, part.frac); rem -= part.frac; be = true; stop = p.entry * (1 + side * 0.0006); continue; }
       if (thr(target, p.tpMaker)){ out(p.tpMaker ? target : (long ? Math.max(target, b.o) : Math.min(target, b.o)), p.tpMaker, rem); rem = 0; why = part ? 'יעד רץ' : 'יעד'; break; }
       if (sg.be && !be && thr(beAt, false)){ be = true; stop = p.entry * (1 + side * 0.0006); }
-      if (b.t + 60e3 >= tEnd){ out(b.c, false, rem); rem = 0; why = 'זמן'; break; }
+      if (sg.trailDist > 0){ stop = long ? Math.max(stop, b.h - sg.trailDist) : Math.min(stop, b.l + sg.trailDist); }
+      if (b.t + bm >= tEnd){ out(b.c, false, rem); rem = 0; why = 'זמן'; break; }
     }
     if (rem > 0){ k = m1.length - 1; out(m1[k].c, false, rem); why = 'סוף נתונים'; }
     if (part && rem < 1 && why === 'סטופ בכניסה') why = 'מימוש חלקי + סטופ בכניסה';
-    return finish(acc, { side, tEntry: m1[p.j].t, tExit: m1[Math.min(k, m1.length - 1)].t + 60e3, entry: p.entry, why, frac: p.frac, risk: p.risk$,
+    return finish(acc, { side, tEntry: m1[p.j].t, tExit: m1[Math.min(k, m1.length - 1)].t + bm, entry: p.entry, why, frac: p.frac, risk: p.risk$,
       feat: (side > 0 ? sg.feat.long : sg.feat.short) });
   }
   // צובר עלויות: כניסה (Maker/Taker) על כל הגודל, ויציאות בחלקים
@@ -305,8 +319,11 @@ export function execute(ctx, sigs, opt = {}){
   function finish(acc, t){
     const funding = fundingCost(opt.funding, t.side, acc.N, t.tEntry, t.tExit, C), fees = acc.fM + acc.fT;
     const net = acc.gross - fees - acc.spread - acc.slip - funding;
+    // R = ביחס לתקציב הסיכון המתוכנן לעסקה (riskUsd), לא לסיכון שהתמלא בפועל: אחרת עסקה שהתמלאה חלקית (כניסה מדורגת, מילוי חלקי)
+    // מקבלת משקל R מנופח, ותוחלת R יכולה להיות חיובית כשהדולרים שליליים (נמצא בריצת הפיתוח, לפני פתיחת המבחן).
+    const budget = R.riskUsd;
     return { coin, ...t, exit: t.exit ?? acc.lastPx, notional: acc.N, gross: acc.gross, fees, fM: acc.fM, fT: acc.fT, spread: acc.spread, slip: acc.slip, funding, net,
-      r: t.risk > 0 ? net / t.risk : 0, rGross: t.risk > 0 ? acc.gross / t.risk : 0 };
+      budget, r: net / budget, rGross: acc.gross / budget };
   }
   // כניסה מדורגת: כל שלב פקודה ממתינה (PostOnly, תור, מילוי חלקי לפי מחזור); סטופ ויעד משותפים; הסיכון הכולל אם כל השלבים
   // התמלאו = riskUsd. יעד לפני מילוי ראשון → ביטול. מחזיר עסקה, או { until } אם לא התמלא כלום.
@@ -320,7 +337,7 @@ export function execute(ctx, sigs, opt = {}){
     const until = sg.t + sg.validMs; let k = j0, first = -1, tEnd = 0, exitPx = null, exitMaker = false, why = '';
     for (; k < m1.length; k++){
       const b = m1[k];
-      if (first < 0 && (long ? b.h >= target : b.l <= target)) return { until: b.t + 60e3 };
+      if (first < 0 && (long ? b.h >= target : b.l <= target)) return { until: b.t + bm };
       if (b.t < until){
         let vol = C.partRate * (b.v || 0);
         for (const r of rungs){
@@ -330,11 +347,11 @@ export function execute(ctx, sigs, opt = {}){
         }
       }
       const filled = rungs.filter((r) => r.n > 0);
-      if (!filled.length){ if (b.t + 60e3 >= until) return { until }; continue; }
+      if (!filled.length){ if (b.t + bm >= until) return { until }; continue; }
       if (first < 0){ first = k; tEnd = b.t + sg.holdMs; }
       if (long ? b.l <= stop : b.h >= stop){ exitPx = k === first ? stop : (long ? Math.min(stop, b.o) : Math.max(stop, b.o)); why = 'סטופ'; break; }
       if (k > first && (long ? b.h >= target * (1 + pen) : b.l <= target * (1 - pen))){ exitPx = target; exitMaker = true; why = 'יעד'; break; }
-      if (b.t + 60e3 >= tEnd){ exitPx = b.c; why = 'זמן'; break; }
+      if (b.t + bm >= tEnd){ exitPx = b.c; why = 'זמן'; break; }
     }
     if (first < 0) return { until };
     if (exitPx === null){ k = m1.length - 1; exitPx = m1[k].c; why = 'סוף נתונים'; }
@@ -342,7 +359,7 @@ export function execute(ctx, sigs, opt = {}){
     const acc = { N, gross: 0, fM: N * C.makerBps / 1e4, fT: 0, spread: 0, slip: 0, exitN: 0 };
     for (const r of filled) accExit(acc, side, r.price, exitPx, exitMaker, 0, r.n);
     const risk = filled.reduce((s2, r) => s2 + r.n * dist(r.price), 0), avg = N / filled.reduce((s2, r) => s2 + r.n / r.price, 0);
-    return finish(acc, { side, tEntry: m1[first].t, tExit: m1[Math.min(k, m1.length - 1)].t + 60e3, entry: avg, exit: exitPx, why: `${why} (${filled.length}/${L.rungs.length} שלבים)`,
+    return finish(acc, { side, tEntry: m1[first].t, tExit: m1[Math.min(k, m1.length - 1)].t + bm, entry: avg, exit: exitPx, why: `${why} (${filled.length}/${L.rungs.length} שלבים)`,
       frac: N / Nfull, risk, feat: (side > 0 ? sg.feat.long : sg.feat.short) });
   }
 }
@@ -358,7 +375,8 @@ export function stats(trades, { from = -Infinity, to = Infinity, costMult = 1, c
   const t = trades.filter((x) => x.tEntry >= from && x.tEntry < to).sort((a, b) => a.tExit - b.tExit);
   const feeOf = (x) => (feeTier && x.fM !== undefined ? x.fM * feeTier.maker / COST.makerBps + x.fT * feeTier.taker / COST.takerBps : x.fees);
   const net = (x) => x.gross - costMult * (feeOf(x) + x.spread + x.slip) - x.funding;
-  const n = t.length, nets = t.map(net), rs = t.map((x, i) => (x.risk > 0 ? nets[i] / x.risk : 0)), rg = t.map((x) => x.rGross);
+  const unit = (x) => x.budget || x.risk; // תקציב הסיכון המתוכנן (עסקאות ישנות בלי budget: הסיכון בפועל)
+  const n = t.length, nets = t.map(net), rs = t.map((x, i) => (unit(x) > 0 ? nets[i] / unit(x) : 0)), rg = t.map((x) => (unit(x) > 0 ? x.gross / unit(x) : 0));
   let eq = 0, peak = 0, dd = 0, win = 0, loss = 0;
   for (const v of nets){ eq += v; peak = Math.max(peak, eq); dd = Math.max(dd, peak - eq); if (v > 0) win += v; else loss -= v; }
   const sum = (f) => t.reduce((s, x) => s + f(x), 0);
@@ -446,6 +464,12 @@ export const BASES = Object.freeze([
     { id: `E12-sweep-${tf}-maker-2R`, exp: 12, family: 'sweep', tf, entry: 'limit', stop: { struct: true }, target: 2, maxPerDay: 3 },
     { id: `E12-touch-${tf}-run`, exp: 12, family: 'touch', tf, stop: { struct: true }, target: 3, partial: { at: 1, frac: 0.5, runner: 3 }, maxPerDay: 3 },
   ]),
+  // שיטות מגמה ארוכות טווח (לא מעמית) — להשוואה: האם יש בנתונים האלה שיטה שמרוויחה לאורך שנים אחרי עלויות.
+  // פריצת ערוץ (Donchian, "צבים") ו-חציית ממוצעים, סטופ 3 ATR נגרר, בלי יעד. גם גרסאות לונג בלבד.
+  ...[20, 55].flatMap((n) => [false, true].map((lo) => ({ id: `T-donchian-1d-${n}${lo ? '-long' : ''}`, exp: 20, family: 'donchian', tf: '1d', n, longOnly: lo, stop: { atr: 3 }, trail: 3, target: 'none', maxStopPct: 40, holdBars: 365 }))),
+  { id: 'T-donchian-4h-55', exp: 20, family: 'donchian', tf: '4h', n: 55, stop: { atr: 3 }, trail: 3, target: 'none', maxStopPct: 40, holdBars: 1000 },
+  ...[false, true].map((lo) => ({ id: `T-ema-1d-20-100${lo ? '-long' : ''}`, exp: 20, family: 'emacross', tf: '1d', fast: 20, slow: 100, longOnly: lo, stop: { atr: 3 }, trail: 3, target: 'none', maxStopPct: 40, holdBars: 365 })),
+  { id: 'T-ema-4h-50-200', exp: 20, family: 'emacross', tf: '4h', fast: 50, slow: 200, stop: { atr: 3 }, trail: 3, target: 'none', maxStopPct: 40, holdBars: 1000 },
   // השוואה (לא מעמית): פריצה עם סטופ 1.5 ATR, יעד 2R/3R — לבדוק אם יש בכלל יתרון שעובר עלויות בנתונים האלה
   ...['15m', '1h'].flatMap((tf) => [2, 3].map((R) => ({ id: `X-breakout-${tf}-${R}R`, exp: 0, family: 'breakout', tf, stop: { atr: 1.5 }, target: R }))),
 ]);
