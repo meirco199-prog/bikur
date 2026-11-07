@@ -108,11 +108,11 @@ test('summarize + recordAmitBot: דוח יומי, תקרת כתיבה של 20 ד
   const stored = await db.get(AMITBOT_KEY);
   assert.equal(stored.halt, 'daily');
   const lines = botLines(stored, NOW + 7 * 60e3).join('\n');
-  assert.match(lines, /חשבון הדמו של Bybit/); assert.match(lines, /היום: 2 עסקאות, 1 הצלחות, נטו -\$30/); assert.match(lines, /מגבלת הפסד יומית/);
+  assert.match(lines, /בוט 1 בחשבון הדמו של Bybit/); assert.match(lines, /היום: 2 עסקאות, 1 הצלחות, נטו -\$30/); assert.match(lines, /מגבלת הפסד יומית/);
   assert.match(botLines(stored, NOW + 5 * 3600e3).join('\n'), /אין דיווח מהבוט 5 שעות/);
   assert.throws(() => cleanBotReport({ v: 2 }), /לא תקין/);
   const s = { trades: [], agg: { n: 0, wins: 0, netUsd: 0, feesUsd: 0 }, pos: null };
-  assert.match(formatSummary(s, day, null, stored, NOW), /בוט בחשבון הדמו של Bybit/);
+  assert.match(formatSummary(s, day, null, stored, NOW), /בוט 1 בחשבון הדמו של Bybit/);
 });
 
 test('POST /amit/bot בלי סוד = 401; עם סוד הגשר = נשמר; GET /amit מחזיר את הבוט', async () => {

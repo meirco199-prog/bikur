@@ -21,22 +21,29 @@ printf 'BYBIT_DEMO_API_KEY=%s\nBYBIT_DEMO_API_SECRET=%s\nWORKER_URL=%s\nBRIDGE_S
 chmod 640 /etc/bikur-bybit/bot.env; chown root:bridge /etc/bikur-bybit/bot.env
 unset BYBIT_KEY BYBIT_SECRET BRIDGE_SECRET
 
-say "שירות"
-cat > /etc/systemd/system/bikur-bybit.service <<UNIT
+say "שירותים: bikur-bybit (בוט 1, BTC, דקה) + bikur-bybit2 (בוט 2, ETH, 15 דקות)"
+unit(){ # $1 שם השירות, $2 תיאור, $3 הסקריפט
+cat > "/etc/systemd/system/$1.service" <<UNIT
 [Unit]
-Description=bikur Amit bot (Bybit DEMO account only)
+Description=$2
 After=network-online.target
 [Service]
 User=bridge
 WorkingDirectory=$H/bikur
 EnvironmentFile=/etc/bikur-bybit/bot.env
-ExecStart=/usr/bin/node invest-api/scripts/bybit-amit-bot.mjs
+ExecStart=/usr/bin/node invest-api/scripts/$3
 Restart=always
 RestartSec=30
 [Install]
 WantedBy=multi-user.target
 UNIT
+}
+unit bikur-bybit "bikur Amit bot 1 (Bybit DEMO account only, BTCUSDT)" bybit-amit-bot.mjs
+unit bikur-bybit2 "bikur Amit bot 2 (Bybit DEMO account only, ETHUSDT 15m)" bybit-amit2-bot.mjs
 mkdir -p "$H/.bikur-bybit" && chown bridge:bridge "$H/.bikur-bybit"
-sudo -u bridge bash -c "set -a; . /etc/bikur-bybit/bot.env; set +a; cd '$H/bikur' && node invest-api/scripts/bybit-amit-bot.mjs --check" || { echo "⚠️ בדיקת החיבור ל-Bybit נכשלה — השירות לא הופעל"; exit 1; }
-systemctl daemon-reload && systemctl enable -q bikur-bybit && systemctl restart bikur-bybit
-sleep 8; systemctl is-active bikur-bybit | sed 's/^/bybit bot service: /'; journalctl -u bikur-bybit -n 12 --no-pager
+for s in bybit-amit-bot.mjs bybit-amit2-bot.mjs; do
+  sudo -u bridge bash -c "set -a; . /etc/bikur-bybit/bot.env; set +a; cd '$H/bikur' && node invest-api/scripts/$s --check" || { echo "⚠️ בדיקת החיבור ל-Bybit נכשלה ($s) — השירותים לא הופעלו"; exit 1; }
+done
+systemctl daemon-reload && systemctl enable -q bikur-bybit bikur-bybit2 && systemctl restart bikur-bybit bikur-bybit2
+sleep 8
+for s in bikur-bybit bikur-bybit2; do systemctl is-active "$s" | sed "s/^/$s: /"; journalctl -u "$s" -n 8 --no-pager; done

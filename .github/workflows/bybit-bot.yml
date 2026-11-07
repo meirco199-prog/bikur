@@ -1,4 +1,4 @@
-# בוט מסלול עמית בחשבון הדמו של Bybit (כסף וירטואלי) — התקנה/עדכון/עצירה על השרת של בעל הריפו. פירוט: invest/docs/BYBIT_BOT.md
+# שני בוטי מסלול עמית בחשבון הדמו של Bybit (כסף וירטואלי): bikur-bybit (בוט 1, BTC) + bikur-bybit2 (בוט 2, ETH) — התקנה/עדכון/עצירה על השרת של בעל הריפו. פירוט: invest/docs/BYBIT_BOT.md
 # Bybit חוסמת שרתים בארה"ב (כמו ה-runner של GitHub), ולכן הבוט רץ על השרת (גרמניה) וה-workflow רק מתחבר אליו ב-SSH.
 # Secrets: SERVER_HOST, SERVER_ROOT_PASSWORD, BYBIT_DEMO_API_KEY, BYBIT_DEMO_API_SECRET, BRIDGE_SECRET (לדיווח ל-Worker).
 name: Bybit demo bot (Amit)
@@ -35,15 +35,16 @@ jobs:
       - name: Run on server
         run: |
           set -e
-          for v in SERVER_HOST SSHPASS BYBIT_KEY BYBIT_SECRET BRIDGE_SECRET; do [ -n "${!v}" ] && echo "✅ $v" || echo "❌ $v חסר"; done
+          miss=""; for v in SERVER_HOST SSHPASS BYBIT_KEY BYBIT_SECRET BRIDGE_SECRET; do if [ -n "${!v}" ]; then echo "✅ $v"; else echo "❌ $v חסר"; miss=1; fi; done
+          [ -z "$miss" ] || { echo "::error::חסרים Secrets (Settings → Secrets and variables → Actions)"; exit 1; }
           sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq sshpass >/dev/null
           SSH="sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 root@$SERVER_HOST"
           # STOP: הבוט מבטל את הפקודות שלו וסוגר פוזיציה בתוך כ-5 שניות, ואז השירות נעצר
           case "$ACTION" in
             install) { printf 'export BYBIT_KEY=%q BYBIT_SECRET=%q BRIDGE_SECRET=%q WORKER_URL=%q\n' "$BYBIT_KEY" "$BYBIT_SECRET" "$BRIDGE_SECRET" "$WORKER_URL"; cat .github/bybit/bot-install.sh; } | $SSH 'bash -s' ;;
-            update)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge git -C "$H/bikur" pull -q && sudo -u bridge git -C "$H/bikur" log --oneline -1 && systemctl restart bikur-bybit && sleep 5 && systemctl is-active bikur-bybit | sed "s/^/bybit bot service: /"' ;;
-            status)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); systemctl is-active bikur-bybit | sed "s/^/bybit bot service: /"; ls "$H/.bikur-bybit/STOP" 2>/dev/null && echo "STOP קיים — הבוט עצור"; journalctl -u bikur-bybit -n 25 --no-pager; true' ;;
-            logs)    $SSH 'journalctl -u bikur-bybit -n 150 --no-pager' ;;
-            stop)    $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP"; chown -R bridge:bridge "$H/.bikur-bybit"; sleep 15; journalctl -u bikur-bybit -n 10 --no-pager; systemctl stop bikur-bybit; echo "stopped (STOP נשאר עד start)"' ;;
-            start)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP"; systemctl start bikur-bybit; sleep 5; systemctl is-active bikur-bybit | sed "s/^/bybit bot service: /"' ;;
+            update)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge git -C "$H/bikur" pull -q && sudo -u bridge git -C "$H/bikur" log --oneline -1 && systemctl restart bikur-bybit bikur-bybit2 && sleep 5; for s in bikur-bybit bikur-bybit2; do systemctl is-active $s | sed "s/^/$s: /"; done' ;;
+            status)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); ls "$H/.bikur-bybit/STOP" 2>/dev/null && echo "STOP קיים — הבוטים עצורים"; for s in bikur-bybit bikur-bybit2; do echo "=== $s: $(systemctl is-active $s)"; journalctl -u $s -n 25 --no-pager; done; true' ;;
+            logs)    $SSH 'for s in bikur-bybit bikur-bybit2; do echo "=== $s"; journalctl -u $s -n 120 --no-pager; done' ;;
+            stop)    $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP"; chown -R bridge:bridge "$H/.bikur-bybit"; sleep 15; journalctl -u bikur-bybit -n 6 --no-pager; journalctl -u bikur-bybit2 -n 6 --no-pager; systemctl stop bikur-bybit bikur-bybit2; echo "stopped (STOP נשאר עד start)"' ;;
+            start)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP"; systemctl start bikur-bybit bikur-bybit2; sleep 5; for s in bikur-bybit bikur-bybit2; do systemctl is-active $s | sed "s/^/$s: /"; done' ;;
           esac
