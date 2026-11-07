@@ -1,0 +1,22 @@
+# זמני (ops): שיטות קריפטו קצרות טווח על נרות שעה מ-2019 (scripts/research-hourly.mjs). מחקר בלבד. MODE=dev → המבחן מוסתר; final → --show-test
+name: research-hourly
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-hourly.yml]
+permissions: { contents: read }
+env: { MODE: dev }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/cache@v4
+        with: { path: hourly-data.json.gz, key: research-hourly-2019-2026-11-07-v1 }
+      - name: data (אם המטמון לא זמין)
+        run: '[ -f hourly-data.json.gz ] || node invest-api/scripts/research-hourly.mjs --start 2019-01-01 --end 2026-11-07 --data hourly-data.json.gz > /dev/null'
+      - name: run
+        run: node --max-old-space-size=6000 invest-api/scripts/research-hourly.mjs --data hourly-data.json.gz --out research-hourly.md $([ "$MODE" = final ] && echo --show-test)
