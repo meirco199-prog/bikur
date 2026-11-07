@@ -1,4 +1,4 @@
-# זמני (ops): (2) המומנטום בין מטבעות במינוף ×1/×1.5/×2/×3 (scripts/research-leverage.mjs) על אותם נתונים יומיים של research-daily. מחקר בלבד.
+# זמני (ops): (3) המומנטום בין מטבעות במינוף ×1/×1.25/×1.5/×2/×3 אחרי ניקוי נתונים שגויים (scripts/research-leverage.mjs). מחקר בלבד.
 name: research-leverage
 on:
   push:
