@@ -15,7 +15,8 @@ const P = { all: { from: days[0], to: days.at(-1) + DAY }, train: { from: days[0
 const pct = (x) => (x == null ? '—' : `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toLocaleString('en-US', { maximumFractionDigits: x && Math.abs(x) > 10 ? 0 : 1 })}%`);
 const fs = (x) => (x == null ? '—' : (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(2));
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
-const VARIANTS = [{ lab: '×1 ספוט (בלי מינוף)', lev: 1, spot: true }, { lab: '×1 חוזה', lev: 1.0001 }, { lab: '×1.5', lev: 1.5 }, { lab: '×2', lev: 2 }, { lab: '×3', lev: 3 }];
+const VARIANTS = [{ lab: '×1 ספוט (בלי מינוף)', lev: 1, spot: true }, ...[1.0001, 1.5, 2, 3].flatMap((lev) => ['low', 'close'].map((liqBy) => ({ lab: `${lev > 1.01 ? '×' + lev : '×1 חוזה'} · חיסול לפי ${liqBy === 'low' ? 'שפל' : 'סגירה'}`, lev, liqBy })))];
+const liqs = [];
 const L = [`# מינוף — ${iso(days[0])} → ${iso(days.at(-1))}, ${A.coins.length} מטבעות, נרות יומיים`,
   'חוזה: עמלה 0.055% + החלקה לכל צד, Funding היסטורי (Hyperliquid מ-2023; לפני כן לונג משלם 0.03% ליום = כ-11% בשנה על הנוציונל). חיסול: השפל של היום מוריד את ההון מתחת ל-0.5% מהחשיפה → ההון מתאפס.', ''];
 for (const id of ['XS14-top3-f200', 'DC20-10-EW', 'MA50-EW', 'BH-BTC']){
@@ -23,7 +24,8 @@ for (const id of ['XS14-top3-f200', 'DC20-10-EW', 'MA50-EW', 'BH-BTC']){
   L.push(`## \`${id}\``, '| מינוף | 2016–2026 מצטבר | תשואה שנתית | ירידה מקס׳ | שארפ | חיסול | Funding מצטבר | מבחן (2024–2026): שנתי / ירידה |', '|---|---|---|---|---|---|---|---|');
   const yearsRow = [];
   for (const v of VARIANTS){
-    const r = v.spot ? runDaily(A, s, { funding: F }) : runDaily(A, { ...s, perp: true }, { funding: F, leverage: v.lev });
+    const r = v.spot ? runDaily(A, s, { funding: F }) : runDaily(A, { ...s, perp: true }, { funding: F, leverage: v.lev, liqBy: v.liqBy });
+    if (r.liqInfo) liqs.push(`- \`${id}\` ${v.lab}: ${iso(r.liquidated)} — ` + r.liqInfo.map((q) => `${q.coin} (משקל ${q.w.toFixed(2)}): פתיחה ${q.o}, שפל ${q.l}, סגירה ${q.c}`).join(' · '));
     const a = dstats(r.series, P.all), t = dstats(r.series, P.test);
     L.push(`| ${v.lab} | ${pct(a.total)} | ${pct(a.cagr)} | ${pct(-a.maxDD)} | ${fs(a.sharpe)} | ${r.liquidated ? `💥 ${iso(r.liquidated)}` : '—'} | ${pct(-a.fundTotal)} | ${pct(t.cagr)} / ${pct(-t.maxDD)} |`);
     const ys = [...new Set(days.map((x) => new Date(x).getUTCFullYear()))];
@@ -32,4 +34,5 @@ for (const id of ['XS14-top3-f200', 'DC20-10-EW', 'MA50-EW', 'BH-BTC']){
   const ys = [...new Set(days.map((x) => new Date(x).getUTCFullYear()))];
   L.push('', '| מינוף | ' + ys.join(' | ') + ' |', '|---|' + ys.map(() => '---').join('|') + '|', ...yearsRow, '');
 }
+L.push('## נרות החיסול (לבדוק אם זה פתיל אמיתי או נתון שגוי)', ...liqs);
 const md = L.join('\n'); console.log(md); if (OUT) writeFileSync(OUT, md);

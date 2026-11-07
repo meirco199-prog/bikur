@@ -83,9 +83,10 @@ export function strategies(coins){
 // funding: { coin: Map(dayMs → סכום שיעורי Funding של היום) } (אופציונלי)
 // leverage > 1 (בקשת מאיר 7/11: "תריץ את הבדיקה במינוף ×1.5 ו-×2"): המשקלות כפול המינוף, הביצוע בחוזה (עמלת חוזה + Funding על כל
 // הנוציונל), וחיסול: אם במהלך היום (שפל/שיא) ההון יורד מתחת לביטחונות המינימליים (mmr × החשיפה) — ההון מתאפס והסדרה נעצרת.
-export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005 } = {}){
+// liqBy: 'low' = לפי השפל של היום בבורסה (מחמיר: גם "פתיל" חריג של בורסה אחת); 'close' = לפי הסגירה (מקל: מחיר הסימון בחוזים מבוסס מדד של כמה בורסות)
+export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low' } = {}){
   const { coins, days, O, C, H, L: LO } = A, K = coins.length, out = [], st = {}, perp = !!strat.perp || leverage > 1;
-  let liquidated = null;
+  let liquidated = null, liqInfo = null;
   const slip = (k) => (cost.slipBps[coins[k]] ?? cost.slipOther) / 1e4;
   let w = new Array(K).fill(0), entries = 0;
   for (let d = 1; d < days.length; d++){
@@ -101,7 +102,7 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
       if (!ok){ if (w[k] || tgt[k]) { tgt[k] = 0; } continue; }
       r += w[k] * (o / c0 - 1) + tgt[k] * (c / o - 1); // הלילה עם המשקל הישן, היום עם החדש
       night += w[k] * (o / c0 - 1);
-      if (tgt[k]){ const ext = tgt[k] > 0 ? LO?.[k]?.[d] : H?.[k]?.[d]; if (Number.isFinite(ext)) worst += tgt[k] * (ext / o - 1); }
+      if (tgt[k]){ const ext = liqBy === 'close' ? c : tgt[k] > 0 ? LO?.[k]?.[d] : H?.[k]?.[d]; if (Number.isFinite(ext)) worst += tgt[k] * (ext / o - 1); }
       const dw = Math.abs(tgt[k] - w[k]); turn += dw;
       if (!w[k] && tgt[k]) entries += 1;
       cst += dw * ((perp ? cost.perpBps : cost.spotBps) / 1e4 + slip(k)) * costMult;
@@ -113,13 +114,14 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
     const expo = tgt.reduce((s, x) => s + Math.abs(x), 0);
     if (leverage > 1 && 1 + night + worst <= mmr * expo){ // חיסול: ההון נמחק
       out.push({ t: days[d], gross: -1, cost: 0, fund: 0, net: -1, turn: 0, exp: expo, liquidated: true }); liquidated = days[d];
+      liqInfo = coins.map((c, k) => (tgt[k] ? { coin: c, w: tgt[k], o: O[k][d], l: LO?.[k]?.[d], c: C[k][d] } : null)).filter(Boolean);
       for (let e = d + 1; e < days.length; e++) out.push({ t: days[e], gross: 0, cost: 0, fund: 0, net: 0, turn: 0, exp: 0 });
       break;
     }
     out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo });
     w = tgt;
   }
-  return { series: out, entries, liquidated };
+  return { series: out, entries, liquidated, liqInfo };
 }
 function portVol(A, w, d, n = 30){
   if (d < n) return 0; const rs = [];
