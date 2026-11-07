@@ -93,11 +93,12 @@ function journal(list){
 // 🧪 מסלול עמית (GET /amit): סקאלפ ביטקוין על נרות דקה — הכללים מצילומי המסך שלו (רצועות בולינגר, סטופ, עמלות)
 const WHY_A = { 'סטופ': '🛑 סטופ', 'יעד': '🎯 יעד' };
 // הבוט בחשבון הדמו של Bybit (אותם כללים, פקודות אמיתיות על כסף וירטואלי) — דוח מהשרת כל שעתיים
+const BOT_UNIT = { 1: 'BTC', 2: 'ETH' };
 const BOT_NAME = { 1: 'בוט 1 — ביטקוין, נרות דקה, נגיעה ברצועה', 2: 'בוט 2 — ETH, נרות 15 דקות, חציה וחזרה לרצועה' };
 function botBlock(b, n = 1){
   if (!b) return `<div class="muted" style="font-size:.85rem;margin:.4rem 0">🤖 ${BOT_NAME[n]} (חשבון הדמו של Bybit): עוד לא דיווח.</div>`;
   const ageH = (Date.now() - Date.parse(b.receivedAt)) / 3600e3;
-  const pos = b.pos ? ` · בעסקה: ${esc(SIDE[b.pos.side] || b.pos.side)} ${esc(String(b.pos.size))} BTC מ-${px(b.pos.entry)}` : '';
+  const pos = b.pos ? ` · בעסקה: ${esc(SIDE[b.pos.side] || b.pos.side)} ${esc(String(b.pos.size))} ${BOT_UNIT[n] || ''} מ-${px(b.pos.entry)}` : '';
   return `<div style="margin:.5rem 0;padding:.5rem .6rem;border:1px dashed var(--border,#444);border-radius:8px">
     <b>🤖 ${BOT_NAME[n]}</b> <span class="muted" style="font-size:.8rem">חשבון הדמו של Bybit · פקודות אמיתיות · כסף וירטואלי · מגבלת הפסד יומית 1,000$</span>
     <div style="font-size:.9rem;margin-top:.25rem">היום ${b.today.n} עסקאות, <b class="${cls(b.today.netUsd)}">${usdS(b.today.netUsd)}</b> · מצטבר ${b.total.n} עסקאות (${b.total.wins} הצלחות), <b class="${cls(b.total.netUsd)}">${usdS(b.total.netUsd)}</b>${isNum(b.equity) ? ` · הון ${usd0(b.equity)}` : ''}${pos}</div>

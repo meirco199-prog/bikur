@@ -94,9 +94,14 @@ test('דיווח בוט 2: מפתח נפרד; GET /amit מחזיר bot2; הסי�
   const txt = formatSummary(s, ilDay(T0), null, await db.get(AMITBOT_KEY), T0, await db.get(AMITBOT2_KEY));
   assert.match(txt, /בוט 1/); assert.match(txt, /בוט 2/); assert.match(txt, /ETH/);
   const { default: worker } = await import('../worker.js');
-  const env = { BRIDGE_SECRET: 'b' };
+  const store = new Map(), kv = { get: async (k) => (store.has(k) ? JSON.parse(store.get(k)) : null), put: async (k, v) => { store.set(k, v); }, delete: async (k) => { store.delete(k); }, list: async () => ({ keys: [] }) };
+  const env = { BRIDGE_SECRET: 'b', INVEST: kv };
   const r = await worker.fetch(new Request('https://x/amit/bot?bot=2&secret=b', { method: 'POST', body: JSON.stringify(rep), headers: { 'Content-Type': 'application/json' } }), env, {});
   assert.equal(r.status, 200);
+  // GET /amit מחזיר את שני הבוטים (KV מדומה משותף לשתי הבקשות)
+  const g = await (await worker.fetch(new Request('https://x/amit'), env, {})).json();
+  assert.ok('bot' in g && 'bot2' in g);
+  assert.equal(g.bot2?.total?.n, 1, 'הדיווח של בוט 2 חוזר ב-GET');
 });
 
 test('הבוט עצמו מול Bybit מדומה: אות → פקודת שוק עם סטופ ויעד; התקדמות → הזזת סטופ; STOP → סגירה', async () => {
@@ -111,6 +116,7 @@ test('הבוט עצמו מול Bybit מדומה: אות → פקודת שוק ע
     const u = new URL(url), body = opts.body ? JSON.parse(opts.body) : null; calls.push({ host: u.host, path: u.pathname, body });
     const ok = (result) => Response.json({ retCode: 0, retMsg: 'OK', result });
     if (u.pathname === '/v5/market/kline'){
+      assert.equal(u.host, 'api.bybit.com', 'נרות: מחירי השוק הציבוריים (בלי מפתח); מסחר רק ב-api-demo');
       assert.equal(u.searchParams.get('interval'), '15'); assert.equal(u.searchParams.get('symbol'), 'ETHUSDT');
       const bars = withLast(2391, 2394, 2390, 2393).map((b, i, a) => [String(slot - (a.length - i) * M15), b.o, b.h, b.l, b.c]);
       return Response.json({ result: { list: [[String(slot), '2396', '2397', '2395', '2396'], ...bars.reverse()] } });
