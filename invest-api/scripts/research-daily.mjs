@@ -113,6 +113,18 @@ async function main(){
   L.push('', '## כל הגרסאות (אימון / אימות' + (SHOW_TEST ? ' / מבחן' : '') + ') — שארפ');
   L.push('| גרסה | משפחה | אימון | אימות |' + (SHOW_TEST ? ' מבחן |' : ''), '|---|---|---|---|' + (SHOW_TEST ? '---|' : ''));
   for (const r of [...res.values()].sort((a, b) => (b.st.train.ci?.[0] ?? -9) - (a.st.train.ci?.[0] ?? -9))) L.push(`| \`${r.s.id}\` | ${r.s.family} | ${fs(r.st.train.sharpe)} ${fci(r.st.train.ci)} | ${fs(r.st.val.sharpe)} |` + (SHOW_TEST ? ` ${fs(r.st.test.sharpe)} |` : ''));
+  // בדיקת עמידות (רק כשהמבחן פתוח): בלי כל מטבע בתורו — האם התוצאה תלויה במטבע אחד (הטיית שורדים / מזל)?
+  if (SHOW_TEST){
+    L.push('', '## עמידות: תקופת המבחן בלי כל מטבע בתורו (לגרסאות שעברו / מבטיחות)');
+    L.push('| גרסה | שארפ מלא | שארפ מינימלי (בלי…) | תשואה שנתית מינימלית | בלי BTC+ETH בלבד? |', '|---|---|---|---|---|');
+    for (const x of report.filter((y) => /✅|🟡/.test(y.v[0]))){
+      const loo = A.coins.map((c) => { const bars = Object.fromEntries(Object.entries(d.bars).filter(([k]) => k !== c)), A2 = align(bars), s2 = strategies(A2.coins).find((q) => q.id === x.best.s.id); return { c, st: s2 ? dstats(runDaily(A2, s2, { funding: F }).series, P.test) : null }; }).filter((q) => q.st && q.st.sharpe !== null);
+      const worst = loo.sort((a, b) => a.st.sharpe - b.st.sharpe)[0], minC = loo.reduce((m, q) => Math.min(m, q.st.cagr), Infinity);
+      const majors = Object.fromEntries(Object.entries(d.bars).filter(([k]) => k === 'BTC' || k === 'ETH')), A3 = align(majors), s3 = strategies(A3.coins).find((q) => q.id === x.best.s.id);
+      const m3 = s3 ? dstats(runDaily(A3, s3, { funding: F }).series, P.test) : null;
+      L.push(`| \`${x.best.s.id}\` | ${fs(x.best.st.test.sharpe)} | ${fs(worst?.st.sharpe)} (בלי ${worst?.c}) | ${pct(minC)} | ${m3 ? `${fs(m3.sharpe)}, ${pct(m3.cagr)}` : '—'} |`);
+    }
+  }
   L.push('', '## Walk-Forward — מה נבחר בכל קפל');
   for (const x of report) L.push(`- **${x.fam}**: ` + x.picks.map((p, i) => `${iso(folds[i].test.from).slice(0, 4)}: \`${p}\``).join(' · '));
   const md = L.join('\n'); console.log(md); if (OUT) writeFileSync(OUT, md);
