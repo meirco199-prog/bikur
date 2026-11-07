@@ -18,6 +18,7 @@ import { ingestSinay, sinayReport, SINAY_KEY } from './lib/sinay.js';
 import { runSinayLive } from './lib/sinay-live.js';
 import { runAmitLive, amitReport, recordAmitBot, AMIT_KEY, AMITBOT_KEY, AMITBOT2_KEY } from './lib/amit-live.js';
 import { recordPaper, XSPAPER_KEY } from './lib/xsmom-paper.js';
+import { recordVbo, VBOPAPER_KEY } from './lib/vbo-paper.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -213,6 +214,15 @@ async function handle(req, env0, ctx){
     if (req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       try { return json(await recordPaper(db, body)); } catch (e) { if (!e.status) await db.logError('xsmom-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
+    }
+    return err('not found', 404);
+  }
+  // מעקב Paper לפריצת תנודתיות תוך-יומית BTC/ETH (lib/vbo-paper.js): GET /vbo ציבורי = המצב; POST /vbo = עדכון מ-Actions (scripts/vbo-paper.mjs) עם סוד ה-cron
+  if (r0 === 'vbo' && !p1){
+    if (req.method === 'GET') return json((await db.get(VBOPAPER_KEY)) || null);
+    if (req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      try { return json(await recordVbo(db, body)); } catch (e) { if (!e.status) await db.logError('vbo-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }
