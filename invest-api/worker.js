@@ -16,7 +16,7 @@ import { recordLive, liveReport } from './lib/agent-live.js';
 import { recordStockScan, stockScanReport } from './lib/agent-stocks.js';
 import { ingestSinay, sinayReport, SINAY_KEY } from './lib/sinay.js';
 import { runSinayLive } from './lib/sinay-live.js';
-import { runAmitLive, amitReport, AMIT_KEY } from './lib/amit-live.js';
+import { runAmitLive, amitReport, recordAmitBot, AMIT_KEY, AMITBOT_KEY } from './lib/amit-live.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -193,7 +193,13 @@ async function handle(req, env0, ctx){
   }
   // מסלול "עמית" (דמה, סקאלפ ביטקוין על נרות דקה — lib/amit-live.js): GET ציבורי = דוח; POST /amit/run = הרצה ידנית (סוד ה-cron)
   if (r0 === 'amit'){
-    if ((!p1 || p1 === 'report') && req.method === 'GET') return json(amitReport(await db.get(AMIT_KEY)));
+    if ((!p1 || p1 === 'report') && req.method === 'GET') return json({ ...amitReport(await db.get(AMIT_KEY)), bot: (await db.get(AMITBOT_KEY)) || null });
+    // דוח מהבוט בחשבון הדמו של Bybit (scripts/bybit-amit-bot.mjs על השרת) — סוד הגשר או ה-cron
+    if (p1 === 'bot' && req.method === 'POST'){
+      const byBridge = !!(q.secret && ((env.BRIDGE_SECRET && q.secret === env.BRIDGE_SECRET) || (env.CRON_SECRET && q.secret === env.CRON_SECRET)));
+      if (!byBridge) needAuth();
+      try { return json(await recordAmitBot(db, body)); } catch (e) { if (!e.status) await db.logError('amit-bot', e.message); return err('בוט עמית: ' + e.message, e.status || 500); }
+    }
     if (p1 === 'run' && req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       try { return json(await runAmitLive(ctx, { force: q.force === '1', notify: q.notify !== '0' })); } catch (e) { await db.logError('amit-live', e.message); return err('מסלול עמית: ' + e.message, e.status || 500); }
