@@ -1,0 +1,29 @@
+# מעקב Paper Trading יומי ל-Donchian 20/10 על 20 מטבעות (engine/dc-paper.js, research/xs-check.md). תיק וירטואלי — אין כסף, אין פקודות, אין מפתחות מסחר.
+# כל יום ב-00:45 UTC: נרות יומיים מ-Coinbase → קידום המצב → POST /dc ב-invest-api (CRON_SECRET). התוצאה מופיעה בסיכום הקריפטו היומי בטלגרם.
+name: Donchian paper (daily)
+on:
+  schedule:
+    - cron: '45 0 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dc-paper
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: invest-api
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: step
+        env:
+          WORKER_URL: https://invest-api.meirco199.workers.dev
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::error::חסר הסוד CRON_SECRET"; exit 1; fi
+          node invest-api/scripts/dc-paper.mjs

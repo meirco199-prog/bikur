@@ -19,6 +19,7 @@ import { runSinayLive } from './lib/sinay-live.js';
 import { runAmitLive, amitReport, recordAmitBot, AMIT_KEY, AMITBOT_KEY, AMITBOT2_KEY } from './lib/amit-live.js';
 import { recordPaper, XSPAPER_KEY } from './lib/xsmom-paper.js';
 import { recordVbo, VBOPAPER_KEY } from './lib/vbo-paper.js';
+import { recordDc, DCPAPER_KEY } from './lib/dc-paper.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -223,6 +224,15 @@ async function handle(req, env0, ctx){
     if (req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       try { return json(await recordVbo(db, body)); } catch (e) { if (!e.status) await db.logError('vbo-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
+    }
+    return err('not found', 404);
+  }
+  // מעקב Paper ל-Donchian 20/10 (lib/dc-paper.js): GET /dc ציבורי = המצב; POST /dc = עדכון יומי מ-Actions (scripts/dc-paper.mjs) עם סוד ה-cron
+  if (r0 === 'dc' && !p1){
+    if (req.method === 'GET') return json((await db.get(DCPAPER_KEY)) || null);
+    if (req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      try { return json(await recordDc(db, body)); } catch (e) { if (!e.status) await db.logError('dc-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }
