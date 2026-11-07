@@ -1,5 +1,6 @@
-# זמני (ops): הרצת מסגרת הניסויים של מסלול עמית (engine/research.js) על שנה של נרות דקה, 5 מטבעות. מחקר בלבד — אין פקודות ואין מפתחות.
-# .github/research/mode: dev = תקופת המבחן מוסתרת; final = ריצה אחת בסוף עם --show-test.
+# זמני (ops): הרצת מסגרת הניסויים של מסלול עמית (engine/research.js). מחקר בלבד — אין פקודות ואין מפתחות.
+# שתי ריצות על אותם 5 מטבעות: שנה על נרות דקה (ביצוע מדויק), ו-5 שנים על נרות 5 דקות (15 דקות ומעלה + שיטות מגמה).
+# .github/research/mode: dev* = תקופת המבחן מוסתרת; final = ריצה אחת בסוף עם --show-test.
 name: research-run
 on:
   push:
@@ -8,18 +9,25 @@ on:
 permissions: { contents: read }
 jobs:
   run:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: '1y-1m', days: 365, base: 1, min: 60, key: 'research-data-2026-11-07-365-v1' }
+          - { name: '5y-5m', days: 1826, base: 5, min: 40, key: 'research-data-5m-2026-11-07-1826-v1' }
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - uses: actions/cache@v4
-        with: { path: research-data.json.gz, key: research-data-2026-11-07-365-v1 }
+        with: { path: research-data.json.gz, key: '${{ matrix.key }}' }
       - name: run
         run: |
           MODE=$(tr -d '[:space:]' < .github/research/mode)
           FLAG=""; [ "$MODE" = "final" ] && FLAG="--show-test"
-          node --max-old-space-size=6144 invest-api/scripts/research-backtest.mjs --end 2026-11-07 --days 365 --data research-data.json.gz --out research.md --json research.json $FLAG
+          node --max-old-space-size=6144 invest-api/scripts/research-backtest.mjs --end 2026-11-07 --days ${{ matrix.days }} --base ${{ matrix.base }} --min-trades ${{ matrix.min }} --data research-data.json.gz --out research.md --json research.json $FLAG
       - uses: actions/upload-artifact@v4
-        with: { name: research, path: 'research.md' }
+        with: { name: 'research-${{ matrix.name }}', path: 'research.*' }
