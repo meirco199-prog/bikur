@@ -72,6 +72,7 @@ async function main(){
     ctx[c] = prepare(d.bars[c].map((r) => ({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5] })));
     fund[c] = (d.funding[c] || []).map(([t, rate]) => ({ t, rate }));
   }
+  for (const c of COINS) ctx[c].btc = ctx.BTC; // מסנן מגמת ביטקוין
   delete d.bars;
   const fundingSrc = COINS.every((c) => fund[c].length > 100) ? 'Hyperliquid (שעתי)' : `קבוע ${COST.fundingBpsPer8h}bp/8h לחלק מהמטבעות`;
   const run = (base, filters = [], risk) => COINS.flatMap((c) => execute(ctx[c], signals(ctx[c], base), { coin: c, filters, funding: fund[c], risk }));
@@ -96,9 +97,13 @@ async function main(){
     { id: 'E1', name: 'קבוצות ביקורת (הבוטים המקוריים)', keys: ['C1-bot1', 'C2-bot2'], fixed: true },
     { id: 'E3', name: 'גרסאות 5 ו-15 דקות', keys: keysWhere((r) => isExp(r, 3) && !r.filters.length) },
     { id: 'E4', name: 'גרסת שעה (+ תיקון אחרי תנופה)', keys: keysWhere((r) => isExp(r, 4) && !r.filters.length) },
-    { id: 'E5', name: 'רק בכיוון המגמה (1H + 4H)', keys: keysWhere((r) => isExp(r, 3, 4) && r.filters.join() === 'trend') },
-    { id: 'E6', name: 'מסנני ATR / תנודתיות / נפח / נזילות / שעות', keys: keysWhere((r) => isExp(r, 3, 4) && r.filters.length === 1 && r.filters[0] !== 'trend') },
+    { id: 'E5', name: 'רק בכיוון המגמה (1H + 4H)', keys: keysWhere((r) => isExp(r, 3, 4, 9) && r.filters.join() === 'trend') },
+    { id: 'E6', name: 'מסנני ATR / תנודתיות / נפח / נזילות / שעות', keys: keysWhere((r) => isExp(r, 3, 4, 9) && r.filters.length === 1 && ['atr', 'vol', 'rvol', 'liq', 'sess'].includes(r.filters[0])) },
     { id: 'E7', name: 'סטופ מבני + יעדים 1.5R/2R/3R', keys: keysWhere((r) => isExp(r, 7) && !r.filters.length) },
+    { id: 'E9', name: 'טווח גבוה (1h/4h) + סטופ רחב 2%/3%', keys: keysWhere((r) => isExp(r, 9) && !r.filters.length) },
+    { id: 'E10', name: 'כניסה מדורגת 1:2:3 בפקודות ממתינות', keys: keysWhere((r) => isExp(r, 10) && !r.filters.length) },
+    { id: 'E11', name: 'מסנני מפגש: נפח ×2, EMA50/200/VWAP, מגמת ביטקוין', keys: keysWhere((r) => isExp(r, 3, 4, 9, 10, 12) && r.filters.length === 1 && ['rvol2', 'conf', 'btc'].includes(r.filters[0])) },
+    { id: 'E12', name: 'כניסה ממתינה בלבד, עד 3 ביום, מימוש חלקי + ריצה', keys: keysWhere((r) => isExp(r, 12) && !r.filters.length) },
     { id: 'X', name: 'השוואה: פריצה (לא מעמית)', keys: keysWhere((r) => isExp(r, 0) && r.filters.length <= 1 && (!r.filters.length || r.filters[0] === 'trend')) },
   ];
   const pickBest = (keys) => {
@@ -141,8 +146,10 @@ async function main(){
       }
       wf.E8 = { st: st(oos, { from: folds[0]?.test.from, to: folds.at(-1)?.test.to }), picks };
     } else if (g.fixed){ // ביקורת: אין בחירה — אותה גרסה בחלונות הבדיקה של הקפלים
-      const tr = g.keys.flatMap((k) => res.get(k).trades.filter((x) => folds.some((f) => x.tEntry >= f.test.from && x.tEntry < f.test.to)));
-      wf[g.id] = { st: st(tr, { from: folds[0]?.test.from, to: folds.at(-1)?.test.to }), picks: folds.map(() => g.keys.join(' + ')) };
+      for (const k of g.keys){
+        const tr = res.get(k).trades.filter((x) => folds.some((f) => x.tEntry >= f.test.from && x.tEntry < f.test.to));
+        wf[`${g.id}:${k}`] = { st: st(tr, { from: folds[0]?.test.from, to: folds.at(-1)?.test.to }), picks: folds.map(() => k) };
+      }
     } else wf[g.id] = wfFor(g.keys.map((k) => ({ key: k, trades: subset(k) })));
   }
 
@@ -155,8 +162,9 @@ async function main(){
       const r = res.get(k), tr = r.trades || run(r.base, r.filters);
       r.trades = tr;
       const cost15 = st(tr, SHOW_TEST ? P.test : P.val, { costMult: 1.5 }), cost2 = st(tr, SHOW_TEST ? P.test : P.val, { costMult: 2 });
-      const v = verdict({ train: r.s.train, val: r.s.val, test: SHOW_TEST ? r.s.test : null, wf: wf[g.id]?.st, cost15 });
-      finals.push({ g, key: k, r, v, cost15, cost2, ok: g.fixed ? true : pickBest(g.keys).ok });
+      const w = (wf[`${g.id}:${k}`] || wf[g.id])?.st;
+      const v = verdict({ train: r.s.train, val: r.s.val, test: SHOW_TEST ? r.s.test : null, wf: w, cost15 });
+      finals.push({ g, key: k, r, v, cost15, cost2, wf: w, ok: g.fixed ? true : pickBest(g.keys).ok });
     }
   }
   // 6. סיכון מוקטן (200$ / 100$), אותן גרסאות
@@ -186,6 +194,7 @@ async function main(){
   const gate = (s) => (s.dev.ciRGross && s.dev.ciRGross[1] < 0 ? 'שלילית בביטחון — אין יתרון גם לפני עלויות' : s.dev.ciRGross && s.dev.ciRGross[0] > 0 ? 'חיובית בביטחון לפני עלויות' : 'לא מובהקת — לא ניתן לשלול אפס');
   L.push('', `**בוט 1:** ${gate(C1)}. **בוט 2:** ${gate(C2)}. (R = רווח/הפסד ביחס לסיכון של העסקה; ‎−1R = סטופ מלא.)`, '');
 
+  L.push('**הניסויים:** ' + groups.map((g) => `${g.id} — ${g.name}`).join(' · '), '');
   L.push('## 1. נציג כל ניסוי (נבחר לפי אימון בלבד: הגבול התחתון של תוחלת נטו ב-R, מינימום 60 עסקאות, רווח ב-3/5 מטבעות)');
   const head = '| ניסוי | גרסה | תקופה | עסקאות | הצלחה | ברוטו | עמלות | מרווח+החלקה | Funding | **נטו** | תוחלת $ | תוחלת R [95%] | PF | ירידה מקס׳ | נטו ליום [95%] |';
   L.push(head, '|' + '---|'.repeat(15));
@@ -200,12 +209,13 @@ async function main(){
   L.push('## 2. פסיקה');
   L.push('| ניסוי | גרסה | Walk-Forward (מחוץ למדגם) | פסיקה | למה |', '|---|---|---|---|---|');
   const icon = { pass: '✅ מרוויחה בביטחון', promising: '🟡 מבטיחה, לא מובהקת', pending: '⏳ עברה אימון ואימות', fail: '❌ נכשלה' };
-  for (const f of finals){ const w = wf[f.g.id]?.st; L.push(`| ${f.g.id} | \`${f.key}\` | ${w ? `${w.n} עסק׳, ${fmt$(w.net)}, R ${fR(w.expR)} ${fCI(w.ciR)}` : '—'} | ${icon[f.v.level]} | ${f.v.why} |`); }
+  for (const f of finals){ const w = f.wf; L.push(`| ${f.g.id} | \`${f.key}\` | ${w ? `${w.n} עסק׳, ${fmt$(w.net)}, R ${fR(w.expR)} ${fCI(w.ciR)}` : '—'} | ${icon[f.v.level]} | ${f.v.why} |`); }
   for (const g of groups) if (g.none) L.push(`| ${g.id} | — | — | ❌ נכשלה | ${g.none} |`);
   L.push('');
   L.push(`## 3. רגישות לעלויות (${SHOW_TEST ? 'מבחן' : 'אימות'})`);
-  L.push('| גרסה | לפני עלויות | עלויות ×1 | ×1.5 | ×2 |', '|---|---|---|---|---|');
-  for (const f of finals){ const s1 = f.r.s[SHOW_TEST ? 'test' : 'val']; L.push(`| \`${f.key}\` | ${fmt$(s1.gross)} | ${fmt$(s1.net)} | ${fmt$(f.cost15.net)} | ${fmt$(f.cost2.net)} |`); }
+  L.push('| גרסה | לפני עלויות | עמלות עמית/VIP (1.4/3.5bp) | עלויות ×1 | ×1.5 | ×2 | מכפיל איזון (אימון) |', '|---|---|---|---|---|---|---|');
+  for (const f of finals){ const s1 = f.r.s[SHOW_TEST ? 'test' : 'val'], vip = st(f.r.trades, SHOW_TEST ? P.test : P.val, { feeTier: { maker: 1.4, taker: 3.5 } }); L.push(`| \`${f.key}\` | ${fmt$(s1.gross)} | ${fmt$(vip.net)} | ${fmt$(s1.net)} | ${fmt$(f.cost15.net)} | ${fmt$(f.cost2.net)} | ${f.r.s.train.breakEvenCost ?? '—'} |`); }
+  L.push('', 'מכפיל איזון = פי כמה העלויות (עמלות+מרווח+החלקה) יכולות להיות ביחס לנוכחיות עד שהגרסה מתאזנת. מתחת ל-1 = מפסידה; שלילי = מפסידה גם בלי עלויות.');
   L.push('', `## 4. סיכון מוקטן לעסקה (${SHOW_TEST ? 'מבחן' : 'אימות'}) — אותו מינוף מקסימלי, עסקאות קטנות יותר`);
   L.push('| גרסה | 400$: נטו / R / PF / ירידה | 200$ | 100$ |', '|---|---|---|---|');
   for (const f of finals) L.push(`| \`${f.key}\` | ` + f.risk.map(({ s }) => `${fmt$(s.net)} / ${fR(s.expR)} / ${fPF(s.pf)} / ${fmt$(-s.maxDD)}`).join(' | ') + ' |');
@@ -226,6 +236,6 @@ async function main(){
   if (OUT) writeFileSync(OUT, md);
   if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify({ start: START, end: END, periods: P, folds, showTest: SHOW_TEST, cost: COST, risk: RISK,
     results: [...res.values()].map((r) => ({ key: r.key, filters: r.filters, base: r.base.id, s: SHOW_TEST ? r.s : { ...r.s, test: null } })),
-    finals: finals.map((f) => ({ group: f.g.id, key: f.key, verdict: f.v, wf: wf[f.g.id]?.st, risk: f.risk, regimes: f.regimes })) }, null, 1));
+    finals: finals.map((f) => ({ group: f.g.id, key: f.key, verdict: f.v, wf: f.wf, risk: f.risk, regimes: f.regimes })) }, null, 1));
 }
 main().catch((e) => { console.error(e); process.exit(1); });
