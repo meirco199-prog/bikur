@@ -181,3 +181,12 @@ test('גרסה 2: רצועות צרות (< 0.35%) → אין כניסה; רחב�
   const tp = decide({ pos: { side: 'long', size: '2.5', entry: 75700, sinceMs: NOW }, orders: [], closes: flat(), newBar: true, nowMs: NOW, barT: 4 }).find((a) => a.type === 'place');
   assert.equal(tp.order.timeInForce, 'GTC');
 });
+
+test('גרסה 2 — גבול הסף 0.35%: ממש מעל → כניסה, ממש מתחת → אין', () => {
+  // רוחב = 4·a/mid (סטיית תקן של סדרה מתחלפת ±a היא a) → a = 0.35%·76000/4 = 66.5
+  const above = flat(20, 76000, 66.6), below = flat(20, 76000, 66.4);
+  assert.ok(levels(above).widthPct >= 0.35 && levels(below).widthPct < 0.35);
+  const a = decide({ pos: null, orders: [], closes: above, newBar: true, nowMs: NOW, barT: 5 });
+  assert.equal(a.length, 2); assert.ok(a.every((x) => x.order.timeInForce === 'PostOnly'));
+  assert.deepEqual(decide({ pos: null, orders: [], closes: below, newBar: true, nowMs: NOW, barT: 5 }), []);
+});
