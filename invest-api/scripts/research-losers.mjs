@@ -22,9 +22,18 @@ async function universe(){
   const pages = ['List_of_S%26P_500_companies', 'List_of_S%26P_400_companies', 'List_of_S%26P_600_companies'], set = new Set();
   for (const p of pages){
     const h = await get(`https://en.wikipedia.org/wiki/${p}`); if (!h) { log('wiki fail', p); continue; }
-    const t = h.slice(h.indexOf('<table'), h.indexOf('</table>'));
-    for (const m of t.matchAll(/<tr>\s*<td[^>]*>\s*(?:<a[^>]*>)?([A-Z][A-Z0-9.\-]{0,6})(?:<\/a>)?\s*<\/td>/g)) set.add(m[1].replace('.', '-'));
+    let n = 0;
+    // תא ראשון בשורה עם קישור לבורסה (nyse/nasdaq) או טקסט טיקר
+    for (const m of h.matchAll(/<td[^>]*>\s*<a[^>]*href="https?:\/\/(?:www\.)?(?:nyse|nasdaq)\.com[^"]*"[^>]*>([A-Z][A-Z0-9.\-]{0,6})<\/a>/g)){ set.add(m[1].replace('.', '-')); n += 1; }
+    if (!n) for (const m of h.matchAll(/<tr>\s*<td[^>]*>\s*(?:<a[^>]*>)?([A-Z][A-Z0-9.\-]{0,6})(?:<\/a>)?\s*\n?<\/td>/g)){ set.add(m[1].replace('.', '-')); n += 1; }
+    log(`${p}: ${n}`);
   }
+  if (set.size < 400){ // גיבוי: רשימת S&P 500 מ-datasets ב-GitHub
+    const csv = await get('https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv');
+    for (const line of (csv || '').split('\n').slice(1)){ const t = line.split(',')[0]?.trim(); if (/^[A-Z][A-Z0-9.\-]{0,6}$/.test(t)) set.add(t.replace('.', '-')); }
+    log(`after csv fallback: ${set.size}`);
+  }
+  if (set.size < 300) throw new Error(`יקום קטן מדי (${set.size}) — לא מריצים סימולציה על נתונים חסרים`);
   return [...set];
 }
 async function bars(sym){
