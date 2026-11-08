@@ -1,0 +1,21 @@
+# זמני (ops): בדיקת עמידות לבוט A (scripts/research-vbo-check.mjs) — 24 שעות תחילת יום, k × ממוצע, כל מטבע לבד. מחקר בלבד.
+name: research-vbo-check
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-vbo-check.yml]
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/cache@v4
+        with: { path: hourly-data.json.gz, key: research-hourly-2019-2026-11-07-v1 }
+      - name: data (אם המטמון לא זמין)
+        run: '[ -f hourly-data.json.gz ] || node invest-api/scripts/research-hourly.mjs --start 2019-01-01 --end 2026-11-07 --data hourly-data.json.gz > /dev/null'
+      - name: run
+        run: node --max-old-space-size=6000 invest-api/scripts/research-vbo-check.mjs --data hourly-data.json.gz --out research-vbo-check.md

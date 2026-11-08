@@ -49,15 +49,16 @@ function indicators(A){
     let s = 0, s2 = 0, cnt = 0; for (let i = 1; i < N; i++){ const x = r[i]; if (Number.isFinite(x)){ s += x; s2 += x * x; cnt += 1; } else { s = s2 = 0; cnt = 0; } if (cnt > n){ const y = r[i - n]; s -= y; s2 -= y * y; cnt = n; } if (cnt === n) a[i] = Math.sqrt(Math.max(0, s2 / n - (s / n) ** 2)); } return a; });
   // ממוצע המחזור ב-n הנרות הקודמים (בלי הנר הנוכחי); לפני שהמטבע קיים המחזור נספר כאפס
   const vmean = (k, n) => get(`vm${k}:${n}`, () => { const a = new Float64Array(N).fill(NaN), V = A.V[k], v = (j) => (Number.isFinite(V[j]) ? V[j] : 0); let s = 0; for (let i = 1; i < N; i++){ s += v(i - 1); if (i - 1 - n >= 0) s -= v(i - 1 - n); if (i >= n) a[i] = s / n; } return a; });
-  // יום UTC: פתיחת היום (פתיחת הנר הראשון שלו), טווח היום הקודם (שיא−שפל), וסגירות יומיות לממוצע 20 יום
-  const day = (k) => get(`day${k}`, () => { const open = new Float64Array(N).fill(NaN), prevRange = new Float64Array(N).fill(NaN), ma20ok = new Uint8Array(N);
+  // "יום מסחר" שמתחיל בשעה offH (UTC; ברירת מחדל 0 = יום UTC): פתיחת היום (פתיחת הנר הראשון שלו), טווח היום הקודם (שיא−שפל),
+  // והאם סגירת אתמול מעל הממוצע של maN הסגירות היומיות האחרונות. offH ו-maN נוספו לבדיקת העמידות של בוט A (8/11)
+  const day = (k, offH = 0, maN = 20) => get(`day${k}:${offH}:${maN}`, () => { const open = new Float64Array(N).fill(NaN), prevRange = new Float64Array(N).fill(NaN), ma20ok = new Uint8Array(N);
     let curDay = null, dOpen = NaN, dHi = -Infinity, dLo = Infinity, pRange = NaN; const closes = [];
     for (let i = 0; i < N; i++){
-      const d = Math.floor(A.T[i] / DAY);
+      const d = Math.floor((A.T[i] - offH * HOUR) / DAY);
       if (d !== curDay){ if (curDay !== null && i > 0 && Number.isFinite(A.C[k][i - 1])){ pRange = dHi > -Infinity ? dHi - dLo : NaN; closes.push(A.C[k][i - 1]); } curDay = d; dOpen = A.O[k][i]; dHi = -Infinity; dLo = Infinity; }
       if (Number.isFinite(A.H[k][i])){ dHi = Math.max(dHi, A.H[k][i]); dLo = Math.min(dLo, A.L[k][i]); }
       open[i] = dOpen; prevRange[i] = pRange;
-      if (closes.length >= 20){ let s = 0; for (let j = closes.length - 20; j < closes.length; j++) s += closes[j]; ma20ok[i] = closes.at(-1) > s / 20 ? 1 : 0; }
+      if (closes.length >= maN){ let s = 0; for (let j = closes.length - maN; j < closes.length; j++) s += closes[j]; ma20ok[i] = closes.at(-1) > s / maN ? 1 : 0; }
     }
     return { open, prevRange, ma20ok }; });
   return { sma, ema, roll, vol, vmean, day, K };
@@ -65,6 +66,26 @@ function indicators(A){
 
 // ---------- אסטרטגיות: (A, i, st) → משקלות יעד (סכום |w| ≤ 1), מתבצעות בפתיחת נר i+1 ----------
 // funding: { coin: Map(hourMs → שיעור) } — רק לאסטרטגיית ה-Funding הקיצוני
+// פריצת תנודתיות תוך-יומית (בוט A) כאסטרטגיה בודדת עם פרמטרים: k0 (חלק מטווח אתמול), filt + maN (מסנן ממוצע יומי),
+// U (מטבעות), offH (שעת תחילת "יום המסחר" ב-UTC; היציאה בסגירת השעה האחרונה שלו). ברירות המחדל = VBO0.7-ma20 של המחקר.
+export function vboStrategy(A, { k0 = 0.7, filt = true, maN = 20, U = null, offH = 0, id = null } = {}, I = indicators(A)){
+  const { coins, T, C } = A, K = coins.length, UU = U || coins.map((_, k) => k);
+  const live = (k, i, need) => i >= need && Number.isFinite(C[k][i - need]) && Number.isFinite(C[k][i]);
+  const ew = (i, f, need) => { const w = new Array(K).fill(0), act = UU.filter((k) => live(k, i, need)); for (const k of act){ const s = f(k); if (s) w[k] = s / act.length; } return w; };
+  return { id: id || `VBO${k0}${filt ? `-ma${maN}` : ''}-o${offH}`, family: 'vol-breakout', perp: true, weights: (A_, i, st) => {
+    st.in ||= new Array(K).fill(0); st.d ||= new Array(K).fill(-1);
+    const t = T[i] - offH * HOUR, dn = Math.floor(t / DAY), last = hourOf(t) === 23;
+    return ew(i, (k) => {
+      if (st.d[k] !== dn){ st.d[k] = dn; st.in[k] = 0; }
+      if (last) return (st.in[k] = 0);
+      const D = I.day(k, offH, maN), trig = D.open[i] + k0 * D.prevRange[i];
+      if (!st.in[k] && Number.isFinite(trig) && C[k][i] > trig && (!filt || D.ma20ok[i])) st.in[k] = 1;
+      return st.in[k];
+    }, 48);
+  } };
+}
+export { indicators };
+
 export function strategies(A, funding = {}){
   const { coins, T, C, V } = A, K = coins.length, I = indicators(A), N = T.length;
   const iB = coins.indexOf('BTC'), iE = coins.indexOf('ETH');
@@ -132,19 +153,7 @@ export function strategies(A, funding = {}){
     } });
   }
   // 7. פריצת תנודתיות תוך-יומית: לונג כשהמחיר עובר את פתיחת היום + k × הטווח של אתמול; יציאה בסוף היום (00:00 UTC)
-  for (const k0 of [0.3, 0.5, 0.7]) for (const filt of [false, true]) for (const [u, U] of Object.entries(UNI)){
-    S.push({ id: `VBO${k0}${filt ? '-ma20' : ''}-${u}`, family: 'vol-breakout', perp: true, weights: (A_, i, st) => {
-      st.in ||= new Array(K).fill(0); st.d ||= new Array(K).fill(-1);
-      const dn = Math.floor(T[i] / DAY), last = hourOf(T[i]) === 23;
-      return ew(U, i, (k) => {
-        if (st.d[k] !== dn){ st.d[k] = dn; st.in[k] = 0; }
-        if (last) return (st.in[k] = 0);
-        const D = I.day(k), trig = D.open[i] + k0 * D.prevRange[i];
-        if (!st.in[k] && Number.isFinite(trig) && C[k][i] > trig && (!filt || D.ma20ok[i])) st.in[k] = 1;
-        return st.in[k];
-      }, 48);
-    } });
-  }
+  for (const k0 of [0.3, 0.5, 0.7]) for (const filt of [false, true]) for (const [u, U] of Object.entries(UNI)) S.push(vboStrategy(A, { k0, filt, U, id: `VBO${k0}${filt ? '-ma20' : ''}-${u}` }, I));
   // 8. שעות מסחר וסוף שבוע (השערות קבועות מראש, בלי בחירת שעות לפי הנתונים): לונג רק בחלון
   const SESS = { asia: [0, 8], europe: [8, 13], us: [13, 21], late: [21, 24] };
   for (const [u, U] of Object.entries(UNI)){
