@@ -6,7 +6,7 @@
 // מניות, מחזיקים יום/3/5 ימים; עמלות IBKR + החלקה 0.05% לצד. סטופ ±250$/±500$ לכל התיק נבדק רק בשנתיים האחרונות (יש נרות שעה).
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { loadData, prepare, run, label, START_USD } from './research-losers-grid.mjs';
+import { loadData, prepare, run, label, START_USD, SLIP } from './research-losers-grid.mjs';
 
 const COMBOS = ['up3+liq', 'up3+bull50'];
 export function rules(){
@@ -44,7 +44,7 @@ async function main(){
   log(`days ${days[0]} → ${days.at(-1)}; 2y from ${days[W.y2[0]]}; hourly from ${Hr.__first}`);
 
   const out = [`# "3 ימי עלייה ברצף → קונים ביום הרביעי" — 10 שנים ושנתיים (${days[W.all[0]]} → ${days.at(-1)})`, '',
-    `- יקום: ${Object.keys(P.S).length} מניות S&P 1500 (הרכב של היום — הטיית שורדים לטובת קנייה), מחיר > 5$, מחזור > 20M$. עמלות IBKR + החלקה 0.05% לצד.`,
+    `- יקום: ${Object.keys(P.S).length} מניות S&P 1500 (הרכב של היום — הטיית שורדים לטובת קנייה), מחיר > 5$, מחזור > 20M$. עמלות IBKR + **החלקה ${(SLIP * 100).toFixed(2)}% לצד**.`,
     `- SPY: 10 השנים ${pct(ann(spyRet('all'), nd('all')))} בשנה · השנתיים האחרונות ${pct(spyRet('y2'))} · חצי השנה ${pct(spyRet('m6'))}.`, '',
     '## 1. סטטיסטיקה: מה קרה ביום הרביעי? (כל המניות, בלי עמלות)',
     '| קבוצה | תקופה | מקרים | עלו ביום הרביעי (פתיחה→סגירה) | ממוצע פתיחה→סגירה | עלו (סגירה→סגירה) | ממוצע סגירה→סגירה |', '|---|---|---|---|---|---|---|'];
@@ -72,6 +72,10 @@ async function main(){
     find({ ...B, entry: 'C' }), find({ ...B, hold: 3 }), find({ ...B, hold: 5 }), find({ ...B, entry: 'C', hold: 5 }), find({ ...B, filt: 'up3+liq' }), find({ ...B, filt: 'up3+liq', hold: 5 }),
     find({ ...B, filt: 'up3+bull50' }), find({ ...B, filt: 'up3+bull50', hold: 5 }), find({ ...B, N: 10, filt: 'up3+liq', hold: 5 })]);
   sect('4. עם סטופ לכל התיק (קנייה בפתיחה, נמדד בכל שעה) — רק שנתיים (אין נרות שעה לפני כן)', R.filter((x) => x.c.port && x.c.key === 'r3'));
+  // 6. מאיפה בא הרווח עם הסטופ? יציאה קבועה בשעה מוקדמת (בלי סטופ) — אם הרווח הוא "תנופה בשעה הראשונה" זה יופיע כאן
+  const ex = [10.5, 11.5, 12.5].map((hr) => ({ ...B, exit: 'hour', hr })).flatMap((c) => [c, { ...c, N: 5 }]).map((c) => ({ c, y2: run(P, c, ...W.y2), m6: run(P, c, ...W.m6) }));
+  out.push(`## 6. יציאה בשעה קבועה (קנייה בפתיחה, בלי סטופ) — שנתיים וחצי שנה · החלקה ${(SLIP * 100).toFixed(2)}% לצד`, '| כלל | שנתיים: 50,000$ → | חצי שנה: 50,000$ → | עסקאות |', '|---|---|---|---|',
+    ...ex.map((x) => `| ${label(x.c)} | ${usd(x.y2.end)} (${pl(x.y2.end - START_USD)}) | ${usd(x.m6.end)} (${pl(x.m6.end - START_USD)}) | ${x.y2.trades} |`), '');
   const top = [...R].filter((x) => !x.c.port).sort((a, b) => b.a10 - a.a10).slice(0, 10);
   sect('5. 10 הגרסאות הטובות ביותר על 10 שנים', top);
   const md = out.join('\n'); console.log(md); if (OUT) writeFileSync(OUT, md);
