@@ -18,10 +18,13 @@ const EXTRA = (arg('--extra', env.LAB_EXTRA || 'SPY,QQQ,IWM,DIA,TLT,GLD,XLK,XLF,
 const FROM = `${new Date().getUTCFullYear() - YEARS}-01-01`;
 const UA = { 'User-Agent': 'Mozilla/5.0 (bikur invest-lab research; github.com/meirco199-prog/bikur)', Accept: '*/*' };
 const log = (...a) => console.error(...a), sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let lastStatus = null;
 async function get(url, { json = false, tries = 4, headers = {} } = {}){
+  // api.github.com: עם GITHUB_TOKEN (ב-Actions) — בלי טוקן המכסה היא 60 בקשות/שעה לכתובת IP משותפת, והרשימה נכשלת בשקט (ריצה 42523832207)
+  const auth = /^https:\/\/api\.github\.com\//.test(url) && (env.GH_TOKEN || env.GITHUB_TOKEN) ? { Authorization: `Bearer ${env.GH_TOKEN || env.GITHUB_TOKEN}` } : {};
   for (let k = 0; k < tries; k++){
-    try { const r = await fetch(url, { headers: { ...UA, ...headers } }); if (r.status === 429 || r.status >= 500){ await sleep(2000 * (k + 1)); continue; } if (!r.ok) return null; return json ? await r.json() : await r.text(); }
-    catch (e) { await sleep(1500 * (k + 1)); }
+    try { const r = await fetch(url, { headers: { ...UA, ...auth, ...headers } }); lastStatus = r.status; if (r.status === 429 || r.status >= 500){ await sleep(2000 * (k + 1)); continue; } if (!r.ok) return null; return json ? await r.json() : await r.text(); }
+    catch (e) { lastStatus = e.message; await sleep(1500 * (k + 1)); }
   }
   return null;
 }
@@ -34,14 +37,22 @@ async function sp500Universe(){
   const notes = [];
   // 1. היסטורי יומי (fja05680)
   try {
+    const NAME = /S&P 500 Historical Components (?:&|&amp;) Changes\(([\d-]+)\)\.csv/;
+    let file = null;
     const list = await get('https://api.github.com/repos/fja05680/sp500/contents/', { json: true, headers: { Accept: 'application/vnd.github+json' } });
-    const file = Array.isArray(list) ? list.find((f) => /^S&P 500 Historical Components & Changes\(.*\)\.csv$/.test(f.name)) : null;
+    if (Array.isArray(list)){ const f = list.find((x) => NAME.test(x.name)); if (f) file = { name: f.name, download_url: f.download_url }; else notes.push(`fja05680: ${list.length} קבצים ברשימה, אף אחד לא תואם`); }
+    else {
+      notes.push(`fja05680: רשימת הקבצים מ-api.github.com נכשלה (${lastStatus}) — מנסים דרך דף ה-HTML`);
+      const html = await get('https://github.com/fja05680/sp500'); const m = html && html.match(NAME);
+      if (m){ const name = m[0].replace('&amp;', '&'); file = { name, download_url: `https://raw.githubusercontent.com/fja05680/sp500/master/${encodeURIComponent(name)}` }; }
+      else notes.push(`fja05680: גם דף ה-HTML לא הניב שם קובץ (${lastStatus})`);
+    }
     if (file){
       const csv = await get(file.download_url);
       const rows = parseCsv(csv).map((r) => ({ day: (r.date || r.Date || '').slice(0, 10), symbols: (r.tickers || r.Tickers || '').split(',').map(normSym).filter((s) => /^[A-Z][A-Z0-9-]{0,6}$/.test(s)) })).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.day) && r.symbols.length > 300);
       if (rows.length > 100){ const m = membershipFromDaily(rows); log(`sp500 history: ${rows.length} snapshots, ${Object.keys(m.members).length} distinct members, ${isoOf(m.from)}→${isoOf(m.to)}`); return { id: 'sp500', pointInTime: true, source: `fja05680/sp500 (${file.name})`, ...m, notes }; }
-      notes.push('fja05680: הקובץ נמצא אך לא נותח');
-    } else notes.push('fja05680: קובץ ההיסטוריה לא נמצא ברשימת הקבצים');
+      notes.push(`fja05680: הקובץ ${file.name} נמצא אך לא נותח (${csv ? csv.length + ' תווים' : 'הורדה נכשלה: ' + lastStatus})`);
+    }
   } catch (e) { notes.push('fja05680: ' + e.message); }
   // 2. גיבוי: הרכב נוכחי (לא point-in-time)
   const csv = await get('https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv');
@@ -83,7 +94,7 @@ async function main(){
   const t0 = Date.now();
   mkdirSync(join(OUT, 'bars'), { recursive: true }); mkdirSync(join(OUT, 'universe'), { recursive: true });
   const fetcher = fetchers[PROVIDER]; if (!fetcher) throw new Error(`ספק ${PROVIDER} לא זמין (חסר מפתח?)`);
-  const uni = await sp500Universe(); const { sectors: sec, names, note: secNote } = await sectors();
+  const uni = await sp500Universe(); for (const n of uni.notes) log('universe:', n); const { sectors: sec, names, note: secNote } = await sectors();
   writeFileSync(join(OUT, 'universe', 'sp500.json'), JSON.stringify({ id: uni.id, pointInTime: uni.pointInTime, source: uni.source, from: uni.from, to: uni.to, members: uni.members, notes: uni.notes }));
   // רק חברים שהיו במדד בתוך טווח השנים המבוקש
   const fromDay = dayNum(FROM);

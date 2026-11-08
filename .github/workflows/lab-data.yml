@@ -31,6 +31,7 @@ jobs:
       - name: Build dataset
         env:
           TIINGO_KEY: ${{ secrets.TIINGO_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAB_YEARS: ${{ inputs.years || '20' }}
           LAB_LIMIT: ${{ inputs.limit || '0' }}
           LAB_PROVIDER: ${{ inputs.provider || 'yahoo' }}

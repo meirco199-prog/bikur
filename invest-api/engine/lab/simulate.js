@@ -197,7 +197,7 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
           const ctx = sig?.ctx || makeCtx(k, []);
           let reason = null, at = null;
           for (const r of condExits) if (r.c.test(ctx, pos.sym)){ reason = 'תנאי יציאה'; at = r.at; break; }
-          if (!reason && rankExit && sig && !todaysPicks.has(pos.sym) && pos.entryK < k){ reason = 'יצאה מהדירוג'; at = rankExit.at; }
+          if (!reason && rankExit && sig && !todaysPicks.has(pos.sym)){ reason = 'יצאה מהדירוג'; at = rankExit.at; }
           if (!reason && oppExit && sigEngine.opposite.has(pos.sym)){ reason = 'אות הפוך'; at = oppExit.at; }
           if (reason){ if (at === 'close') { close(pos, k, bar.c, reason + ' (סגירה)'); continue; } pos.pendingExit = reason + ' (פתיחה למחרת)'; }
         }

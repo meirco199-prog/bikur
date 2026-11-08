@@ -254,3 +254,19 @@ test('סורק היסטורי (scanAt): אותו מנוע אותות כמו הס
   assert.ok(sc.picks[0].nextOpen > 0 && sc.picks[0].values[sc.columns[0].key] !== undefined && sc.picks[0].name === 'חברה ' + sc.picks[0].symbol);
   assert.ok(scanAt(ds, spec, '1990-01-01').error);
 });
+
+test('יציאה באות הפוך (opposite_signal) ויציאה מהדירוג (rank_exit): תאריך, מחיר (פתיחה למחרת) וסיבה — ממצא GPT Review #231', () => {
+  // דירוג לפי ret(1): A היורדת ביותר ביום 2 → נקנית ביום 3; ביום 3 A העולה ביותר (אות הפוך) → יציאה בפתיחת יום 4 במחיר הפתיחה
+  const A = mk('A', [100, 90, 99, 98, 97, 96], { opens: [100, 100, 90, 98.5, 98, 97] }), B = mk('B', [50, 50, 49, 48, 47, 46]), C = mk('C', [20, 20, 20, 20, 20, 20]);
+  const ds = new Dataset({ series: [A, B, C] });
+  const r = simulate(ds, base({ signal: { rank: { feature: 'ret', params: { days: 1 }, order: 'asc', top: 1 } }, exit: { rules: [{ type: 'opposite_signal', at: 'next_open' }, { type: 'time', days: 30 }] } }));
+  const t = r.trades.find((x) => x.symbol === 'A' && x.entryDate === D[2]);
+  assert.ok(t, 'A נקנתה ביום 3'); assert.equal(t.exitDate, D[3]); assert.equal(t.exitPrice, 98.5); assert.match(t.exitReason, /אות הפוך \(פתיחה למחרת\)/);
+  // rank_exit: ביום 3 A כבר לא בדירוג (B היורדת ביותר) → יציאה בפתיחת יום 4
+  const r2 = simulate(ds, base({ signal: { rank: { feature: 'ret', params: { days: 1 }, order: 'asc', top: 1 } }, exit: { rules: [{ type: 'rank_exit', at: 'next_open' }, { type: 'time', days: 30 }] } }));
+  const t2 = r2.trades.find((x) => x.symbol === 'A' && x.entryDate === D[2]);
+  assert.equal(t2.exitDate, D[3]); assert.equal(t2.exitPrice, 98.5); assert.match(t2.exitReason, /יצאה מהדירוג/);
+  // בסגירה (MOC): אותה החלטה, ביצוע בסגירת יום 3
+  const r3 = simulate(ds, base({ signal: { rank: { feature: 'ret', params: { days: 1 }, order: 'asc', top: 1 } }, exit: { rules: [{ type: 'rank_exit', at: 'close' }, { type: 'time', days: 30 }] } }));
+  const t3 = r3.trades.find((x) => x.symbol === 'A' && x.entryDate === D[2]); assert.equal(t3.exitDate, D[2]); assert.equal(t3.exitPrice, 99); assert.match(t3.exitReason, /סגירה/);
+});
