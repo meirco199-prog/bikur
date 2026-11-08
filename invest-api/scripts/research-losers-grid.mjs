@@ -294,7 +294,7 @@ export async function loadData({ cache = '', range = '3y', combos = [] } = {}){
     await Promise.all(Array.from({ length: 6 }, async () => { for (let s; (s = hq.shift());){ const h = await hourly(s, need[s]); if (h) Hr[s] = h.bars; await sleep(100); } }));
     const sh = await hourly('SPY', null); Hr.__first = sh?.first;
     log(`hourly loaded: ${Object.keys(Hr).length - 1}, first hourly day ${Hr.__first}`);
-    if (cache) writeFileSync(cache, JSON.stringify({ D, Hr }));
+    if (cache) try { writeFileSync(cache, JSON.stringify({ D, Hr })); } catch (e) { log(`cache not saved (${e.message}) — continuing without it`); }
     return { D, Hr };
   }
 }

@@ -1,4 +1,4 @@
-# זמני (ops): "3 ימי עלייה ברצף → קונים ביום הרביעי", 10 שנים ושנתיים (scripts/research-losers-up3.mjs). מחקר בלבד.
+# זמני (ops): "3 ימי עלייה ברצף → קונים ביום הרביעי", 10 שנים ושנתיים (scripts/research-losers-up3.mjs). מחקר בלבד. (הרצה 2, בלי מטמון)
 name: research-losers
 on:
   push:
@@ -14,4 +14,4 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - name: up3
-        run: node invest-api/scripts/research-losers-up3.mjs --cache losers-up3.json --out research-losers-up3.md
+        run: node invest-api/scripts/research-losers-up3.mjs --out research-losers-up3.md
