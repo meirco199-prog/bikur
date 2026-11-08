@@ -58,3 +58,13 @@ test('סימולציה: מניה אחת, החזקה של יום, בלי עלוי
   for (const H of [1, 3, 5]) for (const side of ['L', 'S']) assert.ok(Math.abs(simulate(F.ctx, tf, { N: 3, H, side, cost: 'gross' }).end - 50000) < 1e-6);
   const st = stats(g.yr, '2007', '2099'); assert.ok(Number.isFinite(st.sharpe) && st.n > 0);
 });
+
+test('הרכב היסטורי מתמונות מצב (fja05680/sp500): מקטעי חברות, כולל יציאה וחזרה', async () => {
+  const { parseSnapshotsCsv, membershipFromSnapshots } = await import('../scripts/research-xsec.mjs');
+  const snaps = parseSnapshotsCsv('date,tickers\n2010-01-04,"AAA,BBB,BRK.B"\n2012-03-01,"AAA,BRK.B,CCC"\n2015-06-01,"BBB,BRK.B,CCC"\n');
+  assert.equal(snaps.length, 3); assert.ok(snaps[0].set.has('BRK-B'));
+  const iv = membershipFromSnapshots(snaps), at = (s, d) => iv[s]?.some(([a, b]) => (a === null || d >= a) && (b === null || d < b));
+  assert.equal(at('AAA', '2011-01-01'), true); assert.equal(at('AAA', '2016-01-01'), false);
+  assert.equal(at('BBB', '2013-01-01'), false); assert.equal(at('BBB', '2016-01-01'), true); // יצאה ב-2012 וחזרה ב-2015
+  assert.equal(at('CCC', '2011-01-01'), false); assert.equal(at('CCC', '2020-01-01'), true);
+});

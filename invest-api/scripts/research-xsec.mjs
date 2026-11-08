@@ -74,22 +74,49 @@ export function membership(current, changes){
   for (const [s, end] of active) (iv[s] ||= []).push([null, end]);
   return iv;
 }
+// הרכב היסטורי מתמונות מצב (תאריך → רשימת חברים), למשל github.com/fja05680/sp500. מחזיר אותו מבנה כמו membership()
+export function membershipFromSnapshots(snaps){
+  const iv = {}, open = new Map();
+  for (const { date, set } of [...snaps].sort((a, b) => (a.date < b.date ? -1 : 1))){
+    for (const s of set) if (!open.has(s)) open.set(s, date);
+    for (const [s, start] of [...open]) if (!set.has(s)){ (iv[s] ||= []).push([start, date]); open.delete(s); }
+  }
+  for (const [s, start] of open) (iv[s] ||= []).push([start, null]);
+  return iv;
+}
+// CSV של fja05680/sp500: date,tickers  (tickers = "AAA,BBB,...")
+export function parseSnapshotsCsv(csv){
+  const out = [];
+  for (const line of csv.split('\n').slice(1)){ const m = line.match(/^(\d{4}-\d{2}-\d{2}),"?([^"]*)"?/); if (!m) continue; out.push({ date: m[1], set: new Set(m[2].split(',').map((x) => x.trim()).filter((x) => TICK.test(x)).map(yh)) }); }
+  return out;
+}
 const inIv = (ivs, d) => ivs?.some(([a, b]) => (a === null || d >= a) && (b === null || d < b));
 
 async function universes(){
   const page = async (p) => (await get(`https://en.wikipedia.org/wiki/${p}`)) || '';
-  const h500 = await page('List_of_S%26P_500_companies'), h400 = await page('List_of_S%26P_400_companies'), h600 = await page('List_of_S%26P_600_companies'), hN = await page('Nasdaq-100');
-  const sp500 = parseConstituents(h500), sp400 = parseConstituents(h400), sp600 = parseConstituents(h600), ndx = parseConstituents(hN), changes = parseChanges(h500);
-  log(`wiki: sp500 ${sp500.length}, sp400 ${sp400.length}, sp600 ${sp600.length}, ndx ${ndx.length}, changes ${changes.length}`);
-  if (ndx.length < 80) log('NDX tables:\n  ' + tableInfo(hN).join('\n  '));
-  if (changes.length < 100) log('S&P 500 tables:\n  ' + tableInfo(h500).join('\n  '));
-  if (sp500.length < 400 || ndx.length < 80 || changes.length < 100) throw new Error('רשימות מדדים חלקיות מוויקיפדיה — לא מריצים על נתונים חסרים');
+  const h500 = await page('List_of_S%26P_500_companies'), h400 = await page('List_of_S%26P_400_companies'), h600 = await page('List_of_S%26P_600_companies');
+  const sp500 = parseConstituents(h500), sp400 = parseConstituents(h400), sp600 = parseConstituents(h600);
+  let ndx = []; for (const p of ['List_of_Nasdaq-100_companies', 'List_of_NASDAQ-100_companies', 'Nasdaq-100']){ const h = await page(p); ndx = parseConstituents(h); log(`ndx from ${p}: ${ndx.length}`); if (ndx.length >= 80) break; if (h) log('  tables: ' + tableInfo(h).slice(0, 8).join(' | ')); }
+  // הרכב S&P 500 היסטורי: טבלת השינויים בוויקיפדיה (אם קיימת), אחרת תמונות המצב של github.com/fja05680/sp500
+  let changes = parseChanges(h500), iv500 = null, memSrc = 'ויקיפדיה (טבלת השינויים)';
+  if (changes.length >= 100) iv500 = membership(sp500, changes);
+  else {
+    const list = await get('https://api.github.com/repos/fja05680/sp500/contents');
+    let files = []; try { files = JSON.parse(list).filter((f) => /Historical Components.*\.csv$/i.test(f.name)); } catch {}
+    const dt = (n) => { const m = n.match(/(\d{2})-(\d{2})-(\d{4})/); return m ? `${m[3]}-${m[1]}-${m[2]}` : ''; };
+    files.sort((a, b) => (dt(a.name) < dt(b.name) ? 1 : -1));
+    const f = files[0], csv = f ? await get(f.download_url) : null, snaps = csv ? parseSnapshotsCsv(csv) : [];
+    log(`fja05680/sp500: ${f?.name || 'not found'} — ${snaps.length} snapshots${snaps.length ? `, ${snaps[0].date} → ${snaps.at(-1).date}` : ''}`);
+    if (snaps.length >= 100){ snaps.push({ date: new Date().toISOString().slice(0, 10), set: new Set(sp500) }); iv500 = membershipFromSnapshots(snaps); memSrc = `github.com/fja05680/sp500 (${f.name}) + ההרכב הנוכחי מוויקיפדיה`; changes = []; }
+  }
+  log(`wiki: sp500 ${sp500.length}, sp400 ${sp400.length}, sp600 ${sp600.length}, ndx ${ndx.length}; S&P 500 history: ${iv500 ? Object.keys(iv500).length + ' tickers' : 'none'} (${memSrc})`);
+  if (sp500.length < 400 || ndx.length < 80 || !iv500 || Object.keys(iv500).length < 600) throw new Error('רשימות מדדים / הרכב היסטורי חלקיים — לא מריצים על נתונים חסרים');
   let r2k = [], r2kSrc = 'iShares IWM (אחזקות נוכחיות)';
   const csv = await get('https://www.ishares.com/us/products/239710/ishares-russell-2000-etf/1467271812596.ajax?fileType=csv&fileName=IWM_holdings&dataType=fund');
   if (csv){ for (const line of csv.split('\n')){ const f = line.split('","').map((x) => x.replace(/^"|"$/g, '')); if (f.length > 4 && TICK.test(f[0]) && /Equity/i.test(line)) r2k.push(yh(f[0])); } }
   if (r2k.length < 1500){ r2k = sp600; r2kSrc = 'S&P 600 (קירוב — אחזקות IWM לא זמינות)'; }
   log(`russell2000: ${r2k.length} (${r2kSrc})`);
-  return { sp500, sp400, sp600, ndx, r2k, r2kSrc, changes, iv500: membership(sp500, changes) };
+  return { sp500, sp400, sp600, ndx, r2k, r2kSrc, changes, iv500, memSrc };
 }
 
 // ---------- מחירים ----------
@@ -272,7 +299,8 @@ async function main(){
   if (CACHE && existsSync(CACHE)) ({ U, raw } = JSON.parse(readFileSync(CACHE, 'utf8')));
   else {
     U = await universes();
-    const removed = [...new Set(U.changes.map((c) => c.rem).filter(Boolean))], adds = [...new Set(U.changes.map((c) => c.add).filter(Boolean))];
+    // כל מי שהיה חבר ב-S&P 500 מאז 2007 (גם שנמחקו) — נטען אם יש לו מחירים
+    const removed = Object.entries(U.iv500).filter(([, ivs]) => ivs.some(([, b]) => b === null || b >= '2007-01-01')).map(([s]) => s), adds = [];
     const ETF = ['SPY', 'QQQ', 'IWM', 'IJR', 'XLB', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLU', 'XLV', 'XLY', 'XLRE', 'XLC'];
     const syms = [...new Set([...ETF, ...U.sp500, ...U.sp400, ...U.sp600, ...U.ndx, ...U.r2k, ...removed, ...adds])];
     log(`fetching ${syms.length} symbols`); raw = {}; const q = [...syms];
@@ -357,12 +385,12 @@ async function main(){
   writeFileSync(`${OUTDIR}/results.csv`, csvRows.join('\n'));
   writeFileSync(`${OUTDIR}/yearly.csv`, [['universe', 'id', 'N', 'H', ...yearsAll].join(','), ...rows.map((r) => [r.uni, r.id, r.N, r.H, ...yearsAll.map((y) => (r.net.yr[y] ? +(r.net.yr[y].g - 1).toFixed(5) : ''))].join(','))].join('\n'));
   writeFileSync(`${OUTDIR}/walkforward.json`, JSON.stringify(wf, null, 1));
-  writeFileSync(`${OUTDIR}/meta.json`, JSON.stringify({ generated: new Date().toISOString(), calendar: [cal[0], cal.at(-1)], signals_from: cal[k0], dev: [cal[k0], cal[kDev]], test: [cal[kDev + 1], cal.at(-1)], symbols_loaded: syms.length, universes: Object.fromEntries(Object.entries(UNI).map(([k, u]) => [k, u.he])), sp500_changes: U.changes.length, coverage, configs: rows.length }, null, 1));
+  writeFileSync(`${OUTDIR}/meta.json`, JSON.stringify({ generated: new Date().toISOString(), calendar: [cal[0], cal.at(-1)], signals_from: cal[k0], dev: [cal[k0], cal[kDev]], test: [cal[kDev + 1], cal.at(-1)], symbols_loaded: syms.length, universes: Object.fromEntries(Object.entries(UNI).map(([k, u]) => [k, u.he])), sp500_history_source: U.memSrc, sp500_history_tickers: Object.keys(U.iv500).length, coverage, configs: rows.length }, null, 1));
 
   const md = [];
   const T = (h, rs) => { md.push(`| ${h.join(' | ')} |`, `|${h.map(() => '---').join('|')}|`, ...rs.map((x) => `| ${x.join(' | ')} |`), ''); };
   md.push(`# מחקר שיטתי — 12 משפחות אסטרטגיות (${cal[k0]} → ${cal.at(-1)})`, '',
-    `- **נתונים:** Yahoo Finance (מחירים יומיים מתואמים לפיצולים ודיבידנדים), ויקיפדיה (הרכב S&P 500 ושינוייו, Nasdaq 100, S&P 400/600), ${U.r2kSrc}. נטענו ${syms.length} סימבולים.`,
+    `- **נתונים:** Yahoo Finance (מחירים יומיים מתואמים לפיצולים ודיבידנדים), ויקיפדיה (הרכב נוכחי: S&P 500/400/600, Nasdaq 100), הרכב S&P 500 היסטורי: ${U.memSrc || 'ויקיפדיה'}, ${U.r2kSrc}. נטענו ${syms.length} סימבולים.`,
     `- **פיתוח:** ${cal[k0]} → ${cal[kDev]} · **מבחן (לא שימש לבחירה):** ${cal[kDev + 1]} → ${cal.at(-1)} · Walk-Forward שנתי (3 שנים אחורה).`,
     `- **ביצוע:** 50,000$, השקעה מחדש, H תיקי-משנה מדורגים, מניות חלקיות, עמלת IBKR (מינ׳ 1$), חצי מרווח לפי מחזור (1.5–30bp לצד), שורט: השאלה 0.02% ליום.`,
     `- **נבדקו ${rows.length.toLocaleString('en-US')} תצורות** (${V.length - 1} גרסאות × ${Ns.length} גדלי סל × ${Hs.length} תקופות החזקה × 4 יקומים + סקטורים).`,
