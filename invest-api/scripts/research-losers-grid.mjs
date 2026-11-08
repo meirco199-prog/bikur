@@ -71,11 +71,15 @@ export function prepare(D, Hr = {}, { minAdv = 20e6, minPx = 5 } = {}){
       if (b.c[i] <= minPx || adv[i] < minAdv) continue;
       const r = ac(i) / ac(i - 1) - 1, g = (b.o[i] / f[i]) / ac(i - 1) - 1;
       let spl = 99; for (let j = 1; j <= 5 && i + j < n; j++) if (isSp[i + j]){ spl = j; break; } // פיצול בימי ההחזקה → לא נבחרת להחזקה כזו
-      cand[k].push({ s, i, r, gs: r ? g / r : 0, px: b.c[i], adv: adv[i], up: ac(i) > ma[i], spl });
+      // תשואה מצטברת של 2 ו-3 ימים, ורצף ימי ירידה/עלייה שמסתיים היום
+      const r2 = K[i - 2] === k - 2 ? ac(i) / ac(i - 2) - 1 : r, r3 = K[i - 3] === k - 3 ? ac(i) / ac(i - 3) - 1 : r2;
+      let sd = 0, su = 0; for (let j = i; j > 0 && j > i - 10; j--){ const d = ac(j) / ac(j - 1) - 1; if (d < 0 && !su) sd += 1; else if (d > 0 && !sd) su += 1; else break; }
+      cand[k].push({ s, i, r, r2, r3, sd, su, gs: r ? g / r : 0, px: b.c[i], adv: adv[i], up: ac(i) > ma[i], spl });
     }
   }
   for (const c of cand) c.sort((a, b) => a.r - b.r);
-  return { days, L, spyR, spyC: spy.c, spyMa50, spyMa200, S, cand, Hr };
+  const by = (key) => cand.map((c) => [...c].sort((a, b) => a[key] - b[key]));
+  return { days, L, spyR, spyC: spy.c, spyMa50, spyMa200, S, cand, candBy: { r: cand, r2: by('r2'), r3: by('r3') }, Hr };
 }
 
 export const FILT = {
@@ -92,6 +96,9 @@ export const FILT = {
   px50: { he: 'מחיר מעל 50$', f: (x) => x.px >= 50 },
   pxLo: { he: 'מחיר מתחת ל-30$', f: (x) => x.px < 30 },
   liq: { he: 'מחזור מעל 100M$ ביום', f: (x) => x.adv >= 100e6 },
+  // רצפים (research-losers-open.mjs)
+  dn2: { he: '2+ ימי ירידה ברצף', f: (x) => x.sd >= 2, x2: true }, dn3: { he: '3+ ימי ירידה ברצף', f: (x) => x.sd >= 3, x2: true },
+  up2: { he: '2+ ימי עלייה ברצף', f: (x) => x.su >= 2, x2: true }, up3: { he: '3+ ימי עלייה ברצף', f: (x) => x.su >= 3, x2: true },
   // מצב השוק (לא ברשת הכללית; משמשים במחקר הכיוון ההפוך, research-losers-short.mjs)
   bear50: { he: 'שוק יורד (SPY מתחת לממוצע 50)', f: (x, k, P) => P.spyMa50[k] > 0 && P.spyC[k] < P.spyMa50[k], x2: true, day: true },
   bull50: { he: 'שוק עולה (SPY מעל ממוצע 50)', f: (x, k, P) => P.spyMa50[k] > 0 && P.spyC[k] >= P.spyMa50[k], x2: true, day: true },
@@ -106,14 +113,15 @@ function dayBars(P, s, i){ // נרות היום i של המניה: שעתיים 
 const hasHourly = (P, s, i) => !!P.Hr[s]?.[P.S[s].d[i]]?.length;
 
 export function select(P, cfg, k){
-  const fs = cfg._fs || Object.defineProperty(cfg, '_fs', { value: cfg.filt.split('+').map((f) => FILT[f]) })._fs, out = [], H = cfg.hold || 1;
+  const fs = cfg._fs || Object.defineProperty(cfg, '_fs', { value: cfg.filt.split('+').map((f) => { if (!FILT[f]) throw new Error(`סינון לא מוכר: ${f}`); return FILT[f]; }) })._fs, out = [], H = cfg.hold || 1;
   for (const f of fs) if (f.day && !f.f(null, k, P)) return out; // סינון ברמת היום (מצב השוק) — בלי לסרוק מניות
   const xs = fs.filter((f) => !f.day), F = (x) => xs.every((f) => f.f(x, k, P)), lo = cfg.sel === 'lo';
-  const brk = lo ? Math.min(0, ...xs.map((f) => f.brk ?? 0)) : 0; // הרשימה ממוינת: אחרי הסף אין יותר מועמדים
-  const c = P.cand[k], n = c.length;
+  const key = cfg.key || 'r'; // לפי מה מדרגים: תשואת יום (r) או 2/3 ימים (r2/r3)
+  const brk = lo && key === 'r' ? Math.min(0, ...xs.map((f) => f.brk ?? 0)) : 0; // הרשימה ממוינת: אחרי הסף אין יותר מועמדים
+  const c = (P.candBy?.[key] || P.cand)[k], n = c.length;
   for (let q = 0; q < n && out.length < cfg.N; q++){
     const x = c[lo ? q : n - 1 - q];
-    if (lo ? x.r >= brk : x.r <= 0) break; // "יורדות" = רק מי שירדה בפועל (ועד סף הסינון), "עולות" = רק מי שעלתה
+    if (lo ? x[key] >= brk : x[key] <= 0) break; // "יורדות" = רק מי שירדה בפועל (ועד סף הסינון), "עולות" = רק מי שעלתה
     if (x.spl <= H || !F(x)) continue;
     const b = P.S[x.s]; if (b.K[x.i + H] !== k + H) continue; // אין נתון ליום היציאה
     if (cfg.exit === 'hour' && !hasHourly(P, x.s, x.i + 1)) continue;
@@ -166,7 +174,7 @@ function portDay(P, cfg, picks, per, eq){
     const bars = dayBars(P, x.s, x.i + 1);
     pos.push({ x, e, bp, sh, last: cfg.entry === 'C' ? b.o[x.i + 1] : e, m: new Map(bars.map((z) => [z[0], z[4]])), fin: cfg.exit === 'hour' ? null : b.c[x.i + 1] });
   }
-  const tp = cfg.port.tp * eq, sl = cfg.port.sl * eq;
+  const tp = cfg.port.tpUsd ?? cfg.port.tp * eq, sl = cfg.port.slUsd ?? cfg.port.sl * eq; // סף בדולרים קבועים או באחוז מההון
   const mtm = () => pos.reduce((a, p) => a + p.sh * (long ? p.last - p.bp : p.bp - p.last), 0);
   let why = 'end';
   const chk = () => { const v = mtm(); if (v >= tp){ why = 'tp'; return true; } if (v <= -sl){ why = 'sl'; return true; } return false; };
@@ -219,10 +227,10 @@ function runSw(P, cfg, k0, kEnd){
 
 export function label(c){
   if (c.sw) return `לפי מצב השוק (SPY מול ממוצע ${c.sw.ma}): בשוק יורד — ${c.sw.bear ? label(c.sw.bear) : 'מזומן'} ‖ בשוק עולה — ${c.sw.bull ? label(c.sw.bull) : 'מזומן'}`;
-  const side = c.side === 'L' ? 'קנייה' : 'שורט', sel = c.sel === 'lo' ? 'יורדות' : 'עולות';
+  const side = c.side === 'L' ? 'קנייה' : 'שורט', sel = (c.sel === 'lo' ? 'יורדות' : 'עולות') + (c.key && c.key !== 'r' ? ` (${c.key.slice(1)} ימים)` : '');
   const ex = c.exit === 'open' ? 'מכירה בפתיחה למחרת' : c.exit === 'hour' ? `מכירה ב-${Math.floor(c.hr)}:${c.hr % 1 ? '30' : '00'} למחרת` : (c.hold || 1) === 1 ? 'מכירה בסגירה' : `החזקה ${c.hold} ימים`;
   const st = c.stop ? (c.stop.tr ? ` · סטופ נגרר ${c.stop.tr * 100}%` : ` · ${c.stop.tp ? `יעד +${c.stop.tp * 100}%` : ''}${c.stop.tp && c.stop.sl ? '/' : ''}${c.stop.sl ? `סטופ −${c.stop.sl * 100}%` : ''}`) : '';
-  const pt = c.port ? ` · סטופ תיק +${c.port.tp * 100}%/−${c.port.sl * 100}%` : '';
+  const pt = c.port ? (c.port.tpUsd != null ? ` · סטופ תיק +${c.port.tpUsd}$/−${c.port.slUsd}$` : ` · סטופ תיק +${c.port.tp * 100}%/−${c.port.sl * 100}%`) : '';
   return `${side} ${c.N} ${sel} · ${c.filt.split('+').map((f) => FILT[f].he).join(' + ')} · כניסה ב${c.entry === 'C' ? 'סגירה' : 'פתיחה למחרת'} · ${ex}${st}${pt}`;
 }
 
@@ -267,9 +275,9 @@ export async function loadData({ cache = '', range = '3y' } = {}){
     log(`daily loaded: ${Object.keys(D).length}`);
     // נרות שעה רק לימים שבהם מניה יכולה להיות מוחזקת: 20 הראשונות בכל סינון, בכל יום, ל-5 הימים שאחרי
     const P0 = prepare(D), need = {};
-    for (let k = 1; k < P0.L - 1; k++) for (const [, F] of Object.entries(FILT)) if (!F.x2) for (const sel of ['lo', 'hi']){
+    for (let k = 1; k < P0.L - 1; k++) for (const key of ['r', 'r2', 'r3']) for (const [, F] of Object.entries(FILT)) if (!F.day) for (const sel of ['lo', 'hi']){
       if (F.lo && sel === 'hi') continue;
-      const c = P0.cand[k]; let m = 0;
+      const c = P0.candBy[key][k]; let m = 0;
       for (let q2 = 0; q2 < c.length && m < 20; q2++){ const x = c[sel === 'lo' ? q2 : c.length - 1 - q2]; if (!F.f(x, k, P0)) continue; m += 1;
         for (let j = 1; j <= 5; j++){ const d = P0.days[k + j]; if (d) (need[x.s] ||= new Set()).add(d); } }
     }
