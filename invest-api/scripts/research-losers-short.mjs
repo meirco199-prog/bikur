@@ -66,7 +66,7 @@ async function main(){
   const sect = (t, xs, note, H = HEAD, rw = row) => { out.push(`## ${t}`); if (note) out.push(note); out.push(...H, ...xs.filter(Boolean).map(rw), ''); };
   const S1 = { side: 'S', sel: 'lo', entry: 'C', exit: 'close', hold: 1 };
   sect('הבסיס: שורט על היורדות, סגירה → סגירה', [3, 5, 10].map((N) => find({ ...S1, N, filt: 'all' })).concat([find({ ...S1, side: 'L', N: 10, filt: 'all' })]));
-  sect('הכלל שבמעקב ה-Paper (קנייה של 3 שירדו 3%–7%, סגירה → סגירה) — לאורך 10 שנים', [find({ ...S1, side: 'L', N: 3, filt: 'mild' }), find({ ...S1, side: 'L', N: 3, filt: 'mild+bull50' }), find({ ...S1, side: 'L', N: 5, filt: 'mild' })]);
+  sect('"3 שירדו 3%–7%" (קנייה בסגירה, מכירה בסגירה; המועמד מ-losers-sim.md) — לאורך 10 שנים', [find({ ...S1, side: 'L', N: 3, filt: 'mild' }), find({ ...S1, side: 'L', N: 3, filt: 'mild+bull50' }), find({ ...S1, side: 'L', N: 5, filt: 'mild' })]);
   sect('אותו כלל לפי שנה', [find({ ...S1, side: 'L', N: 3, filt: 'mild' }), find({ ...S1, side: 'L', N: 3, filt: 'mild+bull50' })], null, yHead, yRow);
   sect('המשך כלפי מעלה: קנייה של 3 העולות הנזילות (מחזור > 100M$), החזקה 5 ימים — לפי שנה', [find({ side: 'L', sel: 'hi', N: 3, filt: 'liq', entry: 'C', exit: 'close', hold: 5 }), find({ side: 'L', sel: 'hi', N: 5, filt: 'liq', entry: 'C', exit: 'close', hold: 5 })], null, yHead, yRow);
   sect('השורט העקבי ביותר (10 שירדו מעל 15%, פתיחה → סגירה, סטופ 3%) — לפי שנה', [find({ ...S1, N: 10, filt: 'big', entry: 'O', stop: { sl: 0.03 } }), find({ ...S1, N: 3, filt: 'big+bear50', entry: 'O', hold: 2, stop: { tr: 0.03 } })], null, yHead, yRow);
