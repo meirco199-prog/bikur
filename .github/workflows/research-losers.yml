@@ -1,4 +1,4 @@
-# זמני (ops): תנופת בוקר — בדיקת מרווחים ועלויות על ההיסטוריה (scripts/research-losers-spread.mjs). מחקר בלבד.
+# זמני (ops): תנופת בוקר — בדיקת מרווחים ועלויות על ההיסטוריה (scripts/research-losers-spread.mjs). מחקר בלבד. (הרצה 2: אומדן מנרות שעה)
 name: research-losers
 on:
   push:

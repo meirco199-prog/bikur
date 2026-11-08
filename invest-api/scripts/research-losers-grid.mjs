@@ -168,7 +168,7 @@ export function walk(P, cfg, x){
 // החלקה לכל צד: קבועה (SLIP), או לפי מודל עלויות בכלל — cfg.cost = { inK|inFix, outK|outFix }: K × חצי המרווח המשוער של המניה, או אחוז קבוע
 export function slips(cfg, x){
   const c = cfg.cost; if (!c) return [SLIP, SLIP];
-  const hs = x.hs ?? 0.002; // בלי אומדן — 0.2% לצד (שמרני)
+  const hs = (c.key ? x[c.key] : x.hs) ?? 0.002; // בלי אומדן — 0.2% לצד (שמרני); c.key בוחר אומדן אחר (למשל hsH — מנרות שעה)
   return [c.inFix ?? (c.inK ?? 1) * hs, c.outFix ?? (c.outK ?? 1) * hs];
 }
 function trade(long, e, x, per, days = 1, si = SLIP, so = SLIP){ // רווח/הפסד נטו ועמלות (שורט: + עמלת השאלה לכל יום החזקה)
