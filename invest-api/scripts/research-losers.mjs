@@ -9,6 +9,8 @@
 // והחלקה/מרווח 0.05% לכל צד (רגישות: 0.15%). כל ההון מושקע מחדש כל יום, חלקים שווים, מניות שלמות.
 // תוספת (בקשה נוספת): סטופ של 500$ לכל מניה — כשהרווח או ההפסד בפוזיציה מגיע ל-500$ מוכרים. נבדק על נרות שעה (Yahoo): פער בפתיחה
 // מעבר לרמה → יציאה במחיר הפתיחה; נר שנגע בשתי הרמות → מניחים שההפסד קרה קודם (שמרני). אחרת — יציאה בסגירה כרגיל.
+// גרסה שנייה (בקשה נוספת): סטופ של 500$ על כל התיק ביום — הרווח/הפסד המשותף של כל המניות נמדד בסגירת כל נר שעה (ובפתיחה בגרסה A);
+// כשהוא מגיע ל-+500$ או ל-−500$ מוכרים את הכול באותם מחירים.
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg('--out', ''), CACHE = arg('--cache', ''), START_USD = 50000, DAYS = 63;
@@ -32,7 +34,7 @@ async function bars(sym){
 async function hourly(sym){
   const j = await get(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=6mo&interval=1h&includePrePost=false`);
   try { const r = JSON.parse(j).chart.result[0], q = r.indicators.quote[0], out = {};
-    r.timestamp.forEach((t, i) => { if (!(q.high[i] > 0 && q.low[i] > 0)) return; const d = new Date(t * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); (out[d] ||= []).push({ h: q.high[i], l: q.low[i] }); });
+    r.timestamp.forEach((t, i) => { if (!(q.high[i] > 0 && q.low[i] > 0)) return; const d = new Date(t * 1000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); (out[d] ||= []).push({ t, h: q.high[i], l: q.low[i], c: q.close[i] > 0 ? q.close[i] : null }); });
     return out; } catch { return null; }
 }
 async function load(){
@@ -84,6 +86,39 @@ function sim(data, days, N, mode, slip, stopUsd = 0, H = {}){
   return { eq, fees, slipUsd, trades, wins, n: log_.length, dd, worst, best, hitTp, hitSl, noData, log: log_ };
 }
 
+function simPort(data, days, N, mode, slip, stopUsd, H){
+  let eq = START_USD, fees = 0, wins = 0, peak = eq, dd = 0, hitTp = 0, hitSl = 0, n = 0;
+  const idx = {}; for (const [s, b] of Object.entries(data)) idx[s] = new Map(b.map((x, i) => [x.d, i]));
+  for (let k = 0; k < days.length - 1; k++){
+    const d = days[k], nx = days[k + 1], cand = [];
+    for (const [s, b] of Object.entries(data)){
+      if (s === 'SPY') continue;
+      const i = idx[s].get(d), j = idx[s].get(nx); if (i === undefined || j === undefined || i < 21 || j !== i + 1) continue;
+      const adv = b.slice(i - 20, i).reduce((a, x) => a + x.c * (x.v || 0), 0) / 20;
+      if (b[i].c <= 5 || adv < 20e6) continue;
+      cand.push({ s, r: b[i].c / b[i - 1].c - 1, buy: mode === 'A' ? b[i].c : b[j].o, sell: b[j].c, open: b[j].o });
+    }
+    cand.sort((a, b) => a.r - b.r);
+    const pick = cand.slice(0, N); if (!pick.length) continue;
+    const per = eq / pick.length; let cash = 0; const pos = [];
+    for (const p of pick){ const bpx = p.buy * (1 + slip), sh = Math.floor(per / bpx); if (sh < 1){ cash += per; continue; } const cb = comm(sh, bpx); cash += per - sh * bpx - cb; fees += cb; pos.push({ ...p, sh, bpx, last: mode === 'A' ? p.open : p.buy }); }
+    const pnl = () => pos.reduce((a, x) => a + x.sh * (x.last - x.bpx), 0);
+    let exitAt = null; // מחיר יציאה = last של כל פוזיציה
+    if (mode === 'A'){ const v = pnl(); if (v >= stopUsd){ exitAt = 'tp'; } else if (v <= -stopUsd){ exitAt = 'sl'; } }
+    if (!exitAt){
+      const ts = [...new Set(pos.flatMap((x) => (H[x.s]?.[nx] || []).map((b) => b.t)))].sort((a, b) => a - b);
+      const maps = pos.map((x) => new Map((H[x.s]?.[nx] || []).filter((b) => b.c).map((b) => [b.t, b.c])));
+      for (const t of ts){ pos.forEach((x, q) => { const c = maps[q].get(t); if (c) x.last = c; }); const v = pnl(); if (v >= stopUsd){ exitAt = 'tp'; break; } if (v <= -stopUsd){ exitAt = 'sl'; break; } }
+      if (!exitAt) for (const x of pos) x.last = x.sell;
+    }
+    if (exitAt === 'tp') hitTp += 1; if (exitAt === 'sl') hitSl += 1;
+    let end = cash;
+    for (const x of pos){ const spx = x.last * (1 - slip), f = comm(x.sh, spx) + sellFees(x.sh, spx); fees += f; end += x.sh * spx - f; }
+    if (end > eq) wins += 1; eq = end; n += 1; peak = Math.max(peak, eq); dd = Math.max(dd, 1 - eq / peak);
+  }
+  return { eq, fees, wins, n, dd, hitTp, hitSl };
+}
+
 const data = await load();
 const all = [...new Set(Object.values(data).flatMap((b) => b.map((x) => x.d)))].sort();
 const spyDays = new Set((data.SPY || []).map((x) => x.d)), tradingDays = all.filter((d) => spyDays.has(d));
@@ -109,6 +144,13 @@ L.push('| גרסה | מניות ביום | החלקה לצד | סוף | תשוא
 for (const mode of ['A', 'B']) for (const N of [5, 10]) for (const slip of [0.0005, 0.0015]){
   const r = sim(data, days, N, mode, slip, 500, H), b = res[`${mode}${N}${slip}`];
   L.push(`| ${mode === 'A' ? 'A: סגירה → סגירה למחרת' : 'B: פתיחה → סגירה'} | ${N} | ${(slip * 100).toFixed(2)}% | **${usd(r.eq)}** | ${pct(r.eq / START_USD - 1)} | ${usd(r.fees)} | ${r.hitTp} | ${r.hitSl} | ${r.noData} | ${pct(-r.dd)} | ${usd(b.eq)} |`);
+}
+L.push('', '## עם סטופ של 500$ על כל התיק ביום (כשהרווח או ההפסד של כל המניות ביחד מגיע ל-500$ מוכרים הכול; אחרת בסגירה)');
+L.push('נמדד בסגירת כל נר שעה (ובפתיחה בגרסה A). 500$ = 1% מ-50,000$.');
+L.push('| גרסה | מניות ביום | החלקה לצד | סוף | תשואה | עמלות | ימים שנסגרו ברווח 500$ | ימים שנסגרו בהפסד 500$ | ימים רווחיים | ירידה מקס׳ | בלי סטופ (להשוואה) |', '|---|---|---|---|---|---|---|---|---|---|---|');
+for (const mode of ['A', 'B']) for (const N of [5, 10]) for (const slip of [0.0005, 0.0015]){
+  const r = simPort(data, days, N, mode, slip, 500, H), b = res[`${mode}${N}${slip}`];
+  L.push(`| ${mode === 'A' ? 'A: סגירה → סגירה למחרת' : 'B: פתיחה → סגירה'} | ${N} | ${(slip * 100).toFixed(2)}% | **${usd(r.eq)}** | ${pct(r.eq / START_USD - 1)} | ${usd(r.fees)} | ${r.hitTp} | ${r.hitSl} | ${r.wins}/${r.n} | ${pct(-r.dd)} | ${usd(b.eq)} |`);
 }
 L.push('', '## לפי חודש (גרסה A, 10 מניות, החלקה 0.05%)');
 const r10 = res['A100.0005'], byM = {}; let prev = START_USD;
