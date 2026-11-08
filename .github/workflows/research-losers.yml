@@ -1,4 +1,5 @@
-# זמני (ops): סימולציה — קנייה יומית של המניות שירדו הכי הרבה ב-3 החודשים האחרונים: בלי סטופ, סטופ 500$ למניה, וסטופ 500$ לכל התיק ביום (scripts/research-losers.mjs). מחקר בלבד. (תיקון רשימת המניות)
+# זמני (ops): חיפוש כלל חלופי לסימולציית המניות שירדו — אלפי כללים (סטופ, סוג מניה, זמן יציאה, החזקה), 3 החודשים מול 21 החודשים שלפני
+# (scripts/research-losers-grid.mjs). מחקר בלבד.
 name: research-losers
 on:
   push:
@@ -8,10 +9,10 @@ permissions: { contents: read }
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
-      - name: run
-        run: node invest-api/scripts/research-losers.mjs --cache losers-data.json --out research-losers.md
+      - name: grid
+        run: node invest-api/scripts/research-losers-grid.mjs --cache losers-grid.json --out research-losers-grid.md
