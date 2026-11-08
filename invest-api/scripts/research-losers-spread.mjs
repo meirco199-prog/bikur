@@ -86,6 +86,21 @@ async function main(){
   // 4. 5 מניות, ורק מניות במחיר מעל 20$ (מרווח קטן יותר)
   out.push('## 4. וריאציות (שנתיים, אומדן מנרות שעה: MOO + חצי מרווח ביציאה)', '| כלל | מכירה ב-12:30 | סטופ ±250$ |', '|---|---|---|');
   for (const v of [{ N: 5 }, { N: 10 }, { filt: 'up3+liq' }]) out.push(`| ${label({ ...BASE, ...v, exit: 'close' }).replace(' · כניסה בפתיחה למחרת · מכירה בסגירה', '')} | ${[EXITS[1], EXITS[2]].map(([, e]) => { const r = run(P, { ...BASE, ...v, ...e, cost: COSTS[6][1] }, ...W.y2); return `${usd(r.end)} (${pl(r.end - START_USD)})`; }).join(' | ')} |`);
+  // 5. לפי מספר מניות (בקשת מאיר: "ואם זה 2 מניות או מניה אחת?") — אותו כלל, 1/2/3/5 מניות
+  const TOPC = [COSTS[0], COSTS[1], COSTS[6], COSTS[7]], TOPE = [EXITS[1], EXITS[2], EXITS[3], EXITS[4]];
+  for (const [wn, wl] of [['y2', 'שנתיים'], ['m6', 'חצי שנה']]){
+    out.push('', `## 5${wn === 'y2' ? 'א' : 'ב'}. לפי מספר מניות — ${wl}: 50,000$ →`, '| מניות | מודל עלות | ' + TOPE.map(([n]) => n).join(' | ') + ' |', '|---|---|' + TOPE.map(() => '---').join('|') + '|');
+    for (const N of [1, 2, 3, 5]) for (const [cn, cost] of TOPC)
+      out.push(`| ${N} | ${cn} | ${TOPE.map(([, e]) => { const r = run(P, { ...BASE, N, ...e, cost }, ...W[wn]); return `${usd(r.end)} (${pl(r.end - START_USD)})`; }).join(' | ')} |`);
+  }
+  out.push('', '## 5ג. יציבות לפי מספר מניות (מכירה ב-12:30, אומדן שעתי: MOO + חצי מרווח ביציאה)');
+  for (const N of [1, 2, 3, 5]){
+    const t = trace(P, { ...BASE, N, ...EXITS[1][1], cost: COSTS[6][1] }, ...W.y2);
+    const q = []; for (let s2 = 0; s2 < 8; s2++){ const a2 = W.y2[0] + s2 * 63, b2 = Math.min(a2 + 63, W.y2[1]); q.push(pct(t.rets.filter((x) => x.k >= a2 && x.k < b2).reduce((v, x) => v * (1 + x.r), 1) - 1)); }
+    const sorted = [...t.rets].sort((a2, b2) => b2.r - a2.r), drop = (n) => sorted.slice(n).reduce((v, x) => v * (1 + x.r), 1) * START_USD;
+    let pk = START_USD, eq = START_USD, dd = 0; for (const x of t.rets){ eq *= 1 + x.r; pk = Math.max(pk, eq); dd = Math.max(dd, 1 - eq / pk); }
+    out.push(`- **${N} ${N === 1 ? 'מניה' : 'מניות'}:** ${usd(t.end)} (${pl(t.end - START_USD)}) · ירידה מקס׳ ${pct(-dd)} · יום גרוע ${pct(Math.min(...t.rets.map((x) => x.r)))} · רבעונים: ${q.join(' · ')} · בלי 5 הימים הטובים: ${usd(drop(5))}`);
+  }
   const md = out.join('\n'); console.log(md); if (OUT) writeFileSync(OUT, md);
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();
