@@ -66,3 +66,12 @@ test('עסקאות: סכום ה-pnl של כל העסקאות = סכום התשו
   const st = tstats([{ t: 0, w: 0.5, pnl: 0.01, bars: 3 }, { t: 1, w: 0.5, pnl: -0.005, bars: 1 }, { t: 2, w: 1, pnl: 0.01, bars: 2 }]);
   assert.equal(st.n, 3); assert.equal(st.pf, 3); assert.equal(st.winRate, 0.67); assert.equal(st.expPct, 0.67); // (2% − 1% + 1%) / 3
 });
+
+test('vboStrategy: ברירת המחדל זהה ל-VBO0.7-ma20-BE של המחקר; offH מזיז את היציאה לסוף "יום המסחר" החדש', async () => {
+  const { vboStrategy } = await import('../engine/research-hourly.js');
+  const A = alignH({ BTC: walk(24 * 60), ETH: walk(24 * 60) });
+  const a = runBars(A, strategies(A).find((x) => x.id === 'VBO0.7-ma20-BE')).daily, b = runBars(A, vboStrategy(A, { k0: 0.7, filt: true, maN: 20 })).daily;
+  assert.deepEqual(b.map((x) => x.net), a.map((x) => x.net));
+  const s = vboStrategy(A, { k0: 0.3, filt: false, offH: 8 }), st = {};
+  for (let i = 48; i < A.T.length; i++){ const w = s.weights(A, i, st); if (new Date(A.T[i]).getUTCHours() === 7) assert.equal(w[0] + w[1], 0, 'יציאה בסגירת 07:00 = סוף יום שמתחיל ב-08:00'); }
+});
