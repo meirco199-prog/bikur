@@ -16,7 +16,7 @@ import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { get, universe, comm, sellFees, sleep, log } from './losers-common.mjs';
 
-export const START_USD = 50000, SLIP = 0.0005, DAYS3M = 63, BORROW_DAY = 0.0002; // עמלת השאלה לשורט: 0.02% ליום (~5% בשנה)
+export const START_USD = 50000, SLIP = Number(process.env.LOSERS_SLIP || 0.0005), DAYS3M = 63, BORROW_DAY = 0.0002; // עמלת השאלה לשורט: 0.02% ליום (~5% בשנה)
 
 // ---------- נתונים ----------
 // מחירים גולמיים (כמו נרות השעה) + רשימת פיצולים: התשואה והממוצע מחושבים על סדרה מתוקנת-פיצולים, ועסקה שחוצה פיצול לא נבחרת
@@ -229,7 +229,7 @@ function runSw(P, cfg, k0, kEnd){
 export function label(c){
   if (c.sw) return `לפי מצב השוק (SPY מול ממוצע ${c.sw.ma}): בשוק יורד — ${c.sw.bear ? label(c.sw.bear) : 'מזומן'} ‖ בשוק עולה — ${c.sw.bull ? label(c.sw.bull) : 'מזומן'}`;
   const side = c.side === 'L' ? 'קנייה' : 'שורט', sel = (c.sel === 'lo' ? 'יורדות' : 'עולות') + (c.key && c.key !== 'r' ? ` (${c.key.slice(1)} ימים)` : '');
-  const ex = c.exit === 'open' ? 'מכירה בפתיחה למחרת' : c.exit === 'hour' ? `מכירה ב-${Math.floor(c.hr)}:${c.hr % 1 ? '30' : '00'} למחרת` : (c.hold || 1) === 1 ? 'מכירה בסגירה' : `החזקה ${c.hold} ימים`;
+  const ex = c.exit === 'open' ? 'מכירה בפתיחה למחרת' : c.exit === 'hour' ? `מכירה ב-${Math.floor(c.hr)}:${c.hr % 1 ? '30' : '00'}${c.entry === 'O' ? '' : ' למחרת'}` : (c.hold || 1) === 1 ? 'מכירה בסגירה' : `החזקה ${c.hold} ימים`;
   const st = c.stop ? (c.stop.tr ? ` · סטופ נגרר ${c.stop.tr * 100}%` : ` · ${c.stop.tp ? `יעד +${c.stop.tp * 100}%` : ''}${c.stop.tp && c.stop.sl ? '/' : ''}${c.stop.sl ? `סטופ −${c.stop.sl * 100}%` : ''}`) : '';
   const pt = c.port ? (c.port.tpUsd != null ? ` · סטופ תיק +${c.port.tpUsd}$/−${c.port.slUsd}$` : ` · סטופ תיק +${c.port.tp * 100}%/−${c.port.sl * 100}%`) : '';
   return `${side} ${c.N} ${sel} · ${c.filt.split('+').map((f) => FILT[f].he).join(' + ')} · כניסה ב${c.entry === 'C' ? 'סגירה' : 'פתיחה למחרת'} · ${ex}${st}${pt}`;
@@ -294,7 +294,7 @@ export async function loadData({ cache = '', range = '3y', combos = [] } = {}){
     await Promise.all(Array.from({ length: 6 }, async () => { for (let s; (s = hq.shift());){ const h = await hourly(s, need[s]); if (h) Hr[s] = h.bars; await sleep(100); } }));
     const sh = await hourly('SPY', null); Hr.__first = sh?.first;
     log(`hourly loaded: ${Object.keys(Hr).length - 1}, first hourly day ${Hr.__first}`);
-    if (cache) writeFileSync(cache, JSON.stringify({ D, Hr }));
+    if (cache) try { writeFileSync(cache, JSON.stringify({ D, Hr })); } catch (e) { log(`cache not saved (${e.message}) — continuing without it`); }
     return { D, Hr };
   }
 }
