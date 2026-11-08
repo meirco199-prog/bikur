@@ -1,0 +1,17 @@
+# זמני (ops): סימולציה — קנייה יומית של המניות שירדו הכי הרבה ב-3 החודשים האחרונים (scripts/research-losers.mjs). מחקר בלבד.
+name: research-losers
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-losers.yml]
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: run
+        run: node invest-api/scripts/research-losers.mjs --cache losers-data.json --out research-losers.md
