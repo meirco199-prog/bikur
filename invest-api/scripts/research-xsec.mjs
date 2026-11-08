@@ -32,9 +32,16 @@ const yh = (t) => t.replace('.', '-');
 const strip = (h) => h.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#160;|&nbsp;/g, ' ').trim();
 const cells = (row) => [...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((m) => strip(m[1]));
 function tableById(html, id){ const i = html.indexOf(`id="${id}"`); if (i < 0) return null; return html.slice(i, html.indexOf('</table>', i)); }
+const allTables = (html) => [...html.matchAll(/<table[^>]*>[\s\S]*?<\/table>/g)].map((m) => m[0]);
+const headText = (t) => strip((t.match(/<tr[\s\S]*?<\/tr>/g) || []).slice(0, 2).join(' ')).replace(/\s+/g, ' ');
+const tickerRows = (t) => t.split('<tr').slice(1).filter((row) => cells(row).some((x) => TICK.test(x))).length;
+// אבחון: אילו טבלאות יש בעמוד (מזהה, כותרת, כמה שורות עם טיקר) — מודפס כשהפענוח נכשל
+export const tableInfo = (html) => allTables(html).map((t) => `${(t.match(/id="([^"]+)"/) || [])[1] || '-'}: "${headText(t).slice(0, 80)}" (${tickerRows(t)} rows)`);
 // טבלת הרכב: לכל שורה — התא הראשון שנראה כמו טיקר
 export function parseConstituents(html){
-  const t = tableById(html, 'constituents');
+  // קודם טבלה עם id="constituents"; אחרת — הטבלה שכותרתה כוללת Ticker/Symbol ויש בה הכי הרבה שורות עם טיקר
+  let t = tableById(html, 'constituents');
+  if (!t){ const c = allTables(html).filter((x) => /Ticker|Symbol/i.test(headText(x)) && !/Added|Removed/i.test(headText(x))).sort((a, b) => tickerRows(b) - tickerRows(a))[0]; if (c && tickerRows(c) >= 50) t = c; }
   if (!t){ const out = new Set(); for (const m of html.matchAll(/<td[^>]*>\s*<a[^>]*href="https?:\/\/(?:www\.)?(?:nyse|nasdaq)\.com[^"]*"[^>]*>([A-Z][A-Z0-9.\-]{0,6})<\/a>/g)) out.add(yh(m[1])); return [...out]; }
   const out = new Set();
   for (const row of t.split('<tr').slice(1)){ const c = cells(row).find((x) => TICK.test(x)); if (c) out.add(yh(c)); }
@@ -42,7 +49,8 @@ export function parseConstituents(html){
 }
 // טבלת שינויי S&P 500: תאריך | נוסף (טיקר, שם) | הוצא (טיקר, שם) | סיבה. תאריך עם rowspan — שורות המשך בלי תא תאריך
 export function parseChanges(html){
-  const t = tableById(html, 'changes'); if (!t) return [];
+  // טבלת השינויים: id="changes", או הטבלה שכותרתה כוללת Added ו-Removed
+  const t = tableById(html, 'changes') || allTables(html).find((x) => /Added/i.test(headText(x)) && /Removed/i.test(headText(x))); if (!t) return [];
   const out = []; let cur = null;
   for (const row of t.split('<tr').slice(1)){
     if (/<th/.test(row) && !/<td/.test(row)) continue;
@@ -73,6 +81,8 @@ async function universes(){
   const h500 = await page('List_of_S%26P_500_companies'), h400 = await page('List_of_S%26P_400_companies'), h600 = await page('List_of_S%26P_600_companies'), hN = await page('Nasdaq-100');
   const sp500 = parseConstituents(h500), sp400 = parseConstituents(h400), sp600 = parseConstituents(h600), ndx = parseConstituents(hN), changes = parseChanges(h500);
   log(`wiki: sp500 ${sp500.length}, sp400 ${sp400.length}, sp600 ${sp600.length}, ndx ${ndx.length}, changes ${changes.length}`);
+  if (ndx.length < 80) log('NDX tables:\n  ' + tableInfo(hN).join('\n  '));
+  if (changes.length < 100) log('S&P 500 tables:\n  ' + tableInfo(h500).join('\n  '));
   if (sp500.length < 400 || ndx.length < 80 || changes.length < 100) throw new Error('רשימות מדדים חלקיות מוויקיפדיה — לא מריצים על נתונים חסרים');
   let r2k = [], r2kSrc = 'iShares IWM (אחזקות נוכחיות)';
   const csv = await get('https://www.ishares.com/us/products/239710/ishares-russell-2000-etf/1467271812596.ajax?fileType=csv&fileName=IWM_holdings&dataType=fund');

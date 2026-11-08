@@ -1,4 +1,4 @@
-# מחקר שיטתי של 12 משפחות אסטרטגיות חתך (scripts/research-xsec.mjs, invest/docs/research/xsec/). מחקר בלבד — אין כסף, אין פקודות.
+# מחקר שיטתי של 12 משפחות אסטרטגיות חתך (scripts/research-xsec.mjs, invest/docs/research/xsec/). מחקר בלבד — אין כסף, אין פקודות. (הרצה 2: פענוח טבלאות לפי תוכן)
 # הרצה: Actions → research-xsec → Run workflow (או דחיפה שמשנה את הקובץ הזה). התוצאות (report.md, results.csv, yearly.csv,
 # walkforward.json, meta.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow, כך שכל ריצה ניתנת לשחזור ולבדיקה.
 name: research-xsec
