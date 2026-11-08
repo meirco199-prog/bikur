@@ -1,4 +1,4 @@
-# זמני (ops): הכיוון ההפוך — שורט על מניות שירדו בחדות, 10 שנים (scripts/research-losers-short.mjs). מחקר בלבד.
+# זמני (ops): הכיוון ההפוך — שורט על מניות שירדו בחדות, 10 שנים (scripts/research-losers-short.mjs). מחקר בלבד. (הרצה 2: שורות לכלל שבמעקב)
 name: research-losers
 on:
   push:
