@@ -21,6 +21,8 @@
 | **FINRA Query API** | Short interest דו-שבועי | הרשמה חינמית | מוגבל | — | רשמי | לא בזמן אמת | מתועד; Missing Data ב-MVP |
 | **Workers AI / Anthropic** | שכבת ה-AI (סיכום, שאלות על נתוני המערכת) | binding / `ANTHROPIC_API_KEY` | Workers AI: 10k neurons/יום | לפי שימוש | מקומי ב-Cloudflare | Llama פחות מדויק מ-Claude | Workers AI ברירת מחדל; Claude אם יש מפתח |
 
+**מעבדת האסטרטגיות (`invest/lab/`):** מערך נתונים נפרד בענף `lab-data` (הרכב S&P 500 היסטורי + נרות יומיים ל-20 שנה), נבנה ב-GitHub Actions — פירוט, השוואת ספקים ומה חסום: [LAB.md](LAB.md) §4.
+
 **לא בשימוש בכוונה:** Yahoo Finance (API לא רשמי, מנוגד לתנאי שימוש), Google Finance, CNN Fear&Greed (endpoint לא רשמי — במקומו מחושב מדד סנטימנט מקומי שקוף מ-VIX/רוחב/מרווחי אשראי/מומנטום).
 
 ## 2. מיפוי נתון → ספקים לפי עדיפות
