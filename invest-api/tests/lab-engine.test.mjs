@@ -283,4 +283,9 @@ test('מצב מחקר (sizing.unlimited): סכום קבוע גם כשהמזומ�
   assert.ok(research.trades.every((t) => Math.abs(t.shares * t.entryPrice - 1000) < 100), 'סכום קבוע ~1,000$ לכל עסקה');
   assert.equal(research.totals.margin, 0); assert.ok(research.limited && research.assumptions.some((a) => /מצב מחקר/.test(a)));
   const an = analyze(research); assert.ok(an.series.additive && an.series.cagr === null && an.series.totalReturn < -1 && an.series.maxDD < -1 && Object.values(an.periodic.yearly)[0] < 0, JSON.stringify(an.series));
+  // יחסית לייחוס במצב מחקר: בטא/אלפא לא מחושבים (יחידות שונות), קורלציה בלבד; ובחשבון רגיל — מחושבים
+  const ds2 = new Dataset({ series: [A, B, C, rowsToCompact('SPY', syntheticRows({ n: 28, start: '2020-01-02', seed: 9, price: 300 }))] });
+  const r2 = simulate(ds2, base({ sizing: { capital: 1000, maxPositions: 1, reinvest: false, unlimited: true }, benchmarks: ['SPY'] })); const an2 = analyze(r2);
+  assert.equal(an2.benchmarks.SPY.relative.beta, null); assert.ok(an2.benchmarks.SPY.relative.additive && typeof an2.benchmarks.SPY.relative.correlation === 'number');
+  const r3 = simulate(ds2, base({ sizing: { capital: 1000, maxPositions: 1 }, benchmarks: ['SPY'] })); assert.ok(typeof analyze(r3).benchmarks.SPY.relative.beta === 'number');
 });
