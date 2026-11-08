@@ -1,0 +1,17 @@
+# זמני (ops): "3 ימי עלייה ברצף → קונים ביום הרביעי", 10 שנים ושנתיים (scripts/research-losers-up3.mjs). מחקר בלבד.
+name: research-losers
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-losers.yml]
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: up3
+        run: node invest-api/scripts/research-losers-up3.mjs --cache losers-up3.json --out research-losers-up3.md
