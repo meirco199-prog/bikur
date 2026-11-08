@@ -197,17 +197,18 @@ function portDay(P, cfg, picks, per, eq){
 export function run(P, cfg, k0, kEnd){
   if (cfg.sw) return runSw(P, cfg, k0, kEnd);
   const H = cfg.hold || 1, sl = Array(H).fill(START_USD / H), long = cfg.side === 'L';
-  let fees = 0, trades = 0, wins = 0, days = 0, tp = 0, slh = 0, peak = START_USD, dd = 0;
+  let fees = 0, trades = 0, wins = 0, days = 0, tp = 0, slh = 0, peak = START_USD, dd = 0, noHr = 0;
   for (let k = k0; k + H <= kEnd; k++){
     const j = (k - k0) % H, eq = sl[j], picks = select(P, cfg, k); if (!picks.length) continue;
     const per = eq / cfg.N; let pnl = 0;
     if (cfg.port){ const r = portDay(P, cfg, picks, per, eq); pnl = r.pnl; fees += r.fee; if (r.why === 'tp') tp += 1; if (r.why === 'sl') slh += 1; }
     else for (const x of picks){ const w = walk(P, cfg, x), r = trade(long, w.e, w.x, per, H); pnl += r.pnl; fees += r.fee; if (w.why === 'tp') tp += 1; if (w.why === 'sl') slh += 1; }
+    if (cfg.port || cfg.stop || cfg.exit === 'hour') for (const x of picks) if (!hasHourly(P, x.s, x.i + 1)) noHr += 1; // בדיקה: סטופ בלי נרות שעה
     sl[j] = eq + pnl; trades += picks.length; days += 1; if (pnl > 0) wins += 1;
     const tot = sl.reduce((a, v) => a + v, 0); peak = Math.max(peak, tot); dd = Math.max(dd, 1 - tot / peak);
   }
   const end = sl.reduce((a, v) => a + v, 0);
-  return { end, ret: end / START_USD - 1, fees, trades, wins, days, tp, sl: slh, dd };
+  return { end, ret: end / START_USD - 1, fees, trades, wins, days, tp, sl: slh, dd, noHr };
 }
 
 // החלפה לפי מצב השוק (החזקה של יום אחד): בכל יום — אם SPY מתחת לממוצע ma, הכלל bear; אחרת הכלל bull (null = מזומן)
@@ -265,8 +266,22 @@ export function withStops(base){
 }
 
 // ---------- טעינה ----------
+// אילו (מניה, יום) צריכים נרות שעה: לכל יום, לכל דירוג (r/r2/r3), לכל סינון שאינו ברמת היום — וגם לכל צירוף ב-combos (צירוף יכול לבחור
+// מניה שאיננה ב-20 הראשונות של אף סינון בודד; הערת GPT ב-#227) — 20 המועמדות הראשונות, ל-5 ימי ההחזקה שאחרי
+export function hourlyNeed(P0, combos = []){
+  const specs = [...Object.entries(FILT).filter(([, F]) => !F.day).map(([k, F]) => ({ lo: !!F.lo, fs: [F] })),
+    ...combos.map((c) => { const fs = c.split('+').map((f) => FILT[f]); if (fs.some((f) => !f)) throw new Error(`סינון לא מוכר: ${c}`); return { lo: fs.some((f) => f.lo), fs: fs.filter((f) => !f.day) }; })];
+  const need = {};
+  for (let k = 1; k < P0.L - 1; k++) for (const key of ['r', 'r2', 'r3']) for (const sp of specs) for (const sel of ['lo', 'hi']){
+    if (sp.lo && sel === 'hi') continue;
+    const c = P0.candBy[key][k]; let m = 0;
+    for (let q = 0; q < c.length && m < 20; q++){ const x = c[sel === 'lo' ? q : c.length - 1 - q]; if (!sp.fs.every((f) => f.f(x, k, P0))) continue; m += 1;
+      for (let j = 1; j <= 5; j++){ const d = P0.days[k + j]; if (d) (need[x.s] ||= new Set()).add(d); } }
+  }
+  return need;
+}
 // נרות יומיים לכל היקום (range) + נרות שעה (כ-730 יום אחורה, רק לימים שבהם מניה יכולה להיות מוחזקת)
-export async function loadData({ cache = '', range = '3y' } = {}){
+export async function loadData({ cache = '', range = '3y', combos = [] } = {}){
   if (cache && existsSync(cache)) return JSON.parse(readFileSync(cache, 'utf8'));
   {
     const syms = await universe(); let D, Hr; log(`universe: ${syms.length}`);
@@ -274,13 +289,7 @@ export async function loadData({ cache = '', range = '3y' } = {}){
     await Promise.all(Array.from({ length: 6 }, async () => { for (let s; (s = q.shift());){ const b = await daily(s, range); if (b && b.d.length > 80) D[s] = b; await sleep(100); } }));
     log(`daily loaded: ${Object.keys(D).length}`);
     // נרות שעה רק לימים שבהם מניה יכולה להיות מוחזקת: 20 הראשונות בכל סינון, בכל יום, ל-5 הימים שאחרי
-    const P0 = prepare(D), need = {};
-    for (let k = 1; k < P0.L - 1; k++) for (const key of ['r', 'r2', 'r3']) for (const [, F] of Object.entries(FILT)) if (!F.day) for (const sel of ['lo', 'hi']){
-      if (F.lo && sel === 'hi') continue;
-      const c = P0.candBy[key][k]; let m = 0;
-      for (let q2 = 0; q2 < c.length && m < 20; q2++){ const x = c[sel === 'lo' ? q2 : c.length - 1 - q2]; if (!F.f(x, k, P0)) continue; m += 1;
-        for (let j = 1; j <= 5; j++){ const d = P0.days[k + j]; if (d) (need[x.s] ||= new Set()).add(d); } }
-    }
+    const need = hourlyNeed(prepare(D), combos);
     Hr = {}; const hq = Object.keys(need); log(`hourly for ${hq.length} symbols`);
     await Promise.all(Array.from({ length: 6 }, async () => { for (let s; (s = hq.shift());){ const h = await hourly(s, need[s]); if (h) Hr[s] = h.bars; await sleep(100); } }));
     const sh = await hourly('SPY', null); Hr.__first = sh?.first;

@@ -11,6 +11,7 @@ import { loadData, prepare, run, label, START_USD } from './research-losers-grid
 
 const D6 = 126;
 const PORTS = [null, { tpUsd: 500, slUsd: 500 }, { tpUsd: 250, slUsd: 250 }, { tpUsd: 1000, slUsd: 1000 }, { tpUsd: 1000, slUsd: 500 }, { tpUsd: 500, slUsd: 1000 }];
+export const COMBOS = ['dn3+liq', 'up3+liq'];
 export function rules(){
   const out = [];
   for (const sel of ['lo', 'hi']) for (const key of ['r', 'r2', 'r3']) for (const N of [3, 5, 10, 15, 20])
@@ -24,7 +25,7 @@ export function rules(){
 async function main(){
   const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
   const OUT = arg('--out', ''), CACHE = arg('--cache', '');
-  const { D, Hr } = await loadData({ cache: CACHE, range: '3y' });
+  const { D, Hr } = await loadData({ cache: CACHE, range: '3y', combos: COMBOS });
   const P = prepare(D, Hr), L = P.L, days = P.days;
   const k6 = L - 1 - D6, kq = L - 1 - D6 / 2, kP = Math.max(60, days.findIndex((d) => d >= (Hr.__first || days[0])) + 1);
   const W = { m: [k6, L - 1], q1: [k6, kq], q2: [kq, L - 1], p: [kP, k6] };
@@ -41,6 +42,7 @@ async function main(){
   const out = [`# קנייה בפתיחה + סטופ ±500$ לכל התיק — חצי השנה האחרונה (${days[k6]} → ${days.at(-1)})`, '',
     `- ${Object.keys(P.S).length} מניות S&P 1500 (מחיר > 5$, מחזור > 20M$). קונים בפתיחה בחלקים שווים מ-50,000$, מוכרים ב-±500$ לכל התיק (נמדד בסגירת כל נר שעה) או בסגירה.`,
     `- עמלות IBKR + החלקה 0.05% לצד. נבדקו ${R.length} כללים. SPY בחצי השנה: ${pct(spyRet(k6, L - 1))} (${usd(START_USD * (1 + spyRet(k6, L - 1)))}).`,
+    `- בדיקת כיסוי: פוזיציות עם סטופ תיק שאין להן נרות שעה ביום ההחזקה — ${R.filter((x) => x.c.port).reduce((a, x) => a + x.m.noHr, 0)} מתוך ${R.filter((x) => x.c.port).reduce((a, x) => a + x.m.trades, 0)} בחצי השנה.`,
     `- הרוויחו בחצי השנה: ${R.filter((x) => x.m.ret > 0).length} · בחצי השנה וגם ב-15 החודשים שלפני: ${R.filter((x) => x.m.ret > 0 && x.p.ret > 0).length} · וגם בשני הרבעונים: ${R.filter((x) => x.m.ret > 0 && x.p.ret > 0 && x.q1.ret > 0 && x.q2.ret > 0).length}.`, ''];
   const sect = (t, xs, note) => { out.push(`## ${t}`); if (note) out.push(note); out.push(...HEAD, ...xs.filter(Boolean).map(row), ''); };
   sect('הבסיס: 10 שירדו הכי הרבה אתמול — בלי סטופ ועם סטופים שונים לתיק', PORTS.map((port) => find({ ...B, ...(port ? { port } : {}) })));
