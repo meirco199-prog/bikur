@@ -1,0 +1,105 @@
+{
+ "generated": "2026-11-08T21:40:50.504Z",
+ "calendar": [
+  "2007-01-03",
+  "2026-11-06"
+ ],
+ "signals_from": "2008-01-02",
+ "dev": [
+  "2008-01-02",
+  "2018-12-31"
+ ],
+ "test": [
+  "2019-01-02",
+  "2026-11-06"
+ ],
+ "symbols_loaded": 1581,
+ "universes": {
+  "sp500": "S&P 500 (הרכב היסטורי)",
+  "ndx": "Nasdaq 100 (הרכב נוכחי — הטיית שורדים)",
+  "r2k": "Russell 2000 — S&P 600 (קירוב — אחזקות IWM לא זמינות) (הטיית שורדים)",
+  "broad": "יקום רחב (כל המניות שנטענו)",
+  "sectors": "קרנות סקטור SPDR"
+ },
+ "sp500_history_source": "github.com/fja05680/sp500 (S&P 500 Historical Components & Changes (Updated).csv) + ההרכב הנוכחי מוויקיפדיה",
+ "sp500_history_tickers": 1216,
+ "coverage": {
+  "2008": {
+   "members": 497,
+   "withData": 301
+  },
+  "2009": {
+   "members": 499,
+   "withData": 317
+  },
+  "2010": {
+   "members": 499,
+   "withData": 328
+  },
+  "2011": {
+   "members": 497,
+   "withData": 330
+  },
+  "2012": {
+   "members": 497,
+   "withData": 342
+  },
+  "2013": {
+   "members": 497,
+   "withData": 352
+  },
+  "2014": {
+   "members": 498,
+   "withData": 358
+  },
+  "2015": {
+   "members": 500,
+   "withData": 367
+  },
+  "2016": {
+   "members": 504,
+   "withData": 389
+  },
+  "2017": {
+   "members": 506,
+   "withData": 402
+  },
+  "2018": {
+   "members": 506,
+   "withData": 410
+  },
+  "2019": {
+   "members": 505,
+   "withData": 424
+  },
+  "2020": {
+   "members": 505,
+   "withData": 442
+  },
+  "2021": {
+   "members": 505,
+   "withData": 450
+  },
+  "2022": {
+   "members": 503,
+   "withData": 463
+  },
+  "2023": {
+   "members": 503,
+   "withData": 474
+  },
+  "2024": {
+   "members": 503,
+   "withData": 481
+  },
+  "2025": {
+   "members": 503,
+   "withData": 486
+  },
+  "2026": {
+   "members": 503,
+   "withData": 497
+  }
+ },
+ "configs": 4872
+}
