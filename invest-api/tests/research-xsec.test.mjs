@@ -68,3 +68,20 @@ test('הרכב היסטורי מתמונות מצב (fja05680/sp500): מקטעי
   assert.equal(at('BBB', '2013-01-01'), false); assert.equal(at('BBB', '2016-01-01'), true); // יצאה ב-2012 וחזרה ב-2015
   assert.equal(at('CCC', '2011-01-01'), false); assert.equal(at('CCC', '2020-01-01'), true);
 });
+
+test('נרמול שנתי: תיק שקרס בשנה אחת לא "מאפס" את השנה הבאה (כל שנה מתחילה ב-50,000$, התשואות נשמרות)', () => {
+  const flat = mkRaw(5, 760); for (const s of Object.keys(flat)) for (const f of ['o', 'h', 'l', 'c', 'cr']) flat[s][f] = flat[s][f].map(() => 50);
+  const F = mkCtx(flat), tf = new Int32Array(F.ctx.L * TOPK).fill(-1); for (let k = F.ctx.k0; k < F.ctx.L; k++) tf[k * TOPK] = 0;
+  const r = simulate(F.ctx, tf, { N: 1, H: 1, cost: 'net', extra: 0.02 }); // עלות 4% ליום — קריסה בתוך שנה
+  const ys = Object.keys(r.yr).sort(), a = r.yr[ys[0]], b = r.yr[ys[1]];
+  assert.ok(a.g < 0.01, `השנה הראשונה צריכה לקרוס: ${a.g}`);
+  const pa = a.g ** (1 / a.n), pb = b.g ** (1 / b.n); // תשואה יומית ממוצעת — זהה בשתי השנים (בלי נרמול השנה השנייה הייתה "0%" כי אין כסף לפוזיציה)
+  assert.ok(b.g < 0.01 && Math.abs(pa - pb) < 1e-2, `${pa} vs ${pb}`); // (הבדל קטן: עמלת המינימום 1$ כבדה יותר כשהתיק קטן לקראת סוף שנה)
+  assert.ok(Math.abs(r.end / (50000 * Object.values(r.yr).reduce((m, Y) => m * Y.g, 1)) - 1) < 1e-9);
+});
+
+test('fja05680: טיקר שנמחק ("XYZ-200606") נספר כחבר ונשאר בשמו (אין לו מחירים)', async () => {
+  const { parseSnapshotsCsv } = await import('../scripts/research-xsec.mjs');
+  const [s] = parseSnapshotsCsv('date,tickers\n2005-01-03,"AAA,ABS-200606,BF.B,bad token"\n');
+  assert.deepEqual([...s.set].sort(), ['AAA', 'ABS-200606', 'BF-B']);
+});

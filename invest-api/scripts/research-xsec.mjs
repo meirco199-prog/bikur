@@ -84,10 +84,12 @@ export function membershipFromSnapshots(snaps){
   for (const [s, start] of open) (iv[s] ||= []).push([start, null]);
   return iv;
 }
-// CSV של fja05680/sp500: date,tickers  (tickers = "AAA,BBB,...")
+// CSV של fja05680/sp500: date,tickers  (tickers = "AAA,BBB,..."). בקובץ המקורי טיקר שנמחק מסומן "XYZ-200606" — נשמר כחבר
+// (כדי שספירת החברים תהיה נכונה) אבל אין לו מחירים ב-Yahoo, ולכן הוא נספר כ"חסר נתונים" בטבלת הכיסוי
+const DELISTED = /^[A-Z.]{1,6}-\d{6}$/;
 export function parseSnapshotsCsv(csv){
   const out = [];
-  for (const line of csv.split('\n').slice(1)){ const m = line.match(/^(\d{4}-\d{2}-\d{2}),"?([^"]*)"?/); if (!m) continue; out.push({ date: m[1], set: new Set(m[2].split(',').map((x) => x.trim()).filter((x) => TICK.test(x)).map(yh)) }); }
+  for (const line of csv.split('\n').slice(1)){ const m = line.match(/^(\d{4}-\d{2}-\d{2}),"?([^"]*)"?/); if (!m) continue; out.push({ date: m[1], set: new Set(m[2].split(',').map((x) => x.trim()).filter((x) => TICK.test(x) || DELISTED.test(x)).map((x) => (DELISTED.test(x) ? x : yh(x)))) }); }
   return out;
 }
 const inIv = (ivs, d) => ivs?.some(([a, b]) => (a === null || d >= a) && (b === null || d < b));
@@ -104,7 +106,10 @@ async function universes(){
     const list = await get('https://api.github.com/repos/fja05680/sp500/contents');
     let files = []; try { files = JSON.parse(list).filter((f) => /Historical Components.*\.csv$/i.test(f.name)); } catch {}
     const dt = (n) => { const m = n.match(/(\d{2})-(\d{2})-(\d{4})/); return m ? `${m[3]}-${m[1]}-${m[2]}` : ''; };
-    files.sort((a, b) => (dt(a.name) < dt(b.name) ? 1 : -1));
+    // הקובץ המעודכן ("(Updated)", ממוזג עם השינויים מאז 2019) קודם; אחריו לפי תאריך בשם
+    const rank = (n) => (/updated/i.test(n) ? '9' : '0') + dt(n);
+    log(`fja05680/sp500 files: ${files.map((f) => f.name).join(' | ')}`);
+    files.sort((a, b) => (rank(a.name) < rank(b.name) ? 1 : -1));
     const f = files[0], csv = f ? await get(f.download_url) : null, snaps = csv ? parseSnapshotsCsv(csv) : [];
     log(`fja05680/sp500: ${f?.name || 'not found'} — ${snaps.length} snapshots${snaps.length ? `, ${snaps[0].date} → ${snaps.at(-1).date}` : ''}`);
     if (snaps.length >= 100){ snaps.push({ date: new Date().toISOString().slice(0, 10), set: new Set(sp500) }); iv500 = membershipFromSnapshots(snaps); memSrc = `github.com/fja05680/sp500 (${f.name}) + ההרכב הנוכחי מוויקיפדיה`; changes = []; }
@@ -249,7 +254,15 @@ export function simulate(ctx, top, { N, H, side = 'L', off = 1, extra = 0, cost 
   const yr = {}, win = { all: { pk: 1, eq: 1, dd: 0 }, dev: { pk: 1, eq: 1, dd: 0 }, test: { pk: 1, eq: 1, dd: 0 } };
   let prev = START_USD, trades = 0, wins = 0, sumTr = 0, feesUsd = 0;
   const hs = (si, k) => (gross ? 0 : etf ? 1e-4 : halfSpread(I[si].adv[k]) * mul + extra);
+  let G = 1; // תשואה מצטברת (מכפלת התשואות היומיות)
   for (let t = k0 + 1; t < L; t++){
+    // תחילת שנה: התיק מנורמל חזרה ל-50,000$ (כל הפוזיציות והמזומן בקנה מידה אחד) — התשואות לא משתנות, אבל עמלת המינימום (1$)
+    // ורף 5$ לפוזיציה נשארים ריאליים גם אחרי קריסה או צמיחה עצומה, ושנות המבחן לא "יורשות" תיק שהתרסק בשנות הפיתוח
+    if (t > k0 + 1 && cal[t].slice(0, 4) !== cal[t - 1].slice(0, 4)){
+      if (prev > 0){ const f = START_USD / prev; for (const s of sl){ s.cash *= f; for (const p of s.pos){ p.sh *= f; p.basis *= f; } } }
+      else for (const s of sl){ s.cash = START_USD / H; s.pos = []; s.exit = -1; } // שורט שמחק את התיק — מתחילים שנה חדשה מאפס
+      prev = START_USD;
+    }
     // כניסה בפתיחת t
     const j = (t - k0 - 1) % H, Sl = sl[j], sig = t - off;
     if (!Sl.pos.length && t + H - 1 < L && sig >= k0){
@@ -276,11 +289,11 @@ export function simulate(ctx, top, { N, H, side = 'L', off = 1, extra = 0, cost 
       }
       tot += s.cash; for (const p of s.pos) tot += p.sh * p.last;
     }
-    const r = tot / prev - 1; prev = tot;
+    const r = tot / prev - 1; prev = tot; G *= 1 + r;
     const y = cal[t].slice(0, 4), Y = (yr[y] ||= { n: 0, s: 0, s2: 0, g: 1 }); Y.n += 1; Y.s += r; Y.s2 += r * r; Y.g *= 1 + r;
     for (const [w, ok] of [['all', true], ['dev', t <= kDev], ['test', t > kDev]]){ if (!ok) continue; const W = win[w]; W.eq *= 1 + r; W.pk = Math.max(W.pk, W.eq); W.dd = Math.max(W.dd, 1 - W.eq / W.pk); }
   }
-  return { yr, dd: { all: win.all.dd, dev: win.dev.dd, test: win.test.dd }, trades, wins, avgTr: trades ? sumTr / trades : 0, feesUsd, end: prev };
+  return { yr, dd: { all: win.all.dd, dev: win.dev.dd, test: win.test.dd }, trades, wins, avgTr: trades ? sumTr / trades : 0, feesUsd, end: START_USD * G };
 }
 // מדדים לחלון שנים
 export function stats(yr, y0, y1){
@@ -300,7 +313,7 @@ async function main(){
   else {
     U = await universes();
     // כל מי שהיה חבר ב-S&P 500 מאז 2007 (גם שנמחקו) — נטען אם יש לו מחירים
-    const removed = Object.entries(U.iv500).filter(([, ivs]) => ivs.some(([, b]) => b === null || b >= '2007-01-01')).map(([s]) => s), adds = [];
+    const removed = Object.entries(U.iv500).filter(([, ivs]) => ivs.some(([, b]) => b === null || b >= '2007-01-01')).map(([s]) => s).filter((s) => TICK.test(s)), adds = [];
     const ETF = ['SPY', 'QQQ', 'IWM', 'IJR', 'XLB', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLU', 'XLV', 'XLY', 'XLRE', 'XLC'];
     const syms = [...new Set([...ETF, ...U.sp500, ...U.sp400, ...U.sp600, ...U.ndx, ...U.r2k, ...removed, ...adds])];
     log(`fetching ${syms.length} symbols`); raw = {}; const q = [...syms];
@@ -392,7 +405,7 @@ async function main(){
   md.push(`# מחקר שיטתי — 12 משפחות אסטרטגיות (${cal[k0]} → ${cal.at(-1)})`, '',
     `- **נתונים:** Yahoo Finance (מחירים יומיים מתואמים לפיצולים ודיבידנדים), ויקיפדיה (הרכב נוכחי: S&P 500/400/600, Nasdaq 100), הרכב S&P 500 היסטורי: ${U.memSrc || 'ויקיפדיה'}, ${U.r2kSrc}. נטענו ${syms.length} סימבולים.`,
     `- **פיתוח:** ${cal[k0]} → ${cal[kDev]} · **מבחן (לא שימש לבחירה):** ${cal[kDev + 1]} → ${cal.at(-1)} · Walk-Forward שנתי (3 שנים אחורה).`,
-    `- **ביצוע:** 50,000$, השקעה מחדש, H תיקי-משנה מדורגים, מניות חלקיות, עמלת IBKR (מינ׳ 1$), חצי מרווח לפי מחזור (1.5–30bp לצד), שורט: השאלה 0.02% ליום.`,
+    `- **ביצוע:** 50,000$, השקעה מחדש, H תיקי-משנה מדורגים, מניות חלקיות, עמלת IBKR (מינ׳ 1$), חצי מרווח לפי מחזור (1.5–30bp לצד), שורט: השאלה 0.02% ליום. התיק מנורמל ל-50,000$ בתחילת כל שנה (התשואות מורכבות; כך שנות המבחן לא יורשות תיק שקרס או התנפח בפיתוח, ועמלת המינימום נשארת ריאלית). "50K→" = 50,000$ × מכפלת התשואות השנתיות.`,
     `- **נבדקו ${rows.length.toLocaleString('en-US')} תצורות** (${V.length - 1} גרסאות × ${Ns.length} גדלי סל × ${Hs.length} תקופות החזקה × 4 יקומים + סקטורים).`,
     `- **עברו מחוץ למדגם (A):** ${rows.filter((r) => r.passA).length} · **וגם ניצחו את המדד בשארפ במבחן (B):** ${rows.filter((r) => r.passB).length}.`,
     '- **תנאי A:** שארפ פיתוח ≥ 0.5 ותשואה חיובית; שארפ מבחן ≥ 0.3 ותשואה חיובית אחרי עלויות; ובלונג — תשואת המבחן גבוהה מבחירה אקראית באותו יקום, סל והחזקה (מנטרל הטיית שורדים ובטא).', '');
@@ -418,7 +431,7 @@ async function main(){
   md.push('## משפחות שאף תצורה בהן לא עברה (בשום יקום)');
   for (const fam of Object.keys(FAMS)){ if (fam === 'F00') continue; const R = rows.filter((r) => r.fam === fam); if (R.length && !R.some((r) => r.passA)) md.push(`- ❌ ${fam} ${FAMS[fam]} — 0 מתוך ${R.length} תצורות`); }
   md.push('', '## מגבלות שנשארו', '- Nasdaq 100 ו-Russell 2000: הרכב נוכחי בלבד → הטיית שורדים לטובת קנייה. ההשוואה לבחירה אקראית מאותו יקום מנטרלת חלק ממנה.',
-    '- S&P 500: מניות שנמחקו ואין להן מחירים ב-Yahoo חסרות (ראו טבלת הכיסוי).', '- משפחה 7 היא פרוקסי (אין נתוני דוחות היסטוריים). מרווחים הם הערכה לפי מחזור, לא ציטוטים היסטוריים.',
+    '- S&P 500: מניות שנמחקו ואין להן מחירים ב-Yahoo חסרות (ראו טבלת הכיסוי) — בעיקר פשיטות רגל ומיזוגים, כך שגם כאן נשארת הטיית שורדים חלקית. טיקר שעבר לחברה אחרת עלול לקבל מחירים של החברה החדשה.', '- אסטרטגיות גאפ (F10): המרווח בפתיחה אחרי גאפ חד רחב בהרבה מהממוצע היומי — העלות כאן כנראה נמוכה מהאמת; עמודת "עלויות ×2" היא מבחן הלחץ.', '- משפחה 7 היא פרוקסי (אין נתוני דוחות היסטוריים). מרווחים הם הערכה לפי מחזור, לא ציטוטים היסטוריים.',
     '- שארפ בלי ריבית חסרת סיכון. מניות חלקיות; ההון לא ממונף; שורט בלי מגבלות זמינות השאלה.', '', `קבצים: results.csv (כל ${rows.length} התצורות, לפני/אחרי עלויות), yearly.csv, walkforward.json, meta.json. זמן ריצה: ${((Date.now() - t0) / 60000).toFixed(1)} דקות.`);
   writeFileSync(`${OUTDIR}/report.md`, md.join('\n'));
   console.log(md.join('\n'));
