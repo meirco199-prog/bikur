@@ -23,7 +23,7 @@ const withRange = (spec, from, to) => ({ ...spec, period: { ...(spec.period || {
 
 // יעדים (מה למקסם). consistency = חלק השנים החיוביות; stability = Sharpe × עקביות − עונש על ירידה
 export const OBJECTIVES = {
-  cagr: { label: 'תשואה שנתית (CAGR)', score: (a) => a.series?.cagr },
+  cagr: { label: 'תשואה שנתית (CAGR; במצב מחקר — ממוצע על ההון הקבוע)', score: (a) => a.series?.cagr ?? a.series?.avgAnnual },
   sharpe: { label: 'תשואה ביחס לסיכון (Sharpe)', score: (a) => a.series?.sharpe },
   sortino: { label: 'Sortino', score: (a) => a.series?.sortino },
   calmar: { label: 'תשואה ביחס לירידה (Calmar)', score: (a) => a.series?.calmar },
@@ -32,7 +32,7 @@ export const OBJECTIVES = {
   consistency: { label: 'עקביות לאורך שנים', score: (a) => { const ys = Object.values(a.periodic?.yearly || {}); return ys.length ? ys.filter((y) => y > 0).length / ys.length : null; } },
   stability: { label: 'יציבות (Sharpe × עקביות)', score: (a) => { const ys = Object.values(a.periodic?.yearly || {}); const c = ys.length ? ys.filter((y) => y > 0).length / ys.length : 0; return a.series?.sharpe === null ? null : a.series.sharpe * (0.5 + c / 2); } },
 };
-export const summarize = (a) => (!a || a.error ? null : { cagr: a.series.cagr, totalReturn: a.series.totalReturn, sharpe: a.series.sharpe, sortino: a.series.sortino, calmar: a.series.calmar, maxDD: a.series.maxDD, annVol: a.series.annVol, trades: a.trades.count, winRate: a.trades.winRate, profitFactor: a.trades.profitFactor, expectancyPct: a.trades.expectancyPct, finalEquity: a.series.end, years: a.series.years, yearly: a.periodic?.yearly, limited: a.limited });
+export const summarize = (a) => (!a || a.error ? null : { cagr: a.series.cagr ?? a.series.avgAnnual, additive: a.series.additive, totalReturn: a.series.totalReturn, sharpe: a.series.sharpe, sortino: a.series.sortino, calmar: a.series.calmar, maxDD: a.series.maxDD, annVol: a.series.annVol, trades: a.trades.count, winRate: a.trades.winRate, profitFactor: a.trades.profitFactor, expectancyPct: a.trades.expectancyPct, finalEquity: a.series.end, years: a.series.years, yearly: a.periodic?.yearly, limited: a.limited });
 
 // הרצת רשת על טווח — מחזיר שורות ממוינות לפי היעד (הטוב ראשון)
 export function runGrid(ds, spec, params, { objective = 'sharpe', from = null, to = null, onProgress = null, cache = null, minTrades = 20 } = {}){
@@ -42,7 +42,7 @@ export function runGrid(ds, spec, params, { objective = 'sharpe', from = null, t
     const r = simulate(ds, s, { cache: fc, keepSignals: false });
     const a = r.error ? null : analyze(r);
     const sc = a ? obj.score(a) : null;
-    rows.push({ combo, score: a && a.trades.count >= minTrades && sc !== null && sc !== undefined && Number.isFinite(sc) ? rnd(sc) : null, summary: summarize(a), error: r.error || null, tooFewTrades: !!a && a.trades.count < minTrades, dailyReturns: a ? dailyReturns(r.equity) : null });
+    rows.push({ combo, score: a && a.trades.count >= minTrades && sc !== null && sc !== undefined && Number.isFinite(sc) ? rnd(sc) : null, summary: summarize(a), error: r.error || null, tooFewTrades: !!a && a.trades.count < minTrades, dailyReturns: a ? dailyReturns(r.equity, s.sizing?.unlimited ? r.capital : null) : null });
     if (onProgress) onProgress((i + 1) / combos.length, i + 1, combos.length);
   });
   rows.sort((x, y) => (y.score ?? -Infinity) - (x.score ?? -Infinity));
@@ -124,19 +124,20 @@ export function walkForward(ds, specInput, params, { objective = 'sharpe', from 
 }
 
 // Monte Carlo על רצף העסקאות (bootstrap עם החזרה). מגבלה: מניח עסקאות בלתי תלויות וללא חפיפה — מתעלם מתלות בזמן ומתקופות ריכוז.
-export function monteCarlo(trades, { capital = 50000, n = 1000, seed = 7, perTrade = null } = {}){
+// additive (מצב מחקר / סכום קבוע): כל עסקה מוסיפה pnl$ קבוע-נומינל במקום להכפיל את ההון; הירידה נמדדת בדולרים חלקי ההון
+export function monteCarlo(trades, { capital = 50000, n = 1000, seed = 7, perTrade = null, additive = false } = {}){
   if (!trades?.length) return { error: 'אין עסקאות' };
-  const pct = trades.map((t) => t.pnlPct), m = trades.length, rng = mulberry(seed);
+  const pct = trades.map((t) => t.pnlPct), pnl = trades.map((t) => t.pnl), m = trades.length, rng = mulberry(seed);
   const fraction = perTrade || 1 / Math.max(1, mode(trades.map((t) => Math.round(1 / Math.max(1e-6, (t.shares * t.entryPrice) / capital))))); // חלק ההון לעסקה (קירוב)
   const finals = [], dds = [];
   for (let s = 0; s < n; s++){
     let eq = capital, peak = capital, dd = 0;
-    for (let i = 0; i < m; i++){ const r = pct[Math.floor(rng() * m)]; eq *= 1 + r * fraction; peak = Math.max(peak, eq); dd = Math.min(dd, eq / peak - 1); }
+    for (let i = 0; i < m; i++){ const j = Math.floor(rng() * m); if (additive){ eq += pnl[j]; peak = Math.max(peak, eq); dd = Math.min(dd, (eq - peak) / capital); } else { eq *= 1 + pct[j] * fraction; peak = Math.max(peak, eq); dd = Math.min(dd, eq / peak - 1); } }
     finals.push(eq); dds.push(dd);
   }
   finals.sort((a, b) => a - b); dds.sort((a, b) => a - b);
   const q = (arr, p) => arr[Math.min(arr.length - 1, Math.floor(p * arr.length))];
-  return { simulations: n, fractionPerTrade: rnd(fraction, 3), finalEquity: { p5: rnd(q(finals, 0.05), 0), p25: rnd(q(finals, 0.25), 0), median: rnd(q(finals, 0.5), 0), p75: rnd(q(finals, 0.75), 0), p95: rnd(q(finals, 0.95), 0) }, maxDD: { p5: rnd(q(dds, 0.05)), median: rnd(q(dds, 0.5)), p95: rnd(q(dds, 0.95)) }, probLoss: rnd(finals.filter((x) => x < capital).length / n), probDD20: rnd(dds.filter((x) => x <= -0.2).length / n), limitations: ['מניח שהעסקאות בלתי תלויות זו בזו ושסדרן אקראי — בפועל הפסדים מתרכזים בתקופות (משברים).', 'מתעלם מחפיפה בין פוזיציות ומשינוי גודל עם ההון.', 'מדגים את טווח התוצאות האפשרי בהינתן אותה התפלגות עסקאות, לא את ההסתברות שהיתרון יימשך.'] };
+  return { simulations: n, additive, fractionPerTrade: rnd(fraction, 3), finalEquity: { p5: rnd(q(finals, 0.05), 0), p25: rnd(q(finals, 0.25), 0), median: rnd(q(finals, 0.5), 0), p75: rnd(q(finals, 0.75), 0), p95: rnd(q(finals, 0.95), 0) }, maxDD: { p5: rnd(q(dds, 0.05)), median: rnd(q(dds, 0.5)), p95: rnd(q(dds, 0.95)) }, probLoss: rnd(finals.filter((x) => x < capital).length / n), probDD20: rnd(dds.filter((x) => x <= -0.2).length / n), limitations: ['מניח שהעסקאות בלתי תלויות זו בזו ושסדרן אקראי — בפועל הפסדים מתרכזים בתקופות (משברים).', 'מתעלם מחפיפה בין פוזיציות ומשינוי גודל עם ההון.', 'מדגים את טווח התוצאות האפשרי בהינתן אותה התפלגות עסקאות, לא את ההסתברות שהיתרון יימשך.'] };
 }
 const mode = (arr) => { const m = new Map(); let best = arr[0], c = 0; for (const x of arr){ const k = (m.get(x) || 0) + 1; m.set(x, k); if (k > c){ c = k; best = x; } } return best; };
 export function mulberry(seed){ let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -147,7 +148,7 @@ export function normInv(p){ if (p <= 0) return -Infinity; if (p >= 1) return Inf
 
 // מובהקות: t על תשואות יומיות, bootstrap, תיקון Bonferroni לריבוי ניסויים, Deflated Sharpe Ratio (Bailey & López de Prado 2014)
 export function significance(result, { nTrials = 1, trialSharpes = null, bootstrap = 2000, seed = 11 } = {}){
-  const r = dailyReturns(result.equity).filter((x) => Number.isFinite(x)); const T = r.length; if (T < 20) return { error: 'פחות מ-20 ימי מסחר — אין מובהקות' };
+  const r = dailyReturns(result.equity, result.spec?.sizing?.unlimited ? result.capital : null).filter((x) => Number.isFinite(x)); const T = r.length; if (T < 20) return { error: 'פחות מ-20 ימי מסחר — אין מובהקות' };
   const m = mean(r), sd = std(r); const t = sd > 0 ? m / (sd / Math.sqrt(T)) : 0; const p = 2 * (1 - normCdf(Math.abs(t)));
   const rng = mulberry(seed); let ge = 0; for (let s = 0; s < bootstrap; s++){ let acc = 0; for (let i = 0; i < T; i++) acc += r[Math.floor(rng() * T)] - m; if (acc / T >= m) ge++; } // H0: ממוצע 0 (מרכוז)
   const pBoot = Math.max(1 / bootstrap, ge / bootstrap);
@@ -168,5 +169,6 @@ const kurt = (r) => { const m = mean(r), s = std(r, false); if (!s) return 3; re
 export const CRISIS_PERIODS = [{ label: 'משבר 2008 (10/2007–3/2009)', from: '2007-10-09', to: '2009-03-09' }, { label: 'שוק שור 2009–2019', from: '2009-03-10', to: '2019-12-31' }, { label: 'קורונה (2–3/2020)', from: '2020-02-19', to: '2020-03-23' }, { label: 'התאוששות 2020–2021', from: '2020-03-24', to: '2021-12-31' }, { label: 'ריבית עולה 2022', from: '2022-01-03', to: '2022-12-30' }, { label: '2023 עד היום', from: '2023-01-03', to: '2099-12-31' }];
 export function periodBreakdown(result, bench = null){
   const eq = result.equity; if (!eq?.length) return [];
-  return CRISIS_PERIODS.map((p) => { const seg = eq.filter((e) => e[0] >= p.from && e[0] <= p.to); if (seg.length < 10) return { ...p, missing: true }; const m = seriesMetrics(seg); const bs = bench ? bench.filter((e) => e[0] >= p.from && e[0] <= p.to) : null; const bm = bs && bs.length > 10 ? seriesMetrics(bs) : null; const trades = result.trades.filter((t) => t.entryDate >= seg[0][0] && t.entryDate <= seg[seg.length - 1][0]); return { ...p, from: seg[0][0], to: seg[seg.length - 1][0], totalReturn: m.totalReturn, cagr: m.cagr, maxDD: m.maxDD, sharpe: m.sharpe, trades: trades.length, winRate: trades.length ? rnd(trades.filter((t) => t.pnl > 0).length / trades.length) : null, bench: bm ? { totalReturn: bm.totalReturn, maxDD: bm.maxDD } : null }; });
+  const base = result.spec?.sizing?.unlimited ? result.capital : null;
+  return CRISIS_PERIODS.map((p) => { const seg = eq.filter((e) => e[0] >= p.from && e[0] <= p.to); if (seg.length < 10) return { ...p, missing: true }; const m = seriesMetrics(seg, { additiveBase: base }); const bs = bench ? bench.filter((e) => e[0] >= p.from && e[0] <= p.to) : null; const bm = bs && bs.length > 10 ? seriesMetrics(bs) : null; const trades = result.trades.filter((t) => t.entryDate >= seg[0][0] && t.entryDate <= seg[seg.length - 1][0]); return { ...p, from: seg[0][0], to: seg[seg.length - 1][0], totalReturn: m.totalReturn, cagr: m.cagr, maxDD: m.maxDD, sharpe: m.sharpe, trades: trades.length, winRate: trades.length ? rnd(trades.filter((t) => t.pnl > 0).length / trades.length) : null, bench: bm ? { totalReturn: bm.totalReturn, maxDD: bm.maxDD } : null }; });
 }

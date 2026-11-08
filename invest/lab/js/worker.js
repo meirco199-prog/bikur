@@ -78,7 +78,7 @@ const tasks = {
     if (res.error) return { error: res.error, blocked: !!res.blocked, coverage: res.coverage || null };
     const analysis = analyze(res);
     const out = { spec, result: strip(res), analysis, missingSymbols: missing };
-    if (extras){ out.periods = periodBreakdown(res, res.benchmarks?.SPY || null); out.significance = significance(res); out.mc = monteCarlo(res.trades, { capital: res.capital }); }
+    if (extras){ out.periods = periodBreakdown(res, res.benchmarks?.SPY || null); out.significance = significance(res); out.mc = monteCarlo(res.trades, { capital: res.capital, additive: !!spec.sizing.unlimited }); }
     return out;
   },
   async optimize({ base, spec: specIn, params, objective, split, topK }, id){

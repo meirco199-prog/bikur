@@ -42,6 +42,7 @@ jobs:
           set -e
           EXTRA=""; if [ "${{ inputs.run_tests || 'true' }}" = "true" ]; then EXTRA="--optimize --walk"; fi
           node invest-api/scripts/lab-run.mjs --data lab-data-out --template top10-losers-1d $EXTRA --out lab-data-out/results/top10-losers-1d.json --md lab-data-out/results/top10-losers-1d.md > /dev/null
+          node invest-api/scripts/lab-run.mjs --data lab-data-out --template top10-losers-1d-research --out lab-data-out/results/top10-losers-1d-research.json --md lab-data-out/results/top10-losers-1d-research.md > /dev/null
           node invest-api/scripts/lab-run.mjs --data lab-data-out --template top10-gainers-1d --out lab-data-out/results/top10-gainers-1d.json --md lab-data-out/results/top10-gainers-1d.md > /dev/null
           node invest-api/scripts/lab-run.mjs --data lab-data-out --template combo-multi --out lab-data-out/results/combo-multi.json --md lab-data-out/results/combo-multi.md > /dev/null
           node -e "const fs=require('fs');const d='lab-data-out/results';const idx=fs.readdirSync(d).filter(f=>f.endsWith('.json')).map(f=>{const j=JSON.parse(fs.readFileSync(d+'/'+f));return {id:f.replace('.json',''),name:j.spec.name,from:j.result.from,to:j.result.to,cagr:j.analysis.series.cagr,maxDD:j.analysis.series.maxDD,sharpe:j.analysis.series.sharpe,trades:j.analysis.trades.count,finalEquity:j.result.finalEquity,capital:j.result.capital,limited:j.result.limited,builtAt:j.builtAt}});fs.writeFileSync(d+'/index.json',JSON.stringify({builtAt:new Date().toISOString(),runs:idx}))"

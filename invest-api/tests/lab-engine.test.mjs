@@ -270,3 +270,17 @@ test('יציאה באות הפוך (opposite_signal) ויציאה מהדירוג
   const r3 = simulate(ds, base({ signal: { rank: { feature: 'ret', params: { days: 1 }, order: 'asc', top: 1 } }, exit: { rules: [{ type: 'rank_exit', at: 'close' }, { type: 'time', days: 30 }] } }));
   const t3 = r3.trades.find((x) => x.symbol === 'A' && x.entryDate === D[2]); assert.equal(t3.exitDate, D[2]); assert.equal(t3.exitPrice, 99); assert.match(t3.exitReason, /סגירה/);
 });
+
+test('מצב מחקר (sizing.unlimited): סכום קבוע גם כשהמזומן נגמר, ההון יכול להיות שלילי, בלי ריבית מרג\'ין, מסומן מוגבל; חשבון אמיתי נעצר כשהמזומן נגמר', () => {
+  // A יורדת 10% כל יום → נקנית כל יום ומפסידה; הון 1,000$ עם מקום אחד של 1,000$
+  const closes = Array.from({ length: 28 }, (_, i) => +(100 * Math.pow(0.9, i)).toFixed(2)), opens = closes.map((c, i) => (i ? closes[i - 1] : c));
+  const A = mk('A', closes, { opens }), B = mk('B', closes.map((c) => 50), { opens: closes.map(() => 50) }), C = mk('C', closes.map(() => 20));
+  const ds = new Dataset({ series: [A, B, C] });
+  const real = simulate(ds, base({ sizing: { capital: 1000, maxPositions: 1, reinvest: false } }));
+  const research = simulate(ds, base({ sizing: { capital: 1000, maxPositions: 1, reinvest: false, unlimited: true }, costs: { model: 'none', marginAnnualPct: 6 } }));
+  const lastReal = real.trades[real.trades.length - 1]; assert.ok(lastReal.shares * lastReal.entryPrice < 500, 'בחשבון אמיתי הפוזיציה מצטמקת עם המזומן');
+  assert.ok(real.finalEquity >= -1e-6 && research.finalEquity < 0, `הון: אמיתי ${real.finalEquity}, מחקר ${research.finalEquity}`);
+  assert.ok(research.trades.every((t) => Math.abs(t.shares * t.entryPrice - 1000) < 100), 'סכום קבוע ~1,000$ לכל עסקה');
+  assert.equal(research.totals.margin, 0); assert.ok(research.limited && research.assumptions.some((a) => /מצב מחקר/.test(a)));
+  const an = analyze(research); assert.ok(an.series.additive && an.series.cagr === null && an.series.totalReturn < -1 && an.series.maxDD < -1 && Object.values(an.periodic.yearly)[0] < 0, JSON.stringify(an.series));
+});

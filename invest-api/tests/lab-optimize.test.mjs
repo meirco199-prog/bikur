@@ -63,6 +63,7 @@ test('Monte Carlo דטרמיניסטי עם seed, אחוזונים מסודרי�
   assert.ok(mc.finalEquity.p5 <= mc.finalEquity.median && mc.finalEquity.median <= mc.finalEquity.p95);
   assert.ok(mc.maxDD.p5 <= mc.maxDD.median && mc.limitations.length >= 3);
   assert.ok(monteCarlo([]).error);
+  const add = monteCarlo(r.trades, { capital: 20000, n: 200, seed: 1, additive: true }); assert.ok(add.additive && Math.abs(add.finalEquity.median - (20000 + r.trades.reduce((a, t) => a + t.pnl, 0))) < Math.abs(r.trades.reduce((a, t) => a + t.pnl, 0)) * 0.5 + 500, 'אדיטיבי: החציון סביב הון + Σpnl');
 });
 
 test('מובהקות: סדרה חסרת יתרון → לא מובהקת; סדרה עם יתרון חזק → מובהקת; תיקון Bonferroni מגדיל את p; התפלגות נורמלית', () => {
@@ -80,8 +81,8 @@ test('ביצועים לפי תקופות שוק: תקופות שלא מכוסו�
   assert.ok(pb.some((p) => p.missing) && pb.some((p) => !p.missing && typeof p.totalReturn === 'number' && p.bench));
 });
 
-test('ספריית האסטרטגיות: 20 תבניות תקינות, כולן עם params ברי-יישום, ודוגמת Top 10 Losers כמפורט בדרישה', () => {
-  assert.equal(LIBRARY.length, 20);
+test('ספריית האסטרטגיות: 21 תבניות תקינות, כולן עם params ברי-יישום, ודוגמת Top 10 Losers כמפורט בדרישה', () => {
+  assert.equal(LIBRARY.length, 21);
   for (const t of LIBRARY){ const s = normalizeSpec(t.spec); assert.ok(s.name && t.category && t.description); for (const [, p] of Object.entries(t.params)){ assert.ok(p.values.length >= 2 && p.label); const s2 = applyParams(t.spec, Object.fromEntries(Object.entries(t.params).map(([k, v]) => [k, v.values[0]])), t.params); normalizeSpec(s2); } }
   const l = normalizeSpec(byId('top10-losers-1d').spec);
   assert.equal(l.signal.rank.top, 10); assert.equal(l.signal.rank.order, 'asc'); assert.equal(l.entry.timing, 'next_open'); assert.deepEqual(l.exit.rules[0], { type: 'time', at: 'close', days: 1 }); assert.equal(l.sizing.capital, 50000); assert.equal(l.sizing.maxPositions, 10); assert.equal(l.universe.pointInTime, true);
