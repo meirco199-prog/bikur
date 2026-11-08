@@ -247,6 +247,7 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
     const benchmarks = {};
     for (const b of spec.benchmarks){ const s = ds.series.get(b); if (!s) { benchmarks[b] = null; continue; } let k0 = kStart; while (k0 <= kEnd && ds.rowIndex(b, k0) < 0) k0++; if (k0 > kEnd){ benchmarks[b] = null; continue; } const a0 = s.a[ds.rowIndex(b, k0)]; let last = Z.capital; benchmarks[b] = equitySeries.map((e, idx) => { const i = ds.rowIndex(b, kStart + idx); if (i >= 0) last = Z.capital * s.a[i] / a0; return [e[0], +last.toFixed(2)]; }); }
 
+    if ((skipped.small || 0) > Math.max(50, trades.length * 0.1)) warnings.add(`${skipped.small.toLocaleString('en-US')} פקודות לא בוצעו כי הסכום למקום היה קטן ממחיר מניה אחת (ההון קטן מדי יחסית למחירים, או שקרס) — התוצאה משקפת גם את קריסת ההון, לא רק את היתרון היומי; בדוק עם "ללא השקעה חוזרת" או הון גדול יותר`);
     const assumptions = buildAssumptions(spec, ds, { missingFeatureHits: sigEngine.missing(), liquidationDays, warnings: [...warnings, ...sigEngine.warningsLive] });
     const listSet = sigEngine.listSet;
     const coverage = listSet ? { pointInTime: false, note: 'רשימת סימבולים שנבחרה ידנית — הטיית שורדים לא נשללת (מניות שנמחקו לא ברשימה)', withData: [...listSet].filter((s) => ds.series.has(s)).length, missing: [...listSet].filter((s) => !ds.series.has(s)), total: listSet.size, ratio: [...listSet].filter((s) => ds.series.has(s)).length / listSet.size } : ds.coverage(kStart, kEnd, uni), gaps = ds.gaps(kStart, kEnd);

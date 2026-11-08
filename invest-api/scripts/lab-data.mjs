@@ -37,19 +37,22 @@ async function sp500Universe(){
   const notes = [];
   // 1. היסטורי יומי (fja05680)
   try {
-    const NAME = /S&P 500 Historical Components (?:&|&amp;) Changes\(([\d-]+)\)\.csv/;
+    // שם הקובץ במאגר (11/2026): "S&P 500 Historical Components & Changes (Updated).csv" (ובעבר עם תאריך בסוגריים) — מעדיפים את ה-Updated
+    const NAME = /S&P 500 Historical Components (?:&|&amp;) Changes[^"<>/]*\.csv/;
+    const pick = (names) => { const c = names.filter((n) => NAME.test(n)); return c.find((n) => /Updated/i.test(n)) || c.find((n) => /\(/.test(n)) || c[0] || null; };
     let file = null;
     const list = await get('https://api.github.com/repos/fja05680/sp500/contents/', { json: true, headers: { Accept: 'application/vnd.github+json' } });
-    if (Array.isArray(list)){ const f = list.find((x) => NAME.test(x.name)); if (f) file = { name: f.name, download_url: f.download_url }; else notes.push(`fja05680: ${list.length} קבצים ברשימה, אף אחד לא תואם`); }
+    if (Array.isArray(list)){ const name = pick(list.map((x) => x.name)); const f = name && list.find((x) => x.name === name); if (f) file = { name: f.name, download_url: f.download_url }; else notes.push(`fja05680: ${list.length} קבצים ברשימה, אף אחד לא תואם: ${list.map((x) => x.name).join(' | ').slice(0, 300)}`); }
     else {
       notes.push(`fja05680: רשימת הקבצים מ-api.github.com נכשלה (${lastStatus}) — מנסים דרך דף ה-HTML`);
-      const html = await get('https://github.com/fja05680/sp500'); const m = html && html.match(NAME);
-      if (m){ const name = m[0].replace('&amp;', '&'); file = { name, download_url: `https://raw.githubusercontent.com/fja05680/sp500/master/${encodeURIComponent(name)}` }; }
+      const html = await get('https://github.com/fja05680/sp500'); const names = html ? [...new Set([...html.matchAll(new RegExp(NAME.source, 'g'))].map((m) => m[0].replace(/&amp;/g, '&')))] : [];
+      const name = pick(names);
+      if (name){ const branch = (html.match(/\/fja05680\/sp500\/(?:blob|tree)\/([^/"]+)\//) || [])[1] || 'master'; file = { name, download_url: `https://raw.githubusercontent.com/fja05680/sp500/${branch}/${encodeURIComponent(name)}` }; }
       else notes.push(`fja05680: גם דף ה-HTML לא הניב שם קובץ (${lastStatus})`);
     }
     if (file){
       const csv = await get(file.download_url);
-      const rows = parseCsv(csv).map((r) => ({ day: (r.date || r.Date || '').slice(0, 10), symbols: (r.tickers || r.Tickers || '').split(',').map(normSym).filter((s) => /^[A-Z][A-Z0-9-]{0,6}$/.test(s)) })).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.day) && r.symbols.length > 300);
+      const rows = parseMembershipCsv(csv);
       if (rows.length > 100){ const m = membershipFromDaily(rows); log(`sp500 history: ${rows.length} snapshots, ${Object.keys(m.members).length} distinct members, ${isoOf(m.from)}→${isoOf(m.to)}`); return { id: 'sp500', pointInTime: true, source: `fja05680/sp500 (${file.name})`, ...m, notes }; }
       notes.push(`fja05680: הקובץ ${file.name} נמצא אך לא נותח (${csv ? csv.length + ' תווים' : 'הורדה נכשלה: ' + lastStatus})`);
     }
@@ -60,6 +63,11 @@ async function sp500Universe(){
   const members = {}; for (const r of parseCsv(csv)){ const s = normSym(r.Symbol || ''); if (/^[A-Z][A-Z0-9-]{0,6}$/.test(s)) members[s] = [[dayNum('1990-01-01'), null]]; }
   notes.push('⚠ אין היסטוריית חברות — נעשה שימוש בהרכב הנוכחי (הטיית שורדים)');
   return { id: 'sp500', pointInTime: false, source: 'datasets/s-and-p-500-companies (current)', from: null, to: null, members, notes };
+}
+// CSV של חברות יומיות: עמודת תאריך (ISO) + עמודת רשימת טיקרים מופרדת בפסיקים — בלי להניח שמות עמודות
+export function parseMembershipCsv(csv){
+  if (!csv) return [];
+  return parseCsv(csv).map((r) => { const vals = Object.values(r); const day = (vals.find((v) => /^\d{4}-\d{2}-\d{2}/.test(v)) || '').slice(0, 10); const list = vals.filter((v) => v !== day).sort((a, b) => (b.match(/,/g) || []).length - (a.match(/,/g) || []).length)[0] || ''; return { day, symbols: list.split(',').map(normSym).filter((s) => /^[A-Z][A-Z0-9-]{0,6}$/.test(s)) }; }).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.day) && r.symbols.length > 300);
 }
 async function sectors(){
   const out = {}, names = {};
@@ -128,4 +136,4 @@ async function main(){
   log(`done in ${((Date.now() - t0) / 1000).toFixed(0)}s: ${okN} series, ${manifest.missing.length} missing, coverage ${(coverage.ratio * 100).toFixed(1)}%`);
   console.log(JSON.stringify({ ok: true, series: okN, missing: manifest.missing.length, coverage: coverage.ratio, pointInTime: uni.pointInTime }));
 }
-main().catch((e) => { log('::error::' + e.message); process.exit(1); });
+if (process.argv[1] && process.argv[1].endsWith('lab-data.mjs')) main().catch((e) => { log('::error::' + e.message); process.exit(1); });
