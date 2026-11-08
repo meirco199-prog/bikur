@@ -1,0 +1,29 @@
+# מחקר שיטתי של 12 משפחות אסטרטגיות חתך (scripts/research-xsec.mjs, invest/docs/research/xsec/). מחקר בלבד — אין כסף, אין פקודות.
+# הרצה: Actions → research-xsec → Run workflow (או דחיפה שמשנה את הקובץ הזה). התוצאות (report.md, results.csv, yearly.csv,
+# walkforward.json, meta.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow, כך שכל ריצה ניתנת לשחזור ולבדיקה.
+name: research-xsec
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-xsec.yml]
+permissions: { contents: write }
+concurrency: { group: research-xsec, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: research
+        run: node --max-old-space-size=6000 invest-api/scripts/research-xsec.mjs --outdir invest/docs/research/xsec
+      - uses: actions/upload-artifact@v4
+        with: { name: xsec-results, path: invest/docs/research/xsec }
+      - name: commit results
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/xsec
+          git commit -m "ops: תוצאות מחקר החתך (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
