@@ -118,3 +118,14 @@ test('gpt-review: התגובה — כותרת GPT REVIEW, סמן, ממצאים �
   assert.ok(own.includes('OWNER_DECISION_REQUIRED ⚖️') && own.includes('@meirco199-prog') && own.includes('**מה Claude חושב:** C') && own.includes('לקבל את Claude → X'));
   assert.equal(redact('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345 github_pat_ABCDEFGHIJKLMNOPQRSTUVWXYZ'), '[REDACTED] [REDACTED]');
 });
+
+test('gpt-review: חיתוך בטוח — אמוג׳י בנקודת החיתוך לא משאיר surrogate בודד, וה-JSON לבקשה תקין (PR #231)', async () => {
+  const { cut, clip, stripLoneSurrogates } = await import('./review.mjs');
+  const s = 'abc📊def'; // 📊 = שני code units באינדקסים 3–4
+  assert.equal(cut(s, 4), 'abc'); assert.equal(cut(s, 5), 'abc📊'); assert.equal(cut(s, 100), s);
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(clip(s, 4)));
+  assert.equal(stripLoneSurrogates('x\uD83Dy'), 'x�y'); assert.equal(stripLoneSurrogates('ok📊'), 'ok📊');
+  const line = 'a'.repeat(LIMITS.maxLineChars - 1) + '📊tail';
+  const d = buildDiff([{ filename: 'invest/lab/js/app.js', status: 'added', additions: 1, deletions: 0, changes: 1, patch: `+${line}` }]);
+  assert.doesNotThrow(() => JSON.parse(JSON.stringify({ t: d.text }))); assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(d.text), 'surrogate בודד ב-diff');
+});

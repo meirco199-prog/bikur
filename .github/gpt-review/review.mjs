@@ -26,7 +26,10 @@ const CODE_EXT = /\.(m?js|cjs|ts|py|html|css|ya?ml|json|sh|toml)$/i;
 
 export const redact = (s) => String(s).replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,})\b/g, '[REDACTED]');
 export const short = (s) => String(s || '').slice(0, 7);
-export const clip = (s, n) => { s = String(s ?? ''); return s.length > n ? `${s.slice(0, n)}\n…(קוצר, ${s.length - n} תווים נוספים)` : s; };
+// חיתוך בטוח: לא שובר זוג surrogate (אמוג'י) באמצע — surrogate בודד הופך את ה-JSON של הבקשה ל-OpenAI ללא תקין (400 invalid_json, PR #231).
+export const cut = (s, n) => { s = String(s ?? ''); if (s.length <= n) return s; let e = n; const c = s.charCodeAt(e - 1); if (c >= 0xD800 && c <= 0xDBFF) e -= 1; return s.slice(0, e); };
+export const stripLoneSurrogates = (s) => String(s ?? '').replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+export const clip = (s, n) => { s = String(s ?? ''); return s.length > n ? `${cut(s, n)}\n…(קוצר, ${s.length - n} תווים נוספים)` : s; };
 
 /** מיפוי: לכל קובץ שהשתנה, האם לדלג עליו בסקירה (קבצים בינאריים, פקודות ops, lock) */
 export const isSkippedPath = (p) => SKIP_PATHS.some((re) => re.test(p));
@@ -131,8 +134,8 @@ export function buildDiff(files, limits = LIMITS){
   let used = 0; const parts = [], omitted = [];
   for (const f of sorted){
     const head = `### ${f.status || 'modified'} ${f.filename} (+${f.additions || 0} −${f.deletions || 0})`;
-    let patch = String(f.patch || '(אין patch — קובץ בינארי/גדול מדי/שינוי שם)').split('\n').map((l) => (l.length > limits.maxLineChars ? `${l.slice(0, limits.maxLineChars)}…(שורה קוצרה)` : l)).join('\n');
-    if (patch.length > limits.fileChars) patch = `${patch.slice(0, limits.fileChars)}\n…(patch קוצר)`;
+    let patch = String(f.patch || '(אין patch — קובץ בינארי/גדול מדי/שינוי שם)').split('\n').map((l) => (l.length > limits.maxLineChars ? `${cut(l, limits.maxLineChars)}…(שורה קוצרה)` : l)).join('\n');
+    if (patch.length > limits.fileChars) patch = `${cut(patch, limits.fileChars)}\n…(patch קוצר)`;
     const chunk = `${head}\n\`\`\`diff\n${patch}\n\`\`\``;
     if (used + chunk.length > limits.diffChars){ omitted.push(`${f.filename} (+${f.additions || 0} −${f.deletions || 0})`); continue; }
     used += chunk.length; parts.push(chunk);
@@ -324,7 +327,7 @@ async function main(){
   const signals = claudeSignals({ branch, commits, body });
   const diff = buildDiff(files);
   const ctx = { kind, repo: REPO, number, title, body, headSha, branch, baseRef, issues, diff: diff.text, files: diff.list, ci, tests, docs, policies, previous, replies, signals, round, maxRounds: MAX, finalRound };
-  const messages = buildMessages(ctx);
+  const messages = buildMessages(ctx).map((m) => ({ ...m, content: stripLoneSurrogates(m.content) }));
   console.log(`סבב ${round}/${MAX}${finalRound ? ' (אחרון)' : ''} · diff ${diff.chars} תווים · ${files.length} קבצים (${diff.omitted.length} מחוץ לתקציב) · prompt ~${Math.round(messages.reduce((n, m) => n + m.content.length, 0) / 3.5)} טוקנים · מודל ${MODEL}/${EFFORT}`);
 
   // --- OpenAI (פלט מובנה) ---
