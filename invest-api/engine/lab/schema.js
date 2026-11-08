@@ -38,7 +38,7 @@ export function normalizeSpec(input){
   const rules = (x.rules || []).map((r, i) => {
     const path = `exit.rules[${i}]`; if (!EXIT_TYPES.includes(r.type)) throw new Error(`${path}: סוג יציאה לא מוכר "${r.type}"`);
     const out = { type: r.type, at: r.at === 'open' || r.at === 'next_open' ? (r.type === 'time' ? 'open' : 'next_open') : 'close' };
-    if (r.type === 'time') out.days = num(r.days, 1, path + '.days', { min: 1, max: 2000, int: true });
+    if (r.type === 'time') out.days = num(r.days, 1, path + '.days', { min: 1, max: 100000, int: true }); // 100000 = "החזק לנצח" (Buy & Hold)
     if (['take_profit', 'stop_loss', 'trailing_stop'].includes(r.type)){ out.pct = Math.abs(pctIn(r.pct, 0.05, path + '.pct')); if (!(out.pct > 0)) throw new Error(`${path}: אחוז חייב להיות חיובי`); }
     if (r.type === 'condition'){ if (!r.conditions) throw new Error(`${path}: חסר conditions`); out.conditions = normalizeNode(r.conditions, path + '.conditions'); }
     return out;

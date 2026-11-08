@@ -11,8 +11,9 @@
 // מחירים: ביצוע במחירים גולמיים (מה שבאמת אפשר היה לקבל); תשואות ואינדיקטורים על הסגירה המתואמת (features.js).
 import { normalizeSpec } from './schema.js';
 import { compile } from './rules.js';
-import { FeatureCache, FEATURES, featureKey, featureLabel, rollingMean } from './features.js';
+import { FeatureCache, featureKey, featureLabel, rollingMean } from './features.js';
 import { isoOf, weekdayOf, monthOf } from './data.js';
+import { createSignalEngine, fmtFeature } from './signals.js';
 
 const ok = (x) => x === x && x !== undefined && x !== null;
 
@@ -53,8 +54,6 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
   const condExits = spec.exit.rules.filter((r) => r.type === 'condition').map((r) => ({ ...r, c: compile(r.conditions) }));
   const timeRules = spec.exit.rules.filter((r) => r.type === 'time'), tp = spec.exit.rules.find((r) => r.type === 'take_profit'), sl = spec.exit.rules.find((r) => r.type === 'stop_loss'), trail = spec.exit.rules.find((r) => r.type === 'trailing_stop');
   const rankExit = spec.exit.rules.find((r) => r.type === 'rank_exit'), oppExit = spec.exit.rules.find((r) => r.type === 'opposite_signal');
-  const dvKey = featureKey('dollar_vol', { n: 20 });
-  const needVol = Z.mode === 'inverse_vol', volKey = featureKey('vol', { n: Z.volLookback }), capKey = 'market_cap';
 
   // משטר שוק (benchmark מול SMA) — מחושב מראש על סדרת הייחוס
   let regimeOk = () => true;
@@ -71,7 +70,7 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
   const positions = new Map(); // sym → pos
   const pending = []; // פקודות כניסה
   const trades = [], equitySeries = [], signalsLog = [], skipped = {}, warnings = new Set();
-  let tradeId = 0, missingFeatureHits = 0, liquidationDays = 0, dividendsTotal = 0, borrowTotal = 0, marginTotal = 0, commissionTotal = 0, feesTotal = 0, slipTotal = 0;
+  let tradeId = 0, liquidationDays = 0, dividendsTotal = 0, borrowTotal = 0, marginTotal = 0, commissionTotal = 0, feesTotal = 0, slipTotal = 0;
   const skip = (r) => { skipped[r] = (skipped[r] || 0) + 1; };
   const sectorExposure = () => { const m = {}; for (const p of positions.values()){ const s = p.sector || 'לא ידוע'; m[s] = (m[s] || 0) + Math.abs(p.shares * p.last); } return m; };
   const grossExposure = () => { let g = 0; for (const p of positions.values()) g += Math.abs(p.shares * p.last); return g; };
@@ -116,70 +115,9 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
     positions.delete(pos.sym);
   }
 
-  // הקשר רוחבי ליום k
-  function makeCtx(k, eligible){
-    const vals = new Map(), sorted = new Map();
-    const arr = (sym, key) => { let m = vals.get(key); if (!m){ m = new Map(); vals.set(key, m); } return m; };
-    const val = (sym, key) => { const m = arr(sym, key); if (m.has(sym)) return m.get(sym); const i = ds.rowIndex(sym, k); let v = NaN; if (i >= 0){ const [name, ps] = parseKey(key); v = fc.get(ds.series.get(sym), name, ps)[i]; if (v === undefined) v = NaN; } m.set(sym, v); return v; };
-    const prev = (sym, key) => { const i = ds.rowIndex(sym, k); if (i <= 0) return NaN; const [name, ps] = parseKey(key); const v = fc.get(ds.series.get(sym), name, ps)[i - 1]; return v === undefined ? NaN : v; };
-    const sortedFor = (key) => { let s = sorted.get(key); if (!s){ const xs = []; for (const sym of eligible){ const v = val(sym, key); if (v === v) xs.push(v); } xs.sort((a, b) => a - b); s = xs; sorted.set(key, s); } return s; };
-    const lowerBound = (xs, v) => { let lo = 0, hi = xs.length; while (lo < hi){ const m = (lo + hi) >> 1; if (xs[m] < v) lo = m + 1; else hi = m; } return lo; };
-    const upperBound = (xs, v) => { let lo = 0, hi = xs.length; while (lo < hi){ const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m + 1; else hi = m; } return lo; };
-    const ctx = { k, missing: 0, val, prev, attr: (sym, field) => (field === 'sector' ? ds.sectorOf(sym) : field === 'symbol' ? sym : ds.series.get(sym)?.meta?.[field] ?? null),
-      xsPct: (sym, key) => { const v = val(sym, key); if (v !== v) return NaN; const xs = sortedFor(key); if (xs.length < 2) return 50; return lowerBound(xs, v) / (xs.length - 1) * 100; },
-      xsRank: (sym, key, desc) => { const v = val(sym, key); if (v !== v) return NaN; const xs = sortedFor(key); return desc ? xs.length - upperBound(xs, v) + 1 : lowerBound(xs, v) + 1; } };
-    return ctx;
-  }
-  const keyCache = new Map();
-  function parseKey(key){ let p = keyCache.get(key); if (!p){ const m = key.match(/^(\w+)(?:\((.*)\))?$/); const name = m[1]; const ks = Object.keys(FEATURES[name].params); const ps = {}; if (m[2]) m[2].split(',').forEach((v, i) => { ps[ks[i]] = +v; }); p = [name, ps]; keyCache.set(key, p); } return p; }
-
-  // כשירות סטטית ליום k (חברות במדד point-in-time + מסנני מחיר/מחזור/היסטוריה/סקטור)
-  const F = spec.universe.filters, listSet = spec.universe.type === 'list' ? new Set(spec.universe.symbols) : null, excl = new Set(spec.universe.exclude), secIn = F.sectors.length ? new Set(F.sectors) : null, secOut = new Set(F.excludeSectors);
-  function eligibleAt(k){
-    const out = [];
-    const cands = listSet ? [...listSet].filter((s) => ds.series.has(s)) : (uni ? ds.membersAt(k, uni) : ds.symbols);
-    for (const sym of cands){
-      if (excl.has(sym) || spec.benchmarks.includes(sym) && !listSet) continue;
-      const i = ds.rowIndex(sym, k); if (i < 0) continue;
-      const s = ds.series.get(sym); if (i + 1 < F.minBars) continue;
-      const c = s.c[i]; if (!(c >= F.minPrice) || (F.maxPrice && c > F.maxPrice)) continue;
-      if (F.minDollarVol > 0){ const dv = fc.get(s, 'dollar_vol', { n: 20 })[i]; if (!(dv >= F.minDollarVol)) continue; }
-      if (secIn || secOut.size){ const sec = ds.sectorOf(sym); if (secIn && !secIn.has(sec)) continue; if (secOut.has(sec)) continue; }
-      out.push(sym);
-    }
-    return out;
-  }
-
-  // אותות בסיום יום k → רשימת בחירות ממוינות [{sym, value, rank, weight}]
-  let lastPicks = new Set(), lastOpposite = new Set();
-  function signalsAt(k){
-    const eligible = eligibleAt(k), ctx = makeCtx(k, eligible);
-    let passed = cond ? eligible.filter((s) => cond.test(ctx, s)) : eligible;
-    missingFeatureHits += ctx.missing;
-    let picks;
-    if (rank){
-      const scored = []; for (const s of passed){ const v = ctx.val(s, rank.key); if (v === v) scored.push({ sym: s, value: v }); }
-      scored.sort((a, b) => (rank.order === 'asc' ? a.value - b.value : b.value - a.value));
-      picks = scored.slice(0, rank.top).map((x, i) => ({ ...x, rank: i + 1 }));
-      if (oppExit){ const opp = scored.slice(-rank.top); lastOpposite = new Set(opp.map((x) => x.sym)); }
-    } else {
-      picks = passed.map((s) => ({ sym: s, value: null, rank: null }));
-      if (Z.maxPositions && picks.length > Z.maxPositions) picks = picks.slice(0, Z.maxPositions);
-      if (oppExit) lastOpposite = new Set(eligible.filter((s) => !cond.test(ctx, s)));
-    }
-    // משקלים (לגדלים לא שווים)
-    if (picks.length){
-      if (Z.mode === 'inverse_vol' || Z.mode === 'rank' || Z.mode === 'market_cap'){
-        const w = picks.map((p, i) => { if (Z.mode === 'rank') return picks.length - i; const key = Z.mode === 'inverse_vol' ? volKey : capKey; const v = ctx.val(p.sym, key); if (Z.mode === 'inverse_vol') return v > 0 ? 1 / v : NaN; return v > 0 ? v : NaN; });
-        if (w.some((x) => x !== x)){ warnings.add(Z.mode === 'market_cap' ? 'אין נתוני שווי שוק point-in-time לחלק מהמניות — נעשה שימוש בחלוקה שווה עבורן' : 'אין מספיק היסטוריה לתנודתיות בחלק מהמניות — חלוקה שווה עבורן'); }
-        const clean = w.map((x) => (x === x ? x : null)), avg = clean.filter((x) => x !== null).reduce((a, b) => a + b, 0) / Math.max(1, clean.filter((x) => x !== null).length) || 1;
-        const ww = clean.map((x) => (x === null ? avg : x)), sum = ww.reduce((a, b) => a + b, 0);
-        picks.forEach((p, i) => { p.weight = sum > 0 ? ww[i] / sum * picks.length : 1; });
-      } else picks.forEach((p) => { p.weight = 1; });
-    }
-    return { picks, eligible: eligible.length, passed: passed.length, ctx };
-  }
-
+  const sigEngine = createSignalEngine(ds, spec, fc, { uni, rank, cond, oppExit });
+  const { eligibleAt, signalsAt, makeCtx } = sigEngine;
+  let lastPicks = new Set();
   // ---------- הלולאה הראשית ----------
   {
     const total = kEnd - kStart + 1;
@@ -260,7 +198,7 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
           let reason = null, at = null;
           for (const r of condExits) if (r.c.test(ctx, pos.sym)){ reason = 'תנאי יציאה'; at = r.at; break; }
           if (!reason && rankExit && sig && !todaysPicks.has(pos.sym) && pos.entryK < k){ reason = 'יצאה מהדירוג'; at = rankExit.at; }
-          if (!reason && oppExit && lastOpposite.has(pos.sym)){ reason = 'אות הפוך'; at = oppExit.at; }
+          if (!reason && oppExit && sigEngine.opposite.has(pos.sym)){ reason = 'אות הפוך'; at = oppExit.at; }
           if (reason){ if (at === 'close') { close(pos, k, bar.c, reason + ' (סגירה)'); continue; } pos.pendingExit = reason + ' (פתיחה למחרת)'; }
         }
       }
@@ -309,15 +247,16 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
     const benchmarks = {};
     for (const b of spec.benchmarks){ const s = ds.series.get(b); if (!s) { benchmarks[b] = null; continue; } let k0 = kStart; while (k0 <= kEnd && ds.rowIndex(b, k0) < 0) k0++; if (k0 > kEnd){ benchmarks[b] = null; continue; } const a0 = s.a[ds.rowIndex(b, k0)]; let last = Z.capital; benchmarks[b] = equitySeries.map((e, idx) => { const i = ds.rowIndex(b, kStart + idx); if (i >= 0) last = Z.capital * s.a[i] / a0; return [e[0], +last.toFixed(2)]; }); }
 
-    const assumptions = buildAssumptions(spec, ds, { missingFeatureHits, liquidationDays, warnings: [...warnings] });
+    const assumptions = buildAssumptions(spec, ds, { missingFeatureHits: sigEngine.missing(), liquidationDays, warnings: [...warnings, ...sigEngine.warningsLive] });
+    const listSet = sigEngine.listSet;
     const coverage = listSet ? { pointInTime: false, note: 'רשימת סימבולים שנבחרה ידנית — הטיית שורדים לא נשללת (מניות שנמחקו לא ברשימה)', withData: [...listSet].filter((s) => ds.series.has(s)).length, missing: [...listSet].filter((s) => !ds.series.has(s)), total: listSet.size, ratio: [...listSet].filter((s) => ds.series.has(s)).length / listSet.size } : ds.coverage(kStart, kEnd, uni), gaps = ds.gaps(kStart, kEnd);
     const limited = coverage.pointInTime === false || (coverage.total > 0 && coverage.ratio < 0.9) || spec.entry.timing === 'same_close';
-    return { spec, from: isoOf(ds.dayAt(kStart)), to: isoOf(ds.dayAt(kEnd)), days: kEnd - kStart + 1, capital: Z.capital, finalEquity: +equity.toFixed(2), equity: equitySeries, trades, signals: signalsLog, benchmarks, skipped, totals: { commission: +commissionTotal.toFixed(2), fees: +feesTotal.toFixed(2), slippage: +slipTotal.toFixed(2), borrow: +borrowTotal.toFixed(2), margin: +marginTotal.toFixed(2), dividends: +dividendsTotal.toFixed(2), costs: +(commissionTotal + feesTotal + slipTotal + borrowTotal + marginTotal).toFixed(2) }, coverage, gaps, assumptions, limited, warnings: [...warnings], runtimeMs: Date.now() - t0 };
+    return { spec, from: isoOf(ds.dayAt(kStart)), to: isoOf(ds.dayAt(kEnd)), days: kEnd - kStart + 1, capital: Z.capital, finalEquity: +equity.toFixed(2), equity: equitySeries, trades, signals: signalsLog, benchmarks, skipped, totals: { commission: +commissionTotal.toFixed(2), fees: +feesTotal.toFixed(2), slippage: +slipTotal.toFixed(2), borrow: +borrowTotal.toFixed(2), margin: +marginTotal.toFixed(2), dividends: +dividendsTotal.toFixed(2), costs: +(commissionTotal + feesTotal + slipTotal + borrowTotal + marginTotal).toFixed(2) }, coverage, gaps, assumptions, limited, warnings: [...warnings, ...sigEngine.warningsLive], runtimeMs: Date.now() - t0 };
   }
 
-  function reasonOf(p){ if (rank) return `${featureLabel(rank.feature, rank.params)} = ${p.value === null ? '—' : fmtSmall(rank.feature, p.value)} · מקום ${p.rank}/${rank.top}`; return 'תנאי הכניסה התקיימו'; }
+  function reasonOf(p){ if (rank) return `${featureLabel(rank.feature, rank.params)} = ${p.value === null ? '—' : fmtFeature(rank.feature, p.value)} · מקום ${p.rank}/${rank.top}`; return 'תנאי הכניסה התקיימו'; }
 }
-const fmtSmall = (f, v) => (['ret', 'gap', 'intraday', 'price_vs_sma', 'sma_ratio', 'dist_high', 'dist_low', 'drawdown', 'vol', 'atr_pct', 'vwap_dev', 'bb_width', 'pullback', 'macd_hist'].includes(f) ? `${(v * 100).toFixed(2)}%` : v.toFixed(2));
+
 
 export function buildAssumptions(spec, ds, extra = {}){
   const a = [];

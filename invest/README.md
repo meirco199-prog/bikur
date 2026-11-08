@@ -22,6 +22,7 @@
 | [docs/TRACKS.md](docs/TRACKS.md) | חמישה מסלולי השקעה מקבילים (regB/regC/אגרסיבי B + שתי קבוצות ביקורת), מדדי ייחוס שקליים |
 | [docs/STOPS.md](docs/STOPS.md) | סקירת סיכון gap/תוך-יומי בעצירות הנוכחיות + הצעת עיצוב לעצירות ברוקר אמיתיות ב-IBKR |
 | [docs/SECURITY.md](docs/SECURITY.md) | CRON_SECRET כ-secret_text, נעילת מנוע הסיכון (CODEOWNERS + בדיקת נעילה) |
+| [docs/LAB.md](docs/LAB.md) | **Investment Strategy Lab** (`/invest/lab/`): בונה אסטרטגיות ללא קוד, Backtesting point-in-time ללא look-ahead, אופטימיזציה/Walk-Forward/מובהקות, AI, נתונים |
 
 ## הפעלה ראשונה (חד-פעמי)
 1. **הפריסה אוטומטית** בדחיפה ל-`main` (`.github/workflows/deploy-invest-api.yml` יוצר KV `invest`, binding ל-Workers AI, cron).

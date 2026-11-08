@@ -240,3 +240,17 @@ test('עץ תנאים: AND/OR/NOT מקוננים, השוואה למאפיין א
   assert.equal(c.test(ctx, 'C'), false); assert.ok(ctx.missing > 0); // ל-C אין נר ביום האחרון → NaN
   const c2 = compile({ feature: 'ret', params: { days: 1 }, op: 'bottom_n', value: 2 }); assert.equal(c2.features.size, 1);
 });
+
+test('סורק היסטורי (scanAt): אותו מנוע אותות כמו הסימולציה — הבחירות ליום זהות לעסקאות שנפתחו למחרת', async () => {
+  const { scanAt } = await import('../engine/lab/signals.js');
+  const syms = ['A', 'B', 'C', 'D', 'E'];
+  const ds = new Dataset({ series: syms.map((s, i) => rowsToCompact(s, syntheticRows({ n: 300, seed: i + 61, price: 50 }), { meta: { name: 'חברה ' + s, sector: 'Tech' } })) });
+  const spec = base({ universe: { type: 'list', symbols: syms, filters: { minPrice: 0, minDollarVol: 0, minBars: 20 } }, signal: { conditions: { all: [{ feature: 'rsi', params: { n: 5 }, op: '<', value: 60 }] }, rank: { feature: 'ret', params: { days: 2 }, order: 'asc', top: 2 } }, sizing: { capital: 20000, maxPositions: 2 } });
+  const r = simulate(ds, spec); const day = r.trades[40].signalDate;
+  const sc = scanAt(ds, spec, day);
+  assert.equal(sc.date, day); assert.ok(sc.columns.length === 2 && sc.picks.length <= 2 && sc.eligible === 5);
+  const opened = r.trades.filter((t) => t.signalDate === day).map((t) => t.symbol).sort();
+  assert.deepEqual(sc.picks.map((p) => p.symbol).sort(), opened);
+  assert.ok(sc.picks[0].nextOpen > 0 && sc.picks[0].values[sc.columns[0].key] !== undefined && sc.picks[0].name === 'חברה ' + sc.picks[0].symbol);
+  assert.ok(scanAt(ds, spec, '1990-01-01').error);
+});
