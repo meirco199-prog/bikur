@@ -13,6 +13,7 @@ import { sendTelegram } from './alerts.js';
 import { XSPAPER_KEY, paperLines } from './xsmom-paper.js';
 import { VBOPAPER_KEY, vboLines } from './vbo-paper.js';
 import { DCPAPER_KEY, dcLines } from './dc-paper.js';
+import { LOSPAPER_KEY, losersLines } from './losers-paper.js';
 
 export const AMIT_KEY = 'amit:state';
 export const AMITBOT_KEY = 'amitbot:report'; // דוח הבוט בחשבון הדמו של Bybit (scripts/bybit-amit-bot.mjs), כל שעתיים
@@ -74,7 +75,7 @@ export function botLines(rep, nowMs, n = 1){
     ...(ageH > 3 && rep.halt !== 'stop' ? [`⚠️ אין דיווח מהבוט ${Math.round(ageH)} שעות — כנראה לא רץ`] : [])]; // בוט שנעצר ידנית (בוט 1, 7/11) — בלי אזהרה יומית
 }
 
-export function formatSummary(state, day, sinayState = null, botRep = null, nowMs = Date.now(), bot2Rep = null, paperRep = null, vboRep = null, dcRep = null){
+export function formatSummary(state, day, sinayState = null, botRep = null, nowMs = Date.now(), bot2Rep = null, paperRep = null, vboRep = null, dcRep = null, losRep = null){
   const today = (state.trades || []).filter((t) => t.close && t.close.length && dayOf(t.close) === day);
   const net = today.reduce((x, t) => x + t.net_usd, 0), fees = today.reduce((x, t) => x + t.fees_usd, 0);
   const wins = today.filter((t) => t.net_usd > 0).length, a = state.agg;
@@ -84,8 +85,8 @@ export function formatSummary(state, day, sinayState = null, botRep = null, nowM
     `חשבון: ${Math.round(AMIT.account + a.netUsd).toLocaleString('en-US')}$ מתוך ${AMIT.account.toLocaleString('en-US')}$ · פוזיציה ${AMIT.notional.toLocaleString('en-US')}$`];
   if (state.pos) lines.push(`פתוח עכשיו: ${state.pos.side === 'long' ? 'לונג' : 'שורט'} מ-${Math.round(state.pos.entry).toLocaleString('en-US')}`);
   const sl = sinayDayLines(sinayState, (iso) => dayOf(iso) === day), bl = [...botLines(botRep, nowMs, 1), ...(bot2Rep ? ['', ...botLines(bot2Rep, nowMs, 2)] : [])];
-  const pl = paperLines(paperRep, nowMs), vl = vboLines(vboRep, nowMs), dl = dcLines(dcRep, nowMs);
-  return `${lines.join('\n')}${bl.length ? '\n\n' + bl.join('\n') : ''}${sl.length ? '\n\n' + sl.join('\n') : ''}${pl.length ? '\n\n' + pl.join('\n') : ''}${dl.length ? '\n\n' + dl.join('\n') : ''}${vl.length ? '\n\n' + vl.join('\n') : ''}\n\ninvest → 🪙 קריפטו`;
+  const pl = paperLines(paperRep, nowMs), vl = vboLines(vboRep, nowMs), dl = dcLines(dcRep, nowMs), ll = losersLines(losRep, nowMs);
+  return `${lines.join('\n')}${bl.length ? '\n\n' + bl.join('\n') : ''}${sl.length ? '\n\n' + sl.join('\n') : ''}${pl.length ? '\n\n' + pl.join('\n') : ''}${dl.length ? '\n\n' + dl.join('\n') : ''}${vl.length ? '\n\n' + vl.join('\n') : ''}${ll.length ? '\n\n' + ll.join('\n') : ''}\n\ninvest → 🪙 קריפטו`;
 }
 const dayOf = (iso) => ilParts(Date.parse(iso)).day;
 
@@ -120,8 +121,8 @@ export async function runAmitLive(ctx, { fetchFn = fetch, now = new Date(), forc
   if (!want || (prev && meta.writes >= MAX_WRITES_DAY)) return { ok: true, saved: false, feed, events: r.events.length, capped: (moved && !eventsOk) || !!want };
   let telegram = null;
   if (summaryDue){
-    let sinay = null, bot = null, bot2 = null, paper = null, vbo = null, dc = null; try { sinay = (await ctx.db.get(SINAY_KEY))?.state || null; bot = await ctx.db.get(AMITBOT_KEY); bot2 = await ctx.db.get(AMITBOT2_KEY); paper = await ctx.db.get(XSPAPER_KEY); vbo = await ctx.db.get(VBOPAPER_KEY); dc = await ctx.db.get(DCPAPER_KEY); } catch { /* הסיכום יוצא גם בלי דוחות הבוטים */ }
-    telegram = await sendTelegram(ctx.env, formatSummary(state, day, sinay, bot, nowMs, bot2, paper, vbo, dc)); meta.summaryDay = day;
+    let sinay = null, bot = null, bot2 = null, paper = null, vbo = null, dc = null, los = null; try { sinay = (await ctx.db.get(SINAY_KEY))?.state || null; bot = await ctx.db.get(AMITBOT_KEY); bot2 = await ctx.db.get(AMITBOT2_KEY); paper = await ctx.db.get(XSPAPER_KEY); vbo = await ctx.db.get(VBOPAPER_KEY); dc = await ctx.db.get(DCPAPER_KEY); los = await ctx.db.get(LOSPAPER_KEY); } catch { /* הסיכום יוצא גם בלי דוחות הבוטים */ }
+    telegram = await sendTelegram(ctx.env, formatSummary(state, day, sinay, bot, nowMs, bot2, paper, vbo, dc, los)); meta.summaryDay = day;
   }
   if (moved && !(force || summaryDue || hourly)) meta.eventWrites = (meta.eventWrites || 0) + 1;
   meta.savedAt = now.toISOString(); meta.writes += 1;

@@ -1,0 +1,17 @@
+# זמני (ops): הכיוון ההפוך — שורט על מניות שירדו בחדות, 10 שנים (scripts/research-losers-short.mjs). מחקר בלבד.
+name: research-losers
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-losers.yml]
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: short
+        run: node invest-api/scripts/research-losers-short.mjs --cache losers-10y.json --out research-losers-short.md
