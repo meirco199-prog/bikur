@@ -59,6 +59,11 @@ export function prepare(D, Hr = {}, { minAdv = 20e6, minPx = 5 } = {}){
     // מקדם פיצול: מחיר גולמי ÷ מכפלת היחסים של הפיצולים שאחריו = סדרה רציפה
     for (const [d, ratio] of b.sp || []){ for (let i = 0; i < n && b.d[i] < d; i++) f[i] *= ratio; const q = b.d.indexOf(d); if (q >= 0) isSp[q] = 1; }
     const ac = (i) => b.c[i] / f[i];
+    // מרווח קנייה-מכירה משוער (Abdi & Ranaldo 2017, "CHL"): s² = 4·(c_t − η_t)·(c_t − η_{t+1}), η = ממוצע log של שיא ושפל; ממוצע על 21 הימים
+    // שלפני היום (רק מידע עבר). hs = חצי מרווח = עלות צד אחד בפקודת שוק. בלי היסטוריה מספקת — null
+    const lc = (i) => Math.log(ac(i)), eta = (i) => (Math.log(b.h[i] / f[i]) + Math.log(b.l[i] / f[i])) / 2;
+    const s2 = new Float64Array(n); for (let i = 0; i < n - 1; i++) s2[i] = isSp[i + 1] ? NaN : 4 * (lc(i) - eta(i)) * (lc(i) - eta(i + 1));
+    const hsAt = (i) => { if (i < 22) return null; let t = 0, m = 0; for (let j = i - 21; j < i; j++) if (Number.isFinite(s2[j])){ t += s2[j]; m += 1; } return m < 15 ? null : Math.sqrt(Math.max(t / m, 0)) / 2; };
     let sv = 0, sc = 0;
     for (let i = 0; i < n; i++){
       K[i] = dk.get(b.d[i]) ?? -1;
@@ -74,7 +79,7 @@ export function prepare(D, Hr = {}, { minAdv = 20e6, minPx = 5 } = {}){
       // תשואה מצטברת של 2 ו-3 ימים, ורצף ימי ירידה/עלייה שמסתיים היום
       const r2 = K[i - 2] === k - 2 ? ac(i) / ac(i - 2) - 1 : r, r3 = K[i - 3] === k - 3 ? ac(i) / ac(i - 3) - 1 : r2;
       let sd = 0, su = 0; for (let j = i; j > 0 && j > i - 10; j--){ const d = ac(j) / ac(j - 1) - 1; if (d < 0 && !su) sd += 1; else if (d > 0 && !sd) su += 1; else break; }
-      cand[k].push({ s, i, r, r2, r3, sd, su, gs: r ? g / r : 0, px: b.c[i], adv: adv[i], up: ac(i) > ma[i], spl });
+      cand[k].push({ s, i, r, r2, r3, sd, su, gs: r ? g / r : 0, px: b.c[i], adv: adv[i], up: ac(i) > ma[i], spl, hs: hsAt(i) });
     }
   }
   for (const c of cand) c.sort((a, b) => a.r - b.r);
@@ -160,19 +165,25 @@ export function walk(P, cfg, x){
   return { e, x: b.c[i + H], why: 'end' }; // סגירה של יום היציאה
 }
 
-function trade(long, e, x, per, days = 1){ // רווח/הפסד נטו ועמלות (שורט: + עמלת השאלה לכל יום החזקה)
-  if (long){ const bp = e * (1 + SLIP), sh = Math.floor(per / bp); if (sh < 1) return { pnl: 0, fee: 0 }; const sp = x * (1 - SLIP), fee = comm(sh, bp) + comm(sh, sp) + sellFees(sh, sp); return { pnl: sh * (sp - bp) - fee, fee }; }
-  const sp = e * (1 - SLIP), sh = Math.floor(per / sp); if (sh < 1) return { pnl: 0, fee: 0 }; const bp = x * (1 + SLIP), fee = comm(sh, sp) + sellFees(sh, sp) + comm(sh, bp) + sh * sp * BORROW_DAY * days; return { pnl: sh * (sp - bp) - fee, fee };
+// החלקה לכל צד: קבועה (SLIP), או לפי מודל עלויות בכלל — cfg.cost = { inK|inFix, outK|outFix }: K × חצי המרווח המשוער של המניה, או אחוז קבוע
+export function slips(cfg, x){
+  const c = cfg.cost; if (!c) return [SLIP, SLIP];
+  const hs = (c.key ? x[c.key] : x.hs) ?? 0.002; // בלי אומדן — 0.2% לצד (שמרני); c.key בוחר אומדן אחר (למשל hsH — מנרות שעה)
+  return [c.inFix ?? (c.inK ?? 1) * hs, c.outFix ?? (c.outK ?? 1) * hs];
+}
+function trade(long, e, x, per, days = 1, si = SLIP, so = SLIP){ // רווח/הפסד נטו ועמלות (שורט: + עמלת השאלה לכל יום החזקה)
+  if (long){ const bp = e * (1 + si), sh = Math.floor(per / bp); if (sh < 1) return { pnl: 0, fee: 0 }; const sp = x * (1 - so), fee = comm(sh, bp) + comm(sh, sp) + sellFees(sh, sp); return { pnl: sh * (sp - bp) - fee, fee }; }
+  const sp = e * (1 - si), sh = Math.floor(per / sp); if (sh < 1) return { pnl: 0, fee: 0 }; const bp = x * (1 + so), fee = comm(sh, sp) + sellFees(sh, sp) + comm(sh, bp) + sh * sp * BORROW_DAY * days; return { pnl: sh * (sp - bp) - fee, fee };
 }
 
 // סטופ יומי לכל התיק (רק החזקה של יום אחד): נמדד בפתיחה (כניסה בסגירה) ובסגירת כל נר שעה; כשהרווח/הפסד המשותף מגיע לסף — יוצאים מהכול
 function portDay(P, cfg, picks, per, eq){
   const long = cfg.side === 'L', pos = [];
   for (const x of picks){
-    const b = P.S[x.s], e = cfg.entry === 'C' ? b.c[x.i] : b.o[x.i + 1], bp = long ? e * (1 + SLIP) : e * (1 - SLIP), sh = Math.floor(per / bp);
+    const [si, so] = slips(cfg, x), b = P.S[x.s], e = cfg.entry === 'C' ? b.c[x.i] : b.o[x.i + 1], bp = long ? e * (1 + si) : e * (1 - si), sh = Math.floor(per / bp);
     if (sh < 1) continue;
     const bars = dayBars(P, x.s, x.i + 1);
-    pos.push({ x, e, bp, sh, last: cfg.entry === 'C' ? b.o[x.i + 1] : e, m: new Map(bars.map((z) => [z[0], z[4]])), fin: cfg.exit === 'hour' ? null : b.c[x.i + 1] });
+    pos.push({ x, e, bp, sh, si, so, last: cfg.entry === 'C' ? b.o[x.i + 1] : e, m: new Map(bars.map((z) => [z[0], z[4]])), fin: cfg.exit === 'hour' ? null : b.c[x.i + 1] });
   }
   const tp = cfg.port.tpUsd ?? cfg.port.tp * eq, sl = cfg.port.slUsd ?? cfg.port.sl * eq; // סף בדולרים קבועים או באחוז מההון
   const mtm = () => pos.reduce((a, p) => a + p.sh * (long ? p.last - p.bp : p.bp - p.last), 0);
@@ -189,7 +200,7 @@ function portDay(P, cfg, picks, per, eq){
     if (!hit && cfg.exit !== 'hour') for (const p of pos) p.last = p.fin;
   }
   let pnl = 0, fee = 0;
-  for (const p of pos){ const r = trade(long, p.e, p.last, per); pnl += r.pnl; fee += r.fee; }
+  for (const p of pos){ const r = trade(long, p.e, p.last, per, 1, p.si, p.so); pnl += r.pnl; fee += r.fee; }
   return { pnl, fee, why };
 }
 
@@ -202,8 +213,9 @@ export function run(P, cfg, k0, kEnd){
     const j = (k - k0) % H, eq = sl[j], picks = select(P, cfg, k); if (!picks.length) continue;
     const per = eq / cfg.N; let pnl = 0;
     if (cfg.port){ const r = portDay(P, cfg, picks, per, eq); pnl = r.pnl; fees += r.fee; if (r.why === 'tp') tp += 1; if (r.why === 'sl') slh += 1; }
-    else for (const x of picks){ const w = walk(P, cfg, x), r = trade(long, w.e, w.x, per, H); pnl += r.pnl; fees += r.fee; if (w.why === 'tp') tp += 1; if (w.why === 'sl') slh += 1; }
+    else for (const x of picks){ const w = walk(P, cfg, x), r = trade(long, w.e, w.x, per, H, ...slips(cfg, x)); pnl += r.pnl; fees += r.fee; if (w.why === 'tp') tp += 1; if (w.why === 'sl') slh += 1; }
     if (cfg.port || cfg.stop || cfg.exit === 'hour') for (const x of picks) if (!hasHourly(P, x.s, x.i + 1)) noHr += 1; // בדיקה: סטופ בלי נרות שעה
+    if (cfg.trace) cfg.trace.push({ k, r: pnl / eq }); // רישום תשואה יומית (לבדיקות יציבות)
     sl[j] = eq + pnl; trades += picks.length; days += 1; if (pnl > 0) wins += 1;
     const tot = sl.reduce((a, v) => a + v, 0); peak = Math.max(peak, tot); dd = Math.max(dd, 1 - tot / peak);
   }
@@ -220,7 +232,7 @@ function runSw(P, cfg, k0, kEnd){
     const cc = bear ? cfg.sw.bear : cfg.sw.bull; if (!cc) continue;
     const picks = select(P, cc, k); if (!picks.length) continue;
     const per = eq / cc.N; let pnl = 0;
-    for (const x of picks){ const w = walk(P, cc, x), r = trade(cc.side === 'L', w.e, w.x, per, 1); pnl += r.pnl; fees += r.fee; }
+    for (const x of picks){ const w = walk(P, cc, x), r = trade(cc.side === 'L', w.e, w.x, per, 1, ...slips(cc, x)); pnl += r.pnl; fees += r.fee; }
     eq += pnl; trades += picks.length; days += 1; if (pnl > 0) wins += 1; peak = Math.max(peak, eq); dd = Math.max(dd, 1 - eq / peak);
   }
   return { end: eq, ret: eq / START_USD - 1, fees, trades, wins, days, tp: 0, sl: 0, dd, bearDays };
