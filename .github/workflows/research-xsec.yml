@@ -1,12 +1,9 @@
 # מחקר שיטתי של 12 משפחות אסטרטגיות חתך (scripts/research-xsec.mjs, invest/docs/research/xsec/). מחקר בלבד — אין כסף, אין פקודות. (הרצה 4: קובץ ההרכב המעודכן עד 2026, נרמול שנתי ל-50,000$)
-# הרצה: Actions → research-xsec → Run workflow (או דחיפה שמשנה את הקובץ הזה). התוצאות (report.md, results.csv, yearly.csv,
-# walkforward.json, meta.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow, כך שכל ריצה ניתנת לשחזור ולבדיקה.
+# הרצה: Actions → research-xsec → Run workflow (בחר ענף שאינו main). התוצאות (report.md, results.csv, yearly.csv,
+# walkforward.json, meta.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow (לא ל-main — שם רק artifact), כך שכל ריצה ניתנת לשחזור.
 name: research-xsec
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/investment-research-platform-thffd8]
-    paths: [.github/workflows/research-xsec.yml]
 permissions: { contents: write }
 concurrency: { group: research-xsec, cancel-in-progress: false }
 jobs:
@@ -22,6 +19,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: xsec-results, path: invest/docs/research/xsec }
       - name: commit results
+        if: github.ref_name != 'main'
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add invest/docs/research/xsec
