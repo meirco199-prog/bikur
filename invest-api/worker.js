@@ -37,6 +37,7 @@ import { filterUniverse, findAsset, SEED_UNIVERSE, INDICES } from './engine/univ
 import { DEFAULT_WEIGHTS } from './engine/scoring.js';
 import { forwardReturns } from './engine/backtest.js';
 import { isoDate, uid, round, isNum } from './engine/util.js';
+import { parseStrategy } from './lib/lab.js';
 
 const VERSION = '1.0.0';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type,Authorization', 'Access-Control-Max-Age': '86400' };
@@ -48,7 +49,7 @@ const RL = new Map();
 function rateLimited(ip, path){
   const minute = Math.floor(Date.now() / 60000);
   // דליים: AI (יקר) 10/דקה; נתונים לחישוב בדפדפן (bundle/prices/snapshot) 600/דקה; שאר הבקשות 240/דקה
-  const bucket = path.startsWith('/ai') ? 'ai' : /^\/(bundle|prices|snapshot)\//.test(path) ? 'data' : 'all';
+  const bucket = path.startsWith('/ai') || path.startsWith('/lab/parse') ? 'ai' : /^\/(bundle|prices|snapshot)\//.test(path) ? 'data' : 'all';
   const key = `${ip}:${minute}:${bucket}`;
   const n = (RL.get(key) || 0) + 1;
   RL.set(key, n);
@@ -780,6 +781,12 @@ async function handle(req, env0, ctx){
       // force רק עם טוקן (הסוד של ה-cron לא מאפשר ריצות חוזרות באותו יום)
       try { return json(await runAutopilot(ctx, { dry: q.dry === '1', force: q.force === '1' && !bySecret, trigger: q.trigger || 'manual' })); } catch (e) { await db.logError('auto', e.message); return err('אוטומט: ' + e.message, 500); }
     }
+  }
+  // מעבדת האסטרטגיות: טקסט חופשי → spec (ה-AI מנסח; המנוע בדפדפן מחשב). ללא אימות כמו /ai/ask; מוגבל ב-rate limit.
+  if (r0 === 'lab' && p1 === 'parse' && req.method === 'POST'){
+    const text = String(body.text || '').slice(0, 2000);
+    if (text.trim().length < 8) return err('תאר את האסטרטגיה בכמה מילים לפחות: אילו מניות, איזה תנאי, מתי לקנות, מתי למכור, כמה להשקיע');
+    try { return json(await parseStrategy(env, text)); } catch (e) { return err('פענוח: ' + e.message, 422); }
   }
   if (r0 === 'ai' && p1 === 'ask' && req.method === 'POST'){
     const question = String(body.question || '').slice(0, 800);

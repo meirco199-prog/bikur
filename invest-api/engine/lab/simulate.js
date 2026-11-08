@@ -35,10 +35,18 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
 
   // טווח
   const dayNumOf = (iso) => Math.round(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000);
-  let kStart = spec.period.from ? ds.kOnOrAfter(dayNumOf(spec.period.from)) : 0;
-  let kEnd = spec.period.to ? ds.kOnOrBefore(dayNumOf(spec.period.to)) : ds.n - 1;
+  // בלי תאריך התחלה — מתחילים בטווח שנטען (meta.rangeFrom), לא באזור החימום
+  const fromIso = spec.period.from || ds.meta?.rangeFrom || null, toIso = spec.period.to || ds.meta?.rangeTo || null;
+  let kStart = fromIso ? ds.kOnOrAfter(dayNumOf(fromIso)) : 0;
+  let kEnd = toIso ? ds.kOnOrBefore(dayNumOf(toIso)) : ds.n - 1;
   if (kStart >= ds.n || kEnd < 0 || kEnd - kStart < 2) return { error: 'אין מספיק ימי מסחר בתקופה המבוקשת בנתונים שנטענו', spec, coverage: ds.coverage() };
 
+  // הרכב מדד (אם היקום הוא מדד): חייב להיות בנתונים, אחרת חסימה מפורשת (דרישה 11: "אם מקור הנתונים לא מאפשר — חסום")
+  let uni = null;
+  if (spec.universe.type === 'index'){
+    uni = ds.universeById(spec.universe.index);
+    if (!uni && Object.keys(ds.universes).length) return { error: `אין הרכב היסטורי של המדד "${spec.universe.index}" במערך הנתונים — הבדיקה חסומה. יקומים זמינים: ${Object.keys(ds.universes).join(', ')}`, spec, blocked: true };
+  }
   // הידור תנאים
   const cond = spec.signal.conditions ? compile(spec.signal.conditions) : null;
   const rank = spec.signal.rank ? { ...spec.signal.rank, key: featureKey(spec.signal.rank.feature, spec.signal.rank.params) } : null;
@@ -129,7 +137,7 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
   const F = spec.universe.filters, listSet = spec.universe.type === 'list' ? new Set(spec.universe.symbols) : null, excl = new Set(spec.universe.exclude), secIn = F.sectors.length ? new Set(F.sectors) : null, secOut = new Set(F.excludeSectors);
   function eligibleAt(k){
     const out = [];
-    const cands = listSet ? [...listSet].filter((s) => ds.series.has(s)) : (spec.universe.pointInTime && ds.universe ? ds.membersAt(k) : ds.symbols);
+    const cands = listSet ? [...listSet].filter((s) => ds.series.has(s)) : (uni ? ds.membersAt(k, uni) : ds.symbols);
     for (const sym of cands){
       if (excl.has(sym) || spec.benchmarks.includes(sym) && !listSet) continue;
       const i = ds.rowIndex(sym, k); if (i < 0) continue;
@@ -302,8 +310,8 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
     for (const b of spec.benchmarks){ const s = ds.series.get(b); if (!s) { benchmarks[b] = null; continue; } let k0 = kStart; while (k0 <= kEnd && ds.rowIndex(b, k0) < 0) k0++; if (k0 > kEnd){ benchmarks[b] = null; continue; } const a0 = s.a[ds.rowIndex(b, k0)]; let last = Z.capital; benchmarks[b] = equitySeries.map((e, idx) => { const i = ds.rowIndex(b, kStart + idx); if (i >= 0) last = Z.capital * s.a[i] / a0; return [e[0], +last.toFixed(2)]; }); }
 
     const assumptions = buildAssumptions(spec, ds, { missingFeatureHits, liquidationDays, warnings: [...warnings] });
-    const coverage = ds.coverage(kStart, kEnd), gaps = ds.gaps(kStart, kEnd);
-    const limited = coverage.pointInTime === false || (coverage.total && coverage.ratio < 0.9) || spec.entry.timing === 'same_close';
+    const coverage = listSet ? { pointInTime: false, note: 'רשימת סימבולים שנבחרה ידנית — הטיית שורדים לא נשללת (מניות שנמחקו לא ברשימה)', withData: [...listSet].filter((s) => ds.series.has(s)).length, missing: [...listSet].filter((s) => !ds.series.has(s)), total: listSet.size, ratio: [...listSet].filter((s) => ds.series.has(s)).length / listSet.size } : ds.coverage(kStart, kEnd, uni), gaps = ds.gaps(kStart, kEnd);
+    const limited = coverage.pointInTime === false || (coverage.total > 0 && coverage.ratio < 0.9) || spec.entry.timing === 'same_close';
     return { spec, from: isoOf(ds.dayAt(kStart)), to: isoOf(ds.dayAt(kEnd)), days: kEnd - kStart + 1, capital: Z.capital, finalEquity: +equity.toFixed(2), equity: equitySeries, trades, signals: signalsLog, benchmarks, skipped, totals: { commission: +commissionTotal.toFixed(2), fees: +feesTotal.toFixed(2), slippage: +slipTotal.toFixed(2), borrow: +borrowTotal.toFixed(2), margin: +marginTotal.toFixed(2), dividends: +dividendsTotal.toFixed(2), costs: +(commissionTotal + feesTotal + slipTotal + borrowTotal + marginTotal).toFixed(2) }, coverage, gaps, assumptions, limited, warnings: [...warnings], runtimeMs: Date.now() - t0 };
   }
 

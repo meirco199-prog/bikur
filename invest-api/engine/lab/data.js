@@ -77,10 +77,13 @@ export function isMember(intervals, day){ if (!intervals) return false; for (con
 
 // מערך הנתונים המלא לבדיקה אחת
 export class Dataset {
-  // series: Series[] · universe: {members, from, to} | null (null = כל הסדרות חברות תמיד) · sectors: {SYM: 'Technology'} · meta: {source, builtAt, …}
-  constructor({ series = [], universe = null, sectors = {}, meta = {}, calendarFrom = null } = {}){
+  // series: Series[] · universe: {members, from, to, pointInTime?} | null (null = כל הסדרות חברות תמיד) · universes: {id: universe} (כמה מדדים; universe = ברירת המחדל)
+  // sectors: {SYM: 'Technology'} · meta: {source, builtAt, …}
+  constructor({ series = [], universe = null, universes = null, sectors = {}, meta = {}, calendarFrom = null } = {}){
     this.series = new Map(); for (const x of series){ const s = x instanceof Series ? x : new Series(x); this.series.set(s.sym, s); }
-    this.universe = universe; this.sectors = sectors || {}; this.meta = meta || {};
+    this.universes = universes || (universe ? { default: universe } : {});
+    this.universe = universe || (universes ? Object.values(universes)[0] || null : null);
+    this.sectors = sectors || {}; this.meta = meta || {};
     const master = calendarFrom && this.series.get(calendarFrom);
     const days = new Set(); if (master) master.day.forEach((d) => days.add(d)); else for (const s of this.series.values()) s.day.forEach((d) => days.add(d));
     this.calendar = Int32Array.from([...days].sort((a, b) => a - b));
@@ -98,29 +101,39 @@ export class Dataset {
   rowIndex(sym, k){ const p = this.pos.get(sym); return p ? p[k] : -1; }
   // נר גולמי ליום k (או null אם אין נר — יום ללא מסחר בנייר הזה)
   bar(sym, k){ const i = this.rowIndex(sym, k); if (i < 0) return null; const s = this.series.get(sym); return { i, day: s.day[i], o: s.o[i], h: s.h[i], l: s.l[i], c: s.c[i], v: s.v[i], a: s.a[i] }; }
-  memberAt(sym, k){ if (!this.universe) return this.series.has(sym); return isMember(this.universe.members?.[sym], this.calendar[k]); }
+  // בחירת מדד לפי מזהה (sp500, nasdaq100…) — null אם אין הרכב כזה בנתונים
+  universeById(id){ if (!id) return this.universe; if (this.universes[id]) return this.universes[id]; if (this.universe && (!this.universe.id || this.universe.id === id)) return this.universe; return null; }
+  memberAt(sym, k, u = this.universe){ if (!u) return this.series.has(sym); if (u.pointInTime === false) return !!u.members?.[sym] && this.series.has(sym); return isMember(u.members?.[sym], this.calendar[k]); }
   // חברות במדד ביום k — רק סימבולים שיש להם סדרה (אחרים נספרים כחסרים ב-coverage)
-  membersAt(k){ const out = []; for (const sym of this.series.keys()) if (this.memberAt(sym, k)) out.push(sym); return out; }
+  membersAt(k, u = this.universe){ const out = []; for (const sym of this.series.keys()) if (this.memberAt(sym, k, u)) out.push(sym); return out; }
   sectorOf(sym){ return this.sectors[sym] || this.series.get(sym)?.meta?.sector || null; }
   // דוח כיסוי (דרישה 10): כמה חברי מדד היסטוריים יש להם מחירים, וכמה חסרים (בדרך כלל מניות שנמחקו)
-  coverage(fromK = 0, toK = this.n - 1){
-    if (!this.universe) return { pointInTime: false, note: 'אין הרכב מדד היסטורי — היקום הוא רשימה קבועה (הטיית שורדים אפשרית)', withData: this.series.size, missing: [], ratio: 1 };
+  coverage(fromK = 0, toK = this.n - 1, u = this.universe){
+    if (!u) return { pointInTime: false, note: 'אין הרכב מדד היסטורי — היקום הוא רשימה קבועה (הטיית שורדים אפשרית)', withData: this.series.size, missing: [], ratio: 1 };
     const seen = new Set(), missing = new Set();
     const a = this.calendar[fromK], b = this.calendar[toK];
-    for (const [sym, iv] of Object.entries(this.universe.members || {})){
-      const active = iv.some(([x, y]) => x <= b && (y === null || y > a)); if (!active) continue;
+    for (const [sym, iv] of Object.entries(u.members || {})){
+      const active = u.pointInTime === false || iv.some(([x, y]) => x <= b && (y === null || y > a)); if (!active) continue;
       if (this.series.has(sym)) seen.add(sym); else missing.add(sym);
     }
     const total = seen.size + missing.size;
-    return { pointInTime: true, universeFrom: isoOf(this.universe.from), universeTo: isoOf(this.universe.to), withData: seen.size, missing: [...missing].sort(), total, ratio: total ? seen.size / total : 0, note: missing.size ? `${missing.size} מתוך ${total} חברי המדד בתקופה ללא נתוני מחיר (ברובן מניות שנמחקו) — הטיית שורדים חלקית, התוצאה מסומנת כמוגבלת` : 'כל חברי המדד בתקופה עם נתונים' };
+    if (u.pointInTime === false) return { pointInTime: false, universeFrom: null, universeTo: null, withData: seen.size, missing: [...missing].sort(), total, ratio: total ? seen.size / total : 0, note: `הרכב ${u.id || 'המדד'} הוא ההרכב הנוכחי בלבד (אין היסטוריית חברות) — הטיית שורדים; התוצאה מסומנת כמוגבלת` };
+    return { pointInTime: true, universeFrom: u.from === null || u.from === undefined ? null : isoOf(u.from), universeTo: u.to === null || u.to === undefined ? null : isoOf(u.to), withData: seen.size, missing: [...missing].sort(), total, ratio: total ? seen.size / total : 0, note: missing.size ? `${missing.size} מתוך ${total} חברי המדד בתקופה ללא נתוני מחיר (ברובן מניות שנמחקו) — הטיית שורדים חלקית, התוצאה מסומנת כמוגבלת` : 'כל חברי המדד בתקופה עם נתונים' };
   }
   // ספירת נרות חסרים (פערים) לכל סימבול בטווח — מדד שלמות
   gaps(fromK, toK){ let gaps = 0, bars = 0; for (const [sym, p] of this.pos){ const s = this.series.get(sym); for (let k = fromK; k <= toK; k++){ const d = this.calendar[k]; if (d < s.from || d > s.to) continue; bars++; if (p[k] < 0) gaps++; } } return { bars, gaps, ratio: bars ? gaps / bars : 0 }; }
 }
 
 // בניית Dataset מהקבצים שה-UI/סקריפט טענו: manifest + series compact + universe + sectors; חיתוך לטווח עם חימום
-export function buildDataset({ manifest = {}, series = [], universe = null, sectors = null, from = null, to = null, warmupDays = 400, calendarFrom = null } = {}){
+export function buildDataset({ manifest = {}, series = [], universe = null, universes = null, sectors = null, from = null, to = null, warmupDays = 400, calendarFrom = null } = {}){
   const fromDay = from ? dayNum(from) - warmupDays : -Infinity, toDay = to ? dayNum(to) : Infinity;
   const list = series.map((c) => (c instanceof Series ? c : new Series(c))).map((s) => (from || to ? s.slice(fromDay, toDay) : s)).filter((s) => s.n > 0);
-  return new Dataset({ series: list, universe, sectors: sectors || manifest.sectors || {}, meta: { source: manifest.source || null, builtAt: manifest.builtAt || null, provider: manifest.provider || null, notes: manifest.notes || [] }, calendarFrom });
+  return new Dataset({ series: list, universe, universes, sectors: sectors || manifest.sectors || {}, meta: { source: manifest.source || null, builtAt: manifest.builtAt || null, provider: manifest.provider || null, notes: manifest.notes || [], rangeFrom: from || null, rangeTo: to || null }, calendarFrom });
+}
+// איחוד כמה shards של אותו סימבול (קבצים לפי עשור) לסדרה אחת
+export function mergeCompact(parts){
+  const ps = parts.filter(Boolean).sort((a, b) => a.d[0] - b.d[0]); if (!ps.length) return null;
+  const out = { s: ps[0].s, d: [], o: [], h: [], l: [], c: [], v: [], a: [], div: [], split: [], meta: ps[ps.length - 1].meta || ps[0].meta || {} };
+  for (const p of ps){ for (const k of ['d', 'o', 'h', 'l', 'c', 'v', 'a']) if (p[k]) out[k].push(...p[k]); out.div.push(...(p.div || [])); out.split.push(...(p.split || [])); }
+  return out;
 }
