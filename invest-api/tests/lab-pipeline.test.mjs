@@ -58,3 +58,13 @@ test('mergeCompact: shards לא ממוינים מתאחדים לפי זמן', ()
   const a = { s: 'X', d: [10, 11], o: [1, 1], h: [1, 1], l: [1, 1], c: [1, 1], v: [1, 1], a: [1, 1], div: [[11, 0.1]], split: [] }, b = { s: 'X', d: [1, 2], o: [2, 2], h: [2, 2], l: [2, 2], c: [2, 2], v: [2, 2], a: [2, 2], div: [], split: [[2, 2]] };
   const m = mergeCompact([a, b]); assert.deepEqual(m.d, [1, 2, 10, 11]); assert.deepEqual(m.o, [2, 2, 1, 1]); assert.equal(m.div.length, 1); assert.equal(m.split.length, 1); assert.equal(mergeCompact([null]), null);
 });
+
+test('parseMembershipCsv: קובץ fja05680 ללא הנחה על שמות עמודות (date,tickers / Date,Tickers / סדר הפוך) → מרווחי חברות', async () => {
+  const { parseMembershipCsv } = await import('../scripts/lab-data.mjs');
+  const syms = Array.from({ length: 320 }, (_, i) => 'S' + i).join(',');
+  const a = parseMembershipCsv(`date,tickers\n1996-01-02,"${syms}"\n1996-01-03,"${syms},NEW"\n`);
+  assert.equal(a.length, 2); assert.equal(a[0].day, '1996-01-02'); assert.equal(a[0].symbols.length, 320); assert.ok(a[1].symbols.includes('NEW'));
+  const b = parseMembershipCsv(`Tickers,Date\n"${syms}",2001-05-05 00:00:00\n`); assert.equal(b[0].day, '2001-05-05'); assert.equal(b[0].symbols.length, 320);
+  assert.deepEqual(parseMembershipCsv('date,tickers\n2001-01-01,"A,B"\n'), [], 'שורה עם פחות מ-300 סימבולים נפסלת'); assert.deepEqual(parseMembershipCsv(null), []);
+  const m = membershipFromDaily(a); assert.deepEqual(m.members.NEW, [[dayNum('1996-01-03'), null]]);
+});
