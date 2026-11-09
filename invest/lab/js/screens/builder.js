@@ -5,7 +5,7 @@ import { FEATURES, featureLabel } from '../../../../invest-api/engine/lab/featur
 import { normalizeSpec, ENTRY_TIMINGS, SIZING_MODES, COST_PRESETS } from '../../../../invest-api/engine/lab/schema.js';
 import { byId, LIBRARY } from '../../../../invest-api/engine/lab/library.js';
 import { strategies } from '../store.js';
-import { explainBlock } from '../ui.js';
+import { explainBlock, rangePicker, bindRange } from '../ui.js';
 import { state, go } from '../app.js';
 
 const OPS = { '<': 'קטן מ-', '<=': 'קטן/שווה', '>': 'גדול מ-', '>=': 'גדול/שווה', '==': 'שווה', between: 'בין', cross_above: 'חוצה מעלה', cross_below: 'חוצה מטה', top_pct: 'ב-% העליונים', bottom_pct: 'ב-% התחתונים', top_n: 'בין N הגבוהים', bottom_n: 'בין N הנמוכים' };
@@ -21,7 +21,7 @@ export async function render(main, params = {}){
   const spec = draft.spec;
   spec.signal ||= {}; spec.entry ||= {}; spec.exit ||= { rules: [] }; spec.sizing ||= {}; spec.costs ||= { model: 'ibkr_fixed' }; spec.universe ||= { type: 'index', index: 'sp500', filters: {} }; spec.universe.filters ||= {}; spec.period ||= {};
   main.innerHTML = `<div class="page-head"><div><h1>בונה אסטרטגיות</h1><span class="muted">הגדר יקום, תנאים, כניסה, יציאה וגודל — בלי קוד. ההסבר מימין מתעדכן ומראה בדיוק מה ייבדק.</span></div>
-    <div class="row"><input id="name" value="${esc(draft.name || spec.name || '')}" placeholder="שם האסטרטגיה" style="width:260px"><button class="btn" id="save">💾 שמור${draft.id ? ' גרסה' : ''}</button><button class="btn" id="dup" ${draft.id ? '' : 'disabled'}>שכפל</button><button class="btn primary" id="run">▶ הרץ Backtest</button></div></div>
+    <div class="row"><input id="name" class="name" value="${esc(draft.name || spec.name || '')}" placeholder="שם האסטרטגיה"><button class="btn" id="save">💾 שמור${draft.id ? ' גרסה' : ''}</button><button class="btn" id="dup" ${draft.id ? '' : 'disabled'}>שכפל</button><button class="btn primary" id="run">▶ הרץ Backtest</button></div></div>
     <div class="grid g-2-1"><div class="builder" id="form"></div><div><div class="card" style="position:sticky;top:70px"><h3>מה בדיוק ייבדק</h3><div id="explain"></div><div class="row" style="margin-top:.6rem"><button class="btn sm" id="json">JSON</button><label class="btn sm">ייבוא JSON<input type="file" id="imp" accept=".json" hidden></label></div></div></div></div>`;
   const form = main.querySelector('#form'), ex = main.querySelector('#explain');
   const refresh = () => { ex.innerHTML = explainBlock(spec); };
@@ -55,12 +55,9 @@ function secUniverse(spec, on){
 }
 function secPeriod(spec, on){
   const p = spec.period;
-  const n = sec('2. תקופת הבדיקה', `${F('מתאריך', inp('from', p.from || '', { type: 'date' }))}${F('עד תאריך', inp('to', p.to || '', { type: 'date' }))}
-    <div class="row" style="margin:.3rem 0">${['1y', '3y', '5y', '10y', '20y', 'crisis2008', 'bull2010s', 'covid', 'rates2022', 'since2020'].map((k) => `<button class="btn sm" data-q="${k}">${{ '1y': 'שנה', '3y': '3 שנים', '5y': '5 שנים', '10y': '10 שנים', '20y': '20 שנה', crisis2008: 'משבר 2008', bull2010s: '2010–2019', covid: 'קורונה 2020', rates2022: 'ריבית 2022', since2020: '2020–היום' }[k]}</button>`).join('')}</div>
-    ${F('ימים בשבוע לביצוע (0=א׳ … 5=ו׳)', `<input data-k="weekdays" data-nums data-nullable type="text" value="${esc((p.weekdays || []).join(','))}" placeholder="למשל 1,2,3">`)}${F('חודשים (1–12)', `<input data-k="months" data-nums data-nullable type="text" value="${esc((p.months || []).join(','))}" placeholder="למשל 11,12,1">`)}${F('מצב שוק', sel('regime', p.regime || 'all', { all: 'כל התקופה', bull: 'שוק עולה (ייחוס מעל SMA)', bear: 'שוק יורד (ייחוס מתחת SMA)' }))}${F('נייר ייחוס למצב השוק', inp('regimeSymbol', p.regimeSymbol || 'SPY', { type: 'text' }))}${F('SMA למצב השוק', inp('regimeSma', p.regimeSma || 200, { step: 1 }))}`, { hint: 'תקופות ריבית/דוחות: השתמש בתאריכים או במצב השוק; לוח דוחות היסטורי אינו במערך הנתונים (ראה "נתונים").' });
-  const today = new Date().toISOString().slice(0, 10), Y = +today.slice(0, 4);
-  const Q = { '1y': [`${Y - 1}${today.slice(4)}`, today], '3y': [`${Y - 3}${today.slice(4)}`, today], '5y': [`${Y - 5}${today.slice(4)}`, today], '10y': [`${Y - 10}${today.slice(4)}`, today], '20y': [`${Y - 20}${today.slice(4)}`, today], crisis2008: ['2007-10-09', '2009-03-09'], bull2010s: ['2010-01-04', '2019-12-31'], covid: ['2020-02-19', '2020-06-30'], rates2022: ['2022-01-03', '2022-12-30'], since2020: ['2020-01-02', today] };
-  n.querySelectorAll('[data-q]').forEach((b) => { b.onclick = () => { [p.from, p.to] = Q[b.dataset.q]; on(true); }; });
+  const n = sec('2. תקופת הבדיקה', `${rangePicker({ from: p.from || '', to: p.to || '' })}
+    ${F('ימים בשבוע לביצוע (0=א׳ … 5=ו׳)', `<input data-k="weekdays" data-nums data-nullable type="text" value="${esc((p.weekdays || []).join(','))}" placeholder="למשל 1,2,3">`)}${F('חודשים (1–12)', `<input data-k="months" data-nums data-nullable type="text" value="${esc((p.months || []).join(','))}" placeholder="למשל 11,12,1">`)}${F('מצב שוק', sel('regime', p.regime || 'all', { all: 'כל התקופה', bull: 'שוק עולה (ייחוס מעל SMA)', bear: 'שוק יורד (ייחוס מתחת SMA)' }))}${F('נייר ייחוס למצב השוק', inp('regimeSymbol', p.regimeSymbol || 'SPY', { type: 'text' }))}${F('SMA למצב השוק', inp('regimeSma', p.regimeSma || 200, { step: 1 }))}`, { hint: 'טווח לפי תאריכים, לפי שנים (מ–עד) או קיצור דרך. תקופות ריבית/דוחות: השתמש בתאריכים או במצב השוק; לוח דוחות היסטורי אינו במערך הנתונים (ראה "נתונים").' });
+  bindRange(n, ({ from, to }) => { p.from = from; p.to = to; on(); });
   return bind(n, p, on);
 }
 function featureOpts(sel_){ return Object.entries(FEATURES).map(([k, v]) => `<option value="${k}" ${k === sel_ ? 'selected' : ''}>${esc(v.label(v.params))}${v.fundamental ? ' ⚠' : ''}</option>`).join(''); }

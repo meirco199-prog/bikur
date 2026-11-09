@@ -4,14 +4,14 @@ import { lineChart, chartColors } from '../../../js/ui/chart.js';
 import { call } from '../engine.js';
 import { byId, LIBRARY } from '../../../../invest-api/engine/lab/library.js';
 import { strategies, results } from '../store.js';
-import { P, P0, N, $$$, limitedTag, err, download, toCsv } from '../ui.js';
+import { P, P0, N, $$$, limitedTag, err, download, toCsv, rangePicker, bindRange, readRange } from '../ui.js';
 
 export async function render(main){
   const saved = strategies.list(), savedRes = await results.list();
   const today = new Date().toISOString().slice(0, 10), Y = +today.slice(0, 4);
   main.innerHTML = `<div class="page-head"><div><h1>השוואת אסטרטגיות</h1><span class="muted">בחר עד 6 אסטרטגיות. כולן ירוצו באותו הון, באותה תקופה ובאותו מודל עלויות — השוואה הוגנת. Buy&Hold של SPY/QQQ מתווסף אוטומטית.</span></div></div>
   <div class="grid g-2-1"><section class="card"><h3>מה להשוות</h3><div class="row" style="margin-bottom:.5rem"><select id="add" style="max-width:380px"><optgroup label="תבניות">${LIBRARY.map((t) => `<option value="tpl:${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>${saved.length ? `<optgroup label="שמורות">${saved.map((s) => `<option value="id:${s.id}">${esc(s.name)}</option>`).join('')}</optgroup>` : ''}${savedRes.length ? `<optgroup label="תוצאות שמורות (ללא הרצה מחדש — רק אם התקופה זהה)">${savedRes.map((r) => `<option value="res:${r.id}">${esc(r.name)} (${r.from}→${r.to})</option>`).join('')}</optgroup>` : ''}</select><button class="btn" id="addBtn">+ הוסף</button><button class="btn sm ghost" id="preset">דוגמת הדרישה (א׳–ד׳)</button></div><div id="list" class="stack"></div></section>
-  <section class="card"><h3>הנחות משותפות</h3><div class="stack"><label class="f">הון התחלתי $ <input id="cap" type="number" value="50000"></label><label class="f">מתאריך <input id="from" type="date" value="${Y - 10}-01-01"></label><label class="f">עד <input id="to" type="date" value="${today}"></label><label class="f">עלויות <select id="costs"><option value="ibkr_fixed">IBKR Fixed + החלקה 5 נ"ב</option><option value="bps">10 נ"ב לכל צד</option><option value="none">ללא (לא ריאלי)</option></select></label><button class="btn primary" id="go">▶ הרץ השוואה</button></div></section></div>
+  <section class="card"><h3>הנחות משותפות</h3><div class="stack"><label class="f"><span>הון התחלתי $</span><input id="cap" type="number" value="50000"></label><h4>תקופה</h4>${rangePicker({ from: `${Y - 10}-01-01`, to: today })}<label class="f"><span>עלויות</span> <select id="costs"><option value="ibkr_fixed">IBKR Fixed + החלקה 5 נ"ב</option><option value="bps">10 נ"ב לכל צד</option><option value="none">ללא (לא ריאלי)</option></select></label><button class="btn primary" id="go">▶ הרץ השוואה</button></div></section></div>
   <div id="out" style="margin-top:1rem"></div>`;
   const items = [];
   const list = main.querySelector('#list');
@@ -19,10 +19,10 @@ export async function render(main){
   const add = (v) => { if (items.length >= 6) return toast('עד 6 אסטרטגיות', 'err'); if (v.startsWith('tpl:')){ const t = byId(v.slice(4)); items.push({ name: t.name, kind: 'תבנית', spec: t.spec }); } else if (v.startsWith('id:')){ const s = strategies.get(v.slice(3)); items.push({ name: s.name, kind: 'שמורה', spec: s.spec }); } else { items.push({ name: savedRes.find((r) => r.id === v.slice(4))?.name, kind: 'תוצאה שמורה', resultId: v.slice(4) }); } drawList(); };
   main.querySelector('#addBtn').onclick = () => add(main.querySelector('#add').value);
   main.querySelector('#preset').onclick = () => { items.length = 0; const a = byId('top10-losers-1d'); items.push({ name: "א׳: 10 שירדו הכי הרבה אתמול", kind: 'תבנית', spec: a.spec }); items.push({ name: "ב׳: 10 שירדו הכי הרבה ב-3 ימים", kind: 'תבנית', spec: { ...a.spec, signal: { ...a.spec.signal, rank: { ...a.spec.signal.rank, params: { days: 3 } } } } }); items.push({ name: "ג׳: 10 שעלו הכי הרבה בשבוע", kind: 'תבנית', spec: { ...a.spec, signal: { ...a.spec.signal, rank: { feature: 'ret', params: { days: 5 }, order: 'desc', top: 10 } } } }); items.push({ name: "ד׳: Buy & Hold S&P 500", kind: 'תבנית', spec: { name: 'Buy & Hold SPY', universe: { type: 'list', symbols: ['SPY'], filters: { minPrice: 0, minDollarVol: 0, minBars: 2 } }, signal: { conditions: { all: [{ feature: 'bars', op: '>', value: 1 }] } }, entry: { timing: 'next_open' }, exit: { rules: [{ type: 'time', days: 100000 }] }, sizing: { capital: 50000, maxPositions: 1 }, benchmarks: ['SPY'] } }); drawList(); };
-  drawList();
+  drawList(); bindRange(main);
   main.querySelector('#go').onclick = async () => {
     if (!items.length) return toast('הוסף אסטרטגיות', 'err');
-    const cap = +main.querySelector('#cap').value || 50000, from = main.querySelector('#from').value || null, to = main.querySelector('#to').value || null, costs = main.querySelector('#costs').value;
+    const rg = readRange(main); const cap = +main.querySelector('#cap').value || 50000, from = rg.from, to = rg.to, costs = main.querySelector('#costs').value;
     const out = main.querySelector('#out'); out.innerHTML = '';
     const runs = [];
     try {

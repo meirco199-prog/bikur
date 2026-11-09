@@ -83,3 +83,27 @@ export function exportButtons(getRun, name = 'strategy'){
 export const limitedTag = (r) => (r?.limited ? '<span class="tag opinion" title="כיסוי חלקי / הנחה אופטימית — ראה כיסוי והנחות">מוגבל</span>' : '');
 export const warn = (t) => `<div class="limited">⚠ ${esc(t)}</div>`;
 export const err = (e) => `<div class="blocked">שגיאה: ${esc(e?.message || e)}</div>`;
+
+// בורר טווח משותף: תאריכים מ–עד, או שנים מ–עד, או קיצורי דרך (שנה/3/5/10/20, תקופות שוק). readRange(root) → {from,to}
+const TODAY = () => new Date().toISOString().slice(0, 10);
+export const RANGE_PRESETS = () => { const t = TODAY(), Y = +t.slice(0, 4), yrs = (n) => [`${Y - n}${t.slice(4)}`, t]; return [['שנה', ...yrs(1)], ['3 שנים', ...yrs(3)], ['5 שנים', ...yrs(5)], ['10 שנים', ...yrs(10)], ['20 שנה', ...yrs(20)], ['2010–2019', '2010-01-04', '2019-12-31'], ['משבר 2008', '2007-10-09', '2009-03-09'], ['קורונה 2020', '2020-02-19', '2020-06-30'], ['ריבית 2022', '2022-01-03', '2022-12-30'], ['2020–היום', '2020-01-02', t], ['הכול', '', '']]; };
+export function rangePicker({ from = '', to = '', minYear = 1996 } = {}){
+  const Y = +TODAY().slice(0, 4), years = Array.from({ length: Y - minYear + 1 }, (_, i) => Y - i);
+  const opt = (sel, label) => `<option value="">${label}</option>${years.map((y) => `<option value="${y}" ${String(y) === String(sel) ? 'selected' : ''}>${y}</option>`).join('')}`;
+  const y0 = from && /-01-01$/.test(from) ? from.slice(0, 4) : '', y1 = to && /-12-31$/.test(to) ? to.slice(0, 4) : '';
+  return `<div class="range" data-range>
+    <div class="row"><label class="f"><span>מתאריך</span><input data-from type="date" value="${esc(from || '')}"></label><label class="f"><span>עד תאריך</span><input data-to type="date" value="${esc(to || '')}"></label></div>
+    <div class="row"><label class="f"><span>או לפי שנים: משנת</span><select data-y0>${opt(y0, 'תחילת הנתונים')}</select></label><label class="f"><span>עד שנת</span><select data-y1>${opt(y1, 'היום')}</select></label></div>
+    <div class="row chips">${RANGE_PRESETS().map(([l, a, b]) => `<button type="button" class="chip" data-preset data-a="${a}" data-b="${b}">${esc(l)}</button>`).join('')}</div>
+    <div class="muted" data-range-note>ריק = כל ההיסטוריה שבמערך הנתונים</div></div>`;
+}
+export function bindRange(root, onChange = null){
+  const r = root.querySelector('[data-range]') || root; const f = r.querySelector('[data-from]'), t = r.querySelector('[data-to]'), y0 = r.querySelector('[data-y0]'), y1 = r.querySelector('[data-y1]'), note = r.querySelector('[data-range-note]');
+  const fire = () => { if (note) note.textContent = f.value || t.value ? `${f.value || 'תחילת הנתונים'} → ${t.value || 'היום'}` : 'ריק = כל ההיסטוריה שבמערך הנתונים'; onChange?.(readRange(root)); };
+  r.querySelectorAll('[data-preset]').forEach((b) => { b.onclick = () => { f.value = b.dataset.a; t.value = b.dataset.b; y0.value = ''; y1.value = ''; r.querySelectorAll('[data-preset]').forEach((x) => x.classList.toggle('on', x === b)); fire(); }; });
+  const fromYears = () => { const a = y0.value, b = y1.value; if (a) f.value = `${a}-01-01`; if (b) t.value = +b >= +TODAY().slice(0, 4) ? TODAY() : `${b}-12-31`; if (a && b && +a > +b){ y1.value = a; t.value = `${a}-12-31`; } r.querySelectorAll('[data-preset]').forEach((x) => x.classList.remove('on')); fire(); };
+  y0.onchange = fromYears; y1.onchange = fromYears;
+  f.onchange = () => { y0.value = ''; r.querySelectorAll('[data-preset]').forEach((x) => x.classList.remove('on')); fire(); }; t.onchange = () => { y1.value = ''; r.querySelectorAll('[data-preset]').forEach((x) => x.classList.remove('on')); fire(); };
+  return readRange(root);
+}
+export function readRange(root){ const r = root.querySelector('[data-range]') || root; return { from: r.querySelector('[data-from]')?.value || null, to: r.querySelector('[data-to]')?.value || null }; }
