@@ -90,8 +90,10 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
     else target = base * Z.leverage / slots * (order.weight ?? 1);
     target = Math.min(target, base * Z.maxPerSymbolPct);
     if (Z.maxPerSectorPct < 1){ const sec = ds.sectorOf(sym) || 'לא ידוע', ex = sectorExposure()[sec] || 0; target = Math.min(target, Math.max(0, base * Z.maxPerSectorPct - ex)); }
-    const room = base * Z.leverage - grossExposure(); if (room <= 0){ skip('leverage'); return false; } target = Math.min(target, room);
-    if (long && Z.leverage <= 1) target = Math.min(target, Math.max(0, cash));
+    if (!Z.unlimited){ // חשבון אמיתי: מגבלת חשיפה ומזומן. מצב מחקר (unlimited): סכום קבוע תמיד, ההון עלול להיות שלילי — מסומן בהנחות
+      const room = base * Z.leverage - grossExposure(); if (room <= 0){ skip('leverage'); return false; } target = Math.min(target, room);
+      if (long && Z.leverage <= 1) target = Math.min(target, Math.max(0, cash));
+    }
     let shares = Z.fractional ? Math.floor(target / px * 1e4) / 1e4 : Math.floor(target / px);
     if (Z.maxVolumePct && bar && bar.v > 0) shares = Math.min(shares, Z.fractional ? Z.maxVolumePct * bar.v : Math.floor(Z.maxVolumePct * bar.v));
     if (!(shares > 0)){ skip('small'); return false; }
@@ -232,7 +234,7 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
       }
       // 5. עלויות יומיות: השאלה בשורט, ריבית מרג'ין
       if (!long && C.shortBorrowAnnualPct > 0) for (const pos of positions.values()){ const b = Math.abs(pos.shares * pos.last) * C.shortBorrowAnnualPct / 100 / 360; pos.borrow += b; cash -= b; borrowTotal += b; }
-      if (cash < 0 && C.marginAnnualPct > 0){ const m = -cash * C.marginAnnualPct / 100 / 360; cash -= m; marginTotal += m; }
+      if (cash < 0 && C.marginAnnualPct > 0 && !Z.unlimited){ const m = -cash * C.marginAnnualPct / 100 / 360; cash -= m; marginTotal += m; }
       equity = markEquity();
       const gross = grossExposure();
       equitySeries.push([isoOf(day), +equity.toFixed(2), +cash.toFixed(2), +(equity > 0 ? gross / equity : 0).toFixed(4), positions.size]);
@@ -251,7 +253,7 @@ export function simulate(ds, specInput, { onProgress = null, cache = null, keepS
     const assumptions = buildAssumptions(spec, ds, { missingFeatureHits: sigEngine.missing(), liquidationDays, warnings: [...warnings, ...sigEngine.warningsLive] });
     const listSet = sigEngine.listSet;
     const coverage = listSet ? { pointInTime: false, note: 'רשימת סימבולים שנבחרה ידנית — הטיית שורדים לא נשללת (מניות שנמחקו לא ברשימה)', withData: [...listSet].filter((s) => ds.series.has(s)).length, missing: [...listSet].filter((s) => !ds.series.has(s)), total: listSet.size, ratio: [...listSet].filter((s) => ds.series.has(s)).length / listSet.size } : ds.coverage(kStart, kEnd, uni), gaps = ds.gaps(kStart, kEnd);
-    const limited = coverage.pointInTime === false || (coverage.total > 0 && coverage.ratio < 0.9) || spec.entry.timing === 'same_close';
+    const limited = coverage.pointInTime === false || (coverage.total > 0 && coverage.ratio < 0.9) || spec.entry.timing === 'same_close' || !!Z.unlimited;
     return { spec, from: isoOf(ds.dayAt(kStart)), to: isoOf(ds.dayAt(kEnd)), days: kEnd - kStart + 1, capital: Z.capital, finalEquity: +equity.toFixed(2), equity: equitySeries, trades, signals: signalsLog, benchmarks, skipped, totals: { commission: +commissionTotal.toFixed(2), fees: +feesTotal.toFixed(2), slippage: +slipTotal.toFixed(2), borrow: +borrowTotal.toFixed(2), margin: +marginTotal.toFixed(2), dividends: +dividendsTotal.toFixed(2), costs: +(commissionTotal + feesTotal + slipTotal + borrowTotal + marginTotal).toFixed(2) }, coverage, gaps, assumptions, limited, warnings: [...warnings, ...sigEngine.warningsLive], runtimeMs: Date.now() - t0 };
   }
 
@@ -269,6 +271,7 @@ export function buildAssumptions(spec, ds, extra = {}){
   a.push(`עלויות: ${spec.costs.model === 'none' ? 'ללא (לא ריאלי)' : spec.costs.model === 'ibkr_fixed' ? `עמלת ${spec.costs.perShare}$/מניה (מינ׳ ${spec.costs.minPerOrder}$)` : `${spec.costs.bps} נ"ב`} + החלקה ${spec.costs.slippageBps} נ"ב לכל צד${spec.costs.spreadBps ? ` + מרווח ${spec.costs.spreadBps} נ"ב` : ''}. אין מודל השפעת שוק מעבר לכך — השתתפות במחזור מוצגת לכל עסקה.`);
   a.push(spec.costs.dividends ? 'דיבידנדים נזקפים ב-ex-date (לונג מקבל, שורט משלם); פיצולים מתואמים בכמות ובמחיר הכניסה.' : 'דיבידנדים לא נכללים.');
   if (spec.signal.direction === 'short') a.push(`שורט: עלות השאלה ${spec.costs.shortBorrowAnnualPct}% לשנה (קבועה; בפועל משתנה לפי מניה). אין מודל של "קשה להשאיל" או uptick.`);
+  if (spec.sizing.unlimited) a.push('⚠ מצב מחקר: גודל פוזיציה קבוע בלי מגבלת מזומן/חשיפה וללא ריבית מרג\'ין — מודד את תוחלת הכלל לאורך כל התקופה; ההון המוצג יכול להיות שלילי ואינו חשבון שניתן היה להחזיק.');
   if (spec.sizing.leverage > 1) a.push(`מינוף ${spec.sizing.leverage}×: ריבית מרג'ין ${spec.costs.marginAnnualPct}% לשנה על מזומן שלילי; אין margin call מדומה.`);
   a.push('מניה שנמחקה: יציאה כפויה בסגירה האחרונה הידועה. חברות במדד — לפי ההרכב ההיסטורי של כל יום כשקיים.');
   if (extra.missingFeatureHits) a.push(`${extra.missingFeatureHits.toLocaleString('en-US')} בדיקות תנאי נפלו בגלל נתון חסר/היסטוריה קצרה (התנאי נחשב "לא מתקיים", לא הומצא ערך).`);
