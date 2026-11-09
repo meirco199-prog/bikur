@@ -7,7 +7,7 @@ import { byId } from '../../../../invest-api/engine/lab/library.js';
 import { normalizeSpec } from '../../../../invest-api/engine/lab/schema.js';
 import { strategies, results } from '../store.js';
 import { setDraft } from './builder.js';
-import { kpis, metricsTable, tradeStats, heatmap, groupTable, groupBars, equityChart, drawdownChart, histogramChart, explainBlock, coverageBox, assumptionsBox, tradesTable, exportButtons, limitedTag, P, P0, N, $$$, err } from '../ui.js';
+import { kpis, metricsTable, tradeStats, heatmap, groupTable, groupBars, equityChart, drawdownChart, histogramChart, explainBlock, coverageBox, assumptionsBox, tradesTable, exportButtons, limitedTag, P, P0, N, $$$, err, rangePicker, bindRange, readRange } from '../ui.js';
 import { openTradeModal } from './trades.js';
 
 export async function render(main, params = {}){
@@ -23,9 +23,10 @@ export async function render(main, params = {}){
   if (!src){ const t = byId('top10-losers-1d'); src = { spec: t.spec, params: t.params, name: t.name, templateId: t.id }; }
   const spec = JSON.parse(JSON.stringify(src.spec));
   main.querySelector('#setup').innerHTML = `<div class="grid g-2-1"><section class="card"><h3>${esc(src.name || spec.name)} <span class="muted">${src.id ? 'אסטרטגיה שמורה' : src.templateId ? 'תבנית' : 'טיוטה'}</span></h3>${explainBlock(spec)}</section>
-    <section class="card"><h3>הרצה</h3><div class="stack"><label class="f">מתאריך <input id="from" type="date" value="${esc(spec.period?.from || '')}"></label><label class="f">עד <input id="to" type="date" value="${esc(spec.period?.to || '')}"></label><label class="f">הון התחלתי $ <input id="cap" type="number" value="${spec.sizing?.capital ?? 50000}"></label><div class="muted">בלי תאריכים — כל ההיסטוריה במערך הנתונים (ברירת מחדל ~20 שנה). טעינת מערך מלא של S&P 500 לוקחת זמן בפעם הראשונה; הנתונים נשמרים במטמון הדפדפן.</div><button class="btn primary" id="go">▶ הרץ</button><a class="btn" href="#/builder${src.id ? '?id=' + src.id : src.templateId ? '?template=' + src.templateId : ''}">✎ ערוך בבונה</a></div></section></div>`;
+    <section class="card"><h3>הרצה</h3><div class="stack"><h4>תקופת הבדיקה</h4>${rangePicker({ from: spec.period?.from || '', to: spec.period?.to || '' })}<label class="f"><span>הון התחלתי $</span><input id="cap" type="number" value="${spec.sizing?.capital ?? 50000}"></label><div class="muted">טעינת מערך מלא של S&P 500 לוקחת זמן בפעם הראשונה; הנתונים נשמרים במטמון הדפדפן.</div><button class="btn primary" id="go">▶ הרץ</button><a class="btn" href="#/builder${src.id ? '?id=' + src.id : src.templateId ? '?template=' + src.templateId : ''}">✎ ערוך בבונה</a></div></section></div>`;
+  bindRange(main);
   main.querySelector('#go').onclick = async () => {
-    spec.period = { ...(spec.period || {}), from: main.querySelector('#from').value || null, to: main.querySelector('#to').value || null }; spec.sizing = { ...(spec.sizing || {}), capital: +main.querySelector('#cap').value || 50000 };
+    const rg = readRange(main); spec.period = { ...(spec.period || {}), from: rg.from, to: rg.to }; spec.sizing = { ...(spec.sizing || {}), capital: +main.querySelector('#cap').value || 50000 };
     try { normalizeSpec(spec); } catch (e) { return toast(e.message, 'err'); }
     out.innerHTML = '';
     try {
