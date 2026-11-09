@@ -23,7 +23,7 @@ jobs:
         if: inputs.dump
         run: |
           mkdir -p invest/docs/research/xsec/_wiki
-          for p in Nasdaq-100 List_of_NASDAQ-100_companies; do curl -sSL -A "bikur-research/1.0" "https://en.wikipedia.org/wiki/$p" -o "invest/docs/research/xsec/_wiki/$p.html"; done
+          node invest-api/scripts/wiki-revisions.mjs --dump invest/docs/research/xsec/_wiki --titles NASDAQ-100,Nasdaq-100,List_of_NASDAQ-100_companies --dates 2007-01-01,2009-01-01,2011-01-01,2013-01-01,2015-01-01,2017-01-01,2019-01-01,2021-01-01,2023-01-01,2025-01-01
           ls -la invest/docs/research/xsec/_wiki
       - name: research
         if: ${{ !inputs.dump }}
