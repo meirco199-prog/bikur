@@ -21,7 +21,7 @@ printf 'BYBIT_DEMO_API_KEY=%s\nBYBIT_DEMO_API_SECRET=%s\nWORKER_URL=%s\nBRIDGE_S
 chmod 640 /etc/bikur-bybit/bot.env; chown root:bridge /etc/bikur-bybit/bot.env
 unset BYBIT_KEY BYBIT_SECRET BRIDGE_SECRET
 
-say "שירותים: bikur-bybit (בוט 1, BTC, דקה) + bikur-bybit2 (בוט 2, ETH, 15 דקות)"
+say "שירותים: bikur-bybit (בוט 1, BTC, דקה) + bikur-bybit2 (בוט 2, ETH, 15 דקות) + bikur-bybit3 (בוט 3, שיטת הקורס, 8 מטבעות)"
 unit(){ # $1 שם השירות, $2 תיאור, $3 הסקריפט
 cat > "/etc/systemd/system/$1.service" <<UNIT
 [Unit]
@@ -40,13 +40,16 @@ UNIT
 }
 unit bikur-bybit "bikur Amit bot 1 (Bybit DEMO account only, BTCUSDT)" bybit-amit-bot.mjs
 unit bikur-bybit2 "bikur Amit bot 2 (Bybit DEMO account only, ETHUSDT 15m)" bybit-amit2-bot.mjs
+unit bikur-bybit3 "bikur Amit bot 3 (Bybit DEMO account only, course method, 8 coins 1m)" bybit-amit3-bot.mjs
 mkdir -p "$H/.bikur-bybit" && chown bridge:bridge "$H/.bikur-bybit"
-for s in bybit-amit-bot.mjs bybit-amit2-bot.mjs; do
+for s in bybit-amit-bot.mjs bybit-amit2-bot.mjs bybit-amit3-bot.mjs; do
   sudo -u bridge bash -c "set -a; . /etc/bikur-bybit/bot.env; set +a; cd '$H/bikur' && node invest-api/scripts/$s --check" || { echo "⚠️ בדיקת החיבור ל-Bybit נכשלה ($s) — השירותים לא הופעלו"; exit 1; }
 done
 # בוט 1 עצור ומבוטל אם קיים STOP1 (פעולה stop1) — התקנה מחדש לא מחזירה אותו
 systemctl daemon-reload && systemctl enable -q bikur-bybit2
+# בוט 3 עצור ומבוטל אם קיים STOP3 (פעולה stop3)
+if [ -f "$H/.bikur-bybit/STOP3" ]; then systemctl disable -q bikur-bybit3 2>/dev/null || true; else systemctl enable -q bikur-bybit3; fi
 if [ -f "$H/.bikur-bybit/STOP1" ]; then systemctl disable -q bikur-bybit 2>/dev/null || true; else systemctl enable -q bikur-bybit; fi
-for s in bikur-bybit bikur-bybit2; do systemctl is-enabled -q "$s" && systemctl restart "$s"; done
+for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-enabled -q "$s" && systemctl restart "$s"; done
 sleep 8
-for s in bikur-bybit bikur-bybit2; do systemctl is-active "$s" | sed "s/^/$s: /"; journalctl -u "$s" -n 8 --no-pager; done
+for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-active "$s" | sed "s/^/$s: /"; journalctl -u "$s" -n 8 --no-pager; done

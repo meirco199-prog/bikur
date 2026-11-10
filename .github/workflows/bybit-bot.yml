@@ -1,4 +1,4 @@
-# שני בוטי מסלול עמית בחשבון הדמו של Bybit (כסף וירטואלי): bikur-bybit (בוט 1, BTC) + bikur-bybit2 (בוט 2, ETH) — התקנה/עדכון/עצירה על השרת של בעל הריפו. פירוט: invest/docs/BYBIT_BOT.md
+# בוטי מסלול עמית בחשבון הדמו של Bybit (כסף וירטואלי): bikur-bybit (בוט 1, BTC) + bikur-bybit2 (בוט 2, ETH) + bikur-bybit3 (בוט 3, שיטת הקורס, 8 מטבעות) — התקנה/עדכון/עצירה על השרת של בעל הריפו. פירוט: invest/docs/BYBIT_BOT.md
 # Bybit חוסמת שרתים בארה"ב (כמו ה-runner של GitHub), ולכן הבוט רץ על השרת (גרמניה) וה-workflow רק מתחבר אליו ב-SSH.
 # Secrets: SERVER_HOST, SERVER_ROOT_PASSWORD, BYBIT_DEMO_API_KEY, BYBIT_DEMO_API_SECRET, BRIDGE_SECRET (לדיווח ל-Worker).
 name: Bybit demo bot (Amit)
@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'install (התקנה/עדכון מלא + הפעלה) | update (משיכת קוד + ריסטארט) | status | logs | stop (עצירה מיידית: ביטול פקודות + סגירת פוזיציה) | start (ביטול עצירה) | stop1 / start1 (בוט 1 בלבד)'
+        description: 'install (התקנה/עדכון מלא + הפעלה) | update (משיכת קוד + ריסטארט) | status | logs | stop (עצירה מיידית: ביטול פקודות + סגירת פוזיציה) | start (ביטול עצירה) | stop1 / start1 (בוט 1 בלבד) | stop3 / start3 (בוט 3 בלבד) | summary3 (סיכום בוט 3)'
         required: true
         default: 'status'
         type: choice
-        options: [install, update, status, logs, stop, start, stop1, start1]
+        options: [install, update, status, logs, stop, start, stop1, start1, stop3, start3, summary3]
 
 permissions:
   contents: read
@@ -42,11 +42,14 @@ jobs:
           # STOP: הבוט מבטל את הפקודות שלו וסוגר פוזיציה בתוך כ-5 שניות, ואז השירות נעצר
           case "$ACTION" in
             install) { printf 'export BYBIT_KEY=%q BYBIT_SECRET=%q BRIDGE_SECRET=%q WORKER_URL=%q\n' "$BYBIT_KEY" "$BYBIT_SECRET" "$BRIDGE_SECRET" "$WORKER_URL"; cat .github/bybit/bot-install.sh; } | $SSH 'bash -s' ;;
-            update)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge git -C "$H/bikur" pull -q && sudo -u bridge git -C "$H/bikur" log --oneline -1 && for s in bikur-bybit bikur-bybit2; do systemctl is-enabled -q $s && systemctl restart $s; done; sleep 5; for s in bikur-bybit bikur-bybit2; do systemctl is-active $s | sed "s/^/$s: /"; done; true' ;;
-            status)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); ls "$H/.bikur-bybit/STOP" 2>/dev/null && echo "STOP קיים — הבוטים עצורים"; ls "$H/.bikur-bybit/STOP1" 2>/dev/null && echo "STOP1 קיים — בוט 1 עצור"; for s in bikur-bybit bikur-bybit2; do echo "=== $s: $(systemctl is-active $s)"; journalctl -u $s -n 25 --no-pager; done; true' ;;
-            logs)    $SSH 'for s in bikur-bybit bikur-bybit2; do echo "=== $s"; journalctl -u $s -n 120 --no-pager; done' ;;
-            stop)    $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP"; chown -R bridge:bridge "$H/.bikur-bybit"; sleep 15; journalctl -u bikur-bybit -n 6 --no-pager; journalctl -u bikur-bybit2 -n 6 --no-pager; systemctl stop bikur-bybit bikur-bybit2; echo "stopped (STOP נשאר עד start)"' ;;
+            update)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge git -C "$H/bikur" pull -q && sudo -u bridge git -C "$H/bikur" log --oneline -1 && for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-enabled -q $s && systemctl restart $s; done; sleep 5; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-active $s | sed "s/^/$s: /"; done; true' ;;
+            status)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); ls "$H/.bikur-bybit/STOP" 2>/dev/null && echo "STOP קיים — הבוטים עצורים"; ls "$H/.bikur-bybit/STOP1" 2>/dev/null && echo "STOP1 קיים — בוט 1 עצור"; ls "$H/.bikur-bybit/STOP3" 2>/dev/null && echo "STOP3 קיים — בוט 3 עצור"; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do echo "=== $s: $(systemctl is-active $s)"; journalctl -u $s -n 25 --no-pager; done; true' ;;
+            logs)    $SSH 'for s in bikur-bybit bikur-bybit2 bikur-bybit3; do echo "=== $s"; journalctl -u $s -n 120 --no-pager; done' ;;
+            stop)    $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP"; chown -R bridge:bridge "$H/.bikur-bybit"; sleep 15; journalctl -u bikur-bybit -n 6 --no-pager; journalctl -u bikur-bybit2 -n 6 --no-pager; journalctl -u bikur-bybit3 -n 6 --no-pager; systemctl stop bikur-bybit bikur-bybit2 bikur-bybit3; echo "stopped (STOP נשאר עד start)"' ;;
             stop1)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP1"; chown -R bridge:bridge "$H/.bikur-bybit"; systemctl restart bikur-bybit; sleep 20; journalctl -u bikur-bybit -n 10 --no-pager; systemctl stop bikur-bybit; systemctl disable -q bikur-bybit; echo "בוט 1 נעצר ובוטל (STOP1 נשאר עד start1). בוט 2: $(systemctl is-active bikur-bybit2)"' ;;
+            stop3)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP3"; chown -R bridge:bridge "$H/.bikur-bybit"; sleep 75; journalctl -u bikur-bybit3 -n 12 --no-pager; systemctl stop bikur-bybit3; systemctl disable -q bikur-bybit3; echo "בוט 3 נעצר ובוטל (STOP3 נשאר עד start3)"' ;;
+            start3)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP3"; systemctl enable -q bikur-bybit3; systemctl start bikur-bybit3; sleep 5; systemctl is-active bikur-bybit3' ;;
+            summary3) $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge bash -c "set -a; . /etc/bikur-bybit/bot.env; set +a; cd $H/bikur && node invest-api/scripts/bybit-amit3-bot.mjs --summary"; ls -la "$H/.bikur-bybit/bars3" 2>/dev/null; journalctl -u bikur-bybit3 -n 40 --no-pager | grep -E "כניסה|מימוש|סגירה|הסתיימה|עצירה" || true' ;;
             start1)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP1"; systemctl enable -q bikur-bybit; systemctl start bikur-bybit; sleep 5; systemctl is-active bikur-bybit' ;;
-            start)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP"; for s in bikur-bybit bikur-bybit2; do systemctl is-enabled -q $s && systemctl start $s; done; sleep 5; for s in bikur-bybit bikur-bybit2; do systemctl is-active $s | sed "s/^/$s: /"; done' ;;
+            start)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP"; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-enabled -q $s && systemctl start $s; done; sleep 5; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-active $s | sed "s/^/$s: /"; done' ;;
           esac
