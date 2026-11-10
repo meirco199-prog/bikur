@@ -1,7 +1,7 @@
 // בדיקות לבוט 3 (שיטת הקורס בדמו של Bybit): אותו טריגר כמו בבדיקה לאחור, תכנון 30-60-90, ניהול העסקה
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOT3, klines, toM1, liveSignal, planEntry, manage, roundStep } from '../engine/amit3-exec.js';
+import { BOT3, klines, toM1, liveSignal, planEntry, manage, roundStep, retry } from '../engine/amit3-exec.js';
 import { prepare, triggers, CANON } from '../engine/amit-course.js';
 
 const T0 = Date.UTC(2026, 0, 1);
@@ -28,6 +28,25 @@ test('liveSignal: מזהה טריגר רק כשהוא הנר האחרון שנס
   assert.ok(signal); assert.equal(signal.i, k); assert.equal(signal.t, bt.at(-1).t);
   assert.equal(liveSignal(all, 'follow', signal.t).signal, null);  // אותו נר — לא פעמיים
   assert.equal(liveSignal(all.slice(0, -1), 'follow').signal, null); // נר לפני — אין טריגר
+});
+
+test('liveSignal: משיכה שנכשלה — בסבב הבא נוספו 2 נרות, והטריגר בנר שלפני האחרון לא הולך לאיבוד (minI)', () => {
+  const all = scenario('flat'), bt = triggers(prepare(toM1(all)), 'follow', CANON);
+  const L = all.at(-1), more = [...all, { t: L.t + 60e3, o: L.c, c: L.c + 0.02, h: L.c + 0.05, l: L.c - 0.01, v: 1000 }];
+  assert.equal(liveSignal(more, 'follow').signal, null);                          // בלי minI: הטריגר כבר לא האחרון → היה מתפספס
+  const { signal } = liveSignal(more, 'follow', 0, more.length - 2);              // שני הנרות החדשים נבדקים
+  assert.ok(signal); assert.equal(signal.t, bt.at(-1).t);
+  assert.equal(liveSignal(more, 'follow', signal.t, more.length - 2).signal, null); // ואותו טריגר לא נכנס פעמיים
+  assert.equal(liveSignal(more, 'follow', 0, more.length).signal, null);          // אין נרות חדשים → אין טריגר
+});
+
+test('retry: מגבלת קצב (10006) — ניסיון חוזר עם המתנה שגדלה; שגיאה אחרת — בלי ניסיון חוזר', async () => {
+  const waits = [], sleep = async (ms) => { waits.push(ms); };
+  let n = 0;
+  const ok = await retry(async () => { if (++n < 3){ const e = new Error('10006 Too many visits'); e.code = 10006; throw e; } return 'ok'; }, { sleep });
+  assert.equal(ok, 'ok'); assert.equal(n, 3); assert.equal(waits.length, 2); assert.ok(waits[0] >= 1000 && waits[1] >= 2000);
+  n = 0; await assert.rejects(retry(async () => { n++; const e = new Error('10001 params error'); e.code = 10001; throw e; }, { sleep }), /10001/); assert.equal(n, 1);
+  n = 0; await assert.rejects(retry(async () => { n++; const e = new Error('x'); e.code = 10006; throw e; }, { sleep, tries: 3 })); assert.equal(n, 3);
 });
 
 test('planEntry: 30-60-90 — ההפסד אם כל המנות התמלאו והסטופ נפגע ≈ סיכון הבוט', () => {
