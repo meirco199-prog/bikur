@@ -3,9 +3,11 @@
 // כסף וירטואלי בלבד: הכתובת קבועה ל-api-demo. לא נוגע ב-ETHUSDT (בוט 2). אותם מפתחות; STOP (כל הבוטים) או STOP3 (רק בוט 3) → ביטול
 // הפקודות שלו וסגירת הפוזיציות שלו. בנוסף: שומר כל נר דקה סגור מ-Bybit (~/.bikur-bybit/bars3/<SYM>.csv) — כדי להריץ אחר כך את כל
 // הגרסאות (הגרסה ה"מזוקקת", כניסה אחת וכו') על אותם נתונים בדיוק. פירוט: invest/docs/BYBIT_BOT.md
+// כל פעולה מול הברוקר (כניסה, מנה, מימוש, סגירה, הזזת סטופ, ביטול) עוברת קודם את שער הפקודות (engine/amit3-gate.js → order-gate).
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from 'node:fs';
 import { sign, ilDay } from '../engine/amit-exec.js';
 import { BOT3, klines, liveSignal, planEntry, manage } from '../engine/amit3-exec.js';
+import { gate3, linkId3 } from '../engine/amit3-gate.js';
 
 const KEY = process.env.BYBIT_DEMO_API_KEY || '', SECRET = process.env.BYBIT_DEMO_API_SECRET || '';
 const HOME = process.env.HOME || '.', DIR = `${HOME}/.bikur-bybit`, STATE_FILE = `${DIR}/state3.json`, BARS = `${DIR}/bars3`;
@@ -37,7 +39,18 @@ async function history(sym, minutes){
   }
   return [...out.values()].sort((a, b) => a.t - b.t);
 }
-const linkId = (sym, k) => `${BOT3.tag}-${coinOf(sym).slice(0, 6)}-${k}-${Date.now().toString(36)}`;
+// שער הפקודות: כל פעולה → gate3 (order-gate) → רק אם מותר, שולחים; כל החלטה נרשמת ביומן היומי (גם דחייה)
+let ENV = null;
+async function gated(req, call){
+  const g = gate3(req, ENV);
+  const day = new Date(ENV.now).toISOString().slice(0, 10);
+  if (ENV.state.journalDay !== day){ ENV.state.journalDay = day; ENV.state.journal = []; }
+  if (!g.allowed){ log(req.sym, `⛔ השער דחה ${req.side} ${req.qty} (${req.id}):`, g.reasons.join(' · ')); return null; }
+  const r = await call(g.clientOrderId);
+  ENV.state.journal.push({ clientOrderId: g.clientOrderId, t: ENV.now, sym: req.sym, side: req.side, qty: req.qty, reducing: g.reducing });
+  ENV.journal = ENV.state.journal;
+  return r;
+}
 
 async function positions(){
   const out = {};
@@ -46,11 +59,12 @@ async function positions(){
 }
 async function cancelPending(sym){
   const list = (await bybit('GET', '/v5/order/realtime', { category: 'linear', symbol: sym })).list || [];
-  for (const o of list) if ((o.orderLinkId || '').startsWith(`${BOT3.tag}-`)) await bybit('POST', '/v5/order/cancel', { category: 'linear', symbol: sym, orderId: o.orderId }).catch((e) => log(sym, 'ביטול נכשל:', e.message));
+  for (const o of list) if ((o.orderLinkId || '').startsWith(`${BOT3.tag}-`))
+    await gated({ sym, side: 'sell', qty: Number(o.qty) || 0, price: Number(o.price) || 1, id: `${o.orderLinkId}-c` }, () => bybit('POST', '/v5/order/cancel', { category: 'linear', symbol: sym, orderId: o.orderId })).catch((e) => log(sym, 'ביטול נכשל:', e.message));
 }
-async function closeAll(sym, pos, why){
+async function closeAll(sym, pos, why, tag = 'x'){
   await cancelPending(sym);
-  if (pos?.size > 0){ log(sym, 'סגירה בשוק:', why); await bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Sell', orderType: 'Market', qty: String(pos.size), reduceOnly: true, positionIdx: 0, orderLinkId: linkId(sym, 'x') }); }
+  if (pos?.size > 0){ log(sym, 'סגירה בשוק:', why); await gated({ sym, side: 'sell', qty: pos.size, price: pos.avg, id: linkId3(sym, ENV.now, tag) }, (id) => bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Sell', orderType: 'Market', qty: String(pos.size), reduceOnly: true, positionIdx: 0, orderLinkId: id })); }
 }
 async function syncClosed(state){
   const start = Math.max(Date.parse(state.startedAt) || 0, Date.now() - 7 * 86400e3), seen = new Set(state.trades.map((x) => x.id));
@@ -93,11 +107,16 @@ async function tick(state, mem){
   mem.slot = slot;
   const stop = STOP_FILES.some((f) => existsSync(f)), day = ilDay(now);
   const pos = await positions();
-  if (stop){ for (const sym of Object.keys(mem.inst)) if (pos[sym] || state.open[sym]){ await closeAll(sym, pos[sym], 'STOP'); delete state.open[sym]; } saveState(state); if (!mem.stopLogged){ log('מצב עצירה (STOP)'); mem.stopLogged = true; } return; }
+  const w = (await bybit('GET', '/v5/account/wallet-balance', { accountType: 'UNIFIED' })).list?.[0] || {};
+  const equity = Number(w.totalEquity) || 0, available = Number(w.totalAvailableBalance) || 0;
+  state.hwm = Math.max(state.hwm || 0, equity);
+  ENV = { now, equity, available, hwm: state.hwm, positions: pos, dayPnl: 0, journal: state.journalDay === new Date(now).toISOString().slice(0, 10) ? state.journal || [] : [], state };
+  if (stop){ for (const sym of Object.keys(mem.inst)) if (pos[sym] || state.open[sym]){ await closeAll(sym, pos[sym], 'STOP', 'k'); delete state.open[sym]; } saveState(state); if (!mem.stopLogged){ log('מצב עצירה (STOP)'); mem.stopLogged = true; } return; }
   mem.stopLogged = false;
   if (now - (mem.pnlAt || 0) > 5 * 60e3){ await syncClosed(state); mem.pnlAt = now; }
   const today = state.trades.filter((x) => ilDay(x.t) === day).reduce((s, x) => s + x.pnl, 0) + Object.values(pos).reduce((s, p) => s + p.unrealized, 0);
-  if (state.haltDay !== day && today <= -BOT3.dailyLossUsd){ state.haltDay = day; log('⛔ מגבלת הפסד יומית — סוגרים ועוצרים עד מחר'); for (const sym of Object.keys(mem.inst)){ await closeAll(sym, pos[sym], 'מגבלה יומית'); delete state.open[sym]; } }
+  ENV.dayPnl = today;
+  if (state.haltDay !== day && today <= -BOT3.dailyLossUsd){ state.haltDay = day; log('⛔ מגבלת הפסד יומית — סוגרים ועוצרים עד מחר'); for (const sym of Object.keys(mem.inst)){ await closeAll(sym, pos[sym], 'מגבלה יומית', 'd'); delete state.open[sym]; } }
   for (const sym of Object.keys(mem.inst)){
     try {
       const fresh = klines((await market('/v5/market/kline', { category: 'linear', symbol: sym, interval: '1', limit: '5' })).list, now);
@@ -110,10 +129,10 @@ async function tick(state, mem){
         if (pos[sym]) tr.filled = true;
         for (const a of manage(tr, pos[sym], ctx, now, inst)){
           if (a.type === 'cancelPending') await cancelPending(sym);
-          else if (a.type === 'reduce'){ log(sym, 'מימוש:', a.why, a.qty); await bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Sell', orderType: 'Market', qty: String(a.qty), reduceOnly: true, positionIdx: 0, orderLinkId: linkId(sym, 'r') }); }
-          else if (a.type === 'moveSl'){ log(sym, 'סטופ לכניסה:', a.price); await bybit('POST', '/v5/position/trading-stop', { category: 'linear', symbol: sym, stopLoss: String(a.price), tpslMode: 'Full', slTriggerBy: 'LastPrice', positionIdx: 0 }); }
+          else if (a.type === 'reduce'){ log(sym, 'מימוש:', a.why, a.qty); await gated({ sym, side: 'sell', qty: a.qty, price: pos[sym].avg, id: linkId3(sym, tr.signalT, 'r') }, (id) => bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Sell', orderType: 'Market', qty: String(a.qty), reduceOnly: true, positionIdx: 0, orderLinkId: id })); }
+          else if (a.type === 'moveSl'){ log(sym, 'סטופ לכניסה:', a.price); await gated({ sym, side: 'sell', qty: pos[sym].size, price: a.price, id: linkId3(sym, tr.signalT, 's') }, () => bybit('POST', '/v5/position/trading-stop', { category: 'linear', symbol: sym, stopLoss: String(a.price), tpslMode: 'Full', slTriggerBy: 'LastPrice', positionIdx: 0 })); }
           else if (a.type === 'phase'){ tr.phase = a.phase; tr.runner = a.runner; }
-          else if (a.type === 'closeAll'){ await closeAll(sym, pos[sym], a.why); delete state.open[sym]; }
+          else if (a.type === 'closeAll'){ await closeAll(sym, pos[sym], a.why, 't'); delete state.open[sym]; }
           else if (a.type === 'done'){ log(sym, 'עסקה הסתיימה:', a.why); delete state.open[sym]; }
         }
       } else if (signal && !pos[sym] && state.haltDay !== day){
@@ -121,8 +140,11 @@ async function tick(state, mem){
         const p = planEntry(signal, inst);
         if (!p){ log(sym, 'טריגר בלי כניסה (מנה מתחת למינימום או גאומטריה לא תקינה)'); continue; }
         log(sym, 'כניסה (30-60-90):', p.qty.join(' / '), '· מחירים', p.px.map((x) => x.toPrecision(6)).join(' / '), '· סטופ', p.stop, '· עוגן', p.anchor.toPrecision(6), '· אזור', p.zone.join('–') + '%');
-        await bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Buy', orderType: 'Market', qty: String(p.qty[0]), positionIdx: 0, stopLoss: String(p.stop), tpslMode: 'Full', slTriggerBy: 'LastPrice', orderLinkId: linkId(sym, 'e1') });
-        for (const k of [1, 2]) await bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Buy', orderType: 'Limit', qty: String(p.qty[k]), price: String(p.px[k]), timeInForce: 'PostOnly', positionIdx: 0, orderLinkId: linkId(sym, `e${k + 1}`) }).catch((e) => log(sym, `מנה ${k + 1} נדחתה:`, e.message));
+        // הפסד מקסימלי של כל מנה עד הסטופ — לשער (unboundedLoss=false); מנות 60/90 הן חלק מהתוכנית שנקבעה לפני הכניסה (addToPlan)
+        const worst = (k) => p.qty[k] * (p.px[k] - p.stop);
+        const e1 = await gated({ sym, side: 'buy', qty: p.qty[0], price: p.px[0], id: linkId3(sym, p.signalT, 'e1'), worstLoss: worst(0) }, (id) => bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Buy', orderType: 'Market', qty: String(p.qty[0]), positionIdx: 0, stopLoss: String(p.stop), tpslMode: 'Full', slTriggerBy: 'LastPrice', orderLinkId: id }));
+        if (!e1) continue;
+        for (const k of [1, 2]) await gated({ sym, side: 'buy', qty: p.qty[k], price: p.px[k], id: linkId3(sym, p.signalT, `e${k + 1}`), worstLoss: worst(k), addToPlan: true }, (id) => bybit('POST', '/v5/order/create', { category: 'linear', symbol: sym, side: 'Buy', orderType: 'Limit', qty: String(p.qty[k]), price: String(p.px[k]), timeInForce: 'PostOnly', positionIdx: 0, orderLinkId: id })).catch((e) => log(sym, `מנה ${k + 1} נדחתה:`, e.message));
         state.open[sym] = { phase: 0, entryT: now, zone: p.zone, stop: p.stop, px: p.px, qty: p.qty, filled: false, signalT: p.signalT };
       }
     } catch (e) { log(sym, 'שגיאה:', e.message); }

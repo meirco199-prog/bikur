@@ -57,3 +57,29 @@ test('roundStep ובטיחות: הכתובת קבועה לדמו, לא נוגע�
   assert.equal(roundStep(1.2345, 0.01), 1.23); assert.equal(roundStep(1.235, 0.01, 'round'), 1.24);
   assert.ok(BOT3.base.includes('api-demo.')); assert.ok(!('ETH' in BOT3.coins));
 });
+
+// ---------- שער הפקודות (order-gate) לבוט 3 ----------
+import { gate3, linkId3, BOT3_POLICY } from '../engine/amit3-gate.js';
+const ENV0 = (extra = {}) => ({ now: Date.UTC(2026, 10, 10, 12), equity: 100000, available: 90000, dayPnl: 0, hwm: 100000, positions: {}, journal: [], ...extra });
+
+test('שער: כניסה רגילה עוברת; ETH (לא ברשימה) ושורט נדחים', () => {
+  const ok = gate3({ sym: 'SOLUSDT', side: 'buy', qty: 10, price: 150, id: linkId3('SOLUSDT', 1, 'e1'), worstLoss: 40 }, ENV0());
+  assert.equal(ok.allowed, true, ok.reasons.join(','));
+  assert.equal(gate3({ sym: 'ETHUSDT', side: 'buy', qty: 1, price: 3000, id: 'x', worstLoss: 50 }, ENV0()).allowed, false);
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'short', qty: 1, price: 150, id: 'y', worstLoss: 5 }, ENV0()).allowed, false);
+});
+test('שער: מגבלה יומית חוסמת כניסה אבל לא סגירה; כפילות נחסמת; מנה מעבר לתקרה נחסמת', () => {
+  const env = ENV0({ dayPnl: -1001, positions: { SOLUSDT: { size: 10, avg: 150, unrealized: -100 } } });
+  assert.equal(gate3({ sym: 'AVAXUSDT', side: 'buy', qty: 10, price: 30, id: 'a', worstLoss: 10 }, env).allowed, false);
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'sell', qty: 10, price: 150, id: 'b' }, env).allowed, true);
+  const dup = ENV0({ journal: [{ clientOrderId: 'same' }] });
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'buy', qty: 1, price: 150, id: 'same', worstLoss: 4 }, dup).allowed, false);
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'buy', qty: 1000, price: 150, id: 'big', worstLoss: 400 }, ENV0()).allowed, false); // 150,000$ > 60,000$
+});
+test('שער: מנה 60/90 לפוזיציה מפסידה — רק כחלק מתוכנית שנקבעה מראש (addToPlan); בלי סטופ (worstLoss=null) — נדחה', () => {
+  const env = ENV0({ positions: { SOLUSDT: { size: 2, avg: 150, unrealized: -3 } } });
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'buy', qty: 4, price: 149, id: 'e2', worstLoss: 20 }, env).allowed, false);
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'buy', qty: 4, price: 149, id: 'e2b', worstLoss: 20, addToPlan: true }, env).allowed, true);
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'buy', qty: 1, price: 150, id: 'n' }, ENV0()).allowed, false);
+  assert.equal(BOT3_POLICY.mode, 'paper'); assert.equal(BOT3_POLICY.noAveragingDown, true); assert.ok(linkId3('FARTCOINUSDT', Date.now(), 'e3').length <= 36);
+});
