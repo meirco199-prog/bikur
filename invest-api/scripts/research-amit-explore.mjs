@@ -21,8 +21,8 @@ const WF0 = D('2021-11-01'), WF1 = D('2026-11-01'), folds = [];
 for (let d = 603; WF0 + (d + 1) * DAY <= WF1; d += 150) folds.push({ train: { from: WF0 + (d - 603) * DAY, to: WF0 + d * DAY }, test: { from: WF0 + d * DAY, to: Math.min(WF0 + (d + 150) * DAY, WF1) } });
 
 // אחסון דחוס: לכל גרסה עמודות (זמן כניסה, נטו, ברוטו, נומינלי, מטבע)
-const newCols = () => ({ t: [], net: [], gross: [], not: [], coin: [] });
-const push = (c, tr, ci) => { for (const x of tr){ c.t.push(x.tEntry); c.net.push(x.gross - x.fees - x.spread - x.slip - x.funding); c.gross.push(x.gross); c.not.push(x.notional); c.coin.push(ci); } };
+const newCols = () => ({ t: [], net: [], gross: [], not: [], coin: [] }); // not = הסכום המתוכנן לעסקה (כל המנות)
+const push = (c, tr, ci) => { for (const x of tr){ c.t.push(x.tEntry); c.net.push(x.gross - x.fees - x.spread - x.slip - x.funding); c.gross.push(x.gross); c.not.push(x.planned); c.coin.push(ci); } };
 function st(c, p){
   let n = 0, s = 0, s2 = 0, g = 0, w = 0, r5 = 0, g5 = 0; const byCoin = new Float64Array(COINS.length);
   for (let i = 0; i < c.t.length; i++){
@@ -64,13 +64,16 @@ async function main(){
   md.push(`# חקירה: האם אפשר להוציא מהשיטה של עמית גרסה רווחית? — ${V.length.toLocaleString()} גרסאות, נרות דקה 2020–2026`, '');
   md.push(`בקשת מאיר: סטופ צמוד, יציאה מהירה ברווח, הרבה עסקאות, ווליום כשיקול כניסה, עד 5,000$ לעסקה. מטבעות: ${COINS.filter((c) => meta[c]?.bars >= 50000).map((c) => `${c}${meta[c].first > '2020-01-01' ? ` (מ-${meta[c].first})` : ''}`).join(', ')}.`);
   md.push(`תקופות: **מבחן נקי (לא נראה אף פעם) ${iso(P.hold.from)}→${iso(P.hold.to)}** · אימון ${iso(P.train.from)}→${iso(P.train.to)} · אימות →${iso(P.val.to)} · מבחן →${iso(P.test.to)} · Walk-Forward ${folds.length} קפלים (603→150 ימים).`);
-  md.push(`עלויות Bybit מלאות (עמלות 2/5.5bp, מרווח, החלקה, Funding). R = רווח/הפסד ביחס ל-${RISK_USD}$ סיכון. "על 5,000$" = הרווח הממוצע לעסקה אם נכנסים ב-5,000$ (התוצאה ביחס לסכום שנכנס בפועל).`, '');
+  md.push(`עלויות Bybit מלאות (עמלות 2/5.5bp, מרווח, החלקה, Funding). R = רווח/הפסד ביחס ל-${RISK_USD}$ סיכון. "על 5,000$" = הרווח הממוצע לעסקה כשמתכננים 5,000$ לעסקה (כל המנות יחד; ב-30-60-90 נכנס בפועל רק חלק כשהמחיר קופץ מהר).`, '');
   md.push('**מה משתנה ברשת:** אזור — חצי תחתון / רבע תחתון · ווליום ×3/×5/×10 · נר — כל נר / ירוק / "שטיפה וחזרה" (ירד מתחת לאזור וחזר בנר ירוק) · כניסה — 30-60-90 / הכול בטריגר / רק בהנזלה · סטופ — של הקורס / 1% / 0.5% · יציאה — של הקורס / הכול ברמה הקרובה / יעד +0.5% / +1% / +1.5% · זמן — עד 24 שעות / 4 שעות.', '');
   const cnt = (pred) => all.filter(pred).length;
   md.push('## 1. כמה גרסאות מרוויחות?', '| תקופה | R נטו > 0 | גבול תחתון 95% > 0 | R ברוטו > 0 | טובה מהאקראי (R ברוטו) |', '|---|---|---|---|---|');
   for (const [p, name] of [['train', 'אימון'], ['val', 'אימות'], ['test', 'מבחן'], ['hold', '**מבחן נקי 2020–21**']]) md.push(`| ${name} | ${cnt((x) => x[p].R > 0)} | ${cnt((x) => x[p].lo > 0)} | ${cnt((x) => x[p].gR > 0)} | ${cnt((x) => x[p].gR > x.rnd[p].gR)} |`);
-  md.push(`| כל התקופות יחד (אימון+אימות+מבחן+נקי, כל אחת > 0) | ${cnt((x) => ['train', 'val', 'test', 'hold'].every((p) => x[p].R > 0))} | | | |`, '');
-  const row = (label, x) => x ? `| ${label} | \`${x.k}\` | ${x.train.n} | ${f(x.train.win, 0)}% | ${f(x.train.R)} | ${f(x.rnd.train.R)} | ${f(x.val.R)} | ${f(x.test.R)} | **${f(x.hold.R)}** (${x.hold.n}) | ${f$2(x.hold.per5k)} | ${x.train.perDay.toFixed(1)} |` : `| ${label} | — (אף גרסה לא עמדה בתנאי המינימום) | | | | | | | | | |`;
+  md.push(`| כל התקופות יחד (אימון+אימות+מבחן+נקי, כל אחת > 0) | ${cnt((x) => ['train', 'val', 'test', 'hold'].every((p) => x[p].R > 0))} | | | |`);
+  md.push(`| ביקורת: אותן גרסאות בזמנים אקראיים, כל התקופות > 0 | ${cnt((x) => ['train', 'val', 'test', 'hold'].every((p) => x.rnd[p].R > 0))} | | | |`, '');
+  const four = all.filter((x) => ['train', 'val', 'test', 'hold'].every((p) => x[p].R > 0)).sort((a, b) => b.hold.R - a.hold.R).slice(0, 15);
+  md.push('### הגרסאות שהרוויחו בכל 4 התקופות (עד 15, לפי המבחן הנקי)', '| גרסה | עסקאות (אימון / נקי) | R אימון | R אימות | R מבחן | R נקי | R אקראי (נקי) | על 5,000$ (נקי) |', '|---|---|---|---|---|---|---|---|', ...four.map((x) => `| \`${x.k}\` | ${x.train.n} / ${x.hold.n} | ${f(x.train.R)} | ${f(x.val.R)} | ${f(x.test.R)} | ${f(x.hold.R)} | ${f(x.rnd.hold.R)} | ${f$2(x.hold.per5k)} |`), '');
+  const row = (label, x) => x ? `| ${label} | \`${x.k}\` | ${x.train.n} | ${Number.isFinite(x.train.win) ? x.train.win.toFixed(0) : '—'}% | ${f(x.train.R)} | ${f(x.rnd.train.R)} | ${f(x.val.R)} | ${f(x.test.R)} | **${f(x.hold.R)}** (${x.hold.n}) | ${f$2(x.hold.per5k)} | ${x.train.perDay.toFixed(1)} |` : `| ${label} | — (אף גרסה לא עמדה בתנאי המינימום) | | | | | | | | | |`;
   const head = '| | גרסה | עסקאות באימון | הצלחה | R אימון | R אקראי | R אימות | R מבחן | **R מבחן נקי** (עסקאות) | על 5,000$ במבחן הנקי | עסקאות ליום |\n|---|---|---|---|---|---|---|---|---|---|---|';
   md.push('## 2. הגרסה הטובה ביותר בכל משפחה (נבחרה לפי אימון בלבד)', head);
   const fam = [

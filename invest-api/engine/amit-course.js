@@ -142,7 +142,7 @@ export function execute(ctx, trigs, opt = {}){
     const tExit = m1.t[Math.min(k, n - 1)];
     held = (tExit - tIn) / 3600e3;
     const funding = maxCost * 1e-4 * held / 8;
-    trades.push({ coin, tEntry: tIn, tExit, gross, fees, spread, slip, funding, budget: RISK_USD, notional: maxCost, fills, why, evt: g.evt, anchor: g.anchor, entry: px[0] });
+    trades.push({ coin, tEntry: tIn, tExit, gross, fees, spread, slip, funding, budget: RISK_USD, notional: maxCost, planned: N, fills, why, evt: g.evt, anchor: g.anchor, entry: px[0] });
     busy = Math.min(k, n - 1);
   }
   return trades;
