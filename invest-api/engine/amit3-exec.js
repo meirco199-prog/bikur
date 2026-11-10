@@ -29,12 +29,23 @@ export function toM1(bars){
   return m;
 }
 
-// האם הנר האחרון שנסגר הוא טריגר? מריץ את אותו מנוע של הבדיקה לאחור על החלון (בלי מבט לעתיד: רק נרות סגורים).
-export function liveSignal(bars, cat, lastSeenT = 0){
+// האם יש טריגר בנרות שנוספו עכשיו? מריץ את אותו מנוע של הבדיקה לאחור על החלון (בלי מבט לעתיד: רק נרות סגורים).
+// minI = האינדקס של הנר החדש הראשון בסבב הזה (ברירת מחדל: רק הנר האחרון). אם משיכה של דקה נכשלה (מגבלת קצב של Bybit),
+// בסבב הבא נוספים שני נרות — ובלי minI טריגר בנר שלפני האחרון היה הולך לאיבוד (10/11/2026: ~15 משיכות שנכשלו ב-5 שעות).
+export function liveSignal(bars, cat, lastSeenT = 0, minI = bars.length - 1){
   if (bars.length < 1500) return { signal: null };
   const ctx = prepare(toM1(bars)), tg = triggers(ctx, cat, CANON), last = tg.at(-1);
-  const signal = last && last.i === bars.length - 1 && last.t > lastSeenT ? last : null;
+  const signal = last && last.i >= minI && last.t > lastSeenT ? last : null;
   return { signal, ctx };
+}
+
+// ניסיון חוזר לקריאה שנכשלה בשגיאה זמנית (מגבלת קצב 10006 / HTTP 429 / 5xx / רשת), עם המתנה שגדלה: 1s, 2s, 4s…
+export const transient = (e) => e?.code === 10006 || e?.status === 429 || e?.status >= 500 || e?.name === 'TypeError' || /Too many visits|rate limit/i.test(e?.message || '');
+export async function retry(fn, { tries = 3, baseMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), isTransient = transient } = {}){
+  for (let k = 1; ; k++){
+    try { return await fn(); }
+    catch (e){ if (k >= tries || !isTransient(e)) throw e; await sleep(baseMs * 2 ** (k - 1) + Math.floor(Math.random() * 250)); }
+  }
 }
 
 const dec = (step) => Math.max(0, -Math.floor(Math.log10(step) + 1e-9));

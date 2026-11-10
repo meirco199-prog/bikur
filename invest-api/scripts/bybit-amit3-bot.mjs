@@ -6,7 +6,7 @@
 // כל פעולה מול הברוקר (כניסה, מנה, מימוש, סגירה, הזזת סטופ, ביטול) עוברת קודם את שער הפקודות (engine/amit3-gate.js → order-gate).
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from 'node:fs';
 import { sign, ilDay } from '../engine/amit-exec.js';
-import { BOT3, klines, liveSignal, planEntry, manage } from '../engine/amit3-exec.js';
+import { BOT3, klines, liveSignal, planEntry, manage, retry } from '../engine/amit3-exec.js';
 import { gate3, linkId3 } from '../engine/amit3-gate.js';
 
 const KEY = process.env.BYBIT_DEMO_API_KEY || '', SECRET = process.env.BYBIT_DEMO_API_SECRET || '';
@@ -25,9 +25,14 @@ async function bybit(method, path, params = {}){
   if (j.retCode !== 0){ const e = new Error(`${path} → ${j.retCode} ${j.retMsg}`); e.code = j.retCode; throw e; }
   return j.result;
 }
+// נתוני שוק (בלי מפתח). Bybit מגבילה קצב לפי כתובת, ובוט 2 מושך מאותו שרת ברבעי שעה — לכן ניסיון חוזר על שגיאה זמנית
 async function market(path, params){
-  const r = await fetch(`${BOT3.market}${path}?${new URLSearchParams(params)}`, { headers: { 'User-Agent': 'bikur-bybit-bot3' } });
-  const j = await r.json(); if (j.retCode !== 0) throw new Error(`${path} → ${j.retCode} ${j.retMsg}`); return j.result;
+  return retry(async () => {
+    const r = await fetch(`${BOT3.market}${path}?${new URLSearchParams(params)}`, { headers: { 'User-Agent': 'bikur-bybit-bot3' } });
+    const t = await r.text(); let j; try { j = JSON.parse(t); } catch { const e = new Error(`${path} → HTTP ${r.status} ${t.slice(0, 120)}`); e.status = r.status; throw e; }
+    if (j.retCode !== 0){ const e = new Error(`${path} → ${j.retCode} ${j.retMsg}`); e.code = j.retCode; e.status = r.status; throw e; }
+    return j.result;
+  });
 }
 async function history(sym, minutes){
   const out = new Map(); let end = Date.now();
@@ -119,11 +124,13 @@ async function tick(state, mem){
   if (state.haltDay !== day && today <= -BOT3.dailyLossUsd){ state.haltDay = day; log('⛔ מגבלת הפסד יומית — סוגרים ועוצרים עד מחר'); for (const sym of Object.keys(mem.inst)){ await closeAll(sym, pos[sym], 'מגבלה יומית', 'd'); delete state.open[sym]; } }
   for (const sym of Object.keys(mem.inst)){
     try {
-      const fresh = klines((await market('/v5/market/kline', { category: 'linear', symbol: sym, interval: '1', limit: '5' })).list, now);
-      const bars = mem.bars[sym], lastT = bars.at(-1)?.t || 0;
-      for (const b of fresh) if (b.t > lastT){ bars.push(b); appendFileSync(`${BARS}/${sym}.csv`, `${b.t},${b.o},${b.h},${b.l},${b.c},${b.v}\n`); }
+      await new Promise((r) => setTimeout(r, 200));   // פיזור הבקשות בתוך הדקה (מגבלת קצב)
+      const fresh = klines((await market('/v5/market/kline', { category: 'linear', symbol: sym, interval: '1', limit: '10' })).list, now);
+      const bars = mem.bars[sym], lastT = bars.at(-1)?.t || 0; let added = 0;
+      for (const b of fresh) if (b.t > lastT){ bars.push(b); added++; appendFileSync(`${BARS}/${sym}.csv`, `${b.t},${b.o},${b.h},${b.l},${b.c},${b.v}\n`); }
       while (bars.length > BOT3.historyMin) bars.shift();
-      const cat = BOT3.coins[coinOf(sym)], { signal, ctx } = liveSignal(bars, cat, state.lastSeen[sym] || 0), inst = mem.inst[sym];
+      // טריגר נבדק רק בנרות שנוספו בסבב הזה (גם כשמשיכה קודמת נכשלה ונוספו כמה) — לא פעמיים, ולא בנר ישן
+      const cat = BOT3.coins[coinOf(sym)], { signal, ctx } = liveSignal(bars, cat, state.lastSeen[sym] || 0, bars.length - added), inst = mem.inst[sym];
       const tr = state.open[sym];
       if (tr){
         if (pos[sym]) tr.filled = true;
@@ -137,6 +144,8 @@ async function tick(state, mem){
         }
       } else if (signal && !pos[sym] && state.haltDay !== day){
         state.lastSeen[sym] = signal.t;
+        const lagMin = (now - signal.t - 60e3) / 60e3;
+        if (lagMin > 3){ log(sym, `טריגר בלי כניסה: הנר נסגר לפני ${lagMin.toFixed(1)} דק׳ (המחיר כבר זז)`); continue; }
         const p = planEntry(signal, inst);
         if (!p){ log(sym, 'טריגר בלי כניסה (מנה מתחת למינימום או גאומטריה לא תקינה)'); continue; }
         log(sym, 'כניסה (30-60-90):', p.qty.join(' / '), '· מחירים', p.px.map((x) => x.toPrecision(6)).join(' / '), '· סטופ', p.stop, '· עוגן', p.anchor.toPrecision(6), '· אזור', p.zone.join('–') + '%');
