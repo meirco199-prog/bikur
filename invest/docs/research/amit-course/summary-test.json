@@ -1,0 +1,875 @@
+{
+ "meta": {
+  "coins": {
+   "BTC": {
+    "cat": "btc",
+    "months": 60,
+    "missing": 0,
+    "first": "2021-11-01",
+    "bars": 2628000
+   },
+   "ETH": {
+    "cat": "eth",
+    "months": 60,
+    "missing": 0,
+    "first": "2021-11-01",
+    "bars": 2628000
+   },
+   "SOL": {
+    "cat": "follow",
+    "months": 60,
+    "missing": 0,
+    "first": "2021-11-01",
+    "bars": 2620800
+   },
+   "AVAX": {
+    "cat": "follow",
+    "months": 60,
+    "missing": 0,
+    "first": "2021-11-01",
+    "bars": 2628000
+   },
+   "ADA": {
+    "cat": "follow",
+    "months": 60,
+    "missing": 0,
+    "first": "2021-11-01",
+    "bars": 2628000
+   },
+   "INJ": {
+    "cat": "follow",
+    "months": 51,
+    "missing": 9,
+    "first": "2022-08-17",
+    "bars": 2211675
+   },
+   "RENDER": {
+    "cat": "follow",
+    "months": 45,
+    "missing": 15,
+    "first": "2023-02-03",
+    "bars": 1964387
+   },
+   "NEAR": {
+    "cat": "vol",
+    "months": 60,
+    "missing": 0,
+    "first": "2021-11-01",
+    "bars": 2620800
+   },
+   "FARTCOIN": {
+    "cat": "vol",
+    "months": 23,
+    "missing": 37,
+    "first": "2024-12-20",
+    "bars": 978075
+   }
+  },
+  "from": "2021-11-01",
+  "to": "2026-11-01"
+ },
+ "periods": {
+  "train": [
+   "2021-11-01",
+   "2024-11-01"
+  ],
+  "val": [
+   "2024-11-01",
+   "2025-11-01"
+  ],
+  "test": [
+   "2025-11-01",
+   "2026-11-01"
+  ],
+  "dev": [
+   "2021-11-01",
+   "2025-11-01"
+  ],
+  "all": [
+   "2021-11-01",
+   "2026-11-01"
+  ]
+ },
+ "canon": {
+  "key": "M4h-W1-kv3-any-vs-ladder-course",
+  "train": {
+   "n": 1370,
+   "net": -26432.68,
+   "gross": -10203.97,
+   "fees": 10903.49,
+   "spreadSlip": 4129.21,
+   "funding": 1196,
+   "winRate": 75.4,
+   "pf": 0.81,
+   "exp": -19.29,
+   "expR": -0.048,
+   "ciR": [
+    -0.083,
+    -0.014
+   ],
+   "expRGross": -0.019,
+   "ciRGross": [
+    -0.052,
+    0.015
+   ],
+   "maxDD": 27936.75,
+   "days": 1096,
+   "perDay": -24.12,
+   "ciDay": [
+    -47.96,
+    -0.28
+   ],
+   "pDay": 0.976,
+   "byCoin": {
+    "BTC": -6802.53,
+    "ETH": -4768.32,
+    "SOL": -4686.3,
+    "AVAX": 484.73,
+    "ADA": -3302.18,
+    "INJ": -3763.22,
+    "RENDER": -627.08,
+    "NEAR": -2967.78,
+    "FARTCOIN": 0
+   },
+   "coinsPos": 1,
+   "breakEvenCost": -0.76
+  },
+  "val": {
+   "n": 608,
+   "net": -13972.25,
+   "gross": -6337.13,
+   "fees": 4902.45,
+   "spreadSlip": 2203.85,
+   "funding": 528.82,
+   "winRate": 74.84,
+   "pf": 0.79,
+   "exp": -22.98,
+   "expR": -0.057,
+   "ciR": [
+    -0.11,
+    -0.005
+   ],
+   "expRGross": -0.026,
+   "ciRGross": [
+    -0.077,
+    0.025
+   ],
+   "maxDD": 17354.64,
+   "days": 365,
+   "perDay": -38.28,
+   "ciDay": [
+    -89.68,
+    13.12
+   ],
+   "pDay": 0.928,
+   "byCoin": {
+    "BTC": 594.62,
+    "ETH": -5555.44,
+    "SOL": 129.26,
+    "AVAX": -5090.72,
+    "ADA": -641.8,
+    "INJ": -3130.25,
+    "RENDER": 3037.06,
+    "NEAR": 1732.17,
+    "FARTCOIN": -5047.15
+   },
+   "coinsPos": 4,
+   "breakEvenCost": -0.97
+  },
+  "dev": {
+   "n": 1978,
+   "net": -40404.93,
+   "gross": -16541.1,
+   "fees": 15805.95,
+   "spreadSlip": 6333.06,
+   "funding": 1724.82,
+   "winRate": 75.23,
+   "pf": 0.81,
+   "exp": -20.43,
+   "expR": -0.051,
+   "ciR": [
+    -0.08,
+    -0.022
+   ],
+   "expRGross": -0.021,
+   "ciRGross": [
+    -0.049,
+    0.007
+   ],
+   "maxDD": 41029.57,
+   "days": 1461,
+   "perDay": -27.66,
+   "ciDay": [
+    -49.67,
+    -5.64
+   ],
+   "pDay": 0.993,
+   "byCoin": {
+    "BTC": -6207.91,
+    "ETH": -10323.77,
+    "SOL": -4557.04,
+    "AVAX": -4605.99,
+    "ADA": -3943.97,
+    "INJ": -6893.47,
+    "RENDER": 2409.99,
+    "NEAR": -1235.6,
+    "FARTCOIN": -5047.15
+   },
+   "coinsPos": 1,
+   "breakEvenCost": -0.83
+  },
+  "test": {
+   "n": 454,
+   "net": -1495.26,
+   "gross": 3872.66,
+   "fees": 3397.81,
+   "spreadSlip": 1484.24,
+   "funding": 485.87,
+   "winRate": 79.07,
+   "pf": 0.96,
+   "exp": -3.29,
+   "expR": -0.008,
+   "ciR": [
+    -0.063,
+    0.047
+   ],
+   "expRGross": 0.021,
+   "ciRGross": [
+    -0.032,
+    0.075
+   ],
+   "maxDD": 9581.39,
+   "days": 365,
+   "perDay": -4.1,
+   "ciDay": [
+    -41.79,
+    33.59
+   ],
+   "pDay": 0.584,
+   "byCoin": {
+    "BTC": 6.8,
+    "ETH": -753.95,
+    "SOL": 107.51,
+    "AVAX": -3061.7,
+    "ADA": -780.8,
+    "INJ": -1733.86,
+    "RENDER": 587.04,
+    "NEAR": -364.99,
+    "FARTCOIN": 4498.68
+   },
+   "coinsPos": 4,
+   "breakEvenCost": 0.69
+  },
+  "random": {
+   "train": {
+    "n": 1329,
+    "net": -27453.81,
+    "gross": -14202.96,
+    "fees": 8877.47,
+    "spreadSlip": 3277.42,
+    "funding": 1095.96,
+    "winRate": 83.6,
+    "pf": 0.68,
+    "exp": -20.66,
+    "expR": -0.052,
+    "ciR": [
+     -0.076,
+     -0.027
+    ],
+    "expRGross": -0.027,
+    "ciRGross": [
+     -0.05,
+     -0.003
+    ],
+    "maxDD": 28528.07,
+    "days": 1096,
+    "perDay": -25.05,
+    "ciDay": [
+     -37.47,
+     -12.62
+    ],
+    "pDay": 1,
+    "byCoin": {
+     "BTC": -2790.46,
+     "ETH": -3374.55,
+     "SOL": -6294.94,
+     "AVAX": -7144.68,
+     "ADA": -1783.69,
+     "INJ": -2331.79,
+     "RENDER": -1280.5,
+     "NEAR": -2453.2,
+     "FARTCOIN": 0
+    },
+    "coinsPos": 0,
+    "breakEvenCost": -1.26
+   },
+   "val": {
+    "n": 494,
+    "net": -8466.46,
+    "gross": -3659.22,
+    "fees": 3120.89,
+    "spreadSlip": 1358.9,
+    "funding": 327.44,
+    "winRate": 85.22,
+    "pf": 0.72,
+    "exp": -17.14,
+    "expR": -0.043,
+    "ciR": [
+     -0.082,
+     -0.004
+    ],
+    "expRGross": -0.019,
+    "ciRGross": [
+     -0.057,
+     0.02
+    ],
+    "maxDD": 10088.17,
+    "days": 365,
+    "perDay": -23.2,
+    "ciDay": [
+     -43.72,
+     -2.67
+    ],
+    "pDay": 0.987,
+    "byCoin": {
+     "BTC": 338.06,
+     "ETH": -2041.02,
+     "SOL": -1948.41,
+     "AVAX": -3040,
+     "ADA": 2004.62,
+     "INJ": 501.19,
+     "RENDER": -1255.47,
+     "NEAR": -1962.77,
+     "FARTCOIN": -1062.66
+    },
+    "coinsPos": 3,
+    "breakEvenCost": -0.89
+   },
+   "dev": {
+    "n": 1823,
+    "net": -35920.27,
+    "gross": -17862.19,
+    "fees": 11998.36,
+    "spreadSlip": 4636.32,
+    "funding": 1423.41,
+    "winRate": 84.04,
+    "pf": 0.69,
+    "exp": -19.7,
+    "expR": -0.049,
+    "ciR": [
+     -0.07,
+     -0.029
+    ],
+    "expRGross": -0.024,
+    "ciRGross": [
+     -0.045,
+     -0.004
+    ],
+    "maxDD": 37821,
+    "days": 1461,
+    "perDay": -24.59,
+    "ciDay": [
+     -35.22,
+     -13.95
+    ],
+    "pDay": 1,
+    "byCoin": {
+     "BTC": -2452.4,
+     "ETH": -5415.57,
+     "SOL": -8243.35,
+     "AVAX": -10184.68,
+     "ADA": 220.92,
+     "INJ": -1830.6,
+     "RENDER": -2535.97,
+     "NEAR": -4415.97,
+     "FARTCOIN": -1062.66
+    },
+    "coinsPos": 1,
+    "breakEvenCost": -1.16
+   },
+   "test": {
+    "n": 506,
+    "net": -11035.29,
+    "gross": -5941.89,
+    "fees": 3259.1,
+    "spreadSlip": 1410.94,
+    "funding": 423.36,
+    "winRate": 83.79,
+    "pf": 0.65,
+    "exp": -21.81,
+    "expR": -0.055,
+    "ciR": [
+     -0.094,
+     -0.015
+    ],
+    "expRGross": -0.029,
+    "ciRGross": [
+     -0.067,
+     0.009
+    ],
+    "maxDD": 11039.57,
+    "days": 365,
+    "perDay": -30.23,
+    "ciDay": [
+     -53.04,
+     -7.43
+    ],
+    "pDay": 0.995,
+    "byCoin": {
+     "BTC": -158.31,
+     "ETH": -2400.4,
+     "SOL": -38.86,
+     "AVAX": -3278.1,
+     "ADA": -1189.07,
+     "INJ": -1094.19,
+     "RENDER": -916.23,
+     "NEAR": -576.95,
+     "FARTCOIN": -1383.17
+    },
+    "coinsPos": 0,
+    "breakEvenCost": -1.36
+   }
+  },
+  "single": {
+   "train": {
+    "n": 1363,
+    "net": -42708.55,
+    "gross": -17242.66,
+    "fees": 15864.66,
+    "spreadSlip": 8158.58,
+    "funding": 1442.64,
+    "winRate": 69.7,
+    "pf": 0.75,
+    "exp": -31.33,
+    "expR": -0.078,
+    "ciR": [
+     -0.114,
+     -0.043
+    ],
+    "expRGross": -0.032,
+    "ciRGross": [
+     -0.067,
+     0.004
+    ],
+    "maxDD": 45411.66,
+    "days": 1096,
+    "perDay": -38.97,
+    "ciDay": [
+     -63.62,
+     -14.32
+    ],
+    "pDay": 0.999,
+    "byCoin": {
+     "BTC": -9221.94,
+     "ETH": -8589.59,
+     "SOL": -7651.63,
+     "AVAX": -5254.04,
+     "ADA": -5417.3,
+     "INJ": -4131.93,
+     "RENDER": 116.48,
+     "NEAR": -2558.6,
+     "FARTCOIN": 0
+    },
+    "coinsPos": 1,
+    "breakEvenCost": -0.78
+   },
+   "val": {
+    "n": 608,
+    "net": -21178.06,
+    "gross": -9219.1,
+    "fees": 7116.72,
+    "spreadSlip": 4277.8,
+    "funding": 564.45,
+    "winRate": 70.23,
+    "pf": 0.72,
+    "exp": -34.83,
+    "expR": -0.087,
+    "ciR": [
+     -0.14,
+     -0.034
+    ],
+    "expRGross": -0.038,
+    "ciRGross": [
+     -0.09,
+     0.015
+    ],
+    "maxDD": 24486.82,
+    "days": 365,
+    "perDay": -58.02,
+    "ciDay": [
+     -113.93,
+     -2.11
+    ],
+    "pDay": 0.979,
+    "byCoin": {
+     "BTC": -2156.03,
+     "ETH": -5118.02,
+     "SOL": -3115.34,
+     "AVAX": -5378.61,
+     "ADA": -417.04,
+     "INJ": -1783.79,
+     "RENDER": 1014.13,
+     "NEAR": 10.65,
+     "FARTCOIN": -4234.03
+    },
+    "coinsPos": 2,
+    "breakEvenCost": -0.86
+   },
+   "dev": {
+    "n": 1971,
+    "net": -63886.61,
+    "gross": -26461.76,
+    "fees": 22981.38,
+    "spreadSlip": 12436.38,
+    "funding": 2007.09,
+    "winRate": 69.86,
+    "pf": 0.74,
+    "exp": -32.41,
+    "expR": -0.081,
+    "ciR": [
+     -0.111,
+     -0.052
+    ],
+    "expRGross": -0.034,
+    "ciRGross": [
+     -0.063,
+     -0.004
+    ],
+    "maxDD": 64308.97,
+    "days": 1461,
+    "perDay": -43.73,
+    "ciDay": [
+     -66.9,
+     -20.56
+    ],
+    "pDay": 1,
+    "byCoin": {
+     "BTC": -11377.96,
+     "ETH": -13707.61,
+     "SOL": -10766.97,
+     "AVAX": -10632.65,
+     "ADA": -5834.34,
+     "INJ": -5915.72,
+     "RENDER": 1130.62,
+     "NEAR": -2547.95,
+     "FARTCOIN": -4234.03
+    },
+    "coinsPos": 1,
+    "breakEvenCost": -0.8
+   },
+   "test": {
+    "n": 452,
+    "net": -3697.62,
+    "gross": 5063.34,
+    "fees": 5171.75,
+    "spreadSlip": 3027.66,
+    "funding": 561.55,
+    "winRate": 73.67,
+    "pf": 0.92,
+    "exp": -8.18,
+    "expR": -0.02,
+    "ciR": [
+     -0.079,
+     0.038
+    ],
+    "expRGross": 0.028,
+    "ciRGross": [
+     -0.03,
+     0.086
+    ],
+    "maxDD": 10169.72,
+    "days": 365,
+    "perDay": -10.13,
+    "ciDay": [
+     -51.7,
+     31.44
+    ],
+    "pDay": 0.684,
+    "byCoin": {
+     "BTC": -1403.91,
+     "ETH": 186.05,
+     "SOL": 1031.87,
+     "AVAX": -3061.9,
+     "ADA": -634.36,
+     "INJ": -3154.52,
+     "RENDER": -437.59,
+     "NEAR": 433.51,
+     "FARTCOIN": 3343.24
+    },
+    "coinsPos": 4,
+    "breakEvenCost": 0.55
+   }
+  },
+  "wf": {
+   "n": 1225,
+   "net": -21634.66,
+   "gross": -6852.38,
+   "fees": 9550.28,
+   "spreadSlip": 4174.86,
+   "funding": 1057.14,
+   "winRate": 76.16,
+   "pf": 0.83,
+   "exp": -17.66,
+   "expR": -0.044,
+   "ciR": [
+    -0.08,
+    -0.008
+   ],
+   "expRGross": -0.014,
+   "ciRGross": [
+    -0.049,
+    0.021
+   ],
+   "maxDD": 27015.97,
+   "days": 858,
+   "perDay": -25.22,
+   "ciDay": [
+    -55.45,
+    5.02
+   ],
+   "pDay": 0.949,
+   "byCoin": {
+    "BTC": -412.52,
+    "ETH": -5203.57,
+    "SOL": 1309.6,
+    "AVAX": -4078.87,
+    "ADA": -4029.37,
+    "INJ": -5562.93,
+    "RENDER": 2570.2,
+    "NEAR": -1180.05,
+    "FARTCOIN": -5047.15
+   },
+   "coinsPos": 2,
+   "breakEvenCost": -0.58
+  },
+  "verdict": {
+   "level": "fail",
+   "why": "אין יתרון גם לפני עלויות (תוחלת ברוטו ≤ 0)"
+  }
+ },
+ "best": {
+  "key": "M4h-W1-kv5-green-nv-ladder-course",
+  "train": {
+   "n": 603,
+   "net": -2417.18,
+   "gross": 3332,
+   "fees": 3856.88,
+   "spreadSlip": 1453.3,
+   "funding": 439,
+   "winRate": 85.07,
+   "pf": 0.94,
+   "exp": -4.01,
+   "expR": -0.01,
+   "ciR": [
+    -0.049,
+    0.029
+   ],
+   "expRGross": 0.014,
+   "ciRGross": [
+    -0.024,
+    0.052
+   ],
+   "maxDD": 6714.29,
+   "days": 1096,
+   "perDay": -2.21,
+   "ciDay": [
+    -11.6,
+    7.19
+   ],
+   "pDay": 0.677,
+   "byCoin": {
+    "BTC": 665.25,
+    "ETH": -3344.73,
+    "SOL": 537.04,
+    "AVAX": 828.5,
+    "ADA": 570,
+    "INJ": -269,
+    "RENDER": -1452.44,
+    "NEAR": 48.2,
+    "FARTCOIN": 0
+   },
+   "coinsPos": 5,
+   "breakEvenCost": 0.54
+  },
+  "val": {
+   "n": 256,
+   "net": -3806.91,
+   "gross": -1188.85,
+   "fees": 1695,
+   "spreadSlip": 755.76,
+   "funding": 167.31,
+   "winRate": 83.59,
+   "pf": 0.79,
+   "exp": -14.87,
+   "expR": -0.037,
+   "ciR": [
+    -0.098,
+    0.023
+   ],
+   "expRGross": -0.012,
+   "ciRGross": [
+    -0.07,
+    0.047
+   ],
+   "maxDD": 7248.88,
+   "days": 365,
+   "perDay": -10.43,
+   "ciDay": [
+    -32.44,
+    11.58
+   ],
+   "pDay": 0.824,
+   "byCoin": {
+    "BTC": 163.21,
+    "ETH": -824.42,
+    "SOL": 353.76,
+    "AVAX": -2182.94,
+    "ADA": 394.83,
+    "INJ": 295.89,
+    "RENDER": -1069.55,
+    "NEAR": -657.14,
+    "FARTCOIN": -280.54
+   },
+   "coinsPos": 4,
+   "breakEvenCost": -0.55
+  },
+  "dev": {
+   "n": 859,
+   "net": -6224.09,
+   "gross": 2143.16,
+   "fees": 5551.88,
+   "spreadSlip": 2209.06,
+   "funding": 606.3,
+   "winRate": 84.63,
+   "pf": 0.89,
+   "exp": -7.25,
+   "expR": -0.018,
+   "ciR": [
+    -0.051,
+    0.015
+   ],
+   "expRGross": 0.006,
+   "ciRGross": [
+    -0.026,
+    0.038
+   ],
+   "maxDD": 11587.25,
+   "days": 1461,
+   "perDay": -4.26,
+   "ciDay": [
+    -13.19,
+    4.67
+   ],
+   "pDay": 0.825,
+   "byCoin": {
+    "BTC": 828.46,
+    "ETH": -4169.15,
+    "SOL": 890.8,
+    "AVAX": -1354.45,
+    "ADA": 964.82,
+    "INJ": 26.89,
+    "RENDER": -2521.99,
+    "NEAR": -608.94,
+    "FARTCOIN": -280.54
+   },
+   "coinsPos": 4,
+   "breakEvenCost": 0.2
+  },
+  "test": {
+   "n": 229,
+   "net": -2285.19,
+   "gross": 112.56,
+   "fees": 1486.91,
+   "spreadSlip": 740.41,
+   "funding": 170.43,
+   "winRate": 85.15,
+   "pf": 0.83,
+   "exp": -9.98,
+   "expR": -0.025,
+   "ciR": [
+    -0.082,
+    0.032
+   ],
+   "expRGross": 0.001,
+   "ciRGross": [
+    -0.054,
+    0.056
+   ],
+   "maxDD": 4106.27,
+   "days": 365,
+   "perDay": -6.26,
+   "ciDay": [
+    -20.46,
+    7.94
+   ],
+   "pDay": 0.806,
+   "byCoin": {
+    "BTC": 337.77,
+    "ETH": -1068.77,
+    "SOL": 689.97,
+    "AVAX": -1321.95,
+    "ADA": 207.34,
+    "INJ": 557.01,
+    "RENDER": 775.56,
+    "NEAR": -260.87,
+    "FARTCOIN": -2201.24
+   },
+   "coinsPos": 5,
+   "breakEvenCost": -0.03
+  },
+  "verdict": {
+   "level": "fail",
+   "why": "אין יתרון מובהק גם לפני עלויות (טווח הביטחון של הברוטו כולל אפס)"
+  }
+ },
+ "wf": {
+  "n": 703,
+  "net": -22159.13,
+  "gross": -14736.64,
+  "fees": 4997.19,
+  "spreadSlip": 2056.41,
+  "funding": 368.9,
+  "winRate": 79.52,
+  "pf": 0.63,
+  "exp": -31.52,
+  "expR": -0.079,
+  "ciR": [
+   -0.118,
+   -0.04
+  ],
+  "expRGross": -0.052,
+  "ciRGross": [
+   -0.09,
+   -0.015
+  ],
+  "maxDD": 24256.09,
+  "days": 858,
+  "perDay": -25.83,
+  "ciDay": [
+   -42.42,
+   -9.23
+  ],
+  "pDay": 0.999,
+  "byCoin": {
+   "BTC": -3025.77,
+   "ETH": -6435.31,
+   "SOL": -3252.47,
+   "AVAX": -2933.05,
+   "ADA": -2781.79,
+   "INJ": -2885.14,
+   "RENDER": -1877.25,
+   "NEAR": 774.97,
+   "FARTCOIN": 256.69
+  },
+  "coinsPos": 2,
+  "breakEvenCost": -2.14,
+  "picks": [
+   "M4h-W0.5-kv3-green-nv-ladder-course",
+   "M4h-W0.5-kv3-green-nv-ladder-first",
+   "M4h-W1-kv3-green-nv-ladder-first",
+   "M4h-W1-kv3-green-nv-ladder-first",
+   "M4h-W1-kv5-green-vs-single-first",
+   "M4h-W0.5-kv5-green-vs-ladder-first"
+  ]
+ }
+}
