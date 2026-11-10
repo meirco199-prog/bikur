@@ -52,4 +52,4 @@ if [ -f "$H/.bikur-bybit/STOP3" ]; then systemctl disable -q bikur-bybit3 2>/dev
 if [ -f "$H/.bikur-bybit/STOP1" ]; then systemctl disable -q bikur-bybit 2>/dev/null || true; else systemctl enable -q bikur-bybit; fi
 for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-enabled -q "$s" && systemctl restart "$s"; done
 sleep 8
-for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-active "$s" | sed "s/^/$s: /"; journalctl -u "$s" -n 8 --no-pager; done
+for s in bikur-bybit bikur-bybit2 bikur-bybit3; do (systemctl is-active "$s" || true) | sed "s/^/$s: /"; journalctl -u "$s" -n 8 --no-pager || true; done
