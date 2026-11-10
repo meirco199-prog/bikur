@@ -75,3 +75,31 @@ test('רשת: 128 גרסאות ייחודיות, כולל הגרסה הנאמנ�
   const g = grid(); assert.equal(g.length, 128); assert.equal(new Set(g.map(keyOf)).size, 128);
   assert.ok(g.some((v) => keyOf(v) === keyOf(CANON)));
 });
+
+test('סטופ צמוד ויעד קבוע: כניסה אחת, סטופ 1% מתחת לכניסה, יעד +1%', () => {
+  const ctxD = prepare(scenario('down')), tgD = triggers(ctxD, 'follow', CANON);
+  const [lo] = execute(ctxD, tgD.slice(0, 1), { coin: 'AVAX', entry: 'single', exit: 1, stop: 1 });
+  assert.equal(lo.why, 'סטופ'); assert.ok(Math.abs(lo.gross + RISK_USD) < 8, `gross ${lo.gross}`);
+  assert.ok(Math.abs(lo.notional - RISK_USD / 0.01) < 1);           // 1% סטופ → 40,000$ נומינלי ל-400$ סיכון
+  const ctxU = prepare(scenario('up')), tgU = triggers(ctxU, 'follow', CANON);
+  const [hi] = execute(ctxU, tgU, { coin: 'AVAX', entry: 'single', exit: 1, stop: 1 });
+  assert.equal(hi.why, 'יעד'); assert.ok(Math.abs(hi.gross - hi.notional * 0.01) < 1, `gross ${hi.gross}`);
+});
+
+test("כניסה 'deep': רק בהנזלה; המחיר קפץ בלי לרדת → אין עסקה, המחיר ירד → מתמלא", () => {
+  const ctxU = prepare(scenario('up')), tgU = triggers(ctxU, 'follow', CANON);
+  assert.equal(execute(ctxU, tgU, { coin: 'AVAX', entry: 'deep', exit: 'course' }).length, 0);
+  const ctxD = prepare(scenario('down')), tgD = triggers(ctxD, 'follow', CANON), [tr] = execute(ctxD, tgD.slice(0, 1), { coin: 'AVAX', entry: 'deep', exit: 'course' });
+  assert.equal(tr.fills, 2); assert.ok(tr.tEntry > tgD[0].t);
+});
+
+test("טריגר 'reclaim': רק אחרי ירידה מתחת לאזור וחזרה בנר ירוק", () => {
+  const p = [];
+  for (let i = 0; i < 3 * 1440; i++) p.push({ c: 100 + 0.05 * Math.sin(i / 7) });
+  for (let k = 1; k <= 30; k++) p.push({ c: 100 - k * 0.12 });               // → 96.4: מתחת לתחתית האזור (96.95) ולהנזלה הראשונה (96.56)
+  p.push({ o: 96.4, c: 97.3, l: 96.35, h: 97.35, v: 20000 });                   // נר ירוק חוזר לאזור עם ווליום
+  for (let k = 0; k < 600; k++) p.push({ c: 97.3 + Math.min(2, k * 0.01) });
+  const ctx = prepare(series(p)), tg = triggers(ctx, 'follow', { ...CANON, candle: 'reclaim' });
+  assert.equal(tg.length, 1); assert.equal(tg[0].c, 97.3);
+  assert.equal(triggers(prepare(scenario('up')), 'follow', { ...CANON, candle: 'reclaim' }).length, 0); // בלי ירידה מתחת לאזור
+});
