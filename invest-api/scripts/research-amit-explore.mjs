@@ -40,7 +40,25 @@ const f = (x, d = 3) => (Number.isFinite(x) ? (x >= 0 ? '+' : '−') + Math.abs(
 const f$ = (x) => (Number.isFinite(x) ? (x < 0 ? '−' : '+') + '$' + Math.abs(Math.round(x)).toLocaleString('en-US') : '—');
 const f$2 = (x) => (Number.isFinite(x) ? (x < 0 ? '−' : '+') + '$' + Math.abs(x).toFixed(2) : '—');
 
+// בדיקת אימות על מטבעות חדשים (לא היו בחקירה): הגרסאות נקבעו מראש, --validate "k1,k2" --coins … --cats DOGE:vol (ברירת מחדל: follow)
+const VALIDATE = arg('--validate', ''), CATS_ARG = Object.fromEntries(arg('--cats', '').split(',').filter(Boolean).map((x) => x.split(':')));
+const catOf = (c) => CATS_ARG[c] || COIN_CAT[c] || 'follow';
+async function validate(){
+  const keys = VALIDATE.split(','), V = grid2().filter((v) => keys.includes(key2(v))), T = new Map(V.map((v) => [key2(v), newCols()])), R = new Map(V.map((v) => [key2(v), newCols()])), meta = {};
+  for (const [ci, coin] of COINS.entries()){
+    const d = await loadCoin(coin); meta[coin] = { first: d.first, bars: d.m1.t.length, cat: catOf(coin) };
+    if (d.m1.t.length < 50000) continue;
+    const ctx = prepare(d.m1);
+    for (const v of V){ const tg = triggers(ctx, catOf(coin), v), o = { coin, entry: v.entry, exit: v.exit, stop: v.stop, maxHoldMin: v.hold }; push(T.get(key2(v)), execute(ctx, tg, o), ci); push(R.get(key2(v)), execute(ctx, randomTriggers(ctx, tg, 31 + ci), o), ci); }
+  }
+  const ALL = { from: P.hold.from, to: P.test.to }, md = [];
+  md.push('# אימות על מטבעות חדשים — הגרסאות נקבעו מראש (לפני הריצה), אף אחד מהמטבעות לא היה בחקירה', '', `מטבעות: ${COINS.filter((c) => meta[c]?.bars >= 50000).map((c) => `${c} (${meta[c].cat}${meta[c].first > '2020-01-01' ? `, מ-${meta[c].first}` : ''})`).join(', ')}. חסרים: ${COINS.filter((c) => !(meta[c]?.bars >= 50000)).join(', ') || 'אין'}.`, '');
+  md.push('| גרסה | תקופה | עסקאות | הצלחה | R נטו [95%] | נטו | על 5,000$ | R אקראי |', '|---|---|---|---|---|---|---|---|');
+  for (const v of V){ const k = key2(v); for (const [p, name] of [['hold', '2020–21'], ['train', '11/21–11/24'], ['val', '11/24–11/25'], ['test', '11/25–11/26'], ['all', '**הכול**']]){ const pp = p === 'all' ? ALL : P[p], x = st(T.get(k), pp), r = st(R.get(k), pp); md.push(`| \`${k}\` | ${name} | ${x.n} | ${Number.isFinite(x.win) ? x.win.toFixed(0) : '—'}% | ${f(x.R)} [${f(x.lo)}, ${f(x.hi)}] | ${f$(x.net)} | ${f$2(x.per5k)} | ${f(r.R)} |`); } }
+  mkdirSync(OUTDIR, { recursive: true }); writeFileSync(join(OUTDIR, 'validate.md'), md.join('\n')); console.log(md.join('\n'));
+}
 async function main(){
+  if (VALIDATE) return validate();
   const V = grid2(), sigs = [...new Map(V.map((v) => [sig2(v), v])).values()];
   const T = new Map(V.map((v) => [key2(v), newCols()])), R = new Map(V.map((v) => [key2(v), newCols()])), meta = {};
   const t0 = Date.now();
