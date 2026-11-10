@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { stats, score, verdict } from '../engine/research.js';
 import { prepare, triggers, execute, randomTriggers, grid, keyOf, sigKey, CANON, CATS, COIN_CAT, COURSE_COST, RISK_USD } from '../engine/amit-course.js';
 
@@ -29,7 +30,7 @@ async function download(url, file){
   }
 }
 // קובץ חודשי: open_time,open,high,low,close,volume,close_time,quote_volume,… (בקבצים חדשים יש שורת כותרת)
-async function loadCoin(coin){
+export async function loadCoin(coin){
   mkdirSync(CACHE, { recursive: true });
   const rows = new Map(); let got = 0, miss = [];
   for (const mo of months()){
@@ -145,4 +146,4 @@ async function main(){
   writeFileSync(join(OUTDIR, SHOW_TEST ? 'summary-test.json' : 'summary.json'), JSON.stringify({ meta, periods: Object.fromEntries(Object.entries(P).map(([k, v]) => [k, [iso(v.from), iso(v.to)]])), canon: { key: canonK, ...canonS, random: rndS, single: singleS, wf: canonWf, verdict: vCanon }, best: best && { key: best.k, ...bestS, verdict: vBest }, wf: { ...wf, picks } }, null, 1));
   console.log(md.join('\n'));
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((e) => { console.error(e); process.exit(1); }); // גם מודול (research-amit-explore.mjs)

@@ -61,17 +61,19 @@ export function trailingMean(v, N){
   return out;
 }
 
-// אותות: רשימת טריגרים כרונולוגית. cfg: { consH, consW, kv, candle, volSwitch }
+// אותות: רשימת טריגרים כרונולוגית. cfg: { consH, consW, kv, candle, volSwitch, zone }
+//   zone: 'half' (ברירת מחדל — מתחת לחצי האזור) | 'deep' (רק ברבע התחתון)
+//   candle: 'any' | 'green' | 'reclaim' (המחיר כבר ירד מתחת לאזור לתוך ההנזלה, ונר ירוק סוגר בחזרה בתוך האזור — "אחרי שכולם נמחקו")
 export function triggers(ctx, cat, cfg){
   const { m1, n, idx15, q, vAvg60 } = ctx, K = Math.max(2, Math.round(cfg.consH * 4)), base = CATS[cat], out = [];
   const W = cfg.consW * base.zone[0] / 100, maxAge = 4 * DAY;
-  let anchor = NaN, anchorT = 0, evt = false;
+  let anchor = NaN, anchorT = 0, evt = false, swept = false;
   const close15 = (j) => {
     if (j < K - 1) return;
     let hi = -Infinity, lo = Infinity, at = -1; for (let k = j - K + 1; k <= j; k++){ if (q.h[k] > hi) hi = q.h[k]; if (q.l[k] < lo){ lo = q.l[k]; at = k; } }
     const end = q.t[j] + M15;
     // דשדוש = טווח צר, והשפל נקבע לפחות 2 נרות לפני הסוף (תחילת ירידה היא לא דשדוש)
-    if ((hi - lo) / lo <= W && at <= j - 2){ if (lo !== anchor) evt = false; anchor = lo; anchorT = end; return; } // דשדוש (גם חדש ונמוך יותר) → עוגן
+    if ((hi - lo) / lo <= W && at <= j - 2){ if (lo !== anchor){ evt = false; swept = false; } anchor = lo; anchorT = end; return; } // דשדוש (גם חדש ונמוך יותר) → עוגן
     if (Number.isFinite(anchor) && end - anchorT > maxAge){ anchor = NaN; return; }
     if (Number.isFinite(anchor) && q.c[j] < anchor && q.v[j] >= 3 * q.vAvg96[j] && q.c[j] < q.o[j]) evt = true; // נר ירידה עם ווליום חריג
   };
@@ -79,44 +81,53 @@ export function triggers(ctx, cat, cfg){
     if (idx15[i] !== idx15[i - 1]) close15(idx15[i - 1]);   // נר 15 דק׳ נסגר לפני הדקה הזו
     if (!Number.isFinite(anchor)) continue;
     const P = evt && cfg.volSwitch ? base.next : base, c = m1.c[i];
-    const half = anchor * (1 - (P.zone[0] + P.zone[1]) / 200), bottom = anchor * (1 - P.zone[1] / 100);
+    const half = anchor * (1 - (cfg.zone === 'deep' ? P.zone[0] + 0.75 * (P.zone[1] - P.zone[0]) : (P.zone[0] + P.zone[1]) / 2) / 100), bottom = anchor * (1 - P.zone[1] / 100);
+    if (m1.l[i] < bottom * (1 - P.flush[0] / 100)) swept = true;
     if (!(c <= half && c >= bottom)) continue;
     if (!(m1.v[i] >= cfg.kv * vAvg60[i])) continue;
-    if (cfg.candle === 'green' && !(c > m1.o[i])) continue;
+    if ((cfg.candle === 'green' || cfg.candle === 'reclaim') && !(c > m1.o[i])) continue;
+    if (cfg.candle === 'reclaim' && !swept) continue;
     out.push({ i, t: m1.t[i], anchor, evt: evt && cfg.volSwitch, P, L: m1.l[i], c });
-    anchor = NaN; evt = false;                               // האזור "מת" — צריך דשדוש חדש
+    anchor = NaN; evt = false; swept = false;                // האזור "מת" — צריך דשדוש חדש
   }
   return out;
 }
 
-// ביצוע: פוזיציה אחת בכל רגע למטבע. opt: { coin, entry: 'ladder'|'single', exit: 'course'|'first', maxHoldMin, cost }
+// ביצוע: פוזיציה אחת בכל רגע למטבע. opt: { coin, entry, exit, stop, maxHoldMin, cost }
+//   entry: 'ladder' (30-60-90) | 'single' (הכול בטריגר) | 'deep' (רק מנות 60 ו-90 בפקודות ממתינות בהנזלה; לא התמלאו תוך 4 שעות → אין עסקה)
+//   exit: 'course' (75% ברמה הקרובה + 25% רץ) | 'first' (100% ברמה הקרובה) | מספר = יעד קבוע באחוזים מעל מחיר הכניסה הממוצע
+//   stop: 'course' (עוד stopExtra מתחת לקו ההנזלה העמוק) | מספר = סטופ צמוד באחוזים מתחת למחיר הכניסה הנמוך המתוכנן
 export function execute(ctx, trigs, opt = {}){
   const { m1, n, idx15, q } = ctx, coin = opt.coin || 'BTC', Cc = { ...COURSE_COST, ...(opt.cost || {}) };
   const hs = (Cc.halfSpreadBps[coin] ?? 2) / 1e4, sl = (Cc.slipBps[coin] ?? 3) / 1e4, pen = Cc.penBps / 1e4, mk = Cc.makerBps / 1e4, tk = Cc.takerBps / 1e4;
-  const maxHold = opt.maxHoldMin || 1440, W = opt.entry === 'single' ? [1, 0, 0] : [1 / 6, 1 / 3, 1 / 2], trades = [];
+  const maxHold = opt.maxHoldMin || 1440, W = opt.entry === 'single' ? [1, 0, 0] : opt.entry === 'deep' ? [0, 0.4, 0.6] : [1 / 6, 1 / 3, 1 / 2], trades = [];
+  const tpFix = typeof opt.exit === 'number' ? opt.exit / 100 : 0, stopFix = typeof opt.stop === 'number' ? opt.stop / 100 : 0;
   let busy = -1;
   for (const g of trigs){
     if (g.i <= busy) continue;
-    const P = g.P, Lw = g.L, px = [g.c, Lw * (1 - P.flush[0] / 100), Lw * (1 - P.flush[1] / 100)], stop = Lw * (1 - (P.flush[1] + P.stopExtra) / 100);
-    if (!(px[2] > stop && px[0] > px[1])) continue;
+    const P = g.P, Lw = g.L, px = [g.c, Lw * (1 - P.flush[0] / 100), Lw * (1 - P.flush[1] / 100)];
+    const lowest = W[2] > 0 ? px[2] : px[0], stop = stopFix ? lowest * (1 - stopFix) : Lw * (1 - (P.flush[1] + P.stopExtra) / 100);
+    if (!(lowest > stop && px[0] > px[1])) continue;
     const lossPer = W.reduce((s, w, k) => s + w * (1 - stop / px[k]), 0), N = Math.min(RISK_USD / lossPer, MAX_NOTIONAL);
     // מצב: כמויות (בדולרים נומינליים לפי מחיר הכניסה של כל מנה)
-    let qty = 0, cost$ = 0, fees = 0, spread = 0, slip = 0, gross = 0, fills = 1, held = 0, rem = 0;
-    const buy = (k, price, maker) => { const usd = W[k] * N, units = usd / price; qty += units; cost$ += usd; if (maker) fees += usd * mk; else { fees += usd * tk; spread += usd * hs; slip += usd * sl; } };
+    let qty = 0, cost$ = 0, fees = 0, spread = 0, slip = 0, gross = 0, fills = 0, held = 0, maxCost = 0, tIn = 0;
+    const buy = (k, price, maker) => { const usd = W[k] * N, units = usd / price; qty += units; cost$ += usd; maxCost += usd; fills++; if (maker) fees += usd * mk; else { fees += usd * tk; spread += usd * hs; slip += usd * sl; } };
     const sell = (fracQ, price, maker) => { const u = qty * fracQ, usd = u * price; gross += usd - cost$ * fracQ; cost$ -= cost$ * fracQ; qty -= u; if (maker) fees += usd * mk; else { fees += usd * tk; spread += usd * hs; slip += usd * sl; } };
-    buy(0, px[0], false);
-    const open = [W[1] > 0, W[2] > 0];
+    if (W[0] > 0){ buy(0, px[0], false); tIn = g.t; }
+    const open = [W[1] > 0, W[2] > 0], waitEnd = g.t + 240 * 60e3;
     let st = stop, phase = 0, why = 'זמן', k = g.i + 1, runnerTgt = NaN, tp1 = NaN, lastJ = -1, lv = [];
     const tEnd = g.t + maxHold * 60e3;
     for (; k < n && m1.t[k] <= tEnd; k++){
       const lo = m1.l[k], hi = m1.h[k], o = m1.o[k];
       let filled = false;
-      if (phase === 0) for (let s = 0; s < 2; s++) if (open[s] && lo <= px[s + 1] * (1 - pen)){ buy(s + 1, px[s + 1], true); open[s] = false; fills++; filled = true; }
+      if (phase === 0) for (let s = 0; s < 2; s++) if (open[s] && lo <= px[s + 1] * (1 - pen)){ buy(s + 1, px[s + 1], true); open[s] = false; filled = true; if (!tIn) tIn = m1.t[k]; }
+      if (!(qty > 0)){ if (m1.t[k] > waitEnd) break; continue; }   // 'deep': עדיין לא התמלא
       if (lo <= st){ const p = Math.min(st, o); sell(1, p, false); why = phase ? 'סטופ בכניסה' : 'סטופ'; break; }
       // יעד: הרמה הקרובה מעל הממוצע (EMA20/50/VWAP של נר 15 הדקות האחרון שנסגר), מינימום +0.3%
       const j = idx15[k] - 1; if (j < 0) continue;
       const avgPx = cost$ / qty;
       if (j !== lastJ || filled){ lastJ = j; lv = [q.ema20[j], q.ema50[j], q.vwap[j], q.ema200[j]].filter((x) => x > avgPx * 1.003).sort((a, b) => a - b); } // רק כשנר 15 דק׳ נסגר או מנה התמלאה
+      if (tpFix){ if (!filled && hi >= avgPx * (1 + tpFix) * (1 + pen)){ sell(1, avgPx * (1 + tpFix), true); why = 'יעד'; break; } continue; }
       if (phase === 0){
         tp1 = lv.length ? lv[0] : avgPx * (1 + P.zone[0] / 100);
         if (!filled && hi >= tp1 * (1 + pen)){
@@ -126,11 +137,12 @@ export function execute(ctx, trigs, opt = {}){
         }
       } else if (hi >= runnerTgt * (1 + pen)){ sell(1, runnerTgt, true); why = 'יעד + רץ'; break; }
     }
+    if (!fills){ busy = Math.min(k, n - 1); continue; }               // לא התמלא — אין עסקה
     if (qty > 1e-12){ const kk = Math.min(k, n - 1); sell(1, m1.c[kk], false); if (why === 'זמן' && phase) why = 'יעד + זמן'; }
     const tExit = m1.t[Math.min(k, n - 1)];
-    held = (tExit - g.t) / 3600e3;
-    const funding = N * (W[0] + (fills > 1 ? W[1] : 0) + (fills > 2 ? W[2] : 0)) * 1e-4 * held / 8;
-    trades.push({ coin, tEntry: g.t, tExit, gross, fees, spread, slip, funding, budget: RISK_USD, fills, why, evt: g.evt, anchor: g.anchor, entry: px[0] });
+    held = (tExit - tIn) / 3600e3;
+    const funding = maxCost * 1e-4 * held / 8;
+    trades.push({ coin, tEntry: tIn, tExit, gross, fees, spread, slip, funding, budget: RISK_USD, notional: maxCost, planned: N, fills, why, evt: g.evt, anchor: g.anchor, entry: px[0] });
     busy = Math.min(k, n - 1);
   }
   return trades;
@@ -152,5 +164,15 @@ export function grid(){
     for (const entry of ['ladder', 'single']) for (const exit of ['course', 'first']) out.push({ consH, consW, kv, candle, volSwitch, entry, exit });
   return out;
 }
+// רשת החקירה (בקשת מאיר 10/11: סטופ צמוד, יציאה מהירה ברווח, הרבה עסקאות, ווליום כשיקול) — 18 אותות × 90 ביצועים = 1,620
+export function grid2(){
+  const out = [];
+  for (const zone of ['half', 'deep']) for (const kv of [3, 5, 10]) for (const candle of ['any', 'green', 'reclaim'])
+    for (const entry of ['ladder', 'single', 'deep']) for (const stop of ['course', 1, 0.5]) for (const exit of ['course', 'first', 0.5, 1, 1.5]) for (const hold of [1440, 240])
+      out.push({ consH: 4, consW: 1, volSwitch: true, zone, kv, candle, entry, stop, exit, hold });
+  return out;
+}
+export const key2 = (v) => `${v.zone}-kv${v.kv}-${v.candle}|${v.entry}-sl${v.stop}-tp${v.exit}-${v.hold / 60}h`;
+export const sig2 = (v) => `${v.zone}-kv${v.kv}-${v.candle}`;
 export const keyOf = (v) => `M${v.consH}h-W${v.consW}-kv${v.kv}-${v.candle}-${v.volSwitch ? 'vs' : 'nv'}-${v.entry}-${v.exit}`;
 export const sigKey = (v) => `M${v.consH}h-W${v.consW}-kv${v.kv}-${v.candle}-${v.volSwitch ? 'vs' : 'nv'}`;

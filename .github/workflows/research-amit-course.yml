@@ -1,13 +1,16 @@
 # בדיקה לאחור של שיטת הקורס של עמית (scripts/research-amit-course.mjs, engine/amit-course.js). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
 # נתונים: נרות דקה של חוזי הפרפטואל ב-Binance מ-data.binance.vision (קבצים ציבוריים), 9 מטבעות, 5 שנים. נשמרים ב-cache בין ריצות.
 # הרצה: Actions → research-amit-course → Run workflow, או דחיפה של .github/amit-course/command לענף שאינו main
-#   (תוכן הקובץ: "run" — תקופת המבחן מוסתרת; "show-test" — פותחים את המבחן, פעם אחת, בסוף).
+#   (תוכן הקובץ: "run" — תקופת המבחן מוסתרת; "show-test" — פותחים את המבחן, פעם אחת, בסוף;
+#    "explore" — חקירת 1,620 גרסאות (סטופ צמוד, יציאה מהירה, ווליום) עם מבחן נקי 2020–2021, scripts/research-amit-explore.mjs;
+#    "validate" — הגרסאות המובילות מהחקירה, שנקבעו מראש, על 20 מטבעות חדשים).
 # התוצאות (report.md / report-test.md + summary*.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow (לא ל-main).
 name: research-amit-course
 on:
   workflow_dispatch:
     inputs:
       show_test: { description: 'לפתוח את תקופת המבחן (פעם אחת, בסוף)', type: boolean, default: false }
+      explore: { description: 'חקירת 1,620 גרסאות (research-amit-explore.mjs)', type: boolean, default: false }
   push:
     branches-ignore: [main]
     paths: ['.github/amit-course/command']
@@ -24,12 +27,33 @@ jobs:
       - name: unit tests
         run: node --test invest-api/tests/amit-course.test.mjs
       - uses: actions/cache@v4
-        with: { path: amit-course-cache, key: binance-um-1m-2021-11-2026-10-v1 }
+        with: { path: amit-course-cache, key: binance-um-1m-2020-01-2026-10-v1, restore-keys: binance-um-1m- }
+      - name: mode
+        id: mode
+        run: |
+          M=run
+          if [ "${{ github.event_name }}" = "push" ]; then M=$(tr -d '[:space:]' < .github/amit-course/command); fi
+          if [ "${{ inputs.explore }}" = "true" ]; then M=explore; fi
+          if [ "${{ inputs.show_test }}" = "true" ]; then M=show-test; fi
+          echo "mode=$M" >> "$GITHUB_OUTPUT"; echo "mode: $M"
+      - name: explore
+        if: steps.mode.outputs.mode == 'explore'
+        run: |
+          node --max-old-space-size=6500 invest-api/scripts/research-amit-explore.mjs --from 2020-01 --to 2026-10 --cache amit-course-cache --outdir invest/docs/research/amit-course > /dev/null
+          cat invest/docs/research/amit-course/explore.md >> "$GITHUB_STEP_SUMMARY"
+      - name: validate
+        if: steps.mode.outputs.mode == 'validate'
+        run: |
+          # אימות על 20 מטבעות שלא היו בחקירה; הגרסאות נקבעו מראש (10/11/2026) לפי explore.md — לא משנים אחרי הריצה
+          node --max-old-space-size=6500 invest-api/scripts/research-amit-explore.mjs --from 2020-01 --to 2026-10 --cache amit-course-cache --outdir invest/docs/research/amit-course \
+            --coins XRP,DOGE,LINK,DOT,LTC,BCH,ATOM,UNI,AAVE,FIL,ETC,XLM,TRX,ALGO,SAND,AXS,APT,ARB,OP,SUI --cats DOGE:vol \
+            --validate "deep-kv10-reclaim|ladder-slcourse-tp1-4h,deep-kv10-green|ladder-slcourse-tp1-4h,half-kv10-green|ladder-slcourse-tp1-4h,half-kv10-reclaim|ladder-slcourse-tp1-4h" > /dev/null
+          cat invest/docs/research/amit-course/validate.md >> "$GITHUB_STEP_SUMMARY"
       - name: research
+        if: steps.mode.outputs.mode != 'explore' && steps.mode.outputs.mode != 'validate'
         run: |
           FLAGS=""
-          if [ "${{ inputs.show_test }}" = "true" ]; then FLAGS="--show-test"; fi
-          if [ "${{ github.event_name }}" = "push" ] && grep -q "show-test" .github/amit-course/command; then FLAGS="--show-test"; fi
+          if [ "${{ steps.mode.outputs.mode }}" = "show-test" ]; then FLAGS="--show-test"; fi
           echo "flags: $FLAGS"
           node --max-old-space-size=6500 invest-api/scripts/research-amit-course.mjs --cache amit-course-cache --outdir invest/docs/research/amit-course $FLAGS > /dev/null
           cat invest/docs/research/amit-course/report*.md >> "$GITHUB_STEP_SUMMARY"
