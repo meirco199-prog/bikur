@@ -12,6 +12,7 @@ export const BOT3_POLICY = Object.freeze({
   capitalIls: 100000,                              // ההון הווירטואלי שבוט 3 רשאי לסכן (USDT)
   allowedClasses: Object.freeze(['crypto']), allowedExchanges: Object.freeze(['BYBIT']),
   shorting: false, unboundedLoss: false,           // לונג בלבד, תמיד עם סטופ בבורסה
+  // מינוף 10 בבורסה (BOT3.leverage) = כמה מרג'ין נועל כל פוזיציה; החשיפה הכוללת בפועל מוגבלת כאן ל-×4 מההון הווירטואלי
   leverage: Object.freeze({ total: 4, byClass: Object.freeze({ ...TRADING_POLICY.leverage.byClass, crypto: 4 }) }),
   maxTradeShare: BOT3.maxNotional / 100000,        // מנה/עסקה עד 60,000$
   maxAssetShare: BOT3.maxNotional / 100000,
@@ -28,8 +29,11 @@ export const CAPS3 = Object.freeze({ tradable: new Set(Object.keys(BOT3.coins).m
 // מזהה פקודה דטרמיניסטי (≤36 תווים ל-Bybit): אותה החלטה → אותו מזהה → השער והבורסה דוחים כפילות
 export const linkId3 = (sym, signalT, k) => `${BOT3.tag}-${sym.replace(/USDT$/, '').slice(0, 8)}-${Math.floor(signalT / 60e3).toString(36)}-${k}`;
 
-// req: { sym, side: 'buy'|'sell', qty, price, id, worstLoss?, addToPlan? } · env: { now, equity, available, dayPnl, hwm, positions: {SYM:{size, avg, unrealized}}, journal: [{clientOrderId}] }
+// req: { sym, side: 'buy'|'sell', qty, price, id, worstLoss?, addToPlan?, cancel? } · env: { now, equity, available, dayPnl, hwm, positions: {SYM:{size, avg, unrealized}}, journal: [{clientOrderId}] }
 export function gate3(req, env){
+  // ביטול פקודה ממתינה לא יכול להגדיל סיכון — מותר תמיד (גם בעצירה/מגבלה יומית), לא נספר במכסה, ונרשם ביומן כמו כל פעולה.
+  // בלי זה, בעצירה יומית בלי פוזיציה פתוחה, השער היה חוסם ביטול של מנות 60/90 שעוד ממתינות — והן היו עלולות להתמלא.
+  if (req.cancel) return { allowed: true, reducing: true, clientOrderId: req.id, reasons: [], checks: { cancel: true }, policyVersion: BOT3_POLICY.version, mode: BOT3_POLICY.mode };
   const positions = Object.entries(env.positions || {}).map(([s, p]) => ({ symbol: s, qty: p.size, valueIls: p.size * p.avg, pnlIls: p.unrealized, class: 'crypto', strategy: 'amit3' }));
   const order = {
     symbol: req.sym, side: req.side, qty: req.qty, priceRef: req.price, class: 'crypto', exchange: 'BYBIT', strategy: 'amit3', day: new Date(env.now).toISOString().slice(0, 10),

@@ -83,3 +83,9 @@ test('שער: מנה 60/90 לפוזיציה מפסידה — רק כחלק מת�
   assert.equal(gate3({ sym: 'SOLUSDT', side: 'buy', qty: 1, price: 150, id: 'n' }, ENV0()).allowed, false);
   assert.equal(BOT3_POLICY.mode, 'paper'); assert.equal(BOT3_POLICY.noAveragingDown, true); assert.ok(linkId3('FARTCOINUSDT', Date.now(), 'e3').length <= 36);
 });
+test('שער: ביטול פקודה ממתינה מותר גם בעצירה יומית בלי פוזיציה (אחרת מנות 60/90 עלולות להתמלא)', () => {
+  const env = ENV0({ dayPnl: -5000 });
+  assert.equal(gate3({ sym: 'SOLUSDT', side: 'sell', qty: 4, price: 149, id: 'a3-SOL-x-e2-c' }, env).allowed, false); // בלי הדגל — נחסם (סיכון חדש)
+  const c = gate3({ sym: 'SOLUSDT', side: 'sell', qty: 4, price: 149, id: 'a3-SOL-x-e2-c', cancel: true }, env);
+  assert.equal(c.allowed, true); assert.equal(c.checks.cancel, true);
+});

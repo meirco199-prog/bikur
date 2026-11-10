@@ -47,7 +47,7 @@ async function gated(req, call){
   if (ENV.state.journalDay !== day){ ENV.state.journalDay = day; ENV.state.journal = []; }
   if (!g.allowed){ log(req.sym, `⛔ השער דחה ${req.side} ${req.qty} (${req.id}):`, g.reasons.join(' · ')); return null; }
   const r = await call(g.clientOrderId);
-  ENV.state.journal.push({ clientOrderId: g.clientOrderId, t: ENV.now, sym: req.sym, side: req.side, qty: req.qty, reducing: g.reducing });
+  if (!req.cancel) ENV.state.journal.push({ clientOrderId: g.clientOrderId, t: ENV.now, sym: req.sym, side: req.side, qty: req.qty, reducing: g.reducing }); // ביטולים לא נספרים במכסה
   ENV.journal = ENV.state.journal;
   return r;
 }
@@ -60,7 +60,7 @@ async function positions(){
 async function cancelPending(sym){
   const list = (await bybit('GET', '/v5/order/realtime', { category: 'linear', symbol: sym })).list || [];
   for (const o of list) if ((o.orderLinkId || '').startsWith(`${BOT3.tag}-`))
-    await gated({ sym, side: 'sell', qty: Number(o.qty) || 0, price: Number(o.price) || 1, id: `${o.orderLinkId}-c` }, () => bybit('POST', '/v5/order/cancel', { category: 'linear', symbol: sym, orderId: o.orderId })).catch((e) => log(sym, 'ביטול נכשל:', e.message));
+    await gated({ sym, side: 'sell', qty: Number(o.qty) || 0, price: Number(o.price) || 1, id: `${o.orderLinkId}-c`, cancel: true }, () => bybit('POST', '/v5/order/cancel', { category: 'linear', symbol: sym, orderId: o.orderId })).catch((e) => log(sym, 'ביטול נכשל:', e.message));
 }
 async function closeAll(sym, pos, why, tag = 'x'){
   await cancelPending(sym);
