@@ -1,0 +1,34 @@
+# מחקר המשך "סקטור עלה משמעותית — לקנות את המדשדשות?" (scripts/research-sector-strong.mjs, invest/docs/research/sector-strong/). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
+# השאלה (מאיר, 11/11/2026): כשסקטור עלה משמעותית (2%–4%+ ביום, או פער פתיחה 1%–3% כמו היום) — האם לקנות את המניות שמדשדשות?
+# נתונים: Yahoo Finance יומי 2007→היום, הרכב S&P 500 היסטורי, 11 קרנות SPDR (אותו מקור כמו research-xsec).
+# הרצה: Actions → research-sector-strong → Run workflow, או דחיפה של .github/sector-strong/command לענף שאינו main.
+# התוצאות (report.md, results.csv, meta.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow (לא ל-main).
+name: research-sector-strong
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: ['.github/sector-strong/command']
+permissions: { contents: write }
+concurrency: { group: research-sector-strong, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: unit tests
+        run: node --test invest-api/tests/research-sector-strong.test.mjs invest-api/tests/research-sector-laggards.test.mjs invest-api/tests/research-xsec.test.mjs
+      - name: research
+        run: node --max-old-space-size=6000 invest-api/scripts/research-sector-strong.mjs --outdir invest/docs/research/sector-strong
+      - uses: actions/upload-artifact@v4
+        with: { name: sector-strong-results, path: invest/docs/research/sector-strong }
+      - name: commit results
+        if: github.ref_name != 'main'
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/sector-strong
+          git commit -m "ops: תוצאות מחקר המדשדשות בסקטור חזק (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
