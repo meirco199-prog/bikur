@@ -6,7 +6,9 @@ import { RISK_USD } from '../engine/amit-course.js';
 
 test('גרסאות: מזהים ייחודיים, הבסיס = בוט 3 כמו היום (30-60-90, בלי כלל, סטופ של הקורס)', () => {
   const V = variants();
-  assert.equal(V.length, STOPS.length * (Object.keys(WEIGHTS).length * Object.keys(RULES).length + 1) + 3 * 2 * 3);
+  assert.equal(V.length, STOPS.length * (Object.keys(WEIGHTS).length * Object.keys(RULES).length + 1) + 3 * 2 * 3 + 3 * 2 * 3 + 2 * 2 * 4);
+  assert.equal(V.find((v) => v.key === 'course-v3k5-none-slcourse').opt.vol3, 5);
+  assert.deepEqual(V.find((v) => v.key === 'course-bv10two-none-slcourse').opt.byVol, { kv: 10, weak: { weights: [1 / 3, 2 / 3, 0] } });
   assert.equal(V.find((v) => v.key === 'course-none-slatr2').opt.stopAtr, 2);
   assert.equal(V.filter((v) => v.opt.confirm3).length, 18);
   assert.equal(new Set(V.map((v) => v.key)).size, V.length);

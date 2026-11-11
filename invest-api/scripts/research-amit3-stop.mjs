@@ -8,6 +8,7 @@
 //   כלל אחרי מילוי מלא: אין · סטופ 0.3%/0.6% מתחת למנה האחרונה · יציאה בממוצע (0 / +0.3%) · סגירה אחרי 30/60/120 דק׳ · ממוצע + 60 דק׳
 //   סטופ בסיס: של הקורס · 1% מתחת למנה האחרונה המתוכננת · 2/4 × ATR(14) של 15 דק׳ (הצעה מ-GPT)
 //   מנה שלישית רק אחרי אישור היפוך (נר 15 דק׳ שנסגר חזרה מעל הקו שלה תוך 4/8/12 נרות; הצעה מ-GPT)
+//   נפח (מאיר): מנה שלישית רק עם נפח ×3/×5/×10 · טריגר בנפח חלש (< ×5/×10) מנוהל אחרת (בלי השלישית / יציאה בממוצע / 60 דק׳ / שלישית עם נפח)
 // הגודל תמיד מנורמל: הפסד מלא (כל המנות + סטופ) = 400$ = 1R. כך ההשוואה בין משקלות הוגנת.
 //
 // קריטריון שנקבע מראש (לפני הריצה, לא משנים אחריה):
@@ -49,8 +50,17 @@ export function variants(){
   // מנה שלישית רק אחרי אישור היפוך: נר 15 דק׳ שנסגר חזרה מעל הקו שלה תוך 4/8/12 נרות (הצעה מ-GPT, 11/11/2026)
   for (const c3 of [4, 8, 12]) for (const stop of ['course', 1]) for (const r of ['none', 'be0', 't60'])
     out.push({ key: `course-c3n${c3}-${r}-sl${stop}`, w: 'course', c3, r, stop, opt: { entry: 'ladder', exit: 'course', ...stopOpt(stop), weights: WEIGHTS.course, full: RULES[r], confirm3: c3 } });
+  // נפח (מאיר 11/11/2026, "איפה הנפח מסחר נכנס פה לשיקול"):
+  //   מנה שלישית רק עם נפח: קונים אותה רק אחרי נר דקה שנגע בקו שלה עם נפח ≥ ×3/×5/×10 מממוצע 60 הדקות
+  for (const v3 of [3, 5, 10]) for (const stop of ['course', 1]) for (const r of ['none', 'be0', 't60'])
+    out.push({ key: `course-v3k${v3}-${r}-sl${stop}`, w: 'course', v3, r, stop, opt: { entry: 'ladder', exit: 'course', ...stopOpt(stop), weights: WEIGHTS.course, full: RULES[r], vol3: v3 } });
+  //   ניהול לפי עוצמת הנפח בטריגר: טריגר בנפח פחות מ-×5/×10 מנוהל אחרת; טריגר חזק — כמו היום
+  for (const kv of [5, 10]) for (const stop of ['course', 1]) for (const [bw, weak] of Object.entries(BYVOL_WEAK))
+    out.push({ key: `course-bv${kv}${bw}-none-sl${stop}`, w: 'course', bv: kv, bw, r: 'none', stop, opt: { entry: 'ladder', exit: 'course', ...stopOpt(stop), weights: WEIGHTS.course, byVol: { kv, weak } } });
   return out;
 }
+export const BYVOL_WEAK = { two: { weights: WEIGHTS.two }, be0: { full: RULES.be0 }, t60: { full: RULES.t60 }, v3: { vol3: 3 } };
+export const BW_HE = { two: 'בלי השלישית', be0: 'יציאה בממוצע', t60: 'סגירה אחרי 60 דק׳', v3: 'שלישית רק עם נפח ×3' };
 export const BASE = 'course-none-slcourse';   // בוט 3 כמו שהוא היום
 
 // עמודות לכל גרסה: זמן כניסה, נטו בדולרים (ל-400$ סיכון), מספר מילויים, האם מילוי מלא, מטבע
@@ -92,7 +102,7 @@ async function run(coins, V, catOf, seed){
 const f = (x, d = 3) => (Number.isFinite(x) ? (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d) : '—');
 const pc = (x) => (Number.isFinite(x) ? `${x.toFixed(0)}%` : '—');
 const usd = (R) => (Number.isFinite(R) ? (R < 0 ? '−' : '+') + '$' + Math.abs(Math.round(R * BOT_RISK)).toLocaleString('en-US') : '—');
-const name = (x) => `${W_HE[x.v.w]}${x.v.c3 ? ` · שלישית רק באישור (${x.v.c3} נרות)` : ''} · ${R_HE[x.v.r]} · סטופ ${stopHe(x.v.stop)}`;
+const name = (x) => `${W_HE[x.v.w]}${x.v.c3 ? ` · שלישית רק באישור (${x.v.c3} נרות)` : ''}${x.v.v3 ? ` · שלישית רק עם נפח ×${x.v.v3}` : ''}${x.v.bv ? ` · טריגר בנפח < ×${x.v.bv}: ${BW_HE[x.v.bw]}` : ''} · ${R_HE[x.v.r]} · סטופ ${stopHe(x.v.stop)}`;
 
 async function main(){
   const V = variants(), t0 = Date.now();
@@ -101,8 +111,8 @@ async function main(){
     return [v.key, { v, ...Object.fromEntries([...Object.keys(PERIODS), 'all'].map((p) => [p, stat(c, p === 'all' ? ALL : PERIODS[p])])), rnd: { all: stat(r, ALL) } }]; }));
   const base = S.get(BASE), best = pick(S);
   // אימות על 20 מטבעות חדשים: הבסיס, הנבחרת, והטובה (לפי אימון) בכל כלל — נקבע לפני שרואים את המטבעות
-  const byRule = [...Object.keys(RULES).map((r) => pick(new Map([...S].filter(([, x]) => x.v.r === r && x.v.w !== 'single' && !x.v.c3)))),
-    pick(new Map([...S].filter(([, x]) => x.v.c3))), pick(new Map([...S].filter(([, x]) => String(x.v.stop).startsWith('atr'))))].filter(Boolean);
+  const byRule = [...Object.keys(RULES).map((r) => pick(new Map([...S].filter(([, x]) => x.v.r === r && x.v.w !== 'single' && !x.v.c3 && !x.v.v3 && !x.v.bv)))),
+    pick(new Map([...S].filter(([, x]) => x.v.c3))), pick(new Map([...S].filter(([, x]) => x.v.v3))), pick(new Map([...S].filter(([, x]) => x.v.bv))), pick(new Map([...S].filter(([, x]) => String(x.v.stop).startsWith('atr'))))].filter(Boolean);
   const vKeys = [...new Set([BASE, best?.v.key, ...byRule.map((x) => x.v.key)].filter(Boolean))], VV = V.filter((v) => vKeys.includes(v.key));
   const B = VCOINS.length ? await run(VCOINS, VV, (c) => VCAT[c] || 'follow', 77) : null;
   const VS = new Map(VV.map((v) => [v.key, B ? stat(B.T.get(v.key), ALL) : null]));
@@ -130,6 +140,9 @@ async function main(){
 
   md.push('## 3א. מנה שלישית רק אחרי אישור היפוך (30-60-90)', '| אישור תוך | סטופ | כלל | עסקאות | הצלחה | רווח ממוצע | הפסד ממוצע | הפסדים ≥ ½R | R נטו | $ בבוט לעסקה | R אקראי |', '|---|---|---|---|---|---|---|---|---|---|---|');
   for (const x of [...S.values()].filter((y) => y.v.c3)) md.push(`| ${x.v.c3} נרות | ${stopHe(x.v.stop)} | ${R_HE[x.v.r]} | ${x.all.n} | ${pc(x.all.win)} | ${f(x.all.avgWin)} | ${f(x.all.avgLoss)} | ${pc(x.all.bigPct)} | ${f(x.all.R)} | ${usd(x.all.R)} | ${f(x.rnd.all.R)} |`);
+  md.push('');
+  md.push('## 3ג. נפח — מנה שלישית רק עם נפח, וניהול לפי עוצמת הנפח בטריגר (30-60-90)', '| גרסה | עסקאות | הצלחה | רווח ממוצע | הפסד ממוצע | הפסדים ≥ ½R | R נטו | $ בבוט לעסקה | R אקראי |', '|---|---|---|---|---|---|---|---|---|');
+  for (const x of [...S.values()].filter((y) => y.v.v3 || y.v.bv)) md.push(`| ${name(x)} | ${x.all.n} | ${pc(x.all.win)} | ${f(x.all.avgWin)} | ${f(x.all.avgLoss)} | ${pc(x.all.bigPct)} | ${f(x.all.R)} | ${usd(x.all.R)} | ${f(x.rnd.all.R)} |`);
   md.push('');
   md.push('## 3ב. מה כל כלל עושה בכל סטופ (30-60-90) — R נטו, כל התקופות', `| כלל | ${STOPS.map(stopHe).join(' | ')} |`, `|---|${STOPS.map(() => '---|').join('')}`);
   for (const r of Object.keys(RULES)) md.push(`| ${R_HE[r]} | ${STOPS.map((st) => f(S.get(`course-${r}-sl${st}`).all.R)).join(' | ')} |`);

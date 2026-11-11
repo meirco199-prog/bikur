@@ -105,20 +105,26 @@ export function triggers(ctx, cat, cfg){
 //     { min: N } — אם עברו N דקות מהמילוי המלא ועדיין לא יצאנו → סגירה בשוק. אפשר לשלב.
 //   confirm3: N — המנה השלישית לא בפקודה ממתינה: אחרי שהמחיר נגע בקו שלה, קונים בשוק רק אם נר 15 דק׳ נסגר חזרה מעליו תוך N נרות
 //     (ומתחת לקו המנה השנייה); אחרת מוותרים עליה. (הצעה מ-GPT, 11/11/2026: "כניסה שלישית רק אחרי אישור היפוך")
+//   vol3: k — המנה השלישית לא בפקודה ממתינה: קונים אותה בשוק רק אחרי נר דקה שנגע בקו שלה עם נפח ≥ k × ממוצע 60 הדקות ("שטיפה" עם נפח)
+//   byVol: { kv, weak: {...} } — טריגר שהנפח שלו פחות מ-kv × ממוצע 60 הדקות מנוהל לפי weak (למשל בלי המנה השלישית). (מאיר 11/11/2026)
 //   stopAtr: k — סטופ k × ATR(14) של 15 דק׳ מתחת למנה האחרונה המתוכננת (במקום stop). הגודל עדיין לפי הפסד מלא = RISK_USD.
 export function execute(ctx, trigs, opt = {}){
   const { m1, n, idx15, q } = ctx, coin = opt.coin || 'BTC', Cc = { ...COURSE_COST, ...(opt.cost || {}) };
   const hs = (Cc.halfSpreadBps[coin] ?? 2) / 1e4, sl = (Cc.slipBps[coin] ?? 3) / 1e4, pen = Cc.penBps / 1e4, mk = Cc.makerBps / 1e4, tk = Cc.takerBps / 1e4;
-  const maxHold = opt.maxHoldMin || 1440, W = opt.weights || (opt.entry === 'single' ? [1, 0, 0] : opt.entry === 'deep' ? [0, 0.4, 0.6] : [1 / 6, 1 / 3, 1 / 2]), trades = [];
-  const FULL = opt.full || null, nW = W.filter((w) => w > 0).length, lastW = W.reduce((a, w, k) => (w > 0 ? k : a), 0);
-  const tpFix = typeof opt.exit === 'number' ? opt.exit / 100 : 0, stopFix = typeof opt.stop === 'number' ? opt.stop / 100 : 0;
+  const maxHold = opt.maxHoldMin || 1440, trades = [];
+  const tpFix = typeof opt.exit === 'number' ? opt.exit / 100 : 0;
   let busy = -1;
   for (const g of trigs){
     if (g.i <= busy) continue;
+    // byVol: טריגר עם נפח חלש (פחות מ-kv × ממוצע 60 הדקות) מנוהל לפי byVol.weak (משקלות / כלל מילוי מלא / אישור לשלישית)
+    const weak = opt.byVol && ctx.vAvg60 && !(m1.v[g.i] >= opt.byVol.kv * ctx.vAvg60[g.i]), oo = weak ? { ...opt, ...opt.byVol.weak } : opt;
+    const W = oo.weights || (oo.entry === 'single' ? [1, 0, 0] : oo.entry === 'deep' ? [0, 0.4, 0.6] : [1 / 6, 1 / 3, 1 / 2]);
+    const FULL = oo.full || null, nW = W.filter((w) => w > 0).length, lastW = W.reduce((a, w, k) => (w > 0 ? k : a), 0);
+    const stopFix = typeof oo.stop === 'number' ? oo.stop / 100 : 0, V3 = oo.vol3 || 0;
     const P = g.P, Lw = g.L, px = [g.c, Lw * (1 - P.flush[0] / 100), Lw * (1 - P.flush[1] / 100)];
-    const lowest = px[lastW], atr = opt.stopAtr ? q.atr14[idx15[g.i] - 1] : NaN;
-    const stop = opt.stopAtr ? lowest - opt.stopAtr * atr : stopFix ? lowest * (1 - stopFix) : Lw * (1 - (P.flush[1] + P.stopExtra) / 100);
-    if (opt.stopAtr && !(atr > 0)) continue;
+    const lowest = px[lastW], atr = oo.stopAtr ? q.atr14[idx15[g.i] - 1] : NaN;
+    const stop = oo.stopAtr ? lowest - oo.stopAtr * atr : stopFix ? lowest * (1 - stopFix) : Lw * (1 - (P.flush[1] + P.stopExtra) / 100);
+    if (oo.stopAtr && !(atr > 0)) continue;
     if (!(lowest > stop && px[0] > px[1])) continue;
     const lossPer = W.reduce((s, w, k) => s + w * (1 - stop / px[k]), 0), N = Math.min(RISK_USD / lossPer, MAX_NOTIONAL);
     // מצב: כמויות (בדולרים נומינליים לפי מחיר הכניסה של כל מנה)
@@ -128,13 +134,18 @@ export function execute(ctx, trigs, opt = {}){
     if (W[0] > 0){ buy(0, px[0], false); tIn = g.t; }
     const open = [W[1] > 0, W[2] > 0], waitEnd = g.t + 240 * 60e3;
     let st = stop, phase = 0, why = 'זמן', k = g.i + 1, runnerTgt = NaN, tp1 = NaN, lastJ = -1, lv = [], tFull = 0, beTgt = NaN, jTouch = -1, j3 = idx15[g.i];
-    const C3 = opt.confirm3 || 0;
+    const C3 = oo.confirm3 || 0;
     const tEnd = g.t + maxHold * 60e3;
     for (; k < n && m1.t[k] <= tEnd; k++){
       const lo = m1.l[k], hi = m1.h[k], o = m1.o[k];
       let filled = false;
       if (phase === 0) for (let s = 0; s < 2; s++){
         if (!open[s]) continue;
+        if (s === 1 && V3){                                            // מנה שלישית רק עם נפח: נר דקה שנגע בקו שלה עם נפח ≥ V3 × ממוצע 60 דק׳ → קונים בפתיחת הנר הבא
+          const p = k - 1;
+          if (p > g.i && m1.l[p] <= px[2] * (1 - pen) && m1.v[p] >= V3 * ctx.vAvg60[p] && o < px[1]){ buy(2, o, false); open[1] = false; filled = true; if (!tIn) tIn = m1.t[k]; }
+          continue;
+        }
         if (s === 1 && C3){                                            // מנה שלישית רק אחרי אישור: נר 15 דק׳ שנסגר חזרה מעל הקו שלה
           const jc = idx15[k] - 1;
           if (jTouch >= 0 && jc !== j3){ j3 = jc;

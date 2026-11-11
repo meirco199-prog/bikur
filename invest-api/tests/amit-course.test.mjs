@@ -152,3 +152,29 @@ test('סטופ לפי ATR: k × ATR(14) של 15 דק׳ מתחת למנה האח�
   const [a] = execute(ctx, tg, { coin: 'AVAX', entry: 'ladder', exit: 'course', stopAtr: 2 });
   assert.equal(a.why, 'סטופ'); assert.ok(a.gross < 0 && a.gross > -RISK_USD - 10, `gross ${a.gross}`);
 });
+
+// ירידה ישרה מהטריגר ל-93; volAt = נפח לנרות שמתחת לקו המנה השלישית (95.84)
+function downVol(volAt){
+  const p = [];
+  for (let i = 0; i < 3 * 1440; i++) p.push({ c: 100 + 0.05 * Math.sin(i / 7) });
+  for (let k = 1; k <= 20; k++) p.push({ c: 100 - k * 0.13 });
+  p.push({ o: 97.45, c: 97.3, l: 97.2, h: 97.5, v: 20000 });
+  for (let k = 1; k <= 240; k++){ const c = Math.max(93, 97.3 - k * 0.01); p.push({ c, v: c < 95.84 ? volAt : 1000 }); }
+  for (let k = 0; k < 600; k++) p.push({ c: p.at(-1).c });
+  return series(p);
+}
+
+test('מנה שלישית רק עם נפח (vol3): ירידה שקטה → בלי השלישית; ירידה עם נפח גדול → נקנית בשוק', () => {
+  const o = { coin: 'AVAX', entry: 'ladder', exit: 'course', vol3: 3 };
+  const cq = prepare(downVol(1000)), tq = triggers(cq, 'follow', CANON).slice(0, 1), [quiet] = execute(cq, tq, o);
+  assert.equal(quiet.fills, 2); assert.ok(quiet.gross > -320, `gross ${quiet.gross}`);
+  const cl = prepare(downVol(20000)), tl = triggers(cl, 'follow', CANON).slice(0, 1), [loud] = execute(cl, tl, o);
+  assert.equal(loud.fills, 3); assert.ok(loud.gross < quiet.gross);
+});
+
+test('byVol: טריגר בנפח ×20 — מתחת ל-kv=30 נחשב חלש (בלי השלישית), מעל kv=10 חזק (רגיל)', () => {
+  const ctx = prepare(scenario('down')), tg = triggers(ctx, 'follow', CANON).slice(0, 1), o = { coin: 'AVAX', entry: 'ladder', exit: 'course' };
+  const weak = { weights: [1 / 3, 2 / 3, 0] };
+  assert.equal(execute(ctx, tg, { ...o, byVol: { kv: 30, weak } })[0].fills, 2);
+  assert.equal(execute(ctx, tg, { ...o, byVol: { kv: 10, weak } })[0].fills, 3);
+});
