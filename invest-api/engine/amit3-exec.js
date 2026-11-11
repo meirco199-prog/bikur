@@ -10,11 +10,20 @@ import { prepare, triggers, CANON, CATS } from './amit-course.js';
 
 export const BOT3 = Object.freeze({
   version: 1, base: 'https://api-demo.bybit.com', market: 'https://api.bybit.com', category: 'linear', tag: 'a3',
-  coins: Object.freeze({ BTC: 'btc', SOL: 'follow', AVAX: 'follow', ADA: 'follow', INJ: 'follow', RENDER: 'follow', NEAR: 'vol', FARTCOIN: 'vol' }),
+  // בלי BTC (11/11/2026): בוט 1 חזר לסחור ב-BTCUSDT באותו חשבון דמו, ושני בוטים על אותו סימול חולקים פוזיציה אחת —
+  // בוט 3 ספר את העסקאות של בוט 1 כשלו, וההפסד שלהן נכנס למגבלה היומית שלו (שסוגרת את כל הפוזיציות שלו, כולל של בוט 1).
+  coins: Object.freeze({ SOL: 'follow', AVAX: 'follow', ADA: 'follow', INJ: 'follow', RENDER: 'follow', NEAR: 'vol', FARTCOIN: 'vol' }),
   riskUsd: 200,                // הפסד אם כל 3 המנות התמלאו והסטופ נפגע
   maxNotional: 60000, leverage: 10, dailyLossUsd: 1000, maxHoldMin: 1440, historyMin: 6 * 1440,
   weights: Object.freeze([1 / 6, 1 / 3, 1 / 2]),
 });
+
+// מצב שנשמר לפני שינוי רשימת המטבעות: משאירים רק עסקאות, פוזיציות פתוחות וטריגרים של המטבעות של בוט 3 (syms).
+// כך עסקאות BTC של בוט 1, שנספרו בטעות, לא נכנסות לסיכום, לקריטריון ולמגבלה היומית.
+export function ownState(state, syms){
+  const keep = new Set(syms), pick = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => keep.has(k)));
+  return { ...state, trades: (state.trades || []).filter((x) => keep.has(x.sym)), open: pick(state.open), lastSeen: pick(state.lastSeen) };
+}
 
 // נרות Bybit: [[startMs, o, h, l, c, volume, turnover], …] מהחדש לישן → נרות סגורים בלבד, מהישן לחדש (v = מחזור בדולרים)
 export function klines(list, nowMs){

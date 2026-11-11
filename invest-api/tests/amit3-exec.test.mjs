@@ -1,7 +1,7 @@
 // בדיקות לבוט 3 (שיטת הקורס בדמו של Bybit): אותו טריגר כמו בבדיקה לאחור, תכנון 30-60-90, ניהול העסקה
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOT3, klines, toM1, liveSignal, planEntry, manage, roundStep, retry } from '../engine/amit3-exec.js';
+import { BOT3, klines, toM1, liveSignal, planEntry, manage, roundStep, retry, ownState } from '../engine/amit3-exec.js';
 import { prepare, triggers, CANON } from '../engine/amit-course.js';
 
 const T0 = Date.UTC(2026, 0, 1);
@@ -74,7 +74,7 @@ test('manage: 75% ברמה הקרובה → סטופ לכניסה → 25% ברמ
 
 test('roundStep ובטיחות: הכתובת קבועה לדמו, לא נוגעים ב-ETH (בוט 2)', () => {
   assert.equal(roundStep(1.2345, 0.01), 1.23); assert.equal(roundStep(1.235, 0.01, 'round'), 1.24);
-  assert.ok(BOT3.base.includes('api-demo.')); assert.ok(!('ETH' in BOT3.coins));
+  assert.ok(BOT3.base.includes('api-demo.')); assert.ok(!('ETH' in BOT3.coins)); assert.ok(!('BTC' in BOT3.coins)); // BTC — של בוט 1
 });
 
 // ---------- שער הפקודות (order-gate) לבוט 3 ----------
@@ -107,4 +107,12 @@ test('שער: ביטול פקודה ממתינה מותר גם בעצירה יו
   assert.equal(gate3({ sym: 'SOLUSDT', side: 'sell', qty: 4, price: 149, id: 'a3-SOL-x-e2-c' }, env).allowed, false); // בלי הדגל — נחסם (סיכון חדש)
   const c = gate3({ sym: 'SOLUSDT', side: 'sell', qty: 4, price: 149, id: 'a3-SOL-x-e2-c', cancel: true }, env);
   assert.equal(c.allowed, true); assert.equal(c.checks.cancel, true);
+});
+
+test('ownState: עסקאות, פוזיציות וטריגרים של מטבע שהוצא (BTC של בוט 1) לא נשארים במצב של בוט 3', () => {
+  const st = { startedAt: 'x', trades: [{ sym: 'BTCUSDT', pnl: -560 }, { sym: 'SOLUSDT', pnl: 12 }], open: { BTCUSDT: { phase: 0 }, NEARUSDT: { phase: 1 } }, lastSeen: { BTCUSDT: 5, ADAUSDT: 7 }, haltDay: null };
+  const o = ownState(st, ['SOLUSDT', 'NEARUSDT', 'ADAUSDT']);
+  assert.deepEqual(o.trades, [{ sym: 'SOLUSDT', pnl: 12 }]); assert.deepEqual(Object.keys(o.open), ['NEARUSDT']); assert.deepEqual(o.lastSeen, { ADAUSDT: 7 });
+  assert.equal(o.startedAt, 'x'); assert.equal(st.trades.length, 2);   // המקור לא משתנה
+  assert.deepEqual(ownState({}, ['SOLUSDT']).trades, []);
 });

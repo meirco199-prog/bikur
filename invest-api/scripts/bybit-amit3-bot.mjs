@@ -6,16 +6,16 @@
 // כל פעולה מול הברוקר (כניסה, מנה, מימוש, סגירה, הזזת סטופ, ביטול) עוברת קודם את שער הפקודות (engine/amit3-gate.js → order-gate).
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from 'node:fs';
 import { sign, ilDay } from '../engine/amit-exec.js';
-import { BOT3, klines, liveSignal, planEntry, manage, retry } from '../engine/amit3-exec.js';
+import { BOT3, klines, liveSignal, planEntry, manage, retry, ownState } from '../engine/amit3-exec.js';
 import { gate3, linkId3 } from '../engine/amit3-gate.js';
 
 const KEY = process.env.BYBIT_DEMO_API_KEY || '', SECRET = process.env.BYBIT_DEMO_API_SECRET || '';
 const HOME = process.env.HOME || '.', DIR = `${HOME}/.bikur-bybit`, STATE_FILE = `${DIR}/state3.json`, BARS = `${DIR}/bars3`;
 const STOP_FILES = [`${DIR}/STOP`, `${DIR}/STOP3`], RW = '10000', POLL_MS = 5000;
 const log = (...a) => console.log(new Date().toISOString().slice(5, 19), ...a);
-const SYMS = Object.keys(BOT3.coins).map((c) => `${c}USDT`), coinOf = (s) => s.replace(/USDT$/, '');
+const SYMS = Object.keys(BOT3.coins).map((c) => `${c}USDT`), coinOf = (s) => s.replace(/USDT$/, ''), REMOVED = ['BTCUSDT'];
 
-function loadState(){ try { return JSON.parse(readFileSync(STATE_FILE, 'utf8')); } catch { return { startedAt: new Date().toISOString(), trades: [], open: {}, lastSeen: {}, haltDay: null }; } }
+function loadState(){ try { return ownState(JSON.parse(readFileSync(STATE_FILE, 'utf8')), SYMS); } catch { return { startedAt: new Date().toISOString(), trades: [], open: {}, lastSeen: {}, haltDay: null }; } }
 function saveState(s){ try { mkdirSync(DIR, { recursive: true }); writeFileSync(STATE_FILE, JSON.stringify(s)); } catch (e) { log('שמירת מצב נכשלה:', e.message); } }
 
 async function bybit(method, path, params = {}){
@@ -116,6 +116,8 @@ async function tick(state, mem){
   const equity = Number(w.totalEquity) || 0, available = Number(w.totalAvailableBalance) || 0;
   state.hwm = Math.max(state.hwm || 0, equity);
   ENV = { now, equity, available, hwm: state.hwm, positions: pos, dayPnl: 0, journal: state.journalDay === new Date(now).toISOString().slice(0, 10) ? state.journal || [] : [], state };
+  // מטבע שהוצא מבוט 3 (BTC, 11/11/2026 — בוט 1 סוחר בו): פעם אחת, מבטלים פקודות ממתינות שבוט 3 השאיר בו (רק עם התג שלו)
+  if (!mem.cleaned){ mem.cleaned = true; for (const sym of REMOVED) await cancelPending(sym).catch((e) => log(sym, 'ניקוי פקודות ישנות נכשל:', e.message)); }
   if (stop){ for (const sym of Object.keys(mem.inst)) if (pos[sym] || state.open[sym]){ await closeAll(sym, pos[sym], 'STOP', 'k'); delete state.open[sym]; } saveState(state); if (!mem.stopLogged){ log('מצב עצירה (STOP)'); mem.stopLogged = true; } return; }
   mem.stopLogged = false;
   if (now - (mem.pnlAt || 0) > 5 * 60e3){ await syncClosed(state); mem.pnlAt = now; }
