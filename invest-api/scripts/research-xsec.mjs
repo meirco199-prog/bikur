@@ -92,9 +92,9 @@ export function parseSnapshotsCsv(csv){
   for (const line of csv.split('\n').slice(1)){ const m = line.match(/^(\d{4}-\d{2}-\d{2}),"?([^"]*)"?/); if (!m) continue; out.push({ date: m[1], set: new Set(m[2].split(',').map((x) => x.trim()).filter((x) => TICK.test(x) || DELISTED.test(x)).map((x) => (DELISTED.test(x) ? x : yh(x)))) }); }
   return out;
 }
-const inIv = (ivs, d) => ivs?.some(([a, b]) => (a === null || d >= a) && (b === null || d < b));
+export const inIv = (ivs, d) => ivs?.some(([a, b]) => (a === null || d >= a) && (b === null || d < b));
 
-async function universes(){
+export async function universes(){
   const page = async (p) => (await get(`https://en.wikipedia.org/wiki/${p}`)) || '';
   const h500 = await page('List_of_S%26P_500_companies'), h400 = await page('List_of_S%26P_400_companies'), h600 = await page('List_of_S%26P_600_companies');
   const sp500 = parseConstituents(h500), sp400 = parseConstituents(h400), sp600 = parseConstituents(h600);
@@ -125,7 +125,7 @@ async function universes(){
 }
 
 // ---------- מחירים ----------
-async function daily(sym){
+export async function daily(sym){
   const j = await get(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?period1=${P1}&period2=${Math.floor(Date.now() / 1000)}&interval=1d&includeAdjustedClose=true`);
   try {
     const r = JSON.parse(j).chart.result[0], q = r.indicators.quote[0], adj = r.indicators.adjclose?.[0]?.adjclose;
@@ -244,7 +244,7 @@ export function rankAll(ctx, V, uniName, elig){
 }
 
 // ---------- סימולציה ----------
-const halfSpread = (adv) => (adv >= 1e9 ? 1.5e-4 : adv >= 1e8 ? 3e-4 : adv >= 2e7 ? 7e-4 : adv >= 5e6 ? 15e-4 : 30e-4);
+export const halfSpread = (adv) => (adv >= 1e9 ? 1.5e-4 : adv >= 1e8 ? 3e-4 : adv >= 2e7 ? 7e-4 : adv >= 5e6 ? 15e-4 : 30e-4);
 const commission = (sh, px) => Math.min(Math.max(1, 0.005 * sh), 0.01 * sh * px);
 const secFees = (sh, px) => 0.0000278 * sh * px + Math.min(0.000166 * sh, 8.3);
 // cost: 'net' | 'gross' | 'net2x'. מחזיר סטטיסטיקה לפי שנה, לחלונות (מלא/פיתוח/מבחן) ולעסקאות
