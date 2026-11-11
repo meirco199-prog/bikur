@@ -1,0 +1,34 @@
+# מחקר "כשאנבידיה צונחת — מי עולה?" (scripts/research-nvda-drops.mjs, invest/docs/research/nvda-drops/). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
+# השאלה (מאיר, 12/11/2026): איזה מניות בדרך כלל עולות כשאנבידיה צונחת — באותו יום ובימים שאחרי.
+# נתונים: Yahoo Finance יומי 2007→היום, הרכב S&P 500 היסטורי, קרנות ענפים, זהב, אג״ח, דולר, מדד הפחד וקרנות הפוכות (אותו מקור כמו research-xsec).
+# הרצה: Actions → research-nvda-drops → Run workflow, או דחיפה של .github/nvda-drops/command לענף שאינו main.
+# התוצאות (report.md, results.csv, meta.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow (לא ל-main).
+name: research-nvda-drops
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: ['.github/nvda-drops/command']
+permissions: { contents: write }
+concurrency: { group: research-nvda-drops, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: unit tests
+        run: node --test invest-api/tests/research-nvda-drops.test.mjs invest-api/tests/research-xsec.test.mjs
+      - name: research
+        run: node --max-old-space-size=6000 invest-api/scripts/research-nvda-drops.mjs --outdir invest/docs/research/nvda-drops
+      - uses: actions/upload-artifact@v4
+        with: { name: nvda-drops-results, path: invest/docs/research/nvda-drops }
+      - name: commit results
+        if: github.ref_name != 'main'
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/nvda-drops
+          git commit -m "ops: תוצאות מחקר הצניחות של אנבידיה (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
