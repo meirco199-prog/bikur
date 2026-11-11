@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'install (התקנה/עדכון מלא + הפעלה) | update (משיכת קוד + ריסטארט) | status | logs | stop (עצירה מיידית: ביטול פקודות + סגירת פוזיציה) | start (ביטול עצירה) | stop1 / start1 (בוט 1 בלבד) | stop3 / start3 (בוט 3 בלבד) | summary3 (סיכום בוט 3)'
+        description: 'install (התקנה/עדכון מלא + הפעלה) | update (משיכת קוד + ריסטארט) | status | logs | stop (עצירה מיידית: ביטול פקודות + סגירת פוזיציה) | start (ביטול עצירה) | stop1 / start1 (בוט 1 בלבד) | stop3 / start3 (בוט 3 בלבד) | summary3 (סיכום בוט 3) | summary1 (כל הכניסות והעסקאות שנסגרו של בוט 1, 7 ימים)'
         required: true
         default: 'status'
         type: choice
-        options: [install, update, status, logs, stop, start, stop1, start1, stop3, start3, summary3]
+        options: [install, update, status, logs, stop, start, stop1, start1, stop3, start3, summary3, summary1]
 
 permissions:
   contents: read
@@ -49,6 +49,7 @@ jobs:
             stop1)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP1"; chown -R bridge:bridge "$H/.bikur-bybit"; systemctl restart bikur-bybit; sleep 20; journalctl -u bikur-bybit -n 10 --no-pager; systemctl stop bikur-bybit; systemctl disable -q bikur-bybit; echo "בוט 1 נעצר ובוטל (STOP1 נשאר עד start1). בוט 2: $(systemctl is-active bikur-bybit2)"' ;;
             stop3)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); mkdir -p "$H/.bikur-bybit"; touch "$H/.bikur-bybit/STOP3"; chown -R bridge:bridge "$H/.bikur-bybit"; sleep 75; journalctl -u bikur-bybit3 -n 12 --no-pager; systemctl stop bikur-bybit3; systemctl disable -q bikur-bybit3; echo "בוט 3 נעצר ובוטל (STOP3 נשאר עד start3)"' ;;
             start3)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP3"; systemctl enable -q bikur-bybit3; systemctl start bikur-bybit3; sleep 5; systemctl is-active bikur-bybit3' ;;
+            summary1) $SSH 'journalctl -u bikur-bybit --since "7 days ago" --no-pager | grep -E "כניסה|עסקה נסגרה|סטופ|מגבלה|בוט עמית" || true' ;;
             summary3) $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge bash -c "set -a; . /etc/bikur-bybit/bot.env; set +a; cd $H/bikur && node invest-api/scripts/bybit-amit3-bot.mjs --summary"; ls -la "$H/.bikur-bybit/bars3" 2>/dev/null; journalctl -u bikur-bybit3 -n 40 --no-pager | grep -E "כניסה|מימוש|סגירה|הסתיימה|עצירה" || true' ;;
             start1)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP1"; systemctl enable -q bikur-bybit; systemctl start bikur-bybit; sleep 5; systemctl is-active bikur-bybit' ;;
             start)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP"; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-enabled -q $s && systemctl start $s; done; sleep 5; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-active $s | sed "s/^/$s: /"; done' ;;
