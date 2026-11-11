@@ -137,3 +137,18 @@ test('משקלות: בלי המנה השלישית → 2 מילויים, הגו�
   const [a] = execute(ctx, tg, o), [b] = execute(ctx, tg, { ...o, weights: [1 / 6, 1 / 3, 1 / 2] });
   assert.equal(a.gross, b.gross); assert.equal(a.notional, b.notional);
 });
+
+test('מנה שלישית רק אחרי אישור (confirm3): ירידה ישרה → בלי השלישית, הפסד קטן מ-1R; חזרה מעל הקו → נקנית בשוק', () => {
+  const o = { coin: 'AVAX', entry: 'ladder', exit: 'course' };
+  const ctxD = prepare(scenario('down')), tgD = triggers(ctxD, 'follow', CANON).slice(0, 1), [d] = execute(ctxD, tgD, { ...o, confirm3: 4 });
+  assert.equal(d.fills, 2); assert.equal(d.why, 'סטופ'); assert.ok(d.gross > -320 && d.gross < -200, `gross ${d.gross}`);
+  const ctx = prepare(dipScenario()), tg = triggers(ctx, 'follow', CANON).slice(0, 1), [a] = execute(ctx, tg, { ...o, confirm3: 4 }), [base] = execute(ctx, tg, o);
+  assert.equal(a.fills, 3); assert.ok(a.notional > 0 && Math.abs(a.notional - base.notional) < 1);
+});
+
+test('סטופ לפי ATR: k × ATR(14) של 15 דק׳ מתחת למנה האחרונה; הגודל לפי הפסד מלא', () => {
+  const ctx = prepare(scenario('down')), tg = triggers(ctx, 'follow', CANON).slice(0, 1);
+  assert.ok(ctx.q.atr14[ctx.idx15[tg[0].i] - 1] > 0);
+  const [a] = execute(ctx, tg, { coin: 'AVAX', entry: 'ladder', exit: 'course', stopAtr: 2 });
+  assert.equal(a.why, 'סטופ'); assert.ok(a.gross < 0 && a.gross > -RISK_USD - 10, `gross ${a.gross}`);
+});

@@ -6,7 +6,8 @@
 // האות: בדיוק של בוט 3 (CANON, engine/amit3-exec.js), אותם 8 מטבעות ואותם סוגי מטבע. משתנה רק ניהול העסקה (engine/amit-course.js → execute):
 //   משקלות: 30-60-90 של הקורס (1/6,1/3,1/2) · שווה (1/3 כל אחת) · הפוך (1/2,1/3,1/6) · בלי השלישית (1/3,2/3) · כניסה אחת
 //   כלל אחרי מילוי מלא: אין · סטופ 0.3%/0.6% מתחת למנה האחרונה · יציאה בממוצע (0 / +0.3%) · סגירה אחרי 30/60/120 דק׳ · ממוצע + 60 דק׳
-//   סטופ בסיס: של הקורס · 1% מתחת למנה האחרונה המתוכננת
+//   סטופ בסיס: של הקורס · 1% מתחת למנה האחרונה המתוכננת · 2/4 × ATR(14) של 15 דק׳ (הצעה מ-GPT)
+//   מנה שלישית רק אחרי אישור היפוך (נר 15 דק׳ שנסגר חזרה מעל הקו שלה תוך 4/8/12 נרות; הצעה מ-GPT)
 // הגודל תמיד מנורמל: הפסד מלא (כל המנות + סטופ) = 400$ = 1R. כך ההשוואה בין משקלות הוגנת.
 //
 // קריטריון שנקבע מראש (לפני הריצה, לא משנים אחריה):
@@ -35,12 +36,19 @@ export const RULES = { none: null, sl03: { sl: 0.3 }, sl06: { sl: 0.6 }, be0: { 
 export const W_HE = { course: '30-60-90 (1/6, 1/3, 1/2)', equal: 'שווה (1/3 כל אחת)', front: 'הפוך (1/2, 1/3, 1/6)', two: 'בלי השלישית (1/3, 2/3)', single: 'כניסה אחת' };
 export const R_HE = { none: 'כמו היום', sl03: 'סטופ 0.3% מתחת למנה האחרונה', sl06: 'סטופ 0.6% מתחת למנה האחרונה', be0: 'יציאה בממוצע', be03: 'יציאה ב+0.3% מעל הממוצע',
   t30: 'סגירה אחרי 30 דק׳', t60: 'סגירה אחרי 60 דק׳', t120: 'סגירה אחרי 120 דק׳', be0t60: 'יציאה בממוצע, או סגירה אחרי 60 דק׳' };
+// סטופ בסיס: של הקורס · 1% מתחת למנה האחרונה · k × ATR(14) של 15 דק׳ מתחת למנה האחרונה (הצעה מ-GPT, 11/11/2026)
+export const STOPS = ['course', 1, 'atr2', 'atr4'];
+const stopOpt = (stop) => (String(stop).startsWith('atr') ? { stop: 'course', stopAtr: Number(String(stop).slice(3)) } : { stop });
+export const stopHe = (stop) => (stop === 'course' ? 'של הקורס' : String(stop).startsWith('atr') ? `${String(stop).slice(3)}×ATR` : `${stop}%`);
 export function variants(){
   const out = [];
-  for (const stop of ['course', 1]){
-    for (const w of Object.keys(WEIGHTS)) for (const r of Object.keys(RULES)) out.push({ key: `${w}-${r}-sl${stop}`, w, r, stop, opt: { entry: 'ladder', exit: 'course', stop, weights: WEIGHTS[w], full: RULES[r] } });
-    out.push({ key: `single-none-sl${stop}`, w: 'single', r: 'none', stop, opt: { entry: 'single', exit: 'course', stop } });
+  for (const stop of STOPS){
+    for (const w of Object.keys(WEIGHTS)) for (const r of Object.keys(RULES)) out.push({ key: `${w}-${r}-sl${stop}`, w, c3: 0, r, stop, opt: { entry: 'ladder', exit: 'course', ...stopOpt(stop), weights: WEIGHTS[w], full: RULES[r] } });
+    out.push({ key: `single-none-sl${stop}`, w: 'single', c3: 0, r: 'none', stop, opt: { entry: 'single', exit: 'course', ...stopOpt(stop) } });
   }
+  // מנה שלישית רק אחרי אישור היפוך: נר 15 דק׳ שנסגר חזרה מעל הקו שלה תוך 4/8/12 נרות (הצעה מ-GPT, 11/11/2026)
+  for (const c3 of [4, 8, 12]) for (const stop of ['course', 1]) for (const r of ['none', 'be0', 't60'])
+    out.push({ key: `course-c3n${c3}-${r}-sl${stop}`, w: 'course', c3, r, stop, opt: { entry: 'ladder', exit: 'course', ...stopOpt(stop), weights: WEIGHTS.course, full: RULES[r], confirm3: c3 } });
   return out;
 }
 export const BASE = 'course-none-slcourse';   // בוט 3 כמו שהוא היום
@@ -84,7 +92,7 @@ async function run(coins, V, catOf, seed){
 const f = (x, d = 3) => (Number.isFinite(x) ? (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d) : '—');
 const pc = (x) => (Number.isFinite(x) ? `${x.toFixed(0)}%` : '—');
 const usd = (R) => (Number.isFinite(R) ? (R < 0 ? '−' : '+') + '$' + Math.abs(Math.round(R * BOT_RISK)).toLocaleString('en-US') : '—');
-const name = (x) => `${W_HE[x.v.w]} · ${R_HE[x.v.r]} · סטופ ${x.v.stop === 'course' ? 'של הקורס' : `${x.v.stop}%`}`;
+const name = (x) => `${W_HE[x.v.w]}${x.v.c3 ? ` · שלישית רק באישור (${x.v.c3} נרות)` : ''} · ${R_HE[x.v.r]} · סטופ ${stopHe(x.v.stop)}`;
 
 async function main(){
   const V = variants(), t0 = Date.now();
@@ -93,7 +101,8 @@ async function main(){
     return [v.key, { v, ...Object.fromEntries([...Object.keys(PERIODS), 'all'].map((p) => [p, stat(c, p === 'all' ? ALL : PERIODS[p])])), rnd: { all: stat(r, ALL) } }]; }));
   const base = S.get(BASE), best = pick(S);
   // אימות על 20 מטבעות חדשים: הבסיס, הנבחרת, והטובה (לפי אימון) בכל כלל — נקבע לפני שרואים את המטבעות
-  const byRule = Object.keys(RULES).map((r) => pick(new Map([...S].filter(([, x]) => x.v.r === r && x.v.w !== 'single')))).filter(Boolean);
+  const byRule = [...Object.keys(RULES).map((r) => pick(new Map([...S].filter(([, x]) => x.v.r === r && x.v.w !== 'single' && !x.v.c3)))),
+    pick(new Map([...S].filter(([, x]) => x.v.c3))), pick(new Map([...S].filter(([, x]) => String(x.v.stop).startsWith('atr'))))].filter(Boolean);
   const vKeys = [...new Set([BASE, best?.v.key, ...byRule.map((x) => x.v.key)].filter(Boolean))], VV = V.filter((v) => vKeys.includes(v.key));
   const B = VCOINS.length ? await run(VCOINS, VV, (c) => VCAT[c] || 'follow', 77) : null;
   const VS = new Map(VV.map((v) => [v.key, B ? stat(B.T.get(v.key), ALL) : null]));
@@ -116,15 +125,21 @@ async function main(){
   for (const r of Object.keys(RULES)){ const x = S.get(`course-${r}-slcourse`); md.push(`| ${R_HE[r]} | ${x.all.n} | ${pc(x.all.win)} | ${f(x.all.avgWin)} | ${f(x.all.avgLoss)} | ${pc(x.all.bigPct)} | ${f(x.all.worst, 2)} | ${f(x.all.R)} | ${usd(x.all.R)} | ${x.all.ddR.toFixed(1)} | ${f(x.rnd.all.R)} |`); }
   md.push('');
   md.push('## 3. משקלות (בלי כלל נוסף)', '| משקלות | סטופ | עסקאות | הצלחה | רווח ממוצע | הפסד ממוצע | R נטו | $ בבוט לעסקה |', '|---|---|---|---|---|---|---|---|');
-  for (const stop of ['course', 1]) for (const w of [...Object.keys(WEIGHTS), 'single']){ const x = S.get(`${w}-none-sl${stop}`); md.push(`| ${W_HE[w]} | ${stop === 'course' ? 'של הקורס' : `${stop}%`} | ${x.all.n} | ${pc(x.all.win)} | ${f(x.all.avgWin)} | ${f(x.all.avgLoss)} | ${f(x.all.R)} | ${usd(x.all.R)} |`); }
+  for (const stop of STOPS) for (const w of [...Object.keys(WEIGHTS), 'single']){ const x = S.get(`${w}-none-sl${stop}`); md.push(`| ${W_HE[w]} | ${stopHe(stop)} | ${x.all.n} | ${pc(x.all.win)} | ${f(x.all.avgWin)} | ${f(x.all.avgLoss)} | ${f(x.all.R)} | ${usd(x.all.R)} |`); }
   md.push('');
 
+  md.push('## 3א. מנה שלישית רק אחרי אישור היפוך (30-60-90)', '| אישור תוך | סטופ | כלל | עסקאות | הצלחה | רווח ממוצע | הפסד ממוצע | הפסדים ≥ ½R | R נטו | $ בבוט לעסקה | R אקראי |', '|---|---|---|---|---|---|---|---|---|---|---|');
+  for (const x of [...S.values()].filter((y) => y.v.c3)) md.push(`| ${x.v.c3} נרות | ${stopHe(x.v.stop)} | ${R_HE[x.v.r]} | ${x.all.n} | ${pc(x.all.win)} | ${f(x.all.avgWin)} | ${f(x.all.avgLoss)} | ${pc(x.all.bigPct)} | ${f(x.all.R)} | ${usd(x.all.R)} | ${f(x.rnd.all.R)} |`);
+  md.push('');
+  md.push('## 3ב. מה כל כלל עושה בכל סטופ (30-60-90) — R נטו, כל התקופות', `| כלל | ${STOPS.map(stopHe).join(' | ')} |`, `|---|${STOPS.map(() => '---|').join('')}`);
+  for (const r of Object.keys(RULES)) md.push(`| ${R_HE[r]} | ${STOPS.map((st) => f(S.get(`course-${r}-sl${st}`).all.R)).join(' | ')} |`);
+  md.push('');
   md.push('## 4. לפי תקופה — הבסיס, הנבחרת והטובה בכל כלל (נבחרה לפי אימון)', `| גרסה | ${Object.values(PERIODS).map((p) => p.he).join(' | ')} | הכול | אקראי | ${VCOINS.length} מטבעות חדשים |`, `|---|${Object.keys(PERIODS).map(() => '---|').join('')}---|---|---|`);
   for (const k of vKeys){ const x = S.get(k), v = VS.get(k); md.push(`| ${k === BASE ? '**היום:** ' : k === best?.v.key ? '**נבחרת:** ' : ''}${name(x)} | ${Object.keys(PERIODS).map((p) => `${f(x[p].R)} (${x[p].n})`).join(' | ')} | ${f(x.all.R)} | ${f(x.rnd.all.R)} | ${v ? `${f(v.R)} (${v.n})` : '—'} |`); }
   md.push('');
   md.push('## 5. מסקנה', '');
   md.push(best ? `- **הנבחרת לפי אימון:** ${name(best)} — אימון ${f(best.train.R)}, הכול ${f(best.all.R)} (${usd(best.all.R)} לעסקה בבוט), מטבעות חדשים ${f(VS.get(best.v.key)?.R)}.` : '- אין גרסה עם מספיק עסקאות.');
-  md.push(`- **הקריטריון שנקבע מראש:** ${ok ? '**עברה** — אפשר להציע אותה לדמו (החלטה של מאיר).' : '**לא עברה** — אין כלל ניהול שהופך את השיטה לרווחית. כללים שמקטינים את ההפסד הגדול גם מקטינים או מוחקים את הרווחים.'}`);
+  md.push(`- **הקריטריון שנקבע מראש:** ${ok ? '**עברה** — אפשר להציע אותה לדמו (החלטה של מאיר).' : '**לא עברה** — אף גרסת ניהול לא עמדה בקריטריון (ראו סעיף 4 לכל תקופה).'}`);
   md.push(`- **בוט 3 היום:** ${f(base.all.R)} לעסקה (${usd(base.all.R)}), הצלחה ${pc(base.all.win)}, הפסד ממוצע ${f(base.all.avgLoss)} מול רווח ממוצע ${f(base.all.avgWin)}.`);
 
   mkdirSync(OUTDIR, { recursive: true });

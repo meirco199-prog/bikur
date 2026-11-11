@@ -1,12 +1,14 @@
 // מחקר "בוט 3: הגבלת ההפסד כשגם המנה השלישית נכנסת" (scripts/research-amit3-stop.mjs): גרסאות, סטטיסטיקה, בחירה וקריטריון
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { variants, stat, pick, passes, BASE, PERIODS, WEIGHTS, RULES } from '../scripts/research-amit3-stop.mjs';
+import { variants, stat, pick, passes, BASE, PERIODS, WEIGHTS, RULES, STOPS } from '../scripts/research-amit3-stop.mjs';
 import { RISK_USD } from '../engine/amit-course.js';
 
 test('גרסאות: מזהים ייחודיים, הבסיס = בוט 3 כמו היום (30-60-90, בלי כלל, סטופ של הקורס)', () => {
   const V = variants();
-  assert.equal(V.length, 2 * (Object.keys(WEIGHTS).length * Object.keys(RULES).length + 1));
+  assert.equal(V.length, STOPS.length * (Object.keys(WEIGHTS).length * Object.keys(RULES).length + 1) + 3 * 2 * 3);
+  assert.equal(V.find((v) => v.key === 'course-none-slatr2').opt.stopAtr, 2);
+  assert.equal(V.filter((v) => v.opt.confirm3).length, 18);
   assert.equal(new Set(V.map((v) => v.key)).size, V.length);
   const b = V.find((v) => v.key === BASE);
   assert.deepEqual(b.opt.weights, [1 / 6, 1 / 3, 1 / 2]); assert.equal(b.opt.full, null); assert.equal(b.opt.stop, 'course');
