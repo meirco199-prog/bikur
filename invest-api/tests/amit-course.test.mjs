@@ -103,3 +103,78 @@ test("טריגר 'reclaim': רק אחרי ירידה מתחת לאזור וחז�
   assert.equal(tg.length, 1); assert.equal(tg[0].c, 97.3);
   assert.equal(triggers(prepare(scenario('up')), 'follow', { ...CANON, candle: 'reclaim' }).length, 0); // בלי ירידה מתחת לאזור
 });
+
+// ירידה שממלאת את כל 3 המנות (עד 95.7), חזרה קצרה מעל הממוצע (96.7, מתחת ליעד), ואז המשך ירידה לסטופ
+function dipScenario(){
+  const p = [];
+  for (let i = 0; i < 3 * 1440; i++) p.push({ c: 100 + 0.05 * Math.sin(i / 7) });
+  for (let k = 1; k <= 20; k++) p.push({ c: 100 - k * 0.13 });
+  p.push({ o: 97.45, c: 97.3, l: 97.2, h: 97.5, v: 20000 });
+  for (let k = 1; k <= 53; k++) p.push({ c: 97.3 - k * 0.03 });              // → 95.71: המנות 60 (96.81) ו-90 (95.84) מתמלאות
+  for (let k = 1; k <= 33; k++) p.push({ c: 95.71 + k * 0.03 });             // → 96.7
+  for (let k = 1; k <= 140; k++) p.push({ c: Math.max(93, 96.7 - k * 0.03) }); // → 93: הסטופ (94.48)
+  for (let k = 0; k < 600; k++) p.push({ c: p.at(-1).c });
+  return series(p);
+}
+
+test('מילוי מלא (בקשת מאיר 11/11): בלי כלל → הפסד מלא; יציאה בממוצע / סטופ צמוד אחרי המנה השלישית / זמן → הפסד קטן', () => {
+  const ctx = prepare(dipScenario()), tg = triggers(ctx, 'follow', CANON).slice(0, 1), o = { coin: 'AVAX', entry: 'ladder', exit: 'course' };
+  const [base] = execute(ctx, tg, o);
+  assert.equal(base.fills, 3); assert.equal(base.why, 'סטופ'); assert.ok(Math.abs(base.gross + RISK_USD) < 8, `gross ${base.gross}`);
+  const [be] = execute(ctx, tg, { ...o, full: { be: 0 } });
+  assert.equal(be.fills, 3); assert.equal(be.why, 'יציאה בממוצע'); assert.ok(Math.abs(be.gross) < 1, `gross ${be.gross}`);
+  const [sl] = execute(ctx, tg, { ...o, full: { sl: 0.3 } });
+  assert.equal(sl.why, 'סטופ'); assert.ok(sl.gross < -100 && sl.gross > -250, `gross ${sl.gross}`);
+  const [tm] = execute(ctx, tg, { ...o, full: { min: 30 } });
+  assert.equal(tm.why, 'זמן אחרי מילוי מלא'); assert.ok(tm.gross > base.gross);
+  assert.ok(tm.tExit - tm.tEntry >= 30 * 60e3);
+});
+
+test('משקלות: בלי המנה השלישית → 2 מילויים, הגודל עדיין לפי הפסד מלא = 1R; ברירת המחדל לא משתנה', () => {
+  const ctx = prepare(scenario('down')), tg = triggers(ctx, 'follow', CANON).slice(0, 1), o = { coin: 'AVAX', entry: 'ladder', exit: 'course' };
+  const [two] = execute(ctx, tg, { ...o, weights: [1 / 3, 2 / 3, 0] });
+  assert.equal(two.fills, 2); assert.ok(Math.abs(two.gross + RISK_USD) < 8, `gross ${two.gross}`);
+  const [a] = execute(ctx, tg, o), [b] = execute(ctx, tg, { ...o, weights: [1 / 6, 1 / 3, 1 / 2] });
+  assert.equal(a.gross, b.gross); assert.equal(a.notional, b.notional);
+});
+
+test('מנה שלישית רק אחרי אישור (confirm3): ירידה ישרה → בלי השלישית, הפסד קטן מ-1R; חזרה מעל הקו → נקנית בשוק', () => {
+  const o = { coin: 'AVAX', entry: 'ladder', exit: 'course' };
+  const ctxD = prepare(scenario('down')), tgD = triggers(ctxD, 'follow', CANON).slice(0, 1), [d] = execute(ctxD, tgD, { ...o, confirm3: 4 });
+  assert.equal(d.fills, 2); assert.equal(d.why, 'סטופ'); assert.ok(d.gross > -320 && d.gross < -200, `gross ${d.gross}`);
+  const ctx = prepare(dipScenario()), tg = triggers(ctx, 'follow', CANON).slice(0, 1), [a] = execute(ctx, tg, { ...o, confirm3: 4 }), [base] = execute(ctx, tg, o);
+  assert.equal(a.fills, 3); assert.ok(a.notional > 0 && Math.abs(a.notional - base.notional) < 1);
+});
+
+test('סטופ לפי ATR: k × ATR(14) של 15 דק׳ מתחת למנה האחרונה; הגודל לפי הפסד מלא', () => {
+  const ctx = prepare(scenario('down')), tg = triggers(ctx, 'follow', CANON).slice(0, 1);
+  assert.ok(ctx.q.atr14[ctx.idx15[tg[0].i] - 1] > 0);
+  const [a] = execute(ctx, tg, { coin: 'AVAX', entry: 'ladder', exit: 'course', stopAtr: 2 });
+  assert.equal(a.why, 'סטופ'); assert.ok(a.gross < 0 && a.gross > -RISK_USD - 10, `gross ${a.gross}`);
+});
+
+// ירידה ישרה מהטריגר ל-93; volAt = נפח לנרות שמתחת לקו המנה השלישית (95.84)
+function downVol(volAt){
+  const p = [];
+  for (let i = 0; i < 3 * 1440; i++) p.push({ c: 100 + 0.05 * Math.sin(i / 7) });
+  for (let k = 1; k <= 20; k++) p.push({ c: 100 - k * 0.13 });
+  p.push({ o: 97.45, c: 97.3, l: 97.2, h: 97.5, v: 20000 });
+  for (let k = 1; k <= 240; k++){ const c = Math.max(93, 97.3 - k * 0.01); p.push({ c, v: c < 95.84 ? volAt : 1000 }); }
+  for (let k = 0; k < 600; k++) p.push({ c: p.at(-1).c });
+  return series(p);
+}
+
+test('מנה שלישית רק עם נפח (vol3): ירידה שקטה → בלי השלישית; ירידה עם נפח גדול → נקנית בשוק', () => {
+  const o = { coin: 'AVAX', entry: 'ladder', exit: 'course', vol3: 3 };
+  const cq = prepare(downVol(1000)), tq = triggers(cq, 'follow', CANON).slice(0, 1), [quiet] = execute(cq, tq, o);
+  assert.equal(quiet.fills, 2); assert.ok(quiet.gross > -320, `gross ${quiet.gross}`);
+  const cl = prepare(downVol(20000)), tl = triggers(cl, 'follow', CANON).slice(0, 1), [loud] = execute(cl, tl, o);
+  assert.equal(loud.fills, 3); assert.ok(loud.gross < quiet.gross);
+});
+
+test('byVol: טריגר בנפח ×20 — מתחת ל-kv=30 נחשב חלש (בלי השלישית), מעל kv=10 חזק (רגיל)', () => {
+  const ctx = prepare(scenario('down')), tg = triggers(ctx, 'follow', CANON).slice(0, 1), o = { coin: 'AVAX', entry: 'ladder', exit: 'course' };
+  const weak = { weights: [1 / 3, 2 / 3, 0] };
+  assert.equal(execute(ctx, tg, { ...o, byVol: { kv: 30, weak } })[0].fills, 2);
+  assert.equal(execute(ctx, tg, { ...o, byVol: { kv: 10, weak } })[0].fills, 3);
+});
