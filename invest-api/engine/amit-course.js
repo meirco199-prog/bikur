@@ -97,16 +97,21 @@ export function triggers(ctx, cat, cfg){
 //   entry: 'ladder' (30-60-90) | 'single' (הכול בטריגר) | 'deep' (רק מנות 60 ו-90 בפקודות ממתינות בהנזלה; לא התמלאו תוך 4 שעות → אין עסקה)
 //   exit: 'course' (75% ברמה הקרובה + 25% רץ) | 'first' (100% ברמה הקרובה) | מספר = יעד קבוע באחוזים מעל מחיר הכניסה הממוצע
 //   stop: 'course' (עוד stopExtra מתחת לקו ההנזלה העמוק) | מספר = סטופ צמוד באחוזים מתחת למחיר הכניסה הנמוך המתוכנן
+//   weights: [w30, w60, w90] במקום המשקלות של entry (למשל [1/3, 2/3, 0] = בלי המנה השלישית). הגודל תמיד לפי הפסד מלא = RISK_USD.
+//   full: מה עושים כשכל המנות המתוכננות התמלאו (בקשת מאיר 11/11/2026: "הסטופ בשליש האחרון יוצר הפסדים גדולים"):
+//     { sl: x } — הסטופ עולה ל-x% מתחת למחיר המנה האחרונה · { be: x } — יציאה מלאה ב-x% מעל מחיר הממוצע (0 = בממוצע)
+//     { min: N } — אם עברו N דקות מהמילוי המלא ועדיין לא יצאנו → סגירה בשוק. אפשר לשלב.
 export function execute(ctx, trigs, opt = {}){
   const { m1, n, idx15, q } = ctx, coin = opt.coin || 'BTC', Cc = { ...COURSE_COST, ...(opt.cost || {}) };
   const hs = (Cc.halfSpreadBps[coin] ?? 2) / 1e4, sl = (Cc.slipBps[coin] ?? 3) / 1e4, pen = Cc.penBps / 1e4, mk = Cc.makerBps / 1e4, tk = Cc.takerBps / 1e4;
-  const maxHold = opt.maxHoldMin || 1440, W = opt.entry === 'single' ? [1, 0, 0] : opt.entry === 'deep' ? [0, 0.4, 0.6] : [1 / 6, 1 / 3, 1 / 2], trades = [];
+  const maxHold = opt.maxHoldMin || 1440, W = opt.weights || (opt.entry === 'single' ? [1, 0, 0] : opt.entry === 'deep' ? [0, 0.4, 0.6] : [1 / 6, 1 / 3, 1 / 2]), trades = [];
+  const FULL = opt.full || null, nW = W.filter((w) => w > 0).length, lastW = W.reduce((a, w, k) => (w > 0 ? k : a), 0);
   const tpFix = typeof opt.exit === 'number' ? opt.exit / 100 : 0, stopFix = typeof opt.stop === 'number' ? opt.stop / 100 : 0;
   let busy = -1;
   for (const g of trigs){
     if (g.i <= busy) continue;
     const P = g.P, Lw = g.L, px = [g.c, Lw * (1 - P.flush[0] / 100), Lw * (1 - P.flush[1] / 100)];
-    const lowest = W[2] > 0 ? px[2] : px[0], stop = stopFix ? lowest * (1 - stopFix) : Lw * (1 - (P.flush[1] + P.stopExtra) / 100);
+    const lowest = px[lastW], stop = stopFix ? lowest * (1 - stopFix) : Lw * (1 - (P.flush[1] + P.stopExtra) / 100);
     if (!(lowest > stop && px[0] > px[1])) continue;
     const lossPer = W.reduce((s, w, k) => s + w * (1 - stop / px[k]), 0), N = Math.min(RISK_USD / lossPer, MAX_NOTIONAL);
     // מצב: כמויות (בדולרים נומינליים לפי מחיר הכניסה של כל מנה)
@@ -115,15 +120,24 @@ export function execute(ctx, trigs, opt = {}){
     const sell = (fracQ, price, maker) => { const u = qty * fracQ, usd = u * price; gross += usd - cost$ * fracQ; cost$ -= cost$ * fracQ; qty -= u; if (maker) fees += usd * mk; else { fees += usd * tk; spread += usd * hs; slip += usd * sl; } };
     if (W[0] > 0){ buy(0, px[0], false); tIn = g.t; }
     const open = [W[1] > 0, W[2] > 0], waitEnd = g.t + 240 * 60e3;
-    let st = stop, phase = 0, why = 'זמן', k = g.i + 1, runnerTgt = NaN, tp1 = NaN, lastJ = -1, lv = [];
+    let st = stop, phase = 0, why = 'זמן', k = g.i + 1, runnerTgt = NaN, tp1 = NaN, lastJ = -1, lv = [], tFull = 0, beTgt = NaN;
     const tEnd = g.t + maxHold * 60e3;
     for (; k < n && m1.t[k] <= tEnd; k++){
       const lo = m1.l[k], hi = m1.h[k], o = m1.o[k];
       let filled = false;
       if (phase === 0) for (let s = 0; s < 2; s++) if (open[s] && lo <= px[s + 1] * (1 - pen)){ buy(s + 1, px[s + 1], true); open[s] = false; filled = true; if (!tIn) tIn = m1.t[k]; }
       if (!(qty > 0)){ if (m1.t[k] > waitEnd) break; continue; }   // 'deep': עדיין לא התמלא
+      if (FULL && !tFull && phase === 0 && fills === nW){                // כל המנות בפנים — מגבילים את ההפסד של המילוי המלא
+        tFull = m1.t[k];
+        if (FULL.sl != null) st = Math.max(st, px[lastW] * (1 - FULL.sl / 100));
+        if (FULL.be != null) beTgt = cost$ / qty * (1 + FULL.be / 100);
+      }
       if (lo <= st){ const p = Math.min(st, o); sell(1, p, false); why = phase ? 'סטופ בכניסה' : 'סטופ'; break; }
       // יעד: הרמה הקרובה מעל הממוצע (EMA20/50/VWAP של נר 15 הדקות האחרון שנסגר), מינימום +0.3%
+      if (tFull && phase === 0){
+        if (beTgt > 0 && !filled && hi >= beTgt * (1 + pen)){ sell(1, beTgt, true); why = 'יציאה בממוצע'; break; }
+        if (FULL.min != null && m1.t[k] >= tFull + FULL.min * 60e3){ sell(1, m1.c[k], false); why = 'זמן אחרי מילוי מלא'; break; }
+      }
       const j = idx15[k] - 1; if (j < 0) continue;
       const avgPx = cost$ / qty;
       if (j !== lastJ || filled){ lastJ = j; lv = [q.ema20[j], q.ema50[j], q.vwap[j], q.ema200[j]].filter((x) => x > avgPx * 1.003).sort((a, b) => a - b); } // רק כשנר 15 דק׳ נסגר או מנה התמלאה
