@@ -68,11 +68,16 @@ export function simTrade(m1, i0, sig, rule, P = BOT2, C = COST){
   return { pnl, fees, why, be, exitT: m1.t[j] + 60e3, notional };
 }
 
+// פוזיציה אחת: מותר להיכנס בדקה שמתחילה בסוף דקת היציאה הקודמת (busyUntil = סוף דקת היציאה) או אחריה
+export const canEnter = (entryT, busyUntil) => entryT >= busyUntil;
+
 // כל האותות ברצף, פוזיציה אחת בכל רגע. מחזיר [{ t, side, pnl, fees, why, be }]
 export function runVariant(m1, b15, rule, P = BOT2, C = COST){
   const out = []; let busyUntil = -Infinity;
   for (let k = P.bbN - 1; k < b15.length; k++){
-    const bar = b15[k]; if (bar.t + P.barMs < busyUntil) continue;
+    const bar = b15[k];
+    // פוזיציה אחת: הכניסה (פתיחת הדקה bar.next) מותרת רק אחרי סוף דקת היציאה הקודמת. דקת כניסה = דקת יציאה → הפוזיציה עוד פתוחה בסגירת הנר
+    if (bar.next >= m1.t.length || !canEnter(m1.t[bar.next], busyUntil)) continue;
     const sig = signal(b15.slice(k - P.bbN + 1, k + 1), P);
     if (!sig || sig.skip) continue;
     const r = simTrade(m1, bar.next, sig, rule, P, C);

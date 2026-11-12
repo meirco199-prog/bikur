@@ -57,3 +57,11 @@ test('runVariant: פוזיציה אחת בכל רגע; paired משווה רק א
   assert.equal(dec.length, VARIANTS.length - 1); assert.ok(VARIANTS.some((v) => v.k === CURRENT));
   assert.ok(dec.every((x) => !x.better && !x.profitable));
 });
+
+test('canEnter: כניסה מותרת בדקה שאחרי דקת היציאה, ונחסמת כשדקת הכניסה היא דקת היציאה עצמה', async () => {
+  const { canEnter } = await import('../scripts/research-amit2-be.mjs');
+  const exitMinute = Date.UTC(2024, 0, 1, 10, 7), busyUntil = exitMinute + 60e3;   // יציאה בדקה 10:07 → פנוי מ-10:08
+  assert.equal(canEnter(exitMinute + 60e3, busyUntil), true);                       // נר שנסגר ב-10:08 → כניסה ב-10:08
+  assert.equal(canEnter(exitMinute, busyUntil), false);                             // נר שנסגר ב-10:07 → הפוזיציה עוד פתוחה
+  assert.equal(canEnter(0, -Infinity), true);
+});
