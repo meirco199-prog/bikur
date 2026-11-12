@@ -11,6 +11,9 @@ const NOTIONAL = 190000, FEE_EXIT = 0.00055 + 0.0002, FEE_IN = 0.0002;  // יצ�
 const state = JSON.parse(readFileSync(process.env.BOT_STATE, 'utf8'));
 const trades = (state.trades || []).filter((x) => x.entry > 0 && x.exit > 0 && x.t > 0).sort((a, b) => a.t - b.t);
 const iso = (t) => new Date(t).toISOString().slice(5, 16).replace('T', ' ');
+// שורות יומן (journalctl -o short-unix): "<שניות>.<…> host node[pid]: … נכנסנו: לונג 2.557 @ 74289.1"
+let ENTRIES = []; try { ENTRIES = readFileSync(process.env.ENTRIES || '/dev/null', 'utf8').split('\n').map((l) => { const m = l.match(/^(\d+)\.\d+.*נכנסנו:\s*(לונג|שורט)\s+[\d.]+\s*@\s*([\d.]+)/); return m && { t: Number(m[1]) * 1000, side: m[2] === 'לונג' ? 'long' : 'short', px: Number(m[3]) }; }).filter(Boolean); } catch {}
+console.error(`כניסות ביומן: ${ENTRIES.length}`);
 console.error(`עסקאות בקובץ: ${trades.length}, מ-${state.startedAt}`);
 
 async function bars(from, to){
@@ -30,8 +33,10 @@ const mean = (a) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
 const rows = [];
 for (const x of trades){
   const sg = x.side === 'long' ? 1 : -1, iExit = at(x.t); if (iExit == null) continue;
-  // דקת הכניסה: הראשונה ב-61 הדקות שלפני הסגירה שבה המחיר נגע במחיר הכניסה
-  let iIn = null; for (let i = Math.max(0, iExit - 61); i <= iExit; i++) if (all[i].l <= x.entry && x.entry <= all[i].h){ iIn = i; break; }
+  // דקת הכניסה: מהיומן של הבוט ("נכנסנו: … @ מחיר", אותו כיוון, מחיר בטווח 0.05%, עד 65 דק׳ לפני הסגירה); אחרת — הנגיעה האחרונה במחיר
+  const ent = ENTRIES.filter((e) => e.side === x.side && Math.abs(e.px / x.entry - 1) < 0.0005 && e.t <= x.t + 60e3 && e.t >= x.t - 65 * 60e3).at(-1);
+  let iIn = ent ? at(ent.t) : null, src = 'יומן';
+  if (iIn == null){ src = 'משוער'; for (let i = iExit; i >= Math.max(0, iExit - 61); i--) if (all[i].l <= x.entry && x.entry <= all[i].h){ iIn = i; break; } }
   if (iIn == null || iIn < 240) continue;
   const c = (k) => all[iIn - k].c, E = x.entry;
   // מאפיינים לפני הכניסה (רק נתונים עד הדקה שלפני)
@@ -46,7 +51,7 @@ for (const x of trades){
   // מסלול העסקה: הכי רע / הכי טוב, ובאיזו דקה
   let mae = 0, mfe = 0, maeAt = 0; const path = [];
   for (let i = iIn; i <= iExit; i++){ const adv = sg > 0 ? (all[i].l / E - 1) : (E / all[i].h - 1), fav = sg > 0 ? (all[i].h / E - 1) : (E / all[i].l - 1); if (adv * 100 < mae){ mae = adv * 100; maeAt = i - iIn; } mfe = Math.max(mfe, fav * 100); path.push({ i, adv: adv * 100, fav: fav * 100, cl: sg * (all[i].c / E - 1) * 100 }); }
-  rows.push({ ...x, sg, iIn, iExit, mins: iExit - iIn, f, mae, mfe, maeAt, path, big: x.pnl < -300 });
+  rows.push({ ...x, sg, iIn, iExit, mins: iExit - iIn, f, mae, mfe, maeAt, path, big: x.pnl < -300, src });
 }
 console.error(`עסקאות שנותחו: ${rows.length}`);
 
@@ -60,8 +65,8 @@ const md = ['# בוט 1 — ניתוח עומק של העסקאות האמיתי
 const avgRow = (name, a) => md.push(`| ${name} (${a.length}) | ${fx(mean(a.map((r) => r.f.width)))} | ${fx(mean(a.map((r) => r.f.r5)))} | ${fx(mean(a.map((r) => r.f.r15)))} | ${fx(mean(a.map((r) => r.f.r60)))} | ${fx(mean(a.map((r) => r.f.r240)))} | ${fx(mean(a.map((r) => r.f.atr)), 3)} | ${fx(mean(a.map((r) => r.f.vol)), 1)} |`);
 avgRow('רווח', W); avgRow('הפסד גדול', L); avgRow('הפסד קטן', O);
 md.push('', 'מומנטום "בכיוון העסקה": שלילי = המחיר נע נגד הכיוון שנכנסנו אליו (בלונג — ירד) לפני הכניסה, כלומר "תפסנו סכין נופלת".', '',
-  '## 2. איך נראה ההפסד הגדול מבפנים (כל עסקה)', '', '| סגירה (UTC) | כיוון | כניסה | תוצאה | דקות | הכי רע % | באיזו דקה | הכי טוב % | אחרי דקה 1 | אחרי 2 | אחרי 3 | אחרי 5 | מומנטום 15 % | נפח× |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
-for (const r of rows.filter((r) => r.big)){ const p = (k) => fx(r.path[k]?.cl); md.push(`| ${iso(r.t)} | ${r.sg > 0 ? 'לונג' : 'שורט'} | ${r.entry} | ${f$(r.pnl)} | ${r.mins} | ${fx(r.mae)} | ${r.maeAt} | ${fx(r.mfe)} | ${p(1)} | ${p(2)} | ${p(3)} | ${p(5)} | ${fx(r.f.r15)} | ${fx(r.f.vol, 1)} |`); }
+  '## 2. איך נראה ההפסד הגדול מבפנים (כל עסקה)', '', '| סגירה (UTC) | כניסה לפי | כיוון | כניסה | תוצאה | דקות | הכי רע % | באיזו דקה | הכי טוב % | אחרי דקה 1 | אחרי 2 | אחרי 3 | אחרי 5 | מומנטום 15 % | נפח× |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+for (const r of rows.filter((r) => r.big)){ const p = (k) => fx(r.path[k]?.cl); md.push(`| ${iso(r.t)} | ${r.src} | ${r.sg > 0 ? 'לונג' : 'שורט'} | ${r.entry} | ${f$(r.pnl)} | ${r.mins} | ${fx(r.mae)} | ${r.maeAt} | ${fx(r.mfe)} | ${p(1)} | ${p(2)} | ${p(3)} | ${p(5)} | ${fx(r.f.r15)} | ${fx(r.f.vol, 1)} |`); }
 md.push('', '"אחרי דקה k": הרווח/הפסד הצף (%) בסגירת הדקה ה-k מהכניסה.', '');
 // רווחים: איך הם נראו בדקות הראשונות (כדי לראות אם כלל מוקדם היה הורג גם אותם)
 md.push('## 3. אותו דבר לעסקאות המרוויחות — הכי רע בדרך', '', `- הכי רע ממוצע בדרך לרווח: ${fx(mean(W.map((r) => r.mae)))}% · בהפסדים הגדולים: ${fx(mean(L.map((r) => r.mae)))}%.`,
@@ -72,6 +77,10 @@ const exitAt = (r, k) => { const p = r.path[k]; const px = all[p.i].c, g = r.sg 
 const rules = [];
 for (const x of [0.08, 0.1, 0.12, 0.15]) for (const n of [2, 3, 5]) rules.push({ k: `חיתוך: הפסד ${x}% בתוך ${n} דק׳`, fn: (r) => { for (let k = 0; k < Math.min(n, r.path.length); k++) if (r.path[k].adv <= -x) return (-x / 100 - FEE_IN - FEE_EXIT) * NOTIONAL; return r.pnl; } });
 for (const n of [3, 5, 10]) for (const y of [0, 0.05]) rules.push({ k: `אין התקדמות: אחרי ${n} דק׳ פחות מ-+${y}% → יציאה`, fn: (r) => (r.path.length > n && Math.max(...r.path.slice(0, n).map((p) => p.fav)) < y ? exitAt(r, n) : r.pnl) });
+// הגנה על רווח: אחרי שהעסקה הגיעה ל-+a% — הסטופ זז לכניסה + עמלות (0.08%), או נגרר b% מתחת לשיא. בכל דקה: קודם הסטופ הנוכחי, אחר כך עדכון השיא
+const protect = (r, a, b) => { let best = 0, stop = null; for (const p of r.path){ if (stop != null && p.adv <= stop) return (stop / 100 - FEE_IN - FEE_EXIT) * NOTIONAL; best = Math.max(best, p.fav); if (best >= a) stop = Math.max(stop ?? -Infinity, b == null ? 0.08 : best - b); } return r.pnl; };
+for (const a of [0.1, 0.15, 0.2, 0.3]) rules.push({ k: `הגנה: אחרי +${a}% → סטופ לכניסה + עמלות`, fn: (r) => protect(r, a, null) });
+for (const a of [0.15, 0.2, 0.3]) for (const b of [0.1, 0.15]) rules.push({ k: `הגנה: אחרי +${a}% → סטופ נגרר ${b}% מתחת לשיא`, fn: (r) => protect(r, a, b) });
 for (const z of [-0.2, -0.3, -0.5]) rules.push({ k: `סינון: לא נכנסים כשהמומנטום 15 דק׳ < ${z}% ("סכין נופלת")`, fn: (r) => (r.f.r15 < z ? 0 : r.pnl) });
 for (const z of [-0.5, -1]) rules.push({ k: `סינון: לא נכנסים כשהמגמה 4 שעות < ${z}%`, fn: (r) => (r.f.r240 < z ? 0 : r.pnl) });
 for (const v of [2, 3]) rules.push({ k: `סינון: לא נכנסים כשהנפח בכניסה > ×${v}`, fn: (r) => (r.f.vol > v ? 0 : r.pnl) });
