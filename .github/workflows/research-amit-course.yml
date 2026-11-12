@@ -6,7 +6,8 @@
 #    "validate" — הגרסאות המובילות מהחקירה, שנקבעו מראש, על 20 מטבעות חדשים;
 #    "full" — המחקר המלא לפי הבריף: משפחות חלופיות, לונג ושורט, שכבת תיק, scripts/research-amit-full.mjs;
 #    "stop3" — בוט 3: איך מגבילים את ההפסד כשגם המנה השלישית נכנסת (בקשת מאיר 11/11/2026), scripts/research-amit3-stop.mjs →
-#    invest/docs/research/amit3-stop).
+#    invest/docs/research/amit3-stop;
+#    "be2" — בוט 2: מתי להזיז את הסטופ למחיר הכניסה (בקשת מאיר 12/11/2026), scripts/research-amit2-be.mjs → invest/docs/research/amit2-be).
 # התוצאות (report.md / report-test.md + summary*.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow (לא ל-main).
 name: research-amit-course
 on:
@@ -28,7 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - name: unit tests
-        run: node --test invest-api/tests/amit-course.test.mjs invest-api/tests/research-amit3-stop.test.mjs
+        run: node --test invest-api/tests/amit-course.test.mjs invest-api/tests/research-amit3-stop.test.mjs invest-api/tests/research-amit2-be.test.mjs
       - uses: actions/cache@v4
         with: { path: amit-course-cache, key: binance-um-1m-2020-01-2026-10-29coins-v2, restore-keys: binance-um-1m- }
       - name: mode
@@ -56,6 +57,12 @@ jobs:
           # בוט 3: משקלות המנות וכללים אחרי מילוי מלא; קריטריון שנקבע מראש בראש הסקריפט. 8 מטבעות הבוט + 20 מטבעות חדשים לאימות
           node --max-old-space-size=6500 invest-api/scripts/research-amit3-stop.mjs --from 2020-01 --to 2026-10 --cache amit-course-cache --outdir invest/docs/research/amit3-stop > /dev/null
           cat invest/docs/research/amit3-stop/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: be2
+        if: steps.mode.outputs.mode == 'be2'
+        run: |
+          # בוט 2: כללי הזזת הסטופ למחיר הכניסה על ETH 2020–2026; קריטריון שנקבע מראש בראש הסקריפט
+          node --max-old-space-size=6500 invest-api/scripts/research-amit2-be.mjs --from 2020-01 --to 2026-10 --cache amit-course-cache --outdir invest/docs/research/amit2-be > /dev/null
+          cat invest/docs/research/amit2-be/report.md >> "$GITHUB_STEP_SUMMARY"
       - name: validate
         if: steps.mode.outputs.mode == 'validate'
         run: |
@@ -78,11 +85,13 @@ jobs:
           path: |
             invest/docs/research/amit-course
             invest/docs/research/amit3-stop
+            invest/docs/research/amit2-be
       - name: commit results
         if: github.ref_name != 'main'
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add invest/docs/research/amit-course
           if [ -d invest/docs/research/amit3-stop ]; then git add invest/docs/research/amit3-stop; fi
+          if [ -d invest/docs/research/amit2-be ]; then git add invest/docs/research/amit2-be; fi
           git commit -m "ops: תוצאות בדיקת שיטת הקורס של עמית (ריצה ${GITHUB_RUN_ID})" || exit 0
           for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
