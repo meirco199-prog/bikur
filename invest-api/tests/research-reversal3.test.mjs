@@ -1,7 +1,7 @@
 // בדיקות למחקר "המניות שירדו הכי הרבה ב-3 ימים" (scripts/research-reversal3.mjs)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pickBasket, dayReturn, grow, VARIANTS, START } from '../scripts/research-reversal3.mjs';
+import { pickBasket, dayReturn, grow, accelerating, VARIANTS, START } from '../scripts/research-reversal3.mjs';
 
 const close = (a, b) => Math.abs(a - b) < 1e-9;
 const C = [{ s: 'A', sig: -0.10, ret: 0.02, c: 0.001 }, { s: 'B', sig: 0.05, ret: -0.01, c: 0.001 }, { s: 'C', sig: -0.20, ret: 0.04, c: 0.001 }, { s: 'D', sig: 0.01, ret: 0, c: 0.001 }];
@@ -27,4 +27,12 @@ test('grow: ריבית דריבית, ירידה מקסימלית', () => {
   const g = grow([0.1, -0.5, 0.2]);
   assert.ok(close(g.end, START * 1.1 * 0.5 * 1.2)); assert.ok(close(g.dd, 0.5)); assert.equal(g.n, 3);
   assert.ok(VARIANTS.some((v) => v.k === 'open-L3-5') && VARIANTS.some((v) => v.k === 'close-L3-5'));
+});
+
+test('accelerating: ביום השלישי הירידה הכי גדולה', () => {
+  assert.equal(accelerating([100, 99, 98, 94]), true);    // −1%, −1%, −4%
+  assert.equal(accelerating([100, 95, 94, 93]), false);   // הירידה הגדולה ביום הראשון
+  assert.equal(accelerating([100, 101, 102, 101.5]), true);  // עלייה, עלייה, ואז ירידה — היום השלישי הוא הירידה הגדולה
+  assert.equal(accelerating([100, 98, 96, 97]), false);       // ביום השלישי עלתה
+  assert.equal(accelerating([100, 0, 98, 94]), false);
 });

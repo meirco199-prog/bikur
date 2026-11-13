@@ -14,6 +14,7 @@
 // עלויות: חצי מרווח (לפי מחזור, כמו research-xsec) + עמלה 0.01% בכל קנייה ובכל מכירה. רגישות: עלויות כפולות.
 // הכרעה (נקבעה מראש, לפני הריצה): גרסה "שווה דמו" רק אם על 5 השנים — (1) גמרה מעל קניית מדד S&P 500 (SPY) והחזקה, (2) רווח יומי
 //   ממוצע חיובי עם t ≥ 2 גם בחצי הראשון וגם בשני, (3) חיובית ב-4 שנים קלנדריות לפחות מתוך 6, (4) עדיין רווחית עם עלויות כפולות.
+// גרסה נוספת (בקשת מאיר, אותו יום): רק מניות שביום השלישי ירדו יותר מבכל אחד משני הימים הקודמים ("הירידה מאיצה").
 //   נבדקות ~20 גרסאות — גרסה אחת שעוברת בקושי יכולה להיות מקרה.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -26,10 +27,18 @@ export const VARIANTS = [
     { k: `${mode}-L5-5`, mode, N: 5, look: 5, side: 'down' },
     { k: `${mode}-U3-5`, mode, N: 5, look: 3, side: 'up' },
     { k: `${mode}-L3-5-trend`, mode, N: 5, look: 3, side: 'down', trend: true },
+    { k: `${mode}-L3-5-accel`, mode, N: 5, look: 3, side: 'down', accel: true },
+    { k: `${mode}-L3-3-accel`, mode, N: 3, look: 3, side: 'down', accel: true },
   ]),
 ];
 const MODE_HE = { open: 'פתיחה→פתיחה', close: 'סגירה→סגירה' };
-export const variantHe = (v) => `${MODE_HE[v.mode]} · ${v.N} ${v.N === 1 ? 'מניה' : 'מניות'} ש${v.side === 'up' ? 'עלו' : 'ירדו'} הכי הרבה ב-${v.look === 1 ? 'יום אחד' : `${v.look} ימים`}${v.trend ? ' · רק כשהמדד מעל ממוצע 200 יום' : ''}`;
+export const variantHe = (v) => `${MODE_HE[v.mode]} · ${v.N} ${v.N === 1 ? 'מניה' : 'מניות'} ש${v.side === 'up' ? 'עלו' : 'ירדו'} הכי הרבה ב-${v.look === 1 ? 'יום אחד' : `${v.look} ימים`}${v.trend ? ' · רק כשהמדד מעל ממוצע 200 יום' : ''}${v.accel ? ' · רק אם ביום השלישי ירדה יותר מבכל אחד מהימים הקודמים' : ''}`;
+// "הירידה מאיצה": שלושת הימים האחרונים d1 (הישן), d2, d3 (האחרון) — d3 שלילי וגדול בירידה מ-d1 ומ-d2. c = [סגירה לפני 3, לפני 2, לפני 1, אחרונה]
+export function accelerating(c){
+  if (!c.every((x) => x > 0)) return false;
+  const d1 = c[1] / c[0] - 1, d2 = c[2] / c[1] - 1, d3 = c[3] / c[2] - 1;
+  return d3 < 0 && d3 < d1 && d3 < d2;
+}
 
 // בחירת הסל: cands = [{ s, sig, ret, c }] (sig = תשואת התקופה, ret = תשואת ההחזקה, c = עלות צד אחד). מחזיר N מניות
 export function pickBasket(cands, N, side = 'down'){
@@ -88,9 +97,10 @@ async function main(){
           if (!inIv(U.iv500[s], cal[k]) || !(ADV[s][k] >= MIN_ADV)) continue;
           const a = X.C[sk - v.look], b = X.C[sk], e0 = v.mode === 'open' ? X.O[k] : X.C[k], e1 = v.mode === 'open' ? X.O[k + 1] : X.C[k + 1];
           if (!(a > 0 && b > 0 && e0 > 0 && e1 > 0)) continue;
+          if (v.accel && !accelerating([X.C[sk - 3], X.C[sk - 2], X.C[sk - 1], X.C[sk]])) continue;
           cands.push({ s, sig: b / a - 1, ret: e1 / e0 - 1, c: halfSpread(ADV[s][k]) + FEE });
         }
-        if (cands.length >= 50) basket = pickBasket(cands, v.N, v.side);
+        if (cands.length >= (v.accel ? 5 : 50)) basket = pickBasket(cands, v.N, v.side);
       }
       const d = dayReturn(basket, prev, 1), d2 = dayReturn(basket, prev2, 2);
       r[k] = d.r; r2[k] = d2.r; prev = d.held; prev2 = d2.held;
