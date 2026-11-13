@@ -97,7 +97,8 @@ export function triggers(ctx, cat, cfg){
 
 // ביצוע: פוזיציה אחת בכל רגע למטבע. opt: { coin, entry, exit, stop, maxHoldMin, cost }
 //   entry: 'ladder' (30-60-90) | 'single' (הכול בטריגר) | 'deep' (רק מנות 60 ו-90 בפקודות ממתינות בהנזלה; לא התמלאו תוך 4 שעות → אין עסקה)
-//   exit: 'course' (75% ברמה הקרובה + 25% רץ) | 'first' (100% ברמה הקרובה) | מספר = יעד קבוע באחוזים מעל מחיר הכניסה הממוצע
+//   exit: 'course' (75% ברמה הקרובה + 25% רץ) | 'first' (100% ברמה הקרובה) | 'second' (100% ברמה השנייה) | מספר = יעד קבוע באחוזים מעל מחיר הכניסה הממוצע
+//   exitCap: x — עם 'first'/'second': היעד לא גבוה מ-x% מעל מחיר הכניסה הממוצע
 //   stop: 'course' (עוד stopExtra מתחת לקו ההנזלה העמוק) | מספר = סטופ צמוד באחוזים מתחת למחיר הכניסה הנמוך המתוכנן
 //   weights: [w30, w60, w90] במקום המשקלות של entry (למשל [1/3, 2/3, 0] = בלי המנה השלישית). הגודל תמיד לפי הפסד מלא = RISK_USD.
 //   full: מה עושים כשכל המנות המתוכננות התמלאו (בקשת מאיר 11/11/2026: "הסטופ בשליש האחרון יוצר הפסדים גדולים"):
@@ -173,8 +174,15 @@ export function execute(ctx, trigs, opt = {}){
       const avgPx = cost$ / qty;
       if (j !== lastJ || filled){ lastJ = j; lv = [q.ema20[j], q.ema50[j], q.vwap[j], q.ema200[j]].filter((x) => x > avgPx * 1.003).sort((a, b) => a - b); } // רק כשנר 15 דק׳ נסגר או מנה התמלאה
       if (tpFix){ if (!filled && hi >= avgPx * (1 + tpFix) * (1 + pen)){ sell(1, avgPx * (1 + tpFix), true); why = 'יעד'; break; } continue; }
+      if (opt.exit === 'second'){                                       // 100% ברמה השנייה מעל הממוצע (או הראשונה, אם אין שנייה), עד exitCap% (מאיר 13/11/2026)
+        let tg = lv.length > 1 ? lv[1] : lv.length ? lv[0] : avgPx * (1 + P.zone[0] / 100);
+        if (opt.exitCap) tg = Math.min(tg, avgPx * (1 + opt.exitCap / 100));
+        if (!filled && hi >= tg * (1 + pen)){ sell(1, tg, true); why = 'יעד'; break; }
+        continue;
+      }
       if (phase === 0){
         tp1 = lv.length ? lv[0] : avgPx * (1 + P.zone[0] / 100);
+        if (opt.exit === 'first' && opt.exitCap) tp1 = Math.min(tp1, avgPx * (1 + opt.exitCap / 100));
         if (!filled && hi >= tp1 * (1 + pen)){
           if (opt.exit === 'first'){ sell(1, tp1, true); why = 'יעד'; break; }
           sell(0.75, tp1, true); phase = 1; st = avgPx * 1.0006; runnerTgt = Math.max(lv.at(-1) || 0, tp1 * (1 + P.zone[0] / 200));

@@ -178,3 +178,16 @@ test('byVol: טריגר בנפח ×20 — מתחת ל-kv=30 נחשב חלש (ב�
   assert.equal(execute(ctx, tg, { ...o, byVol: { kv: 30, weak } })[0].fills, 2);
   assert.equal(execute(ctx, tg, { ...o, byVol: { kv: 10, weak } })[0].fills, 3);
 });
+
+test("יציאה 'second' (100% בקו השני) ו-exitCap: תקרה מעל מחיר הכניסה הממוצע (מאיר 13/11/2026)", () => {
+  const ctx = prepare(scenario('up')), tg = triggers(ctx, 'follow', CANON);
+  const [sec] = execute(ctx, tg, { coin: 'AVAX', entry: 'single', exit: 'second' });
+  assert.equal(sec.why, 'יעד'); assert.ok(sec.gross > 0);
+  const [cap] = execute(ctx, tg, { coin: 'AVAX', entry: 'single', exit: 'second', exitCap: 0.5 });
+  assert.equal(cap.why, 'יעד'); assert.ok(Math.abs(cap.gross - cap.notional * 0.005) < 1, `gross ${cap.gross}`); // תקרה 0.5% → בדיוק +0.5%
+  assert.ok(cap.gross <= sec.gross + 1e-9);
+  const [first] = execute(ctx, tg, { coin: 'AVAX', entry: 'single', exit: 'first' }), [firstCap] = execute(ctx, tg, { coin: 'AVAX', entry: 'single', exit: 'first', exitCap: 0.5 });
+  assert.ok(firstCap.gross <= first.gross + 1e-9);
+  const ctxD = prepare(scenario('down')), tgD = triggers(ctxD, 'follow', CANON);
+  assert.equal(execute(ctxD, tgD.slice(0, 1), { coin: 'AVAX', entry: 'ladder', exit: 'second', exitCap: 1.8 })[0].why, 'סטופ'); // יציאה מוקדמת לא משנה את הסטופ
+});
