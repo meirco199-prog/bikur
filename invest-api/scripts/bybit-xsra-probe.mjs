@@ -28,3 +28,26 @@ console.log(`\nנסחרים בספוט מול USDT: ${rows.length}/${COINS.lengt
 console.log(`לא נסחרים ב-Bybit בספוט: ${missing.join(', ') || '—'}`);
 const thin = rows.filter((r) => r.turnover < 1e6).map((r) => r.c);
 console.log(`מחזור יומי מתחת למיליון דולר (החלקה גבוהה): ${thin.join(', ') || '—'}`);
+
+// ---- חלק ב' (בקשת מאיר 13/11, משימת ההגנות): תאריך הרישום בספוט של Bybit (הנר החודשי/היומי הראשון), ועומק ספר הפקודות ----
+// לא ניתן לשחזר מטבעות שהוסרו מהמסחר (Bybit לא מחזירה אותם) — מגבלה מתועדת.
+const listing = {}, book = {};
+for (const r of rows){
+  const m = await get('https://api.bybit.com', `/v5/market/kline?category=spot&symbol=${r.sym}&interval=M&start=${Date.UTC(2018, 0, 1)}&limit=200`);
+  const months = (m.result?.list || []).map((x) => Number(x[0])).filter(Number.isFinite);
+  if (months.length){ const m0 = Math.min(...months), dd = await get('https://api.bybit.com', `/v5/market/kline?category=spot&symbol=${r.sym}&interval=D&start=${m0}&end=${m0 + 62 * 86400e3}&limit=100`);
+    const ds = (dd.result?.list || []).map((x) => Number(x[0])).filter(Number.isFinite); listing[r.c] = new Date(ds.length ? Math.min(...ds) : m0).toISOString().slice(0, 10); }
+  const ob = await get('https://api.bybit.com', `/v5/market/orderbook?category=spot&symbol=${r.sym}&limit=200`);
+  const a = (ob.result?.a || []).map(([p, q]) => [Number(p), Number(q)]), b = (ob.result?.b || []).map(([p, q]) => [Number(p), Number(q)]);
+  if (a.length && b.length){
+    const mid = (a[0][0] + b[0][0]) / 2, spreadBps = (a[0][0] - b[0][0]) / mid * 1e4;
+    const depth = (side, pctx) => side.filter(([p]) => Math.abs(p / mid - 1) <= pctx).reduce((s, [p, q]) => s + p * q, 0);
+    const walk = (usd) => { let left = usd, cost = 0, qty = 0; for (const [p, q] of a){ const take = Math.min(left, p * q); cost += take; qty += take / p; left -= take; if (left <= 1e-9) break; } return left > 1e-9 ? null : ((cost / qty) / mid - 1) * 1e4; };
+    book[r.c] = { spreadBps: Math.round(spreadBps * 10) / 10, depth05: Math.round(depth(a, 0.005) + depth(b, 0.005)), depth1: Math.round(depth(a, 0.01) + depth(b, 0.01)), buy1k: walk(1000), buy5k: walk(5000), buy25k: walk(25000) };
+  }
+  await new Promise((res) => setTimeout(res, 120));
+}
+console.log('\n| מטבע | נרשם בספוט | מרווח (נק׳ בסיס) | עומק ±0.5% ($) | עומק ±1% ($) | קנייה 1K$ (נק׳ בסיס מהאמצע) | 5K$ | 25K$ |\n|---|---|---|---|---|---|---|---|');
+const f = (x) => (x == null ? '—' : x.toFixed(1));
+for (const r of rows){ const o = book[r.c] || {}; console.log(`| ${r.c} | ${listing[r.c] || '—'} | ${f(o.spreadBps)} | ${(o.depth05 ?? 0).toLocaleString('en-US')} | ${(o.depth1 ?? 0).toLocaleString('en-US')} | ${f(o.buy1k)} | ${f(o.buy5k)} | ${f(o.buy25k)} |`); }
+console.log('\nJSON:' + JSON.stringify({ at: new Date().toISOString(), listing, book, missing }));
