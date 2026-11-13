@@ -85,3 +85,49 @@ test('drift: אות קבוע → אין מסחר אחרי הכניסה, והתי
   const xs = strategies(B.coins, { rebalDow: 0 }).find((q) => q.id === 'XS14-top3'), st = {}; let prev = null;
   for (let d = 70; d < 300; d++){ const w = xs.weights(B, d, st); if (prev && w !== prev) assert.equal(new Date(B.days[d]).getUTCDay(), 0); prev = w; }
 });
+
+test('מס רווחי הון (tax): קיזוז בתוך השנה, תשלום בתחילת השנה הבאה, חשבון רווח מלא, ובלי מס על רווח שלא מומש', () => {
+  // 800 יום מ-2020: מחיר עולה 0.3% ליום (פתיחה = סגירה קודמת, אין "לילה"); אסטרטגיה נכנסת ויוצאת כל 10 ימים
+  const A = align({ BTC: series(800, (i) => 100 * 1.003 ** i) });
+  const tog = { id: 'TOG', weights: (_, d) => [Math.floor(d / 10) % 2 ? 1 : 0] };
+  const pre = runDaily(A, tog, { drift: true }), zero = runDaily(A, tog, { drift: true, tax: { rate: 0 } }), t = runDaily(A, tog, { drift: true, tax: { rate: 0.25 } });
+  const eq = (r) => r.series.reduce((e, x) => e * (1 + x.net), 1);
+  assert.ok(Math.abs(eq(pre) - eq(zero)) < 1e-12, 'מס 0% = בלי מס');
+  // כל הרווח = ממומש בכל השנים + ממומש בשנה הפתוחה + לא ממומש (בדיקת שלמות של בסיס העלות)
+  const z = zero.taxInfo, all = z.years.reduce((s, y) => s + y.realized, 0) + z.open.realized + z.open.unrealized;
+  assert.ok(Math.abs(all - (eq(zero) - 1)) < 1e-9, `רווח ${all} מול ${eq(zero) - 1}`);
+  // 2020 ו-2021 רווחיות → מס של 25% מהרווח הממומש, משולם ביום הראשון של השנה הבאה
+  assert.deepEqual(t.taxInfo.years.map((y) => y.y), [2020, 2021]);
+  for (const y of t.taxInfo.years){ assert.ok(y.realized > 0); assert.ok(Math.abs(y.tax - 0.25 * y.realized) < 1e-12); }
+  const jan21 = t.series.find((x) => x.t === Date.UTC(2021, 0, 1));
+  assert.ok(Math.abs(jan21.tax * eq({ series: t.series.filter((x) => x.t < Date.UTC(2021, 0, 1)) }) - t.taxInfo.years[0].tax) < 1e-12);
+  assert.equal(t.series.filter((x) => x.tax > 0).length, 2);
+  assert.ok(eq(t) < eq(pre) && t.taxInfo.liq.net < t.taxInfo.liq.equity);
+  // קנה והחזק: אין מכירה → אין מס עד הסוף; במכירה ביום האחרון — 25% מהרווח (אחרי עמלות)
+  const bh = runDaily(A, strategies(A.coins).find((x) => x.id === 'BH-BTC'), { drift: true, tax: { rate: 0.25 } }).taxInfo;
+  assert.ok(bh.years.every((y) => y.tax === 0));
+  assert.ok(Math.abs(bh.liq.tax - 0.25 * (bh.liq.equity - bh.liq.fee - 1)) < 1e-9);
+});
+
+test('מס: מחיר קבוע, קנייה ואז מכירה — ההפסד הממומש = עמלת הקנייה + עמלת המכירה (העמלה לא נספרת פעמיים)', () => {
+  // סבב GPT 1 של #260: בדיקה שעמלת הקנייה בתוך בסיס העלות. מחיר קבוע 100; קונים ביום 11, מוכרים ביום 21
+  const A = align({ BTC: series(30, () => 100) }), one = (DCOST.spotBps + DCOST.slipBps.BTC) / 1e4;
+  const r = runDaily(A, { id: 'IO', weights: (_, d) => [d >= 10 && d < 20 ? 1 : 0] }, { drift: true, tax: { rate: 0.25 } });
+  const eq = r.series.reduce((e, x) => e * (1 + x.net), 1), ti = r.taxInfo;
+  assert.ok(Math.abs(eq - (1 - one - one * (1 - one))) < 1e-12, 'ההון: שתי עמלות');
+  assert.ok(Math.abs(ti.open.realized - (eq - 1)) < 1e-12, `ממומש ${ti.open.realized} = ‎−(עמלת קנייה + עמלת מכירה) ${eq - 1}`);
+  assert.equal(ti.liq.tax, 0); assert.equal(ti.open.unrealized, 0);
+});
+
+test('מס: הפסד נטו בשנה — בלי מס; carry "year" מאפס אותו, "forward" מקזז מול השנה הבאה', () => {
+  // שנה ראשונה יורדת (−0.2% ליום), השנה השנייה עולה
+  const A = align({ BTC: series(730, (i) => (i < 366 ? 100 * 0.998 ** i : 100 * 0.998 ** 366 * 1.002 ** (i - 366))) });
+  const tog = { id: 'TOG', weights: (_, d) => [Math.floor(d / 10) % 2 ? 1 : 0] };
+  const y = runDaily(A, tog, { drift: true, tax: { rate: 0.25 } }).taxInfo, f = runDaily(A, tog, { drift: true, tax: { rate: 0.25, carry: 'forward' } }).taxInfo;
+  assert.ok(y.years[0].realized < 0 && y.years[0].tax === 0 && f.years[0].tax === 0);
+  assert.equal(y.carry, 0); assert.ok(f.carry < 0 || f.liq.tax < y.liq.tax, 'ההפסד מ-2020 מקטין את המס אחר כך');
+  assert.throws(() => runDaily(A, tog, { tax: { rate: 0.25 } }), /drift/);
+  // tax.from: החשבון מתחיל ב-2021 — אין שנת מס 2020, וההון באותו יום נשמר להשוואה
+  const fr = runDaily(A, tog, { drift: true, tax: { rate: 0.25, from: Date.UTC(2021, 0, 1) } }).taxInfo;
+  assert.equal(fr.years.length, 0); assert.equal(fr.open.y, 2021); assert.ok(fr.from < 1);
+});

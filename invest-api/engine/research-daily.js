@@ -88,11 +88,22 @@ export function strategies(coins, { rebalDow = null } = {}){
 // liqBy: 'low' = לפי השפל של היום בבורסה (מחמיר: גם "פתיל" חריג של בורסה אחת); 'close' = לפי הסגירה (מקל: מחיר הסימון בחוזים מבוסס מדד של כמה בורסות)
 // drift (8/11, אחרי הערת GPT): המשקלות זזים עם המחירים בין החלפות, ומחליפים רק כשהאות משתנה — כמו תיק אמיתי ומעקב ה-Paper.
 // ברירת המחדל (false) = משקלי יעד קבועים כל יום בלי עלות איזון (ההתנהגות המקורית; התוצאות הקודמות לא משתנות).
-export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low', drift = false } = {}){
+// tax (בקשת מאיר 13/11/2026, "מודל מס"): מס רווחי הון בישראל — { rate: 0.25, carry: 'year' | 'forward' }. דורש drift (תיק אמיתי).
+// כל מכירה (החלפה שבועית, יציאה, מטבע שירד מהמסחר) = אירוע מס; בסיס עלות ממוצע לכל מטבע, עמלות קנייה בתוך הבסיס ועמלות מכירה
+// מורידות את התמורה. רווחים והפסדים ממומשים מתקזזים בתוך השנה הקלנדרית; המס על הרווח נטו משולם בפתיחת היום הראשון של השנה הבאה
+// — קודם מהמזומן, ואם אין מספיק, במכירה יחסית מכל המטבעות (שגם היא אירוע מס של השנה החדשה). carry 'year' = הפסד שנתי נטו לא עובר
+// לשנה הבאה (מה שהתבקש, שמרני); 'forward' = הפסד הון עובר לשנים הבאות (כמו בפקודה). בלי תיאום אינפלציה ובלי מס יסף. רווח שלא מומש לא
+// ממוסה עד המכירה — taxInfo.liq מחשב את ההון אם מוכרים הכול ביום האחרון (כולל המס של השנה השוטפת). tax.from = תחילת החשבון (כמו
+// משקיע שמתחיל באותו יום: מה שכבר מוחזק נחשב כאילו נקנה בו); taxInfo.from = ההון ביום הזה.
+export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low', drift = false, tax = null } = {}){
   const { coins, days, O, C, H, L: LO } = A, K = coins.length, out = [], st = {}, perp = !!strat.perp || leverage > 1;
+  if (tax && (!drift || perp)) throw new Error('tax: רק ספוט עם drift');
+  const tx = tax ? { rate: tax.rate ?? 0.25, fwd: tax.carry === 'forward', from: tax.from ?? -Infinity, on: false, Efrom: 1, B: new Array(K).fill(0), E: 1, real: 0, carry: 0, yr: null, years: [] } : null;
+  const settle = (y, E0) => { const base = tx.real + (tx.fwd ? tx.carry : 0), due = Math.max(0, base) * tx.rate;
+    tx.years.push({ y, realized: tx.real, base, tax: due, taxPct: due / E0 }); tx.carry = tx.fwd ? Math.min(0, base) : 0; tx.real = 0; return due; };
   let liquidated = null, liqInfo = null;
   const slip = (k) => (cost.slipBps[coins[k]] ?? cost.slipOther) / 1e4;
-  let w = new Array(K).fill(0), entries = 0, prevRaw = null;
+  let w = new Array(K).fill(0), entries = 0, prevRaw = null, tax0 = 0, taxFee = 0, Ep = 0;
   const same = (a, b) => a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) < 1e-12);
   for (let d = 1; d < days.length; d++){
     // יום d: בפתיחה מבצעים את מה שהוחלט בסגירת d−1
@@ -101,6 +112,19 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
     if (drift){ // המשקלות בפתיחה אחרי תנועת הלילה; אות שלא השתנה → לא נוגעים בתיק
       let nt = 0; const g = w.map((x, k) => { const q = C[k][d - 1], o = O[k][d]; const m = Number.isFinite(q) && Number.isFinite(o) ? o / q : 1; nt += x * (m - 1); return x * m; });
       wo = g.map((x) => x / (1 + nt));
+      if (tx){ // מס: תשלום בתחילת שנה חדשה, ואז מימוש רווח/הפסד בכל מכירה
+        const y = new Date(days[d]).getUTCFullYear(), E0 = tx.E, Eo = E0 * (1 + nt); tax0 = 0; taxFee = 0; Ep = Eo;
+        if (!tx.on && days[d] >= tx.from){ // תחילת חשבון המס (tax.from): מה שמוחזק נחשב כאילו נקנה עכשיו
+          tx.on = true; tx.yr = y; tx.Efrom = E0; for (let k = 0; k < K; k++) tx.B[k] = wo[k] * Eo; }
+        if (tx.on && y !== tx.yr){
+          const due = settle(tx.yr, E0); tx.yr = y;
+          if (due > 0){
+            const hold = wo.reduce((s2, x) => s2 + x, 0), cash = Eo * (1 - hold), sale = Math.max(0, due - cash), sh = sale > 0 && hold > 0 ? Math.min(1, sale / (hold * Eo)) : 0;
+            for (let k = 0; k < K; k++) if (wo[k] && sh){ const v = wo[k] * Eo, fee = sh * v * ((cost.slipBps[coins[k]] ?? cost.slipOther) + cost.spotBps) / 1e4 * costMult; tx.real += sh * (v - tx.B[k]) - fee; tx.B[k] *= 1 - sh; taxFee += fee; }
+            Ep = Eo - due - taxFee; wo = wo.map((x) => x * (1 - sh) * Eo / Ep); tax0 = due / E0; taxFee /= E0;
+          }
+        }
+      }
       if (prevRaw && same(raw, prevRaw)) tgt = wo.slice();
     }
     prevRaw = raw;
@@ -111,13 +135,19 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
     for (let k = 0; k < K; k++){
       const c0 = C[k][d - 1], o = O[k][d], c = C[k][d];
       const ok = Number.isFinite(c0) && Number.isFinite(o) && Number.isFinite(c);
-      if (!ok){ if (w[k] || tgt[k]) { tgt[k] = 0; } continue; }
+      if (!ok){ if (tx?.on && wo[k] > 0){ tx.real += wo[k] * Ep - tx.B[k]; tx.B[k] = 0; } if (w[k] || tgt[k]) { tgt[k] = 0; } continue; }
       r += w[k] * (o / c0 - 1) + tgt[k] * (c / o - 1); // הלילה עם המשקל הישן, היום עם החדש
       night += w[k] * (o / c0 - 1);
       if (tgt[k]){ const ext = liqBy === 'close' ? c : tgt[k] > 0 ? LO?.[k]?.[d] : H?.[k]?.[d]; if (Number.isFinite(ext)) worst += tgt[k] * (ext / o - 1); }
       const dw = Math.abs(tgt[k] - wo[k]); turn += dw;
       if (!w[k] && tgt[k]) entries += 1;
       cst += dw * ((perp ? cost.perpBps : cost.spotBps) / 1e4 + slip(k)) * costMult;
+      if (tx?.on && dw > 1e-15){ const fee = dw * ((cost.spotBps) / 1e4 + slip(k)) * costMult * tx.E;
+        if (tgt[k] < wo[k]){ const f = (wo[k] - tgt[k]) / wo[k]; tx.real += f * (wo[k] * Ep - tx.B[k]) - fee; tx.B[k] *= 1 - f; }
+        // קנייה: בסיס העלות = כל הכסף שיצא (tgt − wo) × Ep, *כולל* העמלה — כי המנוע מוריד את העמלה מההון, והמשקל החדש tgt נמדד על
+        // ההון שאחרי העמלה; כלומר המטבעות שווים (tgt − wo) × Ep − fee, והבסיס גבוה מהם בדיוק בעמלה. הוספת fee כאן הייתה סופרת אותה פעמיים
+        // (נבדק: "מחיר קבוע, קנייה ואז מכירה" ו"רווח ממומש + לא ממומש = כל הרווח" ב-research-daily.test.mjs).
+        else tx.B[k] += (tgt[k] - wo[k]) * Ep; }
       if (perp && tgt[k]){
         const f = funding[coins[k]]?.get(days[d]);
         fund += f !== undefined ? tgt[k] * f : (tgt[k] > 0 ? tgt[k] * cost.longFundBpsDay / 1e4 : 0);
@@ -130,11 +160,18 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
       for (let e = d + 1; e < days.length; e++) out.push({ t: days[e], gross: 0, cost: 0, fund: 0, net: 0, turn: 0, exp: 0 });
       break;
     }
-    out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo });
+    if (tx){ cst += taxFee; out.push({ t: days[d], gross: r, cost: cst, fund, tax: tax0, net: r - cst - fund - tax0, turn, exp: expo }); tx.E *= 1 + r - cst - fund - tax0; }
+    else out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo });
     if (drift){ let dr = 0; const v = tgt.map((x, k) => { const o = O[k][d], c = C[k][d], m = x && Number.isFinite(o) && Number.isFinite(c) ? c / o : 1; dr += x * (m - 1); return x * m; }); w = v.map((x) => x / (1 + dr)); }
     else w = tgt;
   }
-  return { series: out, entries, liquidated, liqInfo };
+  let taxInfo = null;
+  if (tx){ // מכירת הכול ביום האחרון: רווח שלא מומש + הרווח הממומש של השנה השוטפת (עם קיזוז לפי carry)
+    let unreal = 0, fee = 0; for (let k = 0; k < K; k++) if (w[k]){ unreal += w[k] * tx.E - tx.B[k]; fee += w[k] * tx.E * (cost.spotBps + (cost.slipBps[coins[k]] ?? cost.slipOther)) / 1e4 * costMult; }
+    const base = tx.on ? tx.real + unreal - fee + (tx.fwd ? tx.carry : 0) : 0, due = Math.max(0, base) * tx.rate;
+    taxInfo = { years: tx.years, open: { y: tx.yr, realized: tx.real, unrealized: unreal }, carry: tx.carry, from: tx.Efrom, liq: { equity: tx.E, fee, tax: due, net: tx.E - fee - due } };
+  }
+  return { series: out, entries, liquidated, liqInfo, taxInfo };
 }
 function portVol(A, w, d, n = 30){
   if (d < n) return 0; const rs = [];
@@ -174,7 +211,7 @@ export function dstats(series, { from = -Infinity, to = Infinity } = {}){
   let eq = 1, peak = 1, dd = 0; for (const x of r){ eq *= 1 + x; peak = Math.max(peak, eq); dd = Math.max(dd, 1 - eq / peak); }
   const sum = (f) => s.reduce((a, x) => a + f(x), 0), r2 = (x) => Math.round(x * 1000) / 1000;
   return { n, years: r2(n / 365), cagr: r2(eq ** (365 / n) - 1), vol: r2(sd * A), sharpe: r2(srD * A), ci: [r2((srD - 1.96 * se) * A), r2((srD + 1.96 * se) * A)],
-    maxDD: r2(dd), total: r2(eq - 1), grossTotal: r2(sum((x) => x.gross)), costTotal: r2(sum((x) => x.cost)), fundTotal: r2(sum((x) => x.fund)),
+    maxDD: r2(dd), total: r2(eq - 1), grossTotal: r2(sum((x) => x.gross)), costTotal: r2(sum((x) => x.cost)), fundTotal: r2(sum((x) => x.fund)), taxTotal: r2(sum((x) => x.tax || 0)),
     turnYr: r2(sum((x) => x.turn) / n * 365), exposure: r2(sum((x) => x.exp) / n) };
 }
 export const dscore = (st) => (st && st.ci && st.n >= 300 && st.exposure > 0.05 ? st.ci[0] : null);
