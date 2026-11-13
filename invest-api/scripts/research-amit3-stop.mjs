@@ -64,9 +64,9 @@ export const BW_HE = { two: 'בלי השלישית', be0: 'יציאה בממוצ
 export const BASE = 'course-none-slcourse';   // בוט 3 כמו שהוא היום
 
 // עמודות לכל גרסה: זמן כניסה, נטו בדולרים (ל-400$ סיכון), מספר מילויים, האם מילוי מלא, מטבע
-const cols = () => ({ t: [], net: [], fills: [], full: [], coin: [] });
-const nW = (v) => (v.w === 'single' ? 1 : WEIGHTS[v.w].filter((x) => x > 0).length);
-function push(c, trades, v, ci){ for (const x of trades){ c.t.push(x.tEntry); c.net.push(x.gross - x.fees - x.spread - x.slip - x.funding); c.fills.push(x.fills); c.full.push(x.fills >= nW(v)); c.coin.push(ci); } }
+export const cols = () => ({ t: [], net: [], fills: [], full: [], coin: [] });
+const nW = (v) => (v.w === 'single' ? 1 : (WEIGHTS[v.w] || WEIGHTS.course).filter((x) => x > 0).length);
+export function push(c, trades, v, ci){ for (const x of trades){ c.t.push(x.tEntry); c.net.push(x.gross - x.fees - x.spread - x.slip - x.funding); c.fills.push(x.fills); c.full.push(x.fills >= nW(v)); c.coin.push(ci); } }
 
 export function stat(c, p){
   const idx = []; for (let i = 0; i < c.t.length; i++) if (c.t[i] >= p.from && c.t[i] < p.to) idx.push(i);
@@ -86,7 +86,7 @@ export function stat(c, p){
 export function pick(S, minN = 100){ return [...S.values()].filter((x) => x.train.n >= minN).sort((a, b) => b.train.R - a.train.R)[0] || null; }
 export function passes(x, v){ return Object.keys(PERIODS).every((p) => x[p].R > 0) && x.all.R > x.rnd.all.R && !!v && v.R > 0; }
 
-async function run(coins, V, catOf, seed){
+export async function run(coins, V, catOf, seed){
   const { loadCoin } = await import('./research-amit-course.mjs');
   const T = new Map(V.map((v) => [v.key, cols()])), Rn = new Map(V.map((v) => [v.key, cols()])), meta = {};
   for (const [ci, coin] of coins.entries()){

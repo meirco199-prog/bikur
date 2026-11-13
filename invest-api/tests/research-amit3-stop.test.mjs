@@ -35,3 +35,18 @@ test('בחירה לפי אימון בלבד (מינימום עסקאות); קר�
   assert.equal(passes({ ...good, rnd: { all: { R: 0.2 } } }, { R: 0.05 }), false);
   assert.equal(passes(good, { R: -0.01 }), false); assert.equal(passes(good, null), false);
 });
+
+test('research-amit3-exit: 48 גרסאות ייחודיות, הבקשה = קו שני עד 1.8% עם סטופ ומשקלות של היום', async () => {
+  const { exitVariants, REQUESTED, BASE_EXIT } = await import('../scripts/research-amit3-exit.mjs');
+  const V = exitVariants(WEIGHTS);
+  assert.equal(V.length, 8 * 3 * 2); assert.equal(new Set(V.map((v) => v.key)).size, V.length);
+  const r = V.find((v) => v.key === REQUESTED); assert.equal(r.opt.exit, 'second'); assert.equal(r.opt.exitCap, 1.8); assert.equal(r.opt.stop, 'course'); assert.deepEqual(r.opt.weights, WEIGHTS.course);
+  assert.equal(V.find((v) => v.key === BASE_EXIT).opt.exit, 'course');
+  assert.equal(V.find((v) => v.key === 'fix18-two-slatr2').opt.stopAtr, 2);
+});
+
+test('research-amit3-exit: "$ בבוט" לפי הסיכון של בוט 3 (BOT3.riskUsd), לא לפי הנרמול של הבדיקה לאחור', async () => {
+  const { botRisk } = await import('../scripts/research-amit3-exit.mjs');
+  const { BOT3 } = await import('../engine/amit3-exec.js');
+  assert.equal(botRisk(BOT3), BOT3.riskUsd); assert.equal(BOT3.riskUsd, 200); assert.equal(RISK_USD, 400);
+});
