@@ -144,4 +144,30 @@ L.push('', '## 5. פסיקה לפי הקריטריון שנקבע מראש',
   res.seven.verdict = per; const ok = per.every((x) => x.sh && x.dd && x.cg), nm = { train: 'אימון', val: 'אימות', test: 'מבחן' };
   L.push('', ...per.map((x) => `- ${nm[x.k]}: שארפ ${x.sh ? '✅' : '❌'} · ירידה ${x.dd ? '✅' : '❌'} · תשואה ${x.cg ? '✅' : '❌'}`), '', `**פסיקה (7 מנות): ${ok ? '✅ עוברת' : '❌ לא עוברת'}**`);
 }
+// ---------- 7. מומנטום יחסי מול ביטקוין, 7 מנות (הצעת GPT אחרי סעיף 6; ענף מחקר נפרד, לא נוגע במעקב החי) ----------
+// הכלל נקבע לפני ההרצה: כמו סעיף 6, אבל מטבע שאינו BTC נבחר רק אם תשואת 21 הימים שלו גבוהה משל BTC, ומשבצת ריקה → BTC (לא מזומן).
+// הקריטריון — אותו קריטריון של GPT מסעיף 6: שארפ, ירידה ותשואה טובים מ-BTC בכל אחת משלוש התקופות.
+{
+  const relCache = new Map();
+  const relSleeve = (bars, dow, key) => { const k = `${key}|${dow}`; if (relCache.has(k)) return relCache.get(k); const A = align(bars), r = runDaily(A, xsRiskAdj(A.coins, { dow, rel: true }), { drift: true }).series; relCache.set(k, r); return r; };
+  const relT = (bars, key) => combineSleeves([0, 1, 2, 3, 4, 5, 6].map((w) => relSleeve(bars, w, key)));
+  const rel7 = S(relT(ALL, 'all')); res.rel7 = rel7;
+  const relLoo = []; for (const c of Object.keys(ALL)){ if (c === 'BTC') continue; relLoo.push({ c, st: S(relT(without(ALL, [c]), `-${c}`)) }); }
+  relLoo.sort((a, b) => a.st.test.cagr - b.st.test.cagr);
+  L.push('', '## 7. מומנטום יחסי מול ביטקוין, 7 מנות — הצעת GPT (ענף מחקר נפרד)',
+    '**הכלל (נקבע לפני ההרצה):** כמו סעיף 6, אבל מטבע שאינו BTC נבחר רק אם עלה ב-21 הימים יותר מ-BTC; משבצת שלא התמלאה → BTC במקום מזומן. המסנן המאקרו (BTC מעל ממוצע 100, אחרת מזומן) נשאר.',
+    '**הקריטריון:** כמו בסעיף 6 — בכל אחת משלוש התקופות שארפ, ירידה ותשואה טובים מ-BTC.', '',
+    '| גרסה | אימון: שנתי / שארפ / ירידה | אימות: שנתי / שארפ / ירידה | מבחן: שנתי / שארפ / ירידה | מ-2022: שנתי / ירידה |', '|---|---|---|---|---|');
+  const r3 = (lab, st) => L.push(`| ${lab} | ${['train', 'val', 'test'].map((k) => `${pct(st[k].cagr)} / ${fs(st[k].sharpe)} / ${pct(-st[k].maxDD)}`).join(' | ')} | ${pct(st.s22.cagr)} / ${pct(-st.s22.maxDD)} |`);
+  r3('**יחסי, 7 מנות, 50 מטבעות**', rel7); r3('7 מנות (סעיף 6, במעקב החי)', res.seven); r3('קנה והחזק BTC', btc);
+  for (const x of relLoo.slice(0, 3)) r3(`יחסי בלי ${x.c}`, x.st);
+  r3('יחסי, רק 20 המטבעות של היום', S(relT(BASEB, 'base')));
+  L.push('', `טווח תשואת המבחן בכל ${relLoo.length} ההוצאות (יחסי): ${pct(relLoo[0].st.test.cagr)} עד ${pct(relLoo.at(-1).st.test.cagr)}.`);
+  const per = ['train', 'val', 'test'].map((k) => ({ k, sh: rel7[k].sharpe > btc[k].sharpe, dd: rel7[k].maxDD < btc[k].maxDD, cg: rel7[k].cagr > btc[k].cagr }));
+  res.rel7.verdict = per; const ok = per.every((x) => x.sh && x.dd && x.cg), nm = { train: 'אימון', val: 'אימות', test: 'מבחן' };
+  L.push('', ...per.map((x) => `- ${nm[x.k]}: שארפ ${x.sh ? '✅' : '❌'} · ירידה ${x.dd ? '✅' : '❌'} · תשואה ${x.cg ? '✅' : '❌'}`), '', `**פסיקה (יחסי, 7 מנות): ${ok ? '✅ עוברת' : '❌ לא עוברת'}**`);
+  // לפי שנה: יחסי מול 7 מנות מול BTC (האם הפער ב-2023–2024 נסגר)
+  L.push('', '| גרסה | ' + ys.join(' | ') + ' |', '|---|' + ys.map(() => '---').join('|') + '|');
+  yr('יחסי, 7 מנות', relT(ALL, 'all')); yr('7 מנות', tranche(ALL, [0, 1, 2, 3, 4, 5, 6], 'all')); yr('BTC', other(ALL, 'BH-BTC'));
+}
 const md = L.join('\n'); console.log(md); if (OUT) writeFileSync(OUT, md); if (JOUT) writeFileSync(JOUT, JSON.stringify(res, (k, v) => (v instanceof Float64Array ? undefined : v), 1));

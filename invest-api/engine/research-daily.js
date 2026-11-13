@@ -88,9 +88,11 @@ export function strategies(coins, { rebalDow = null } = {}){
 // 3. דירוג: תשואת 21 יום חלקי סטיית התקן של התשואות היומיות ב-21 הימים (לא שנתי). 4 הראשונים, 25% לכל אחד (פחות מועמדים → מזומן).
 // מנה (tranche) אחת = אסטרטגיה עם יום החלפה אחד; שתי מנות של 50% (ראשון + רביעי) מחברים עם combineSleeves.
 export const XSRA = Object.freeze({ uni: 15, volN: 30, smaMacro: 100, smaMicro: 50, retN: 21, top: 4 });
-export function xsRiskAdj(coins, { dow = 0, P = XSRA, id } = {}){
+// rel (הצעת GPT 13/11, ענף מחקר נפרד — "מומנטום יחסי מול ביטקוין"): מטבע שאינו BTC נכנס רק אם תשואת 21 הימים שלו גבוהה משל BTC;
+// דירוג בין הנבחרים — אותו ציון (תשואה/תנודתיות). משבצת שלא התמלאה מקבלת BTC (במקום מזומן). המסנן המאקרו (BTC מעל ממוצע 100) נשאר: מתחתיו — מזומן.
+export function xsRiskAdj(coins, { dow = 0, P = XSRA, id, rel = false } = {}){
   const K = coins.length, iB = coins.indexOf('BTC');
-  return { id: id || `XSRA-d${dow}`, family: 'xsra', weights: (A, d, st) => {
+  return { id: id || `XSRA${rel ? 'rel' : ''}-d${dow}`, family: 'xsra', weights: (A, d, st) => {
     const reb = new Date(A.days[d]).getUTCDay() === dow;
     if (st.w && !reb) return st.w;
     const w = new Array(K).fill(0); st.pick = [];
@@ -104,7 +106,9 @@ export function xsRiskAdj(coins, { dow = 0, P = XSRA, id } = {}){
     }
     dv.sort((a, b) => b[1] - a[1]);
     const cand = [];
+    const rB = ret(A.C[iB], P.retN, d);
     for (const [k] of dv.slice(0, P.uni)){
+      if (rel && (k === iB || !(ret(A.C[k], P.retN, d) > rB))) continue; // יחסי: רק מטבעות שעלו יותר מ-BTC (BTC עצמו — רק כממלא מקום)
       if (!(A.C[k][d] > sma(A.C[k], P.smaMicro, d))) continue;
       const r = ret(A.C[k], P.retN, d); let m = 0; const xs = [];
       for (let i = d - P.retN + 1; i <= d; i++){ const x = A.C[k][i] / A.C[k][i - 1] - 1; xs.push(x); m += x; }
@@ -113,6 +117,7 @@ export function xsRiskAdj(coins, { dow = 0, P = XSRA, id } = {}){
     }
     cand.sort((a, b) => b[1] - a[1]);
     for (const [k] of cand.slice(0, P.top)) w[k] = 1 / P.top;
+    if (rel && cand.length < P.top) w[iB] += (P.top - cand.length) / P.top; // משבצות ריקות → BTC
     st.pick = cand.slice(0, P.top).map(([k, z]) => [coins[k], z]);
     return (st.w = w);
   } };

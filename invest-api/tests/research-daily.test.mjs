@@ -159,3 +159,16 @@ test('XSRA: יקום לפי נפח דולרי, מסנן BTC מעל 100, מטבע
   const c = combineSleeves([s1, s2]), E = c.reduce((e, x) => e * (1 + x.net), 1);
   assert.ok(Math.abs(E - (0.5 * 1.21 + 0.5)) < 1e-12);
 });
+
+test('XSRA rel: רק מטבעות שעלו יותר מ-BTC ב-21 יום; משבצות ריקות → BTC; מתחת לממוצע 100 — מזומן', async () => {
+  const { xsRiskAdj } = await import('../engine/research-daily.js');
+  const mk = (n, f, v) => Array.from({ length: n }, (_, i) => { const c = f(i), o = i ? f(i - 1) : c; return { t: D0 + i * DAY, o, h: Math.max(o, c), l: Math.min(o, c), c, v: v(i) }; });
+  const N = 200, up = (g, wig) => (i) => 100 * (1 + g) ** i * (1 + wig * Math.sin(i * 1.7));
+  const bars = { BTC: mk(N, up(0.004, 0.001), () => 1e6), FAST: mk(N, up(0.006, 0.001), () => 1e5), SLOW: mk(N, up(0.002, 0.0005), () => 1e5) };
+  const A = align(bars), d = N - 1, dow = new Date(A.days[d]).getUTCDay();
+  const w = xsRiskAdj(A.coins, { dow, rel: true }).weights(A, d, {}), got = Object.fromEntries(A.coins.map((c, k) => [c, w[k]]));
+  assert.equal(got.FAST, 0.25); assert.equal(got.SLOW, 0, 'עלה פחות מ-BTC'); assert.equal(got.BTC, 0.75, '3 משבצות ריקות → BTC');
+  const base = xsRiskAdj(A.coins, { dow }).weights(A, d, {}); assert.ok(base[A.coins.indexOf('SLOW')] > 0, 'בלי rel — SLOW נבחר');
+  const A2 = align({ ...bars, BTC: mk(N, (i) => 100 * 0.996 ** i, () => 1e6) });
+  assert.ok(xsRiskAdj(A2.coins, { dow, rel: true }).weights(A2, d, {}).every((x) => x === 0));
+});
