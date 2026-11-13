@@ -1,4 +1,4 @@
-# זמני (ops): שיפור המומנטום — 4 הגנות ו-3 שילובים (scripts/research-xs-protect.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
+# זמני (ops), ריצה 2 (תיקון נתיבים): שיפור המומנטום — 4 הגנות ו-3 שילובים (scripts/research-xs-protect.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
 name: research-xs-protect
 on:
   push:
@@ -20,11 +20,11 @@ jobs:
         run: '[ -f xsra-data.json.gz ] || node invest-api/scripts/research-xs-ra.mjs --data xsra-data.json.gz > /dev/null'
       - name: run
         run: |
-          mkdir -p invest/docs/research/xs-ra-dd
-          node invest-api/scripts/research-xs-protect.mjs --data xsra-data.json.gz --out invest/docs/research/xs-ra-dd/report.md --json invest/docs/research/xs-ra-dd/results.json
+          mkdir -p invest/docs/research/xs-protect
+          node --max-old-space-size=6000 invest-api/scripts/research-xs-protect.mjs --data xsra-data.json.gz --bybit invest/docs/research/xs-protect/bybit-probe.json --out invest/docs/research/xs-protect/report.md --json invest/docs/research/xs-protect/results.json
       - name: commit results
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add invest/docs/research/xs-ra-dd
+          git add invest/docs/research/xs-protect
           git commit -m "ops: תוצאות משימת ההגנות (ריצה ${GITHUB_RUN_ID})" || exit 0
           for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
