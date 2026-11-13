@@ -20,6 +20,7 @@ import { runAmitLive, amitReport, recordAmitBot, AMIT_KEY, AMITBOT_KEY, AMITBOT2
 import { recordPaper, XSPAPER_KEY } from './lib/xsmom-paper.js';
 import { recordVbo, VBOPAPER_KEY } from './lib/vbo-paper.js';
 import { recordDc, DCPAPER_KEY } from './lib/dc-paper.js';
+import { recordXsra, XSRAPAPER_KEY } from './lib/xsra-paper.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -234,6 +235,15 @@ async function handle(req, env0, ctx){
     if (req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       try { return json(await recordDc(db, body)); } catch (e) { if (!e.status) await db.logError('dc-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
+    }
+    return err('not found', 404);
+  }
+  // מעקב Paper למומנטום המשודרג, 7 מנות (lib/xsra-paper.js): GET /xsra ציבורי = המצב; POST /xsra = עדכון יומי מ-Actions (scripts/xsra-paper.mjs) עם סוד ה-cron
+  if (r0 === 'xsra' && !p1){
+    if (req.method === 'GET') return json((await db.get(XSRAPAPER_KEY)) || null);
+    if (req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      try { return json(await recordXsra(db, body)); } catch (e) { if (!e.status) await db.logError('xsra-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }
