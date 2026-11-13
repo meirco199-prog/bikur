@@ -1,0 +1,29 @@
+# מעקב Paper Trading יומי למומנטום המשודרג, 7 מנות (engine/xsra-paper.js, research/xs-ra/report.md). תיק וירטואלי — אין כסף, אין פקודות, אין מפתחות מסחר.
+# כל יום ב-00:50 UTC: נרות יומיים עם נפח מ-Coinbase (50 מועמדים) → קידום המצב → POST /xsra ב-invest-api (CRON_SECRET). התוצאה בסיכום הקריפטו היומי.
+name: XSRA paper (daily)
+on:
+  schedule:
+    - cron: '50 0 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: xsra-paper
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: invest-api
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: step
+        env:
+          WORKER_URL: https://invest-api.meirco199.workers.dev
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::error::חסר הסוד CRON_SECRET"; exit 1; fi
+          node invest-api/scripts/xsra-paper.mjs
