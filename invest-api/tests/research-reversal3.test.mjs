@@ -36,3 +36,14 @@ test('accelerating: ביום השלישי הירידה הכי גדולה', () =>
   assert.equal(accelerating([100, 98, 96, 97]), false);       // ביום השלישי עלתה
   assert.equal(accelerating([100, 0, 98, 94]), false);
 });
+
+test('momo3: ההכרעה דורשת מעל המדד, t ≥ 2, 60% שנים, ועלויות כפולות', async () => {
+  const { verdict, VARIANTS: V, MAIN } = await import('../scripts/research-momo3.mjs');
+  const g = { end: 90000, mean: 0.001, t: 2.5, pct: 0.8 }, spy = { end: 80000 }, g2 = { pct: 0.3 };
+  assert.equal(verdict(g, spy, g2, 9, 14), true);
+  assert.equal(verdict({ ...g, t: 1.9 }, spy, g2, 9, 14), false);
+  assert.equal(verdict(g, { end: 95000 }, g2, 9, 14), false);
+  assert.equal(verdict(g, spy, g2, 8, 14), false);
+  assert.equal(verdict(g, spy, { pct: -0.1 }, 9, 14), false);
+  assert.ok(V.some((v) => v.k === MAIN));
+});

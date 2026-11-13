@@ -21,13 +21,23 @@ jobs:
       - name: unit tests
         run: node --test invest-api/tests/research-reversal3.test.mjs invest-api/tests/research-xsec.test.mjs
       - name: research
-        run: node --max-old-space-size=6000 invest-api/scripts/research-reversal3.mjs --outdir invest/docs/research/reversal3
+        run: |
+          # "momo" — מבחן ההמשך ל"5 שעלו הכי הרבה לפני הסגירה" על 2008 → 11/2021 (scripts/research-momo3.mjs)
+          if [ "$(tr -d '[:space:]' < .github/reversal3/command)" = "momo" ]; then
+            node --max-old-space-size=6000 invest-api/scripts/research-momo3.mjs --outdir invest/docs/research/momo3
+          else
+            node --max-old-space-size=6000 invest-api/scripts/research-reversal3.mjs --outdir invest/docs/research/reversal3
+          fi
       - uses: actions/upload-artifact@v4
-        with: { name: reversal3-results, path: invest/docs/research/reversal3 }
+        with:
+          name: reversal3-results
+          path: |
+            invest/docs/research/reversal3
+            invest/docs/research/momo3
       - name: commit results
         if: github.ref_name != 'main'
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add invest/docs/research/reversal3
+          git add invest/docs/research/reversal3; if [ -d invest/docs/research/momo3 ]; then git add invest/docs/research/momo3; fi
           git commit -m "ops: תוצאות מחקר 5 היורדות (ריצה ${GITHUB_RUN_ID})" || exit 0
           for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
