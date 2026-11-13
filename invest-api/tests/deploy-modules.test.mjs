@@ -17,6 +17,7 @@ test('כל המודולים שה-Worker מייבא נמצאים בתיקיות �
   }
   const outside = [...seen].filter((f) => f !== 'worker.js' && !/^(engine|providers|lib)\//.test(f));
   assert.deepEqual(outside, [], 'מודול מחוץ לתיקיות שהפריסה מעלה');
+  assert.deepEqual([...seen].filter((f) => !f.endsWith('.js')), [], 'הפריסה מעלה רק ‎.js — מודול בסיומת אחרת לא יועלה');
   const wf = readFileSync(join(REPO, '.github/workflows/deploy-invest-api.yml'), 'utf8');
   assert.match(wf, /find engine providers lib -name '\*\.js'/, 'הפריסה צריכה להעלות גם תת-תיקיות (find), לא רק engine/*.js');
   assert.ok(seen.size > 50);
