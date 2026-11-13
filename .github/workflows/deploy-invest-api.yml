@@ -95,10 +95,11 @@ jobs:
           }))
           PY
           )
-          # כל קבצי המודולים (engine/providers/lib) מועלים כחלקי multipart בשמות הנתיבים שלהם
+          # כל קבצי המודולים (engine/providers/lib, כולל תת-תיקיות כמו engine/lab) מועלים כחלקי multipart בשמות הנתיבים שלהם.
+          # (עד 13/11/2026 הרשימה הייתה engine/*.js בלבד — מאז #231 ה-Worker ייבא engine/lab/*.js וכל הפריסות נכשלו: "No such module")
           ARGS=()
           cd invest-api
-          for f in worker.js engine/*.js providers/*.js lib/*.js; do
+          for f in worker.js $(find engine providers lib -name '*.js' | sort); do
             ARGS+=(-F "$f=@$f;type=application/javascript+module;filename=$f")
           done
           resp=$(curl -sS -X PUT \
