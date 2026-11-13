@@ -127,4 +127,21 @@ L.push('', '## 5. פסיקה לפי הקריטריון שנקבע מראש',
   `3. בלי ${worst.c}: מבחן ${pct(worst.test)} מול BTC ${pct(btc.test.cagr)} → ${c3 ? '✅' : '❌'}`,
   `4. פער ימי ההחלפה מ-2022: 2 מנות ${((sP[1] - sP[0]) * 100).toFixed(1)} נק׳ מול יום בודד ${((sS[1] - sS[0]) * 100).toFixed(1)} נק׳ → ${c4 ? '✅' : '❌'}`,
   '', `**פסיקה: ${res.verdict.pass ? '✅ עוברת' : '❌ לא עוברת'}**`);
+// ---------- 6. גרסת 7 מנות (הצעת GPT, 13/11/2026, אחרי הדוח): 1/7 מהתיק מוחלף בכל יום בשבוע — מבטל את בחירת היום ----------
+// הקריטריון שלו, כלשונו, נקבע לפני ההרצה: "שארפ גבוה מביטקוין וירידה מקסימלית נמוכה משל ביטקוין בכל אחת משלוש התקופות (אימון, אימות ומבחן),
+// ללא תלות ביום ההתחלה, תוך שמירה על תשואה שנתית עודפת נטו מעמלות". הפירוש: בכל תקופה — שארפ > BTC, ירידה < BTC, ותשואה שנתית > BTC.
+{
+  const seven = S(tranche(ALL, [0, 1, 2, 3, 4, 5, 6], 'all')), sevenB = S(tranche(BASEB, [0, 1, 2, 3, 4, 5, 6], 'base')); res.seven = seven;
+  const loo7 = []; for (const x of loo.slice(0, 3)) loo7.push({ c: x.c, st: S(tranche(without(ALL, [x.c]), [0, 1, 2, 3, 4, 5, 6], `-${x.c}`)) });
+  L.push('', '## 6. גרסת 7 מנות (1/7 בכל יום) — הצעת GPT אחרי הדוח',
+    '**הקריטריון (של GPT, כלשונו, נקבע לפני ההרצה):** בכל אחת משלוש התקופות — אימון, אימות, מבחן — שארפ גבוה מ-BTC, ירידה מקסימלית נמוכה משל BTC, ותשואה שנתית גבוהה מ-BTC (נטו מעמלות).', '',
+    '| גרסה | אימון: שנתי / שארפ / ירידה | אימות: שנתי / שארפ / ירידה | מבחן: שנתי / שארפ / ירידה | מ-2022: שנתי / ירידה |', '|---|---|---|---|---|');
+  const r3 = (lab, st) => L.push(`| ${lab} | ${['train', 'val', 'test'].map((k) => `${pct(st[k].cagr)} / ${fs(st[k].sharpe)} / ${pct(-st[k].maxDD)}`).join(' | ')} | ${pct(st.s22.cagr)} / ${pct(-st.s22.maxDD)} |`);
+  r3('**7 מנות, 50 מטבעות**', seven); r3('2 מנות (ראשון + רביעי)', main); r3('קנה והחזק BTC', btc);
+  for (const x of loo7) r3(`7 מנות בלי ${x.c}`, x.st);
+  r3('7 מנות, רק 20 המטבעות של היום', sevenB);
+  const per = ['train', 'val', 'test'].map((k) => ({ k, sh: seven[k].sharpe > btc[k].sharpe, dd: seven[k].maxDD < btc[k].maxDD, cg: seven[k].cagr > btc[k].cagr }));
+  res.seven.verdict = per; const ok = per.every((x) => x.sh && x.dd && x.cg), nm = { train: 'אימון', val: 'אימות', test: 'מבחן' };
+  L.push('', ...per.map((x) => `- ${nm[x.k]}: שארפ ${x.sh ? '✅' : '❌'} · ירידה ${x.dd ? '✅' : '❌'} · תשואה ${x.cg ? '✅' : '❌'}`), '', `**פסיקה (7 מנות): ${ok ? '✅ עוברת' : '❌ לא עוברת'}**`);
+}
 const md = L.join('\n'); console.log(md); if (OUT) writeFileSync(OUT, md); if (JOUT) writeFileSync(JOUT, JSON.stringify(res, (k, v) => (v instanceof Float64Array ? undefined : v), 1));
