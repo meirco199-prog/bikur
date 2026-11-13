@@ -49,3 +49,32 @@ test('מס: 0% לא משנה כלום; 25% מקטין; חברה עם מס דיב
   const p = simulate(A, { tax: { rate: 0.25, period: 'semi', carry: true } }).taxInfo, c = simulate(A, { tax: { rate: 0.23, period: 'annual', carry: true, divRate: 0.30 } }).taxInfo;
   assert.ok(p.net < plain && p.paidDuring > 0); assert.ok(c.divTax > 0 && c.net < c.equity);
 });
+
+test('א+ג: תקרת המטבע לא חלה על החלק הקבוע — BTC בתוך המנות נקנה כמו בלי ה-BTC הקבוע (סבב GPT 1 של #268)', () => {
+  const K = A.coins.length, iB = A.coins.indexOf('BTC');
+  // BTC במנות בלבד = סך BTC פחות החלק הקבוע; עם תקרה 15% הוא לא אמור להיחסם בגלל 30% של החלק הקבוע
+  const ac = simulate(A, { capCoin: 0.15, btcFixed: 0.30, trace: true }), a = simulate(A, { capCoin: 0.15, trace: true });
+  const btcInSleevesAC = [], btcA = [];
+  for (let d = 200; d < A.days.length; d++){ btcA.push(a.wtr[d * K + iB]); btcInSleevesAC.push(ac.wtr[d * K + iB]); }
+  const maxA = Math.max(...btcA), maxAC = Math.max(...btcInSleevesAC);
+  assert.ok(maxA > 0.05, 'בנתוני הבדיקה המנות קונות BTC'); assert.ok(maxAC > 0.30 + 0.05, `ב-א+ג סך BTC עובר את 30% של החלק הקבוע (${maxAC})`);
+});
+
+test('xsRiskAdj: rng — אותו מספר מטבעות, בחירה שונה בין זרעים; allow — מטבע לא נבחר לפני תאריך הזמינות ונבחר אחריו', () => {
+  const lcg = (seed) => { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32); };
+  const d = 300, dow = new Date(A.days[d]).getUTCDay(), pick = (o) => xsRiskAdj(A.coins, { dow, ...o }).weights(A, d, {});
+  const base = pick({}), r1 = pick({ rng: lcg(1) }), r2 = pick({ rng: lcg(99) }), n = (w) => w.filter((x) => x > 0).length;
+  assert.equal(n(r1), n(base)); assert.equal(n(r2), n(base));
+  // יום שבו יש יותר מועמדים ממקומות (אחרת כל בחירה אקראית זהה): מחפשים בטווח, עם 2 מקומות במקום 4
+  const P2 = { uni: 15, volN: 30, smaMacro: 100, smaMicro: 50, retN: 21, top: 2 };
+  let differs = false;
+  for (let dd = 150; dd < A.days.length - 1 && !differs; dd++){ const dw = new Date(A.days[dd]).getUTCDay();
+    const ss = Array.from({ length: 8 }, (_, i) => xsRiskAdj(A.coins, { dow: dw, P: P2, rng: lcg(i + 1) }).weights(A, dd, {}).join(','));
+    if (new Set(ss).size > 1) differs = true; }
+  assert.ok(differs, 'זרעים שונים → בחירות שונות');
+  const k = base.findIndex((x) => x > 0 && A.coins[base.indexOf(x)] !== undefined), coin = A.coins[k], from = A.days[d] + 1;
+  const blocked = pick({ allow: (kk, t) => kk !== k || t >= from });
+  assert.equal(blocked[k], 0, `${coin} לא זמין עדיין`);
+  const later = pick({ allow: (kk, t) => kk !== k || t >= A.days[d] });
+  assert.ok(later[k] > 0, `${coin} זמין`);
+});

@@ -50,10 +50,13 @@ export function simulate(A, opt = {}){
   const tx = opt.tax ? { ...opt.tax, B: new Float64Array(K), real: 0, carry: 0, paid: 0, per: null } : null;
   const trace = !!opt.trace, contrib = trace ? new Float64Array(D * K) : null, wtr = trace ? new Float32Array(D * K) : null;
   const out = []; let Eprev = 1, trades = 0, fees = 0;
-  const held = (k) => { let s = 0; for (const x of sl) s += x.V[k]; return s + (k === iB ? fb.V : 0); };
+  const held = (k) => { let s = 0; for (const x of sl) s += x.V[k]; return s + (k === iB ? fb.V : 0); }; // כל התיק (לבסיס העלות במס)
+  const heldSleeves = (k) => { let s = 0; for (const x of sl) s += x.V[k]; return s; }; // רק 7 המנות — לתקרת המטבע (לא חלה על החלק הקבוע; סבב GPT 1 של #268)
   const altHeld = () => { let s = 0; for (const x of sl) for (let k = 0; k < K; k++) if (k !== iB) s += x.V[k]; return s; };
   const equity = () => { let e = fb.V + fb.cash; for (const x of sl){ e += x.cash; for (let k = 0; k < K; k++) e += x.V[k]; } return e; };
   // קנייה/מכירה ברמת מנה (who = אובייקט עם V/cash; isFixed = החלק הקבוע) + חשבון מס
+  // עמלות: בהחלפה של מנה — defer (כמו במנוע המחקר, ראו למטה). בחלק הקבוע, בתשלום מס ובקיצוץ האלטים — העמלה יורדת מהמזומן ונכנסת לבסיס
+  // העלות (בקנייה) או מקטינה את התמורה (במכירה). שתי הדרכים עקביות: העמלה נספרת פעם אחת בדיוק — או בשווי הפוזיציה או בבסיס.
   // defer: העמלה לא יורדת כאן מהמזומן אלא נצברת, ובסוף ההחלפה של המנה יורדת באופן יחסי מכל המנה (כמו במנוע המחקר) — ואז היא כבר
   // מקטינה את שווי הפוזיציות, ולכן לא נכנסת שוב לבסיס העלות (אחרת הייתה נספרת פעמיים במס)
   let defer = false, pend = 0;
@@ -112,7 +115,7 @@ export function simulate(A, opt = {}){
       defer = true; pend = 0;
       for (let k = 0; k < K; k++) if (s.V[k] > T[k] + 1e-12){ traded += s.V[k] - T[k]; sell(s, k, s.V[k] - T[k]); }
       const want = T.map((x, k) => Math.max(0, x - s.V[k]));
-      if (cap) for (let k = 0; k < K; k++) if (want[k] > 0) want[k] = Math.min(want[k], Math.max(0, cap * Eo - held(k)));
+      if (cap) for (let k = 0; k < K; k++) if (want[k] > 0) want[k] = Math.min(want[k], Math.max(0, cap * Eo - heldSleeves(k)));
       if (altCap){ const wa = want.reduce((a, x, k) => a + (k !== iB ? x : 0), 0), room = Math.max(0, altCap * Eo - altHeld()); if (wa > room){ const g = wa > 0 ? room / wa : 0; for (let k = 0; k < K; k++) if (k !== iB) want[k] *= g; } }
       for (let k = 0; k < K; k++) if (want[k] > 0){ traded += want[k]; buy(s, k, want[k]); }
       defer = false; if (pend > 0 && S > 0){ const g = 1 - pend / S; for (let k = 0; k < K; k++) s.V[k] *= g; s.cash *= g; }

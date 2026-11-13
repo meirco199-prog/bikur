@@ -1,0 +1,31 @@
+# זמני (ops), ריצה 4 (תיקון: תקרת המטבע לא חלה על החלק הקבוע — סבב GPT 1 של #268): שיפור המומנטום — 4 הגנות ו-3 שילובים (scripts/research-xs-protect.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
+name: research-xs-protect
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-xs-protect.yml]
+permissions: { contents: write }
+concurrency: { group: research-xs-protect, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/cache@v4
+        with: { path: xsra-data.json.gz, key: research-xsra-2016-2026-11-13-v1 }
+      - name: data (אם המטמון לא זמין)
+        run: '[ -f xsra-data.json.gz ] || node invest-api/scripts/research-xs-ra.mjs --data xsra-data.json.gz > /dev/null'
+      - name: run
+        run: |
+          mkdir -p invest/docs/research/xs-protect
+          node --max-old-space-size=6000 invest-api/scripts/research-xs-protect.mjs --data xsra-data.json.gz --bybit invest/docs/research/xs-protect/bybit-probe.json --out invest/docs/research/xs-protect/report.md --json invest/docs/research/xs-protect/results.json
+          node --max-old-space-size=6000 invest-api/scripts/research-xs-protect.mjs --data xsra-data.json.gz --bybit invest/docs/research/xs-protect/bybit-probe.json --universe bybit --out invest/docs/research/xs-protect/report-bybit.md --json invest/docs/research/xs-protect/results-bybit.json
+      - name: commit results
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/xs-protect
+          git commit -m "ops: תוצאות משימת ההגנות (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
