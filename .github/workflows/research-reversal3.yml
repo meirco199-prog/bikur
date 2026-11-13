@@ -1,0 +1,33 @@
+# מחקר "המניות שירדו הכי הרבה ב-3 ימים" (scripts/research-reversal3.mjs, invest/docs/research/reversal3/). מחקר בלבד — אין כסף, אין פקודות.
+# השאלה (מאיר, 13/11/2026): 50,000$ שווה בשווה על 5 המניות שירדו הכי הרבה ב-3 ימים, להחליף כל יום. פתיחה→פתיחה וסגירה→סגירה,
+# 1/3/5/10 מניות, שנה עד 5 שנים. נתונים: Yahoo Finance יומי, הרכב S&P 500 היסטורי (אותו מקור כמו research-xsec).
+# הרצה: Actions → research-reversal3 → Run workflow, או דחיפה של .github/reversal3/command לענף שאינו main.
+name: research-reversal3
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: ['.github/reversal3/command']
+permissions: { contents: write }
+concurrency: { group: research-reversal3, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: unit tests
+        run: node --test invest-api/tests/research-reversal3.test.mjs invest-api/tests/research-xsec.test.mjs
+      - name: research
+        run: node --max-old-space-size=6000 invest-api/scripts/research-reversal3.mjs --outdir invest/docs/research/reversal3
+      - uses: actions/upload-artifact@v4
+        with: { name: reversal3-results, path: invest/docs/research/reversal3 }
+      - name: commit results
+        if: github.ref_name != 'main'
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/reversal3
+          git commit -m "ops: תוצאות מחקר 5 היורדות (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
