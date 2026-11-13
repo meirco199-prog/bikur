@@ -1,0 +1,1400 @@
+{
+ "main": [
+  {
+   "key": "base",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 1.833,
+     "vol": 0.638,
+     "sharpe": 1.948,
+     "ci": [
+      1.178,
+      2.718
+     ],
+     "maxDD": 0.467,
+     "total": 878.526,
+     "grossTotal": 0,
+     "costTotal": 0.132,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 14.31,
+     "exposure": 0.431
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.126,
+     "vol": 0.509,
+     "sharpe": 0.486,
+     "ci": [
+      -0.844,
+      1.816
+     ],
+     "maxDD": 0.52,
+     "total": 0.294,
+     "grossTotal": 0,
+     "costTotal": 0.081,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 25.806,
+     "exposure": 0.501
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.506,
+     "vol": 0.529,
+     "sharpe": 1.036,
+     "ci": [
+      -0.29,
+      2.361
+     ],
+     "maxDD": 0.417,
+     "total": 1.452,
+     "grossTotal": 0,
+     "costTotal": 0.075,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 23.395,
+     "exposure": 0.488
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.226,
+     "vol": 0.498,
+     "sharpe": 0.656,
+     "ci": [
+      -0.233,
+      1.544
+     ],
+     "maxDD": 0.534,
+     "total": 1.695,
+     "grossTotal": 0,
+     "costTotal": 0.162,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 22.963,
+     "exposure": 0.456
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 1.075,
+     "vol": 0.593,
+     "sharpe": 1.523,
+     "ci": [
+      0.927,
+      2.118
+     ],
+     "maxDD": 0.557,
+     "total": 2788.485,
+     "grossTotal": 0,
+     "costTotal": 0.288,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 18.437,
+     "exposure": 0.456
+    }
+   },
+   "trades": 782.2479838709678,
+   "turn": 18.436960984768465,
+   "exp": 0.4564164834404991,
+   "worstM": -0.31524087040214244,
+   "worstY": [
+    "2022",
+    -0.22045585352364894
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.18769822037893813
+  },
+  {
+   "key": "A",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 1.203,
+     "vol": 0.459,
+     "sharpe": 1.947,
+     "ci": [
+      1.177,
+      2.717
+     ],
+     "maxDD": 0.294,
+     "total": 169.836,
+     "grossTotal": 0,
+     "costTotal": 0.096,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 10.337,
+     "exposure": 0.309
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.226,
+     "vol": 0.37,
+     "sharpe": 0.733,
+     "ci": [
+      -0.597,
+      2.063
+     ],
+     "maxDD": 0.369,
+     "total": 0.556,
+     "grossTotal": 0,
+     "costTotal": 0.055,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 17.608,
+     "exposure": 0.348
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.424,
+     "vol": 0.368,
+     "sharpe": 1.143,
+     "ci": [
+      -0.183,
+      2.469
+     ],
+     "maxDD": 0.274,
+     "total": 1.167,
+     "grossTotal": 0,
+     "costTotal": 0.05,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 15.774,
+     "exposure": 0.339
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.259,
+     "vol": 0.354,
+     "sharpe": 0.825,
+     "ci": [
+      -0.063,
+      1.714
+     ],
+     "maxDD": 0.385,
+     "total": 2.068,
+     "grossTotal": 0,
+     "costTotal": 0.111,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 15.714,
+     "exposure": 0.318
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 0.794,
+     "vol": 0.425,
+     "sharpe": 1.585,
+     "ci": [
+      0.989,
+      2.18
+     ],
+     "maxDD": 0.421,
+     "total": 574.969,
+     "grossTotal": 0,
+     "costTotal": 0.201,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 12.885,
+     "exposure": 0.323
+    }
+   },
+   "trades": 564.609375,
+   "turn": 12.885183162199594,
+   "exp": 0.3227508276447551,
+   "worstM": -0.21129375095181602,
+   "worstY": [
+    "2022",
+    -0.14261202312622767
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.18042168153873311
+  },
+  {
+   "key": "B",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 0.919,
+     "vol": 0.327,
+     "sharpe": 2.154,
+     "ci": [
+      1.383,
+      2.924
+     ],
+     "maxDD": 0.243,
+     "total": 68.671,
+     "grossTotal": 0,
+     "costTotal": 0.078,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 8.607,
+     "exposure": 0.238
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.203,
+     "vol": 0.305,
+     "sharpe": 0.757,
+     "ci": [
+      -0.574,
+      2.087
+     ],
+     "maxDD": 0.296,
+     "total": 0.494,
+     "grossTotal": 0,
+     "costTotal": 0.051,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 16.299,
+     "exposure": 0.288
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.271,
+     "vol": 0.303,
+     "sharpe": 0.942,
+     "ci": [
+      -0.383,
+      2.268
+     ],
+     "maxDD": 0.279,
+     "total": 0.689,
+     "grossTotal": 0,
+     "costTotal": 0.05,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 15.91,
+     "exposure": 0.299
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.184,
+     "vol": 0.291,
+     "sharpe": 0.725,
+     "ci": [
+      -0.164,
+      1.613
+     ],
+     "maxDD": 0.325,
+     "total": 1.275,
+     "grossTotal": 0,
+     "costTotal": 0.105,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 14.932,
+     "exposure": 0.27
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 0.609,
+     "vol": 0.318,
+     "sharpe": 1.652,
+     "ci": [
+      1.056,
+      2.247
+     ],
+     "maxDD": 0.351,
+     "total": 174.82,
+     "grossTotal": 0,
+     "costTotal": 0.18,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 11.615,
+     "exposure": 0.261
+    }
+   },
+   "trades": 883.3404737903226,
+   "turn": 11.614708644948825,
+   "exp": 0.26056753008472455,
+   "worstM": -0.14726666006015632,
+   "worstY": [
+    "2022",
+    -0.1448018540953755
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.2055608659697912
+  },
+  {
+   "key": "C",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 1.665,
+     "vol": 0.598,
+     "sharpe": 1.938,
+     "ci": [
+      1.168,
+      2.709
+     ],
+     "maxDD": 0.523,
+     "total": 588.994,
+     "grossTotal": 0,
+     "costTotal": 0.096,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 10.019,
+     "exposure": 0.595
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.309,
+     "vol": 0.461,
+     "sharpe": 0.813,
+     "ci": [
+      -0.518,
+      2.143
+     ],
+     "maxDD": 0.443,
+     "total": 0.794,
+     "grossTotal": 0,
+     "costTotal": 0.055,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 17.238,
+     "exposure": 0.66
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.397,
+     "vol": 0.457,
+     "sharpe": 0.958,
+     "ci": [
+      -0.367,
+      2.284
+     ],
+     "maxDD": 0.389,
+     "total": 1.078,
+     "grossTotal": 0,
+     "costTotal": 0.053,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 16.276,
+     "exposure": 0.643
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.226,
+     "vol": 0.444,
+     "sharpe": 0.679,
+     "ci": [
+      -0.209,
+      1.568
+     ],
+     "maxDD": 0.443,
+     "total": 1.695,
+     "grossTotal": 0,
+     "costTotal": 0.112,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 15.659,
+     "exposure": 0.621
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 1.03,
+     "vol": 0.547,
+     "sharpe": 1.568,
+     "ci": [
+      0.972,
+      2.163
+     ],
+     "maxDD": 0.524,
+     "total": 2197.909,
+     "grossTotal": 0,
+     "costTotal": 0.204,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 12.721,
+     "exposure": 0.617
+    }
+   },
+   "trades": 830.3566028225806,
+   "turn": 12.721461255320222,
+   "exp": 0.6173010925560878,
+   "worstM": -0.26561352852670783,
+   "worstY": [
+    "2022",
+    -0.3584962444096673
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.1394179362683425
+  },
+  {
+   "key": "D",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 1.457,
+     "vol": 0.501,
+     "sharpe": 2.041,
+     "ci": [
+      1.271,
+      2.811
+     ],
+     "maxDD": 0.35,
+     "total": 346.557,
+     "grossTotal": 0,
+     "costTotal": 0.098,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 10.695,
+     "exposure": 0.35
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.172,
+     "vol": 0.363,
+     "sharpe": 0.617,
+     "ci": [
+      -0.713,
+      1.947
+     ],
+     "maxDD": 0.435,
+     "total": 0.411,
+     "grossTotal": 0,
+     "costTotal": 0.059,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 18.898,
+     "exposure": 0.37
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.428,
+     "vol": 0.368,
+     "sharpe": 1.151,
+     "ci": [
+      -0.175,
+      2.477
+     ],
+     "maxDD": 0.279,
+     "total": 1.181,
+     "grossTotal": 0,
+     "costTotal": 0.055,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 17.327,
+     "exposure": 0.369
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.237,
+     "vol": 0.35,
+     "sharpe": 0.782,
+     "ci": [
+      -0.107,
+      1.671
+     ],
+     "maxDD": 0.437,
+     "total": 1.818,
+     "grossTotal": 0,
+     "costTotal": 0.118,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 16.878,
+     "exposure": 0.34
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 0.9,
+     "vol": 0.452,
+     "sharpe": 1.643,
+     "ci": [
+      1.047,
+      2.239
+     ],
+     "maxDD": 0.437,
+     "total": 1068.989,
+     "grossTotal": 0,
+     "costTotal": 0.211,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 13.67,
+     "exposure": 0.357
+    }
+   },
+   "trades": 1999.9571572580646,
+   "turn": 13.669700551393193,
+   "exp": 0.3574658945756749,
+   "worstM": -0.2197549952237826,
+   "worstY": [
+    "2022",
+    -0.13504161766249623
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.20564442146504827
+  },
+  {
+   "key": "AB",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 0.766,
+     "vol": 0.295,
+     "sharpe": 2.072,
+     "ci": [
+      1.302,
+      2.843
+     ],
+     "maxDD": 0.236,
+     "total": 39.496,
+     "grossTotal": 0,
+     "costTotal": 0.071,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 7.707,
+     "exposure": 0.211
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.184,
+     "vol": 0.281,
+     "sharpe": 0.739,
+     "ci": [
+      -0.591,
+      2.07
+     ],
+     "maxDD": 0.291,
+     "total": 0.443,
+     "grossTotal": 0,
+     "costTotal": 0.046,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 14.818,
+     "exposure": 0.267
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.257,
+     "vol": 0.278,
+     "sharpe": 0.959,
+     "ci": [
+      -0.367,
+      2.285
+     ],
+     "maxDD": 0.236,
+     "total": 0.648,
+     "grossTotal": 0,
+     "costTotal": 0.046,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 14.541,
+     "exposure": 0.277
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.171,
+     "vol": 0.269,
+     "sharpe": 0.721,
+     "ci": [
+      -0.167,
+      1.61
+     ],
+     "maxDD": 0.311,
+     "total": 1.157,
+     "grossTotal": 0,
+     "costTotal": 0.096,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 13.656,
+     "exposure": 0.251
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 0.522,
+     "vol": 0.289,
+     "sharpe": 1.596,
+     "ci": [
+      1.001,
+      2.192
+     ],
+     "maxDD": 0.316,
+     "total": 95.301,
+     "grossTotal": 0,
+     "costTotal": 0.163,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 10.504,
+     "exposure": 0.235
+    }
+   },
+   "trades": 832.1043346774194,
+   "turn": 10.504069249179768,
+   "exp": 0.2354406272462618,
+   "worstM": -0.13927959282932978,
+   "worstY": [
+    "2022",
+    -0.14088242726896172
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.19099727631994554
+  },
+  {
+   "key": "AD",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 1.115,
+     "vol": 0.429,
+     "sharpe": 1.957,
+     "ci": [
+      1.187,
+      2.727
+     ],
+     "maxDD": 0.288,
+     "total": 130.241,
+     "grossTotal": 0,
+     "costTotal": 0.087,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 9.419,
+     "exposure": 0.293
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.24,
+     "vol": 0.345,
+     "sharpe": 0.793,
+     "ci": [
+      -0.537,
+      2.123
+     ],
+     "maxDD": 0.364,
+     "total": 0.595,
+     "grossTotal": 0,
+     "costTotal": 0.053,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 16.847,
+     "exposure": 0.33
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.409,
+     "vol": 0.341,
+     "sharpe": 1.174,
+     "ci": [
+      -0.152,
+      2.5
+     ],
+     "maxDD": 0.25,
+     "total": 1.117,
+     "grossTotal": 0,
+     "costTotal": 0.049,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 15.515,
+     "exposure": 0.324
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.261,
+     "vol": 0.329,
+     "sharpe": 0.868,
+     "ci": [
+      -0.02,
+      1.757
+     ],
+     "maxDD": 0.381,
+     "total": 2.098,
+     "grossTotal": 0,
+     "costTotal": 0.107,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 15.172,
+     "exposure": 0.302
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 0.752,
+     "vol": 0.397,
+     "sharpe": 1.608,
+     "ci": [
+      1.012,
+      2.203
+     ],
+     "maxDD": 0.384,
+     "total": 442.026,
+     "grossTotal": 0,
+     "costTotal": 0.189,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 12.131,
+     "exposure": 0.306
+    }
+   },
+   "trades": 1294.977318548387,
+   "turn": 12.13113697112773,
+   "exp": 0.306229029657046,
+   "worstM": -0.2060871466247084,
+   "worstY": [
+    "2022",
+    -0.13798328727141695
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.1880166070629347
+  },
+  {
+   "key": "AC",
+   "st": {
+    "train": {
+     "n": 2376,
+     "years": 6.51,
+     "cagr": 1.559,
+     "vol": 0.561,
+     "sharpe": 1.955,
+     "ci": [
+      1.185,
+      2.726
+     ],
+     "maxDD": 0.516,
+     "total": 452.189,
+     "grossTotal": 0,
+     "costTotal": 0.088,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 9.185,
+     "exposure": 0.571
+    },
+    "val": {
+     "n": 793,
+     "years": 2.173,
+     "cagr": 0.269,
+     "vol": 0.437,
+     "sharpe": 0.763,
+     "ci": [
+      -0.568,
+      2.093
+     ],
+     "maxDD": 0.413,
+     "total": 0.677,
+     "grossTotal": 0,
+     "costTotal": 0.052,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 16.187,
+     "exposure": 0.636
+    },
+    "test": {
+     "n": 799,
+     "years": 2.189,
+     "cagr": 0.355,
+     "vol": 0.415,
+     "sharpe": 0.938,
+     "ci": [
+      -0.387,
+      2.264
+     ],
+     "maxDD": 0.38,
+     "total": 0.944,
+     "grossTotal": 0,
+     "costTotal": 0.048,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 14.87,
+     "exposure": 0.614
+    },
+    "s22": {
+     "n": 1777,
+     "years": 4.868,
+     "cagr": 0.198,
+     "vol": 0.413,
+     "sharpe": 0.643,
+     "ci": [
+      -0.246,
+      1.531
+     ],
+     "maxDD": 0.427,
+     "total": 1.407,
+     "grossTotal": 0,
+     "costTotal": 0.104,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 14.508,
+     "exposure": 0.596
+    },
+    "all": {
+     "n": 3968,
+     "years": 10.871,
+     "cagr": 0.957,
+     "vol": 0.511,
+     "sharpe": 1.568,
+     "ci": [
+      0.973,
+      2.164
+     ],
+     "maxDD": 0.516,
+     "total": 1476.605,
+     "grossTotal": 0,
+     "costTotal": 0.188,
+     "fundTotal": 0,
+     "taxTotal": 0,
+     "turnYr": 11.729,
+     "exposure": 0.593
+    }
+   },
+   "trades": 760.4473286290323,
+   "turn": 11.728857692572383,
+   "exp": 0.5929775275664739,
+   "worstM": -0.24872036281471088,
+   "worstY": [
+    "2022",
+    -0.35419806714247193
+   ],
+   "topCoin": "ETH",
+   "topShare": 0.13729259970078309
+  }
+ ],
+ "loo": {
+  "base": {
+   "coin": "ETH",
+   "test": 0.452,
+   "s22": 0.197,
+   "zecTest": 0.506,
+   "zecS22": 0.226
+  },
+  "A": {
+   "coin": "ETH",
+   "test": 0.428,
+   "s22": 0.255,
+   "zecTest": 0.424,
+   "zecS22": 0.259
+  },
+  "B": {
+   "coin": "ETH",
+   "test": 0.235,
+   "s22": 0.177,
+   "zecTest": 0.271,
+   "zecS22": 0.184
+  },
+  "C": {
+   "coin": "ETH",
+   "test": 0.36,
+   "s22": 0.206,
+   "zecTest": 0.397,
+   "zecS22": 0.226
+  },
+  "D": {
+   "coin": "ETH",
+   "test": 0.417,
+   "s22": 0.232,
+   "zecTest": 0.428,
+   "zecS22": 0.237
+  },
+  "AB": {
+   "coin": "ETH",
+   "test": 0.216,
+   "s22": 0.161,
+   "zecTest": 0.257,
+   "zecS22": 0.171
+  },
+  "AD": {
+   "coin": "ETH",
+   "test": 0.405,
+   "s22": 0.243,
+   "zecTest": 0.409,
+   "zecS22": 0.261
+  },
+  "AC": {
+   "coin": "ETH",
+   "test": 0.36,
+   "s22": 0.222,
+   "zecTest": 0.355,
+   "zecS22": 0.198
+  }
+ },
+ "rand": {
+  "base": {
+   "medTest": 0.238,
+   "medS22": 0.046,
+   "beatTest": 10,
+   "beatS22": 10
+  },
+  "A": {
+   "medTest": 0.2445,
+   "medS22": 0.086,
+   "beatTest": 10,
+   "beatS22": 10
+  },
+  "B": {
+   "medTest": 0.1665,
+   "medS22": 0.105,
+   "beatTest": 10,
+   "beatS22": 10
+  },
+  "C": {
+   "medTest": 0.2055,
+   "medS22": 0.087,
+   "beatTest": 10,
+   "beatS22": 10
+  },
+  "D": {
+   "medTest": 0.238,
+   "medS22": 0.115,
+   "beatTest": 10,
+   "beatS22": 10
+  },
+  "AB": {
+   "medTest": 0.154,
+   "medS22": 0.0945,
+   "beatTest": 10,
+   "beatS22": 10
+  },
+  "AD": {
+   "medTest": 0.2115,
+   "medS22": 0.11599999999999999,
+   "beatTest": 10,
+   "beatS22": 10
+  },
+  "AC": {
+   "medTest": 0.2005,
+   "medS22": 0.089,
+   "beatTest": 10,
+   "beatS22": 10
+  }
+ },
+ "cost": {
+  "base": {
+   "c2test": 0.455,
+   "c2s22": 0.185
+  },
+  "A": {
+   "c2test": 0.39,
+   "c2s22": 0.23
+  },
+  "B": {
+   "c2test": 0.242,
+   "c2s22": 0.159
+  },
+  "C": {
+   "c2test": 0.362,
+   "c2s22": 0.197
+  },
+  "D": {
+   "c2test": 0.391,
+   "c2s22": 0.207
+  },
+  "AB": {
+   "c2test": 0.23,
+   "c2s22": 0.148
+  },
+  "AD": {
+   "c2test": 0.377,
+   "c2s22": 0.234
+  },
+  "AC": {
+   "c2test": 0.324,
+   "c2s22": 0.171
+  }
+ },
+ "bybit": {
+  "base": {
+   "u38": {
+    "test": 0.506,
+    "s22": 0.226
+   },
+   "listed": {
+    "test": 0.423,
+    "s22": 0.159,
+    "dd": 0.532
+   },
+   "book": {
+    "test": 0.408,
+    "s22": 0.141
+   }
+  },
+  "A": {
+   "u38": {
+    "test": 0.424,
+    "s22": 0.259
+   },
+   "listed": {
+    "test": 0.352,
+    "s22": 0.181,
+    "dd": 0.407
+   },
+   "book": {
+    "test": 0.339,
+    "s22": 0.166
+   }
+  },
+  "B": {
+   "u38": {
+    "test": 0.271,
+    "s22": 0.184
+   },
+   "listed": {
+    "test": 0.243,
+    "s22": 0.157,
+    "dd": 0.346
+   },
+   "book": {
+    "test": 0.236,
+    "s22": 0.148
+   }
+  },
+  "C": {
+   "u38": {
+    "test": 0.397,
+    "s22": 0.226
+   },
+   "listed": {
+    "test": 0.341,
+    "s22": 0.177,
+    "dd": 0.447
+   },
+   "book": {
+    "test": 0.331,
+    "s22": 0.165
+   }
+  },
+  "D": {
+   "u38": {
+    "test": 0.428,
+    "s22": 0.237
+   },
+   "listed": {
+    "test": 0.369,
+    "s22": 0.155,
+    "dd": 0.442
+   },
+   "book": {
+    "test": 0.359,
+    "s22": 0.142
+   }
+  },
+  "AB": {
+   "u38": {
+    "test": 0.257,
+    "s22": 0.171
+   },
+   "listed": {
+    "test": 0.24,
+    "s22": 0.15,
+    "dd": 0.317
+   },
+   "book": {
+    "test": 0.234,
+    "s22": 0.142
+   }
+  },
+  "AD": {
+   "u38": {
+    "test": 0.409,
+    "s22": 0.261
+   },
+   "listed": {
+    "test": 0.343,
+    "s22": 0.179,
+    "dd": 0.401
+   },
+   "book": {
+    "test": 0.332,
+    "s22": 0.165
+   }
+  },
+  "AC": {
+   "u38": {
+    "test": 0.355,
+    "s22": 0.198
+   },
+   "listed": {
+    "test": 0.33,
+    "s22": 0.181,
+    "dd": 0.435
+   },
+   "book": {
+    "test": 0.32,
+    "s22": 0.169
+   }
+  }
+ },
+ "tax": {
+  "base": {
+   "cg25": {
+    "s22": 0.0834968087335255,
+    "all": 0.8437929106604853
+   },
+   "cg30": {
+    "s22": 0.06938672626829256,
+    "all": 0.7954478742013711
+   },
+   "biz": {
+    "s22": 0.04789908719466762,
+    "all": 0.6810637530147794
+   },
+   "co": {
+    "s22": 0.07832378032546217,
+    "all": 0.844783768968504
+   },
+   "co0": {
+    "s22": 0.10607577183642047,
+    "all": 0.9062456334431757
+   }
+  },
+  "A": {
+   "cg25": {
+    "s22": 0.10931170193560868,
+    "all": 0.6142719042758671
+   },
+   "cg30": {
+    "s22": 0.09665094628415805,
+    "all": 0.5770112405869146
+   },
+   "biz": {
+    "s22": 0.06877507642913971,
+    "all": 0.4749583985003474
+   },
+   "co": {
+    "s22": 0.09394734463179577,
+    "all": 0.6036756331807511
+   },
+   "co0": {
+    "s22": 0.12616243642944314,
+    "all": 0.6568937888100996
+   }
+  },
+  "B": {
+   "cg25": {
+    "s22": 0.09746278625733762,
+    "all": 0.45507321529721834
+   },
+   "cg30": {
+    "s22": 0.0853535890538748,
+    "all": 0.4236431223659618
+   },
+   "biz": {
+    "s22": 0.05683180801385479,
+    "all": 0.3480291786845391
+   },
+   "co": {
+    "s22": 0.08322349815185426,
+    "all": 0.44830221514454216
+   },
+   "co0": {
+    "s22": 0.11240559075395051,
+    "all": 0.4958693845396507
+   }
+  },
+  "C": {
+   "cg25": {
+    "s22": 0.10296006871630614,
+    "all": 0.8234088376616768
+   },
+   "cg30": {
+    "s22": 0.08892237279105886,
+    "all": 0.7797095513847543
+   },
+   "biz": {
+    "s22": 0.06377372927974778,
+    "all": 0.653071611348101
+   },
+   "co": {
+    "s22": 0.09220155465144209,
+    "all": 0.8077645989302145
+   },
+   "co0": {
+    "s22": 0.12393165765248337,
+    "all": 0.8679767761186612
+   }
+  },
+  "D": {
+   "cg25": {
+    "s22": 0.09337469074778704,
+    "all": 0.706731529804212
+   },
+   "cg30": {
+    "s22": 0.08142794678772658,
+    "all": 0.6661107953058125
+   },
+   "biz": {
+    "s22": 0.0559894206756788,
+    "all": 0.5529545299981438
+   },
+   "co": {
+    "s22": 0.08026867069236143,
+    "all": 0.6942771106741157
+   },
+   "co0": {
+    "s22": 0.10859176735954645,
+    "all": 0.7506300484144379
+   }
+  },
+  "AB": {
+   "cg25": {
+    "s22": 0.09033920901520909,
+    "all": 0.38892421975015745
+   },
+   "cg30": {
+    "s22": 0.07897216996263157,
+    "all": 0.361740192881554
+   },
+   "biz": {
+    "s22": 0.05245238597335944,
+    "all": 0.2914720063621943
+   },
+   "co": {
+    "s22": 0.07696239268582783,
+    "all": 0.3771274078656863
+   },
+   "co0": {
+    "s22": 0.10431188250282886,
+    "all": 0.4218426307053025
+   }
+  },
+  "AD": {
+   "cg25": {
+    "s22": 0.10840193385174302,
+    "all": 0.5780442803713253
+   },
+   "cg30": {
+    "s22": 0.09562185379444088,
+    "all": 0.5423976871976051
+   },
+   "biz": {
+    "s22": 0.06749648434683664,
+    "all": 0.4444398752738752
+   },
+   "co": {
+    "s22": 0.09318170700641382,
+    "all": 0.5671834342677493
+   },
+   "co0": {
+    "s22": 0.12518451068021363,
+    "all": 0.6191156096663573
+   }
+  },
+  "AC": {
+   "cg25": {
+    "s22": 0.10703151460974847,
+    "all": 0.7645439527770428
+   },
+   "cg30": {
+    "s22": 0.09350447044460308,
+    "all": 0.7237853521664037
+   },
+   "biz": {
+    "s22": 0.0677498674411825,
+    "all": 0.6057440410391974
+   },
+   "co": {
+    "s22": 0.09445246186812772,
+    "all": 0.748691049390384
+   },
+   "co0": {
+    "s22": 0.12680725888652078,
+    "all": 0.8069008710050576
+   }
+  }
+ },
+ "targets": {
+  "base": {
+   "c20": false,
+   "c30": false,
+   "dd": false,
+   "sh": false,
+   "loo": true,
+   "cost": false,
+   "all": false
+  },
+  "A": {
+   "c20": true,
+   "c30": false,
+   "dd": false,
+   "sh": false,
+   "loo": true,
+   "cost": true,
+   "all": false
+  },
+  "B": {
+   "c20": true,
+   "c30": false,
+   "dd": true,
+   "sh": false,
+   "loo": true,
+   "cost": false,
+   "all": false
+  },
+  "C": {
+   "c20": true,
+   "c30": true,
+   "dd": false,
+   "sh": false,
+   "loo": true,
+   "cost": false,
+   "all": false
+  },
+  "D": {
+   "c20": false,
+   "c30": false,
+   "dd": false,
+   "sh": false,
+   "loo": true,
+   "cost": true,
+   "all": false
+  },
+  "AB": {
+   "c20": false,
+   "c30": false,
+   "dd": true,
+   "sh": false,
+   "loo": true,
+   "cost": false,
+   "all": false
+  },
+  "AD": {
+   "c20": true,
+   "c30": false,
+   "dd": false,
+   "sh": false,
+   "loo": true,
+   "cost": true,
+   "all": false
+  },
+  "AC": {
+   "c20": true,
+   "c30": false,
+   "dd": false,
+   "sh": false,
+   "loo": true,
+   "cost": false,
+   "all": false
+  }
+ }
+}

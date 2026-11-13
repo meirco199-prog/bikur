@@ -90,7 +90,9 @@ export function strategies(coins, { rebalDow = null } = {}){
 export const XSRA = Object.freeze({ uni: 15, volN: 30, smaMacro: 100, smaMicro: 50, retN: 21, top: 4 });
 // rel (הצעת GPT 13/11, ענף מחקר נפרד — "מומנטום יחסי מול ביטקוין"): מטבע שאינו BTC נכנס רק אם תשואת 21 הימים שלו גבוהה משל BTC;
 // דירוג בין הנבחרים — אותו ציון (תשואה/תנודתיות). משבצת שלא התמלאה מקבלת BTC (במקום מזומן). המסנן המאקרו (BTC מעל ממוצע 100) נשאר: מתחתיו — מזומן.
-export function xsRiskAdj(coins, { dow = 0, P = XSRA, id, rel = false } = {}){
+// rng (בדיקת בסיס אקראית, משימת ההגנות 13/11): במקום הדירוג — בחירה אקראית מבין המועמדים שעברו את כל המסננים (אותו מספר מטבעות).
+// allow(k, dayMs) (בדיקת Bybit): מטבע שאינו זמין באותו יום לא נכנס ליקום. ברירות המחדל לא משנות שום דבר.
+export function xsRiskAdj(coins, { dow = 0, P = XSRA, id, rel = false, rng = null, allow = null } = {}){
   const K = coins.length, iB = coins.indexOf('BTC');
   return { id: id || `XSRA${rel ? 'rel' : ''}-d${dow}`, family: 'xsra', weights: (A, d, st) => {
     const reb = new Date(A.days[d]).getUTCDay() === dow;
@@ -102,7 +104,7 @@ export function xsRiskAdj(coins, { dow = 0, P = XSRA, id, rel = false } = {}){
     for (let k = 0; k < K; k++){
       if (d < need) continue; let s = 0, ok = true;
       for (let i = d - P.volN + 1; i <= d; i++){ const x = A.C[k][i] * A.V[k][i]; if (!Number.isFinite(x)){ ok = false; break; } s += x; }
-      if (ok && s > 0 && Number.isFinite(A.C[k][d - need])) dv.push([k, s]);
+      if (ok && s > 0 && Number.isFinite(A.C[k][d - need]) && (!allow || allow(k, A.days[d]))) dv.push([k, s]);
     }
     dv.sort((a, b) => b[1] - a[1]);
     const cand = [];
@@ -115,7 +117,7 @@ export function xsRiskAdj(coins, { dow = 0, P = XSRA, id, rel = false } = {}){
       m /= xs.length; const sd = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1));
       if (Number.isFinite(r) && sd > 0) cand.push([k, r / sd]);
     }
-    cand.sort((a, b) => b[1] - a[1]);
+    if (rng){ for (let i = cand.length - 1; i > 0; i--){ const j = Math.floor(rng() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; } } else cand.sort((a, b) => b[1] - a[1]);
     for (const [k] of cand.slice(0, P.top)) w[k] = 1 / P.top;
     if (rel && cand.length < P.top) w[iB] += (P.top - cand.length) / P.top; // משבצות ריקות → BTC
     st.pick = cand.slice(0, P.top).map(([k, z]) => [coins[k], z]);
