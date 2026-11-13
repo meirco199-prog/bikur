@@ -15,11 +15,11 @@ export function align(byCoin){
   for (const c of coins) for (const b of byCoin[c]) set.add(Math.floor(b.t / DAY) * DAY);
   const days = [...set].sort((a, b) => a - b), idx = new Map(days.map((d, i) => [d, i]));
   const M = () => coins.map(() => new Float64Array(days.length).fill(NaN));
-  const O = M(), H = M(), L = M(), C = M();
-  coins.forEach((c, k) => { for (const b of byCoin[c]){ const i = idx.get(Math.floor(b.t / DAY) * DAY); O[k][i] = b.o; H[k][i] = b.h; L[k][i] = b.l; C[k][i] = b.c; } });
+  const O = M(), H = M(), L = M(), C = M(), V = M(); // V = נפח מסחר (ביחידות המטבע), אם יש בנרות (b.v); אחרת NaN
+  coins.forEach((c, k) => { for (const b of byCoin[c]){ const i = idx.get(Math.floor(b.t / DAY) * DAY); O[k][i] = b.o; H[k][i] = b.h; L[k][i] = b.l; C[k][i] = b.c; if (Number.isFinite(b.v)) V[k][i] = b.v; } });
   // יום חסר באמצע (אין מסחר) → ממשיכים את הסגירה הקודמת, כדי שתשואה לא תיחשב כחסרה
-  for (let k = 0; k < coins.length; k++) for (let d = 1; d < days.length; d++) if (Number.isNaN(C[k][d]) && Number.isFinite(C[k][d - 1]) && hasLater(C[k], d)){ C[k][d] = O[k][d] = H[k][d] = L[k][d] = C[k][d - 1]; }
-  return { coins, days, O, H, L, C };
+  for (let k = 0; k < coins.length; k++) for (let d = 1; d < days.length; d++) if (Number.isNaN(C[k][d]) && Number.isFinite(C[k][d - 1]) && hasLater(C[k], d)){ C[k][d] = O[k][d] = H[k][d] = L[k][d] = C[k][d - 1]; V[k][d] = 0; }
+  return { coins, days, O, H, L, C, V };
 }
 const hasLater = (a, d) => { for (let i = d + 1; i < a.length; i++) if (Number.isFinite(a[i])) return true; return false; };
 
@@ -79,6 +79,55 @@ export function strategies(coins, { rebalDow = null } = {}){
     } });
   }
   return S;
+}
+
+// ---------- מומנטום בין מטבעות "משודרג" (בקשת מאיר 13/11/2026, אחרי בדיקות העמידות של 3 המטבעות) ----------
+// הכללים נקבעו מראש, בלי כיוונון מספרים: בסגירת יום dow (UTC) —
+// 1. יקום דינמי: 15 המטבעות עם נפח המסחר הדולרי (סגירה × נפח) הגבוה ב-30 הימים האחרונים (רק מידע עד d).
+// 2. מאקרו: BTC מעל הממוצע של 100 יום, אחרת מזומן. מיקרו: המטבע עצמו מעל הממוצע של 50 יום שלו.
+// 3. דירוג: תשואת 21 יום חלקי סטיית התקן של התשואות היומיות ב-21 הימים (לא שנתי). 4 הראשונים, 25% לכל אחד (פחות מועמדים → מזומן).
+// מנה (tranche) אחת = אסטרטגיה עם יום החלפה אחד; שתי מנות של 50% (ראשון + רביעי) מחברים עם combineSleeves.
+export const XSRA = Object.freeze({ uni: 15, volN: 30, smaMacro: 100, smaMicro: 50, retN: 21, top: 4 });
+export function xsRiskAdj(coins, { dow = 0, P = XSRA, id } = {}){
+  const K = coins.length, iB = coins.indexOf('BTC');
+  return { id: id || `XSRA-d${dow}`, family: 'xsra', weights: (A, d, st) => {
+    const reb = new Date(A.days[d]).getUTCDay() === dow;
+    if (st.w && !reb) return st.w;
+    const w = new Array(K).fill(0); st.pick = [];
+    if (!(iB >= 0 && A.C[iB][d] > sma(A.C[iB], P.smaMacro, d))) return (st.w = w);
+    const need = Math.max(P.volN, P.smaMicro, P.retN + 1);
+    const dv = [];
+    for (let k = 0; k < K; k++){
+      if (d < need) continue; let s = 0, ok = true;
+      for (let i = d - P.volN + 1; i <= d; i++){ const x = A.C[k][i] * A.V[k][i]; if (!Number.isFinite(x)){ ok = false; break; } s += x; }
+      if (ok && s > 0 && Number.isFinite(A.C[k][d - need])) dv.push([k, s]);
+    }
+    dv.sort((a, b) => b[1] - a[1]);
+    const cand = [];
+    for (const [k] of dv.slice(0, P.uni)){
+      if (!(A.C[k][d] > sma(A.C[k], P.smaMicro, d))) continue;
+      const r = ret(A.C[k], P.retN, d); let m = 0; const xs = [];
+      for (let i = d - P.retN + 1; i <= d; i++){ const x = A.C[k][i] / A.C[k][i - 1] - 1; xs.push(x); m += x; }
+      m /= xs.length; const sd = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1));
+      if (Number.isFinite(r) && sd > 0) cand.push([k, r / sd]);
+    }
+    cand.sort((a, b) => b[1] - a[1]);
+    for (const [k] of cand.slice(0, P.top)) w[k] = 1 / P.top;
+    st.pick = cand.slice(0, P.top).map(([k, z]) => [coins[k], z]);
+    return (st.w = w);
+  } };
+}
+// מנות נפרדות: כל מנה תיק עצמאי (משקלות שזזים, עלויות משלה), בלי איזון בין המנות. התשואה היומית = ממוצע משוקלל לפי ההון של כל מנה.
+export function combineSleeves(list, shares = list.map(() => 1 / list.length)){
+  const n = list[0].length; for (const s of list) if (s.length !== n) throw new Error('combineSleeves: אורכים שונים');
+  const eq = shares.slice(), out = [];
+  for (let i = 0; i < n; i++){
+    const tot = eq.reduce((a, b) => a + b, 0); let net = 0, gross = 0, cost = 0, turn = 0, exp = 0;
+    list.forEach((s, j) => { const f = eq[j] / tot, x = s[i]; if (x.t !== list[0][i].t) throw new Error('combineSleeves: ימים שונים');
+      net += f * x.net; gross += f * x.gross; cost += f * x.cost; turn += f * x.turn; exp += f * x.exp; eq[j] *= 1 + x.net; });
+    out.push({ t: list[0][i].t, gross, cost, fund: 0, net, turn, exp });
+  }
+  return out;
 }
 
 // ---------- הרצת תיק יומי ----------

@@ -131,3 +131,31 @@ test('מס: הפסד נטו בשנה — בלי מס; carry "year" מאפס או
   const fr = runDaily(A, tog, { drift: true, tax: { rate: 0.25, from: Date.UTC(2021, 0, 1) } }).taxInfo;
   assert.equal(fr.years.length, 0); assert.equal(fr.open.y, 2021); assert.ok(fr.from < 1);
 });
+
+test('XSRA: יקום לפי נפח דולרי, מסנן BTC מעל 100, מטבע מעל 50, דירוג תשואה/תנודתיות, 4 מטבעות; combineSleeves', async () => {
+  const { xsRiskAdj, combineSleeves } = await import('../engine/research-daily.js');
+  const mk = (n, f, v) => Array.from({ length: n }, (_, i) => { const c = f(i), o = i ? f(i - 1) : c; return { t: D0 + i * DAY, o, h: Math.max(o, c), l: Math.min(o, c), c, v: v(i) }; });
+  const N = 200, up = (g, wig) => (i) => 100 * (1 + g) ** i * (1 + wig * Math.sin(i * 1.7));
+  const bars = {
+    BTC: mk(N, up(0.002, 0.001), () => 1e6),
+    SMO: mk(N, up(0.004, 0.0005), () => 1e5),   // עלייה חלקה → ציון גבוה
+    WIL: mk(N, up(0.008, 0.08), () => 1e5),     // עלייה חזקה יותר אבל תנודתית מאוד → ציון נמוך
+    LOW: mk(N, up(0.01, 0.0005), () => 1),      // הכי טוב — אבל נפח זעום (לא ביקום כש-uni קטן)
+    DWN: mk(N, (i) => 100 * 0.997 ** i, () => 1e5), // מתחת לממוצע 50 → מסונן
+  };
+  const A = align(bars), d = N - 1, P = { uni: 4, volN: 30, smaMacro: 100, smaMicro: 50, retN: 21, top: 4 };
+  const st = {}, w = xsRiskAdj(A.coins, { dow: new Date(A.days[d]).getUTCDay(), P }).weights(A, d, st);
+  const got = Object.fromEntries(A.coins.map((c, k) => [c, w[k]]));
+  assert.equal(got.LOW, 0, 'נפח נמוך — מחוץ ליקום'); assert.equal(got.DWN, 0, 'מתחת לממוצע 50');
+  assert.equal(got.SMO, 0.25); assert.equal(got.BTC, 0.25);
+  assert.deepEqual(st.pick.map((x) => x[0]).slice(0, 1), ['SMO'], 'החלקה מדורגת ראשונה');
+  assert.ok(st.pick.findIndex((x) => x[0] === 'SMO') < st.pick.findIndex((x) => x[0] === 'WIL'));
+  // מאקרו: BTC יורד → מזומן
+  const A2 = align({ ...bars, BTC: mk(N, (i) => 100 * 0.996 ** i, () => 1e6) });
+  assert.ok(xsRiskAdj(A2.coins, { dow: new Date(A2.days[d]).getUTCDay(), P }).weights(A2, d, {}).every((x) => x === 0));
+  // שתי מנות: 50/50 בלי איזון ביניהן — ההון הכולל = ממוצע ההון של המנות
+  const s1 = [{ t: 1, net: 0.1, gross: 0.1, cost: 0, turn: 0, exp: 1 }, { t: 2, net: 0.1, gross: 0.1, cost: 0, turn: 0, exp: 1 }];
+  const s2 = [{ t: 1, net: 0, gross: 0, cost: 0, turn: 0, exp: 0 }, { t: 2, net: 0, gross: 0, cost: 0, turn: 0, exp: 0 }];
+  const c = combineSleeves([s1, s2]), E = c.reduce((e, x) => e * (1 + x.net), 1);
+  assert.ok(Math.abs(E - (0.5 * 1.21 + 0.5)) < 1e-12);
+});
