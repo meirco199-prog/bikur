@@ -1041,5 +1041,122 @@
     "cg": true
    }
   ]
+ },
+ "rel7": {
+  "all": {
+   "n": 3968,
+   "years": 10.871,
+   "cagr": 1.276,
+   "vol": 0.642,
+   "sharpe": 1.601,
+   "ci": [
+    1.005,
+    2.196
+   ],
+   "maxDD": 0.577,
+   "total": 7638.785,
+   "grossTotal": 11.5,
+   "costTotal": 0.337,
+   "fundTotal": 0,
+   "taxTotal": 0,
+   "turnYr": 22.215,
+   "exposure": 0.573
+  },
+  "train": {
+   "n": 2376,
+   "years": 6.51,
+   "cagr": 2.178,
+   "vol": 0.7,
+   "sharpe": 2.001,
+   "ci": [
+    1.23,
+    2.771
+   ],
+   "maxDD": 0.577,
+   "total": 1857.689,
+   "grossTotal": 9.279,
+   "costTotal": 0.161,
+   "fundTotal": 0,
+   "taxTotal": 0,
+   "turnYr": 17.945,
+   "exposure": 0.588
+  },
+  "val": {
+   "n": 793,
+   "years": 2.173,
+   "cagr": 0.094,
+   "vol": 0.526,
+   "sharpe": 0.433,
+   "ci": [
+    -0.897,
+    1.763
+   ],
+   "maxDD": 0.531,
+   "total": 0.216,
+   "grossTotal": 0.586,
+   "costTotal": 0.091,
+   "fundTotal": 0,
+   "taxTotal": 0,
+   "turnYr": 29.897,
+   "exposure": 0.579
+  },
+  "test": {
+   "n": 799,
+   "years": 2.189,
+   "cagr": 0.744,
+   "vol": 0.556,
+   "sharpe": 1.273,
+   "ci": [
+    -0.053,
+    2.599
+   ],
+   "maxDD": 0.425,
+   "total": 2.379,
+   "grossTotal": 1.635,
+   "costTotal": 0.084,
+   "fundTotal": 0,
+   "taxTotal": 0,
+   "turnYr": 27.286,
+   "exposure": 0.526
+  },
+  "s22": {
+   "n": 1777,
+   "years": 4.868,
+   "cagr": 0.291,
+   "vol": 0.519,
+   "sharpe": 0.749,
+   "ci": [
+    -0.14,
+    1.637
+   ],
+   "maxDD": 0.554,
+   "total": 2.465,
+   "grossTotal": 2.073,
+   "costTotal": 0.182,
+   "fundTotal": 0,
+   "taxTotal": 0,
+   "turnYr": 26.524,
+   "exposure": 0.508
+  },
+  "verdict": [
+   {
+    "k": "train",
+    "sh": true,
+    "dd": true,
+    "cg": true
+   },
+   {
+    "k": "val",
+    "sh": false,
+    "dd": false,
+    "cg": false
+   },
+   {
+    "k": "test",
+    "sh": true,
+    "dd": true,
+    "cg": true
+   }
+  ]
  }
 }
