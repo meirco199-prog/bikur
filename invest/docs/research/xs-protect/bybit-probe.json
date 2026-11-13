@@ -1,0 +1,363 @@
+{
+ "source": "bybit-xsra-probe.mjs via bybit-bot.yml probexs, run 43512081289, 2026-11-13T21:36Z (read-only)",
+ "listing": {
+  "BTC": "2021-07-05",
+  "ETH": "2021-07-05",
+  "SOL": "2021-10-21",
+  "XRP": "2021-07-20",
+  "LINK": "2021-09-22",
+  "AAVE": "2021-09-23",
+  "DOGE": "2021-08-31",
+  "UNI": "2021-09-22",
+  "LTC": "2021-08-31",
+  "ADA": "2021-10-21",
+  "XLM": "2021-09-06",
+  "AVAX": "2021-11-12",
+  "ICP": "2021-10-10",
+  "BCH": "2021-10-10",
+  "MANA": "2021-09-30",
+  "SHIB": "2021-12-06",
+  "DOT": "2021-08-31",
+  "BAT": "2021-10-19",
+  "CRV": "2021-10-16",
+  "ATOM": "2021-11-12",
+  "FIL": "2021-10-21",
+  "ALGO": "2021-11-12",
+  "ZEN": "2021-12-16",
+  "GRT": "2021-10-22",
+  "CHZ": "2021-09-30",
+  "ETC": "2022-07-28",
+  "SAND": "2021-11-02",
+  "XTZ": "2021-10-10",
+  "SUSHI": "2021-09-22",
+  "SNX": "2021-12-01",
+  "1INCH": "2021-12-02",
+  "COMP": "2021-09-23",
+  "YFI": "2021-09-22",
+  "AXS": "2021-09-30",
+  "ENJ": "2021-11-09",
+  "ZRX": "2021-10-19",
+  "UMA": "2021-12-02",
+  "LRC": "2021-12-03"
+ },
+ "book": {
+  "BTC": {
+   "spreadBps": 0.0,
+   "depth05": 6644077,
+   "depth1": 6644077,
+   "buy1k": 0.0,
+   "buy5k": 0.0,
+   "buy25k": 0.0
+  },
+  "ETH": {
+   "spreadBps": 0.1,
+   "depth05": 3055448,
+   "depth1": 3068476,
+   "buy1k": 0.0,
+   "buy5k": 0.0,
+   "buy25k": 0.7
+  },
+  "SOL": {
+   "spreadBps": 1.3,
+   "depth05": 2586622,
+   "depth1": 3969878,
+   "buy1k": 0.6,
+   "buy5k": 1.0,
+   "buy25k": 1.7
+  },
+  "XRP": {
+   "spreadBps": 1.0,
+   "depth05": 1407104,
+   "depth1": 1503405,
+   "buy1k": 0.5,
+   "buy5k": 1.7,
+   "buy25k": 4.1
+  },
+  "LINK": {
+   "spreadBps": 2.0,
+   "depth05": 211172,
+   "depth1": 489066,
+   "buy1k": 3.5,
+   "buy5k": 5.3,
+   "buy25k": 7.9
+  },
+  "AAVE": {
+   "spreadBps": 0.9,
+   "depth05": 125509,
+   "depth1": 162602,
+   "buy1k": 4.9,
+   "buy5k": 7.0,
+   "buy25k": 13.5
+  },
+  "DOGE": {
+   "spreadBps": 3.1,
+   "depth05": 638181,
+   "depth1": 744701,
+   "buy1k": 1.5,
+   "buy5k": 2.7,
+   "buy25k": 5.4
+  },
+  "UNI": {
+   "spreadBps": 3.5,
+   "depth05": 156957,
+   "depth1": 351823,
+   "buy1k": 4.0,
+   "buy5k": 9.3,
+   "buy25k": 14.5
+  },
+  "LTC": {
+   "spreadBps": 4.1,
+   "depth05": 234145,
+   "depth1": 272711,
+   "buy1k": 4.9,
+   "buy5k": 8.4,
+   "buy25k": 13.0
+  },
+  "ADA": {
+   "spreadBps": 5.9,
+   "depth05": 215871,
+   "depth1": 287000,
+   "buy1k": 3.0,
+   "buy5k": 7.7,
+   "buy25k": 12.5
+  },
+  "XLM": {
+   "spreadBps": 6.8,
+   "depth05": 154978,
+   "depth1": 275035,
+   "buy1k": 3.7,
+   "buy5k": 10.6,
+   "buy25k": 18.8
+  },
+  "AVAX": {
+   "spreadBps": 1.2,
+   "depth05": 92998,
+   "depth1": 158979,
+   "buy1k": 5.3,
+   "buy5k": 12.0,
+   "buy25k": 16.2
+  },
+  "ICP": {
+   "spreadBps": 7.9,
+   "depth05": 30452,
+   "depth1": 46306,
+   "buy1k": 5.1,
+   "buy5k": 16.7,
+   "buy25k": 52.4
+  },
+  "BCH": {
+   "spreadBps": 1.3,
+   "depth05": 78115,
+   "depth1": 198386,
+   "buy1k": 3.7,
+   "buy5k": 6.8,
+   "buy25k": 11.0
+  },
+  "MANA": {
+   "spreadBps": 7.5,
+   "depth05": 11276,
+   "depth1": 23403,
+   "buy1k": 9.3,
+   "buy5k": 33.6,
+   "buy25k": 115.6
+  },
+  "SHIB": {
+   "spreadBps": 4.7,
+   "depth05": 58282,
+   "depth1": 76333,
+   "buy1k": 2.4,
+   "buy5k": 6.0,
+   "buy25k": 16.7
+  },
+  "DOT": {
+   "spreadBps": 2.4,
+   "depth05": 80916,
+   "depth1": 129329,
+   "buy1k": 5.9,
+   "buy5k": 10.7,
+   "buy25k": 21.1
+  },
+  "BAT": {
+   "spreadBps": 9.2,
+   "depth05": 12707,
+   "depth1": 20354,
+   "buy1k": 8.8,
+   "buy5k": 22.1,
+   "buy25k": 1667.8
+  },
+  "CRV": {
+   "spreadBps": 8.7,
+   "depth05": 43200,
+   "depth1": 72970,
+   "buy1k": 5.9,
+   "buy5k": 11.5,
+   "buy25k": 33.8
+  },
+  "ATOM": {
+   "spreadBps": 7.3,
+   "depth05": 31181,
+   "depth1": 52578,
+   "buy1k": 10.0,
+   "buy5k": 14.7,
+   "buy25k": 45.1
+  },
+  "FIL": {
+   "spreadBps": 2.8,
+   "depth05": 86664,
+   "depth1": 108814,
+   "buy1k": 4.2,
+   "buy5k": 5.7,
+   "buy25k": 13.4
+  },
+  "ALGO": {
+   "spreadBps": 10.5,
+   "depth05": 34817,
+   "depth1": 94648,
+   "buy1k": 8.9,
+   "buy5k": 15.7,
+   "buy25k": 29.8
+  },
+  "ZEN": {
+   "spreadBps": 6.7,
+   "depth05": 14941,
+   "depth1": 22359,
+   "buy1k": 7.5,
+   "buy5k": 26.2,
+   "buy25k": null
+  },
+  "GRT": {
+   "spreadBps": 23.1,
+   "depth05": 7570,
+   "depth1": 11835,
+   "buy1k": 15.0,
+   "buy5k": 40.8,
+   "buy25k": null
+  },
+  "CHZ": {
+   "spreadBps": 28.0,
+   "depth05": 14691,
+   "depth1": 25584,
+   "buy1k": 14.0,
+   "buy5k": 27.1,
+   "buy25k": 111.4
+  },
+  "ETC": {
+   "spreadBps": 1.6,
+   "depth05": 29901,
+   "depth1": 34901,
+   "buy1k": 9.4,
+   "buy5k": 16.8,
+   "buy25k": 267.2
+  },
+  "SAND": {
+   "spreadBps": 7.4,
+   "depth05": 9968,
+   "depth1": 12826,
+   "buy1k": 10.5,
+   "buy5k": 28.5,
+   "buy25k": null
+  },
+  "XTZ": {
+   "spreadBps": 8.5,
+   "depth05": 7593,
+   "depth1": 43458,
+   "buy1k": 10.9,
+   "buy5k": 30.0,
+   "buy25k": 71.3
+  },
+  "SUSHI": {
+   "spreadBps": 17.7,
+   "depth05": 17835,
+   "depth1": 30781,
+   "buy1k": 8.9,
+   "buy5k": 16.2,
+   "buy25k": null
+  },
+  "SNX": {
+   "spreadBps": 12.3,
+   "depth05": 4575,
+   "depth1": 6835,
+   "buy1k": 10.8,
+   "buy5k": 53.1,
+   "buy25k": 3762.7
+  },
+  "1INCH": {
+   "spreadBps": 8.4,
+   "depth05": 15318,
+   "depth1": 20824,
+   "buy1k": 15.3,
+   "buy5k": 26.5,
+   "buy25k": null
+  },
+  "COMP": {
+   "spreadBps": 10.3,
+   "depth05": 14621,
+   "depth1": 33022,
+   "buy1k": 14.9,
+   "buy5k": 32.1,
+   "buy25k": 98.1
+  },
+  "YFI": {
+   "spreadBps": 11.1,
+   "depth05": 14435,
+   "depth1": 19084,
+   "buy1k": 9.8,
+   "buy5k": 19.8,
+   "buy25k": 4500.9
+  },
+  "AXS": {
+   "spreadBps": 12.0,
+   "depth05": 8026,
+   "depth1": 12499,
+   "buy1k": 13.5,
+   "buy5k": 36.2,
+   "buy25k": null
+  },
+  "ENJ": {
+   "spreadBps": 28.6,
+   "depth05": 10918,
+   "depth1": 13411,
+   "buy1k": 17.2,
+   "buy5k": 35.8,
+   "buy25k": null
+  },
+  "ZRX": {
+   "spreadBps": 26.6,
+   "depth05": 2095,
+   "depth1": 5603,
+   "buy1k": 33.1,
+   "buy5k": 196.4,
+   "buy25k": 6383.3
+  },
+  "UMA": {
+   "spreadBps": 27.0,
+   "depth05": 4085,
+   "depth1": 7447,
+   "buy1k": 17.4,
+   "buy5k": 50.2,
+   "buy25k": 8624.7
+  },
+  "LRC": {
+   "spreadBps": 57.3,
+   "depth05": 69,
+   "depth1": 1073,
+   "buy1k": 101.3,
+   "buy5k": 1535.7,
+   "buy25k": 19967.5
+  }
+ },
+ "missing": [
+  "ZEC",
+  "MKR",
+  "OMG",
+  "REP",
+  "DASH",
+  "EOS",
+  "KNC",
+  "BAND",
+  "NMR",
+  "MATIC",
+  "BNT",
+  "STORJ"
+ ]
+}
