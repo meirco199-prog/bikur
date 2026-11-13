@@ -1,5 +1,6 @@
 # זמני (ops): מומנטום בין מטבעות "משודרג" (scripts/research-xs-ra.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
 # התוצאות נדחפות ל-invest/docs/research/xs-ra בענף שעליו רץ ה-workflow (לא ל-main).
+# ריצה 2: ייחוס הרווח למטבעות לפי שנה וחציון זוגות ימי ההחלפה.
 name: research-xs-ra
 on:
   push:

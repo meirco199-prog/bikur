@@ -144,7 +144,7 @@ export function combineSleeves(list, shares = list.map(() => 1 / list.length)){
 // לשנה הבאה (מה שהתבקש, שמרני); 'forward' = הפסד הון עובר לשנים הבאות (כמו בפקודה). בלי תיאום אינפלציה ובלי מס יסף. רווח שלא מומש לא
 // ממוסה עד המכירה — taxInfo.liq מחשב את ההון אם מוכרים הכול ביום האחרון (כולל המס של השנה השוטפת). tax.from = תחילת החשבון (כמו
 // משקיע שמתחיל באותו יום: מה שכבר מוחזק נחשב כאילו נקנה בו); taxInfo.from = ההון ביום הזה.
-export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low', drift = false, tax = null } = {}){
+export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low', drift = false, tax = null, trace = false } = {}){
   const { coins, days, O, C, H, L: LO } = A, K = coins.length, out = [], st = {}, perp = !!strat.perp || leverage > 1;
   if (tax && (!drift || perp)) throw new Error('tax: רק ספוט עם drift');
   const tx = tax ? { rate: tax.rate ?? 0.25, fwd: tax.carry === 'forward', from: tax.from ?? -Infinity, on: false, Efrom: 1, B: new Array(K).fill(0), E: 1, real: 0, carry: 0, yr: null, years: [] } : null;
@@ -210,7 +210,7 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
       break;
     }
     if (tx){ cst += taxFee; out.push({ t: days[d], gross: r, cost: cst, fund, tax: tax0, net: r - cst - fund - tax0, turn, exp: expo }); tx.E *= 1 + r - cst - fund - tax0; }
-    else out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo });
+    else out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo, ...(trace ? { w: tgt.slice() } : {}) }); // trace: משקלות היום (לייחוס רווח למטבע)
     if (drift){ let dr = 0; const v = tgt.map((x, k) => { const o = O[k][d], c = C[k][d], m = x && Number.isFinite(o) && Number.isFinite(c) ? c / o : 1; dr += x * (m - 1); return x * m; }); w = v.map((x) => x / (1 + dr)); }
     else w = tgt;
   }

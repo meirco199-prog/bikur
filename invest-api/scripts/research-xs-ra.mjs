@@ -103,6 +103,21 @@ const ys = [...new Set(A0.days.map((x) => new Date(x).getUTCFullYear()))];
 L.push('| גרסה | ' + ys.join(' | ') + ' |', '|---|' + ys.map(() => '---').join('|') + '|');
 const yr = (lab, sr) => L.push(`| ${lab} | ` + ys.map((y) => { const q = dstats(sr, { from: Date.UTC(y, 0, 1), to: Date.UTC(y + 1, 0, 1) }); return q.n >= 30 ? pct(q.total) : '—'; }).join(' | ') + ' |');
 yr('משודרג (2 מנות)', tranche(ALL, [0, 3], 'all')); yr(`משודרג בלי ${worst.c}`, tranche(without(ALL, [worst.c]), [0, 3], `-${worst.c}`)); yr('הישנה (50 מטבעות)', other(ALL, 'XS14-top3-f200', { dow: 0 })); yr('BTC', other(ALL, 'BH-BTC'));
+// מאיפה הרווח: תרומת כל מטבע לפי שנה (משקל היום × תשואת סגירה-לסגירה, לפי ההון של כל מנה) — בדיקת שפיות לשנים החריגות
+{
+  const A = align(ALL), sl = [0, 3].map((w) => runDaily(A, xsRiskAdj(A.coins, { dow: w }), { drift: true, trace: true }).series);
+  const eq = [0.5, 0.5], byY = {};
+  for (let i = 0; i < sl[0].length; i++){
+    const di = i + 1, y = new Date(A.days[di]).getUTCFullYear(), tot = eq[0] + eq[1];
+    for (let j = 0; j < 2; j++){ const x = sl[j][i]; for (let k = 0; k < A.coins.length; k++) if (x.w[k]){ const g = A.C[k][di] / A.C[k][di - 1] - 1; if (Number.isFinite(g)){ (byY[y] ||= {})[A.coins[k]] = (byY[y][A.coins[k]] || 0) + eq[j] / tot * x.w[k] * g; } } eq[j] *= 1 + x.net; }
+  }
+  L.push('', '## 4א. מאיפה הרווח — 3 המטבעות שתרמו הכי הרבה בכל שנה (סכום תרומות יומיות, משודרג 2 מנות)', '', '| שנה | הכי תורמים | הכי מזיקים | מספר מטבעות שהוחזקו |', '|---|---|---|---|');
+  res.contrib = byY;
+  for (const y of Object.keys(byY).sort()){ const e = Object.entries(byY[y]).sort((a, b) => b[1] - a[1]); const f = (a) => a.map(([c, v]) => `${c} ${pct(v)}`).join(', ');
+    L.push(`| ${y} | ${f(e.slice(0, 3))} | ${f(e.slice(-2).reverse().filter((x) => x[1] < 0))} | ${e.length} |`); }
+  const pr = pairs.map((s2) => s2.s22.cagr).sort((a, b) => a - b), pt = pairs.map((s2) => s2.test.cagr).sort((a, b) => a - b);
+  L.push('', `**חציון 7 זוגות ימי ההחלפה:** מבחן ${pct(pt[3])}, מ-2022 ${pct(pr[3])} — מול BTC ${pct(btc.test.cagr)} / ${pct(btc.s22.cagr)}. הזוג הגרוע ביותר: מבחן ${pct(pt[0])}, מ-2022 ${pct(pr[0])}.`);
+}
 // פסיקה לפי הקריטריון שנקבע מראש
 const c1 = main.test.cagr > 0 && main.test.cagr > btc.test.cagr && main.test.maxDD < btc.test.maxDD, c2 = main.test.sharpe > btc.test.sharpe, c3 = worst.test > btc.test.cagr, c4 = (sP[1] - sP[0]) < 0.5 * (sS[1] - sS[0]);
 res.verdict = { c1, c2, c3, c4, pass: c1 && c2 && c3 && c4 };
