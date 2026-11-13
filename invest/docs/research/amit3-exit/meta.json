@@ -50,5 +50,6 @@
    "ddR": 110.52890821505173
   }
  },
- "risk": 400
+ "backtestRiskUsd": 400,
+ "botRiskUsd": 200
 }

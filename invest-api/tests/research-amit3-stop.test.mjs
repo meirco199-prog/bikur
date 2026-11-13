@@ -44,3 +44,9 @@ test('research-amit3-exit: 48 גרסאות ייחודיות, הבקשה = קו �
   assert.equal(V.find((v) => v.key === BASE_EXIT).opt.exit, 'course');
   assert.equal(V.find((v) => v.key === 'fix18-two-slatr2').opt.stopAtr, 2);
 });
+
+test('research-amit3-exit: "$ בבוט" לפי הסיכון של בוט 3 (BOT3.riskUsd), לא לפי הנרמול של הבדיקה לאחור', async () => {
+  const { botRisk } = await import('../scripts/research-amit3-exit.mjs');
+  const { BOT3 } = await import('../engine/amit3-exec.js');
+  assert.equal(botRisk(BOT3), BOT3.riskUsd); assert.equal(BOT3.riskUsd, 200); assert.equal(RISK_USD, 400);
+});

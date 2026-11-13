@@ -29,14 +29,18 @@ export function exitVariants(WEIGHTS){
   return out;
 }
 
+// "$ בבוט" = R × הסיכון לעסקה של בוט 3 (מקור אחד: BOT3.riskUsd), לא הנרמול של הבדיקה לאחור (RISK_USD)
+export const botRisk = (bot3) => bot3.riskUsd;
+
 async function main(){
   const M = await import('./research-amit3-stop.mjs');
   const { COIN_CAT, RISK_USD } = await import('../engine/amit-course.js');
+  const { BOT3 } = await import('../engine/amit3-exec.js');
   const { PERIODS, WEIGHTS, W_HE, stopHe, stat, pick, passes, run } = M;
   const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
   const OUTDIR = arg('--outdir', 'invest/docs/research/amit3-exit'), COINS = 'BTC,SOL,AVAX,ADA,INJ,RENDER,NEAR,FARTCOIN'.split(',');
   const VCOINS = 'XRP,DOGE,LINK,DOT,LTC,BCH,ATOM,UNI,AAVE,FIL,ETC,XLM,TRX,ALGO,SAND,AXS,APT,ARB,OP,SUI'.split(','), VCAT = { DOGE: 'vol' };
-  const ALL = { from: PERIODS.hold.from, to: PERIODS.test.to }, BOT_RISK = 200, log = (...a) => console.error(...a), t0 = Date.now();
+  const ALL = { from: PERIODS.hold.from, to: PERIODS.test.to }, BOT_RISK = botRisk(BOT3), log = (...a) => console.error(...a), t0 = Date.now();
   const V = exitVariants(WEIGHTS);
   const A = await run(COINS, V, (c) => COIN_CAT[c] || 'follow', 41);
   const S = new Map(V.map((v) => { const c = A.T.get(v.key), r = A.Rn.get(v.key);
@@ -53,7 +57,7 @@ async function main(){
   const md = ['# בוט 3: לצאת "בקו השני, עד 1.8%" — רווחים קטנים יותר, פחות הפסדים גדולים? — 2020–2026, נרות דקה', '',
     'בקשת מאיר (13/11/2026): "תנסה לעשות בבוט — לצאת באינדיקטור השני, עד 1.8, כדי להרוויח עסקאות קטנות יותר, אבל לא ליפול בהפסדים גדולים".', '',
     `- **האות:** בדיוק של בוט 3, ${COINS.join(', ')}. **הקווים:** EMA20 / EMA50 / VWAP / EMA200 של נר 15 דק׳ מעל מחיר הכניסה הממוצע, מהקרוב לרחוק.`,
-    `- **גרסאות:** ${V.length} (יציאה × סטופ × משקלות). **R:** ביחס להפסד המלא המתוכנן; בבוט 3 הפסד מלא = ${BOT_RISK}$. עלויות Bybit מלאות.`,
+    `- **גרסאות:** ${V.length} (יציאה × סטופ × משקלות). **R:** רווח/הפסד ביחס להפסד המלא המתוכנן. הבדיקה לאחור מנרמלת כל עסקה להפסד מלא של ${RISK_USD}$; בבוט 3 הפסד מלא = ${BOT_RISK}$ (BOT3.riskUsd), ולכן "$ בבוט" = R × ${BOT_RISK}. עלויות Bybit מלאות.`,
     `- **תקופות:** ${Object.values(PERIODS).map((p) => p.he).join(' · ')}. אימות: ${VCOINS.length} מטבעות חדשים.`,
     '- **ההכרעה (נקבעה מראש):** בחירה לפי אימון בלבד; עוברת רק אם R > 0 בכל 4 התקופות, טובה מהאקראי, ו-R > 0 על המטבעות החדשים.', '',
     '## 1. היציאות (סטופ ומשקלות של היום) — כל התקופות', '| יציאה | עסקאות | הצלחה | רווח ממוצע | הפסד ממוצע | הפסדים ≥ ½R | R נטו | $ בבוט לעסקה | R אקראי |', '|---|---|---|---|---|---|---|---|---|'];
@@ -69,7 +73,7 @@ async function main(){
     `- **ההכרעה שנקבעה מראש:** ${ok ? '**עברה** — אפשר להציע לדמו (החלטה של מאיר).' : '**לא עברה** — שינוי היציאה לא הופך את בוט 3 לרווחי.'}`);
   mkdirSync(OUTDIR, { recursive: true });
   writeFileSync(join(OUTDIR, 'report.md'), md.join('\n') + '\n');
-  writeFileSync(join(OUTDIR, 'meta.json'), JSON.stringify({ variants: V.length, best: best?.v.key || null, passes: ok, requested: { key: REQUESTED, all: req.all, v: VS.get(REQUESTED) }, base: { key: BASE_EXIT, all: base.all }, risk: RISK_USD }, null, 1));
+  writeFileSync(join(OUTDIR, 'meta.json'), JSON.stringify({ variants: V.length, best: best?.v.key || null, passes: ok, requested: { key: REQUESTED, all: req.all, v: VS.get(REQUESTED) }, base: { key: BASE_EXIT, all: base.all }, backtestRiskUsd: RISK_USD, botRiskUsd: BOT_RISK }, null, 1));
   console.log(md.join('\n'));
 }
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) main().catch((e) => { console.error(e); process.exit(1); });
