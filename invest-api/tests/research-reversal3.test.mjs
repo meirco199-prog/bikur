@@ -47,3 +47,11 @@ test('momo3: ההכרעה דורשת מעל המדד, t ≥ 2, 60% שנים, ו�
   assert.equal(verdict(g, spy, { pct: -0.1 }, 9, 14), false);
   assert.ok(V.some((v) => v.k === MAIN));
 });
+
+test('dayReturn: יום בלי סל — מוכרים את הסל של אתמול ומשלמים עלות יציאה', () => {
+  const prev = new Map([['A', 0.001], ['B', 0.001]]);
+  const d = dayReturn([], prev, 1);
+  assert.ok(close(d.r, -0.001)); assert.equal(d.held.size, 0);
+  assert.ok(close(dayReturn([], prev, 2).r, -0.002));
+  assert.equal(dayReturn([], new Map(), 1).r, 0);                 // אין סל ואין מה למכור — 0
+});
