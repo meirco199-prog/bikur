@@ -10,7 +10,8 @@
 #    "be2" — בוט 2: מתי להזיז את הסטופ למחיר הכניסה (בקשת מאיר 12/11/2026), scripts/research-amit2-be.mjs → invest/docs/research/amit2-be;
 #    "guard1" — בוט 1: סינון "סכין נופלת" וסטופ נגרר אחרי רווח (בקשת מאיר 12/11/2026), scripts/research-amit1-guard.mjs →
 #    invest/docs/research/amit1-guard;
-#    "exit3" — בוט 3: יציאה "בקו השני, עד 1.8%" (בקשת מאיר 13/11/2026), scripts/research-amit3-exit.mjs → invest/docs/research/amit3-exit).
+#    "exit3" — בוט 3: יציאה "בקו השני, עד 1.8%" (בקשת מאיר 13/11/2026), scripts/research-amit3-exit.mjs → invest/docs/research/amit3-exit;
+#    "scalp" — סקאלפינג: סטופ קצר מאוד, הרבה עסקאות (בקשת מאיר 13/11/2026), scripts/research-scalp.mjs → invest/docs/research/scalp).
 # התוצאות (report.md / report-test.md + summary*.json) נשמרות כ-artifact ונדחפות לענף שעליו רץ ה-workflow (לא ל-main).
 name: research-amit-course
 on:
@@ -32,7 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - name: unit tests
-        run: node --test invest-api/tests/amit-course.test.mjs invest-api/tests/research-amit3-stop.test.mjs invest-api/tests/research-amit2-be.test.mjs invest-api/tests/research-amit1-guard.test.mjs
+        run: node --test invest-api/tests/amit-course.test.mjs invest-api/tests/research-amit3-stop.test.mjs invest-api/tests/research-amit2-be.test.mjs invest-api/tests/research-amit1-guard.test.mjs invest-api/tests/research-scalp.test.mjs
       - uses: actions/cache@v4
         with: { path: amit-course-cache, key: binance-um-1m-2020-01-2026-10-29coins-v2, restore-keys: binance-um-1m- }
       - name: mode
@@ -66,6 +67,12 @@ jobs:
           # בוט 2: כללי הזזת הסטופ למחיר הכניסה על ETH 2020–2026; קריטריון שנקבע מראש בראש הסקריפט
           node --max-old-space-size=6500 invest-api/scripts/research-amit2-be.mjs --from 2020-01 --to 2026-10 --cache amit-course-cache --outdir invest/docs/research/amit2-be > /dev/null
           cat invest/docs/research/amit2-be/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: scalp
+        if: steps.mode.outputs.mode == 'scalp'
+        run: |
+          # סקאלפינג על BTC/ETH/SOL 2020–2026: 4 כניסות × 4 סטופים × 3 יעדים; הכרעה שנקבעה מראש בראש הסקריפט
+          node --max-old-space-size=6500 invest-api/scripts/research-scalp.mjs --from 2020-01 --to 2026-10 --cache amit-course-cache --outdir invest/docs/research/scalp > /dev/null
+          cat invest/docs/research/scalp/report.md >> "$GITHUB_STEP_SUMMARY"
       - name: exit3
         if: steps.mode.outputs.mode == 'exit3'
         run: |
@@ -103,6 +110,7 @@ jobs:
             invest/docs/research/amit2-be
             invest/docs/research/amit1-guard
             invest/docs/research/amit3-exit
+            invest/docs/research/scalp
       - name: commit results
         if: github.ref_name != 'main'
         run: |
@@ -112,5 +120,6 @@ jobs:
           if [ -d invest/docs/research/amit2-be ]; then git add invest/docs/research/amit2-be; fi
           if [ -d invest/docs/research/amit1-guard ]; then git add invest/docs/research/amit1-guard; fi
           if [ -d invest/docs/research/amit3-exit ]; then git add invest/docs/research/amit3-exit; fi
+          if [ -d invest/docs/research/scalp ]; then git add invest/docs/research/scalp; fi
           git commit -m "ops: תוצאות בדיקת שיטת הקורס של עמית (ריצה ${GITHUB_RUN_ID})" || exit 0
           for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
