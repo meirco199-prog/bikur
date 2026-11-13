@@ -109,6 +109,16 @@ test('מס רווחי הון (tax): קיזוז בתוך השנה, תשלום ב�
   assert.ok(Math.abs(bh.liq.tax - 0.25 * (bh.liq.equity - bh.liq.fee - 1)) < 1e-9);
 });
 
+test('מס: מחיר קבוע, קנייה ואז מכירה — ההפסד הממומש = עמלת הקנייה + עמלת המכירה (העמלה לא נספרת פעמיים)', () => {
+  // סבב GPT 1 של #260: בדיקה שעמלת הקנייה בתוך בסיס העלות. מחיר קבוע 100; קונים ביום 11, מוכרים ביום 21
+  const A = align({ BTC: series(30, () => 100) }), one = (DCOST.spotBps + DCOST.slipBps.BTC) / 1e4;
+  const r = runDaily(A, { id: 'IO', weights: (_, d) => [d >= 10 && d < 20 ? 1 : 0] }, { drift: true, tax: { rate: 0.25 } });
+  const eq = r.series.reduce((e, x) => e * (1 + x.net), 1), ti = r.taxInfo;
+  assert.ok(Math.abs(eq - (1 - one - one * (1 - one))) < 1e-12, 'ההון: שתי עמלות');
+  assert.ok(Math.abs(ti.open.realized - (eq - 1)) < 1e-12, `ממומש ${ti.open.realized} = ‎−(עמלת קנייה + עמלת מכירה) ${eq - 1}`);
+  assert.equal(ti.liq.tax, 0); assert.equal(ti.open.unrealized, 0);
+});
+
 test('מס: הפסד נטו בשנה — בלי מס; carry "year" מאפס אותו, "forward" מקזז מול השנה הבאה', () => {
   // שנה ראשונה יורדת (−0.2% ליום), השנה השנייה עולה
   const A = align({ BTC: series(730, (i) => (i < 366 ? 100 * 0.998 ** i : 100 * 0.998 ** 366 * 1.002 ** (i - 366))) });

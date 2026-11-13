@@ -144,7 +144,10 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
       cst += dw * ((perp ? cost.perpBps : cost.spotBps) / 1e4 + slip(k)) * costMult;
       if (tx?.on && dw > 1e-15){ const fee = dw * ((cost.spotBps) / 1e4 + slip(k)) * costMult * tx.E;
         if (tgt[k] < wo[k]){ const f = (wo[k] - tgt[k]) / wo[k]; tx.real += f * (wo[k] * Ep - tx.B[k]) - fee; tx.B[k] *= 1 - f; }
-        else tx.B[k] += (tgt[k] - wo[k]) * Ep; } // הקנייה: הכסף ששולם (כולל העמלה, שהמנוע מוריד מההון) = בסיס העלות
+        // קנייה: בסיס העלות = כל הכסף שיצא (tgt − wo) × Ep, *כולל* העמלה — כי המנוע מוריד את העמלה מההון, והמשקל החדש tgt נמדד על
+        // ההון שאחרי העמלה; כלומר המטבעות שווים (tgt − wo) × Ep − fee, והבסיס גבוה מהם בדיוק בעמלה. הוספת fee כאן הייתה סופרת אותה פעמיים
+        // (נבדק: "מחיר קבוע, קנייה ואז מכירה" ו"רווח ממומש + לא ממומש = כל הרווח" ב-research-daily.test.mjs).
+        else tx.B[k] += (tgt[k] - wo[k]) * Ep; }
       if (perp && tgt[k]){
         const f = funding[coins[k]]?.get(days[d]);
         fund += f !== undefined ? tgt[k] * f : (tgt[k] > 0 ? tgt[k] * cost.longFundBpsDay / 1e4 : 0);
