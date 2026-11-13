@@ -1,4 +1,4 @@
-# זמני (ops), ריצה 2 (תיקון נתיבים): שיפור המומנטום — 4 הגנות ו-3 שילובים (scripts/research-xs-protect.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
+# זמני (ops), ריצה 3 (גם רק 38 המטבעות של Bybit): שיפור המומנטום — 4 הגנות ו-3 שילובים (scripts/research-xs-protect.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
 name: research-xs-protect
 on:
   push:
@@ -22,6 +22,7 @@ jobs:
         run: |
           mkdir -p invest/docs/research/xs-protect
           node --max-old-space-size=6000 invest-api/scripts/research-xs-protect.mjs --data xsra-data.json.gz --bybit invest/docs/research/xs-protect/bybit-probe.json --out invest/docs/research/xs-protect/report.md --json invest/docs/research/xs-protect/results.json
+          node --max-old-space-size=6000 invest-api/scripts/research-xs-protect.mjs --data xsra-data.json.gz --bybit invest/docs/research/xs-protect/bybit-probe.json --universe bybit --out invest/docs/research/xs-protect/report-bybit.md --json invest/docs/research/xs-protect/results-bybit.json
       - name: commit results
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

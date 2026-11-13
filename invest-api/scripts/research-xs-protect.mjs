@@ -15,7 +15,9 @@ const DATA = arg('--data', 'xsra-data.json.gz'), BYB = arg('--bybit', 'invest/do
 const DAY = 86400e3, log = (...a) => console.error(...a);
 const d0 = JSON.parse(gunzipSync(readFileSync(DATA))), byb = JSON.parse(readFileSync(BYB, 'utf8'));
 for (const bars of Object.values(d0.bars)) for (const b of bars){ const lo = Math.min(b.o, b.c); if (b.l < 0.1 * lo) b.l = lo; }
-const ALL = d0.bars, A = align(ALL), K = A.coins.length, iB = A.coins.indexOf('BTC');
+// --universe bybit (בקשת מאיר 13/11: "רק למטבעות של בייביט — נסחר שם"): כל הדוח על 38 המטבעות שנסחרים בספוט של Bybit (נרות Coinbase מ-2016)
+const UNIV = arg('--universe', 'all');
+const ALL = UNIV === 'bybit' ? Object.fromEntries(Object.entries(d0.bars).filter(([c]) => byb.listing[c])) : d0.bars, A = align(ALL), K = A.coins.length, iB = A.coins.indexOf('BTC');
 const iso = (t) => new Date(t).toISOString().slice(0, 10), ym = (t) => iso(t).slice(0, 7), yr = (t) => new Date(t).getUTCFullYear();
 const pct = (x) => (x == null || !Number.isFinite(x) ? '—' : `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toFixed(1)}%`);
 const f2 = (x) => (x == null || !Number.isFinite(x) ? '—' : (x >= 0 ? '' : '−') + Math.abs(x).toFixed(2));
@@ -35,8 +37,8 @@ const S = (sr) => Object.fromEntries(Object.entries(P).map(([k, w]) => [k, dstat
 const contribBy = (r, from = -Infinity, to = Infinity) => { const c = new Float64Array(K); for (let d = 1; d < A.days.length; d++){ const t = A.days[d]; if (t < from || t >= to) continue; for (let k = 0; k < K; k++) c[k] += r.contrib[d * K + k]; } return c; };
 const without = (cs) => Object.fromEntries(Object.entries(ALL).filter(([k]) => !cs.includes(k)));
 
-const L = ['# שיפור המומנטום המשודרג (7 מנות) — 4 הגנות ו-3 שילובים שנקבעו מראש, מול המקורית', '',
-  `**נתונים:** ${K} מטבעות מ-Coinbase (כולל 30 שקרסו או שהמסחר בהם הופסק), נרות יומיים ${iso(A.days[0])} → ${iso(A.days.at(-1))}. **עלויות:** עמלת Taker 0.1% + החלקה 0.02% (BTC/ETH) / 0.05% (השאר) בכל קנייה ומכירה. בלי מינוף.`,
+const L = [`# שיפור המומנטום המשודרג (7 מנות) — 4 הגנות ו-3 שילובים שנקבעו מראש, מול המקורית${UNIV === 'bybit' ? ' — רק 38 המטבעות שנסחרים ב-Bybit' : ''}`, '',
+  `**נתונים:** ${K} מטבעות מ-Coinbase (${UNIV === 'bybit' ? 'רק מה שנסחר היום בספוט של Bybit — כל ההיסטוריה מ-2016 היא "כאילו היו זמינים"; השחזור לפי תאריכי הרישום בסעיף 9' : 'כולל 30 שקרסו או שהמסחר בהם הופסק'}), נרות יומיים ${iso(A.days[0])} → ${iso(A.days.at(-1))}. **עלויות:** עמלת Taker 0.1% + החלקה 0.02% (BTC/ETH) / 0.05% (השאר) בכל קנייה ומכירה. בלי מינוף.`,
   `**תקופות:** אימון ${iso(P.train.from)}→${iso(P.train.to)} · אימות →${iso(P.val.to)} · מבחן ${iso(P.test.from)}→. **שימו לב:** כל התקופות כבר נחשפו במחקר הקודם (7יח) — אף תוצאה כאן אינה הוכחה עצמאית מחוץ למדגם. ההכרעה הסופית — רק על נתונים עתידיים.`,
   '**ההגנות (קבועות מראש, `PROTECT` ב-`engine/xsra-protect.js`):** א. תקרה 15% למטבע בכל 7 המנות יחד (נבדק בקנייה, לפי שווי שוק; לא מוכרים כדי לעקוף) · ב. יעד תנודתיות 40% לשנה (30 ימים, ביום ההחלפה של כל מנה, לעולם לא מעל המשקל המקורי) · ג. 30% BTC קבוע בלי מסנן + 70% לשיטה, חזרה ל-30/70 בתחילת כל רבעון · ד. סך האלטים עד 60% (בקנייה, וקיצוץ יחסי יומי). שילובים: א+ב, א+ד, א+ג.',
   '**יעדי המחקר (נקבעו מראש):** תשואה שנתית ≥ 20% בכל אחת משלוש התקופות (מועדף 30%), ירידה מקסימלית ≤ 35% בכל תקופה, שארפ ≥ 1.2 בכל תקופה, וגם: בלי המטבע התורם ביותר — מבחן ≥ 20%; ובעלויות ×2 — מבחן ומ-2022 ≥ 20%.', ''];
@@ -123,7 +125,7 @@ L.push('', '## 9. התאמה ל-Bybit (בדיקות רגישות — לא שחז
   `- **38 המטבעות שנסחרים היום בספוט של Bybit** (חסרים: ${byb.missing.join(', ')}). מטבעות שהוסרו מ-Bybit לא ניתנים לשחזור — Bybit לא מחזירה אותם.`,
   '- **שחזור זמינות:** מטבע נכנס ליקום רק מתאריך הנר הראשון שלו בספוט של Bybit (BTC/ETH: 5/7/2021); לפני כן — מזומן. התוצאה רלוונטית רק מסוף 2021.',
   '- **עלות לפי ספר הפקודות (היום):** החלקה לכל מטבע = המחיר הממוצע בקנייה של 5,000$ מול אמצע הספר, במקום 0.02%/0.05%. נמדד היום בלבד — ההיסטוריה לא ידועה.', '',
-  '| גרסה | 50 מטבעות: מבחן / מ-2022 / ירידה מ-2022 | 38 של Bybit (כל ההיסטוריה): מבחן / מ-2022 / ירידה | Bybit עם תאריכי רישום: מבחן / מ-2022 / ירידה | Bybit + תאריכים + עלות לפי ספר הפקודות: מבחן / מ-2022 |', '|---|---|---|---|---|');
+  `| גרסה | ${K} מטבעות (הטבלה הראשית): מבחן / מ-2022 / ירידה מ-2022 | 38 של Bybit (כל ההיסטוריה): מבחן / מ-2022 / ירידה | Bybit עם תאריכי רישום: מבחן / מ-2022 / ירידה | Bybit + תאריכים + עלות לפי ספר הפקודות: מבחן / מ-2022 |`, '|---|---|---|---|---|');
 const slipBook = Object.fromEntries(BY.map((c) => [c, byb.book[c]?.buy5k ?? 100]));
 const COSTB = { ...DCOST, slipBps: Object.fromEntries(BY.map((c) => [c, Math.max(DCOST.slipBps[c] ?? DCOST.slipOther, slipBook[c])])) };
 const AB = align(BYBARS), allowB = (k, t) => t >= (listT[AB.coins[k]] ?? Infinity);
