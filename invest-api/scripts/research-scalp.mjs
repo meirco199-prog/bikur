@@ -95,7 +95,7 @@ async function main(){
     `- **מינוף:** לא משנה את הרווח באחוזים מהפוזיציה. בפוזיציה של ${NOTIONAL.toLocaleString()}$ (כמו בוט 1) כל 0.1% = ${NOTIONAL / 1000}$, וכל עסקה משלמת כ-${Math.round(NOTIONAL * cost('סטופ'))}$ עמלות בסטופ.`,
     '- **הכרעה (נקבעה מראש):** רווח אחרי עלויות > 0 עם t ≥ 2 בפיתוח (2020–2023) ובמבחן (2024 →), ב-2 מטבעות לפחות.', ''];
   for (const coin of coins){
-    md.push(`## ${coin}`, '', '| כניסה | סטופ | יעד | עסקאות ביום | הצלחה | לפני עלויות לעסקה | עלות לעסקה | נטו לעסקה (פיתוח) | נטו לעסקה (מבחן) | t מבחן | $ ביום (מבחן, 190K$) |', '|---|---|---|---|---|---|---|---|---|---|---|');
+    md.push(`## ${coin}`, '', '| כניסה | סטופ | יעד | עסקאות ביום | הצלחה (אחרי עלויות) | לפני עלויות לעסקה | עלות לעסקה | נטו לעסקה (פיתוח) | נטו לעסקה (מבחן) | t מבחן | $ ביום (מבחן, 190K$) |', '|---|---|---|---|---|---|---|---|---|---|---|');
     for (const k of keys){ const x = R[coin][k], all = x.test; md.push(`| ${RULE_HE[x.rule]} | ${x.s}% | ${(x.s * x.rr).toFixed(2)}% | ${Math.round((x.dev.perDay + x.test.perDay) / 2)} | ${Math.round(all.win * 100)}% | ${pp(all.gross)} | ${pp(-all.cost)} | ${pp(x.dev.net)} | ${pp(x.test.net)} | ${Number.isFinite(x.test.t) ? x.test.t.toFixed(1) : '—'} | ${f$(x.test.net * NOTIONAL * x.test.perDay)} |`); }
     md.push('');
   }
