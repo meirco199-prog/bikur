@@ -7,9 +7,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { align, DCOST } from '../engine/research-daily.js';
-import { simulate, VERSIONS } from '../engine/xsra-protect.js';
+import { simulate, VERSIONS, CYCLES } from '../engine/xsra-protect.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
+const CYC = arg('--cycle', 'weekly'), CY = CYCLES[CYC] ? { cycle: CYCLES[CYC] } : {}; // --cycle monthly: אותו חישוב לאיזון החודשי (7כז)
 const DATA = arg('--data', 'xsra-data.json.gz'), BYB = arg('--bybit', 'invest/docs/research/xs-protect/bybit-probe.json'), OUT = arg('--out', ''), JOUT = arg('--json', '');
 const DAY = 86400e3, T21 = Date.UTC(2021, 0, 1), CAP = 50000, log = (...a) => console.error(...a);
 const d0 = JSON.parse(gunzipSync(readFileSync(DATA))), byb = JSON.parse(readFileSync(BYB, 'utf8'));
@@ -37,15 +38,15 @@ const btc = (si) => { const o = AC.O[iB][si], c = AC.C[iB].at(-1); let pk = 0, d
 const RES = { meta: { last: iso(LASTT), cap: CAP, cost: 'ספר פקודות 5,000$' }, yearlyReal: {}, yearlyLong: {}, invest: {} };
 for (const v of V){
   log(v.key);
-  RES.yearlyReal[v.key] = yearly(simulate(AC, { ...v, allow: allowC, C: C5 }).series);
-  RES.yearlyLong[v.key] = yearly(simulate(AF, v).series, Date.UTC(2017, 0, 1));
+  RES.yearlyReal[v.key] = yearly(simulate(AC, { ...v, ...CY, allow: allowC, C: C5 }).series);
+  RES.yearlyLong[v.key] = yearly(simulate(AF, { ...v, ...CY }).series, Date.UTC(2017, 0, 1));
   RES.invest[v.key] = STARTS.map(([lab, t]) => { const si = AC.days.findIndex((x) => x >= t);
-    const sr = simulate(AC, { ...v, allow: allowC, C: C5, startIdx: si }).series.filter((x) => x.t >= AC.days[si]);
+    const sr = simulate(AC, { ...v, ...CY, allow: allowC, C: C5, startIdx: si }).series.filter((x) => x.t >= AC.days[si]);
     let E = 1, fee = 0; for (const x of sr){ fee += x.cost * E; E *= 1 + x.net; } const yrs = sr.length / 365;
     return { lab, from: iso(AC.days[si]), ret: E - 1, cagr: yrs >= 1 ? E ** (1 / yrs) - 1 : null, fee: fee * CAP, end: E * CAP, profit: (E - 1) * CAP, dd: ddOf(sr), btc: btc(si) }; });
 }
 const L = [];
-L.push('# מומנטום משודרג (7 מנות) עם ההגנות — תשואה לפי שנה, ו-50,000$ מנקודות התחלה שונות', '',
+L.push(`# מומנטום משודרג (7 מנות) עם ההגנות — תשואה לפי שנה, ו-50,000$ מנקודות התחלה שונות${CYC === 'monthly' ? ' — איזון חודשי (7כז)' : ''}`, '',
   `נתונים עד ${iso(LASTT)}. **אותם כללים בדיוק כמו בסעיפים 7יט–7כ — בלי שום שינוי.** מחקר בלבד: אין פקודות ואין כסף אמיתי. **בלי מס** (במס של 25% נשאר בערך שליש פחות מהרווח — סעיף 7יז).`, '',
   '**הגרסה המציאותית:** 38 המטבעות שנסחרים בספוט של Bybit, כל מטבע רק מהיום שנרשם שם (לפני 7/2021 — מזומן), ועלות מסחר לפי ספר הפקודות של Bybit (עמלה 0.1% + החלקה לפי פקודה של 5,000$, ' +
   'שמרני לתיק של 50,000$). משקיע חדש קונה הכול ביום הראשון, והעמלות של הקנייה הראשונה כלולות.', '');
