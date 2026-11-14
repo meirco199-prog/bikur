@@ -1,6 +1,11 @@
 {
   "source": "Coinbase Exchange public daily candles (api.exchange.coinbase.com, granularity 86400, UTC)",
   "file": "../../../../xsra-data.json.gz",
+  "midnight_utc_check": {
+    "BTC": true,
+    "ETH": true,
+    "SOL": true
+  },
   "assets": {
     "BTC": {
       "first": "2016-01-01",
