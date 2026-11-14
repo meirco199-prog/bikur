@@ -151,7 +151,9 @@ export function combineSleeves(list, shares = list.map(() => 1 / list.length)){
 // לשנה הבאה (מה שהתבקש, שמרני); 'forward' = הפסד הון עובר לשנים הבאות (כמו בפקודה). בלי תיאום אינפלציה ובלי מס יסף. רווח שלא מומש לא
 // ממוסה עד המכירה — taxInfo.liq מחשב את ההון אם מוכרים הכול ביום האחרון (כולל המס של השנה השוטפת). tax.from = תחילת החשבון (כמו
 // משקיע שמתחיל באותו יום: מה שכבר מוחזק נחשב כאילו נקנה בו); taxInfo.from = ההון ביום הזה.
-export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low', drift = false, tax = null, trace = false } = {}){
+export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST, volTarget = 0, leverage = 1, mmr = 0.005, liqBy = 'low', drift = false, tax = null, trace = false, rebal = null, partial = false } = {}){
+  // rebal(d) (עם drift): ביום החלטה d שבו rebal מחזיר true — חוזרים למשקלות היעד גם אם האות לא השתנה (איזון לפי לוח זמנים).
+  // partial (עם drift): כשהאות משתנה ביום שאינו יום איזון — משנים רק את המטבעות שהאות שלהם השתנה; השאר נשארים במשקל שזז.
   const { coins, days, O, C, H, L: LO } = A, K = coins.length, out = [], st = {}, perp = !!strat.perp || leverage > 1;
   if (tax && (!drift || perp)) throw new Error('tax: רק ספוט עם drift');
   const tx = tax ? { rate: tax.rate ?? 0.25, fwd: tax.carry === 'forward', from: tax.from ?? -Infinity, on: false, Efrom: 1, B: new Array(K).fill(0), E: 1, real: 0, carry: 0, yr: null, years: [] } : null;
@@ -159,7 +161,7 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
     tx.years.push({ y, realized: tx.real, base, tax: due, taxPct: due / E0 }); tx.carry = tx.fwd ? Math.min(0, base) : 0; tx.real = 0; return due; };
   let liquidated = null, liqInfo = null;
   const slip = (k) => (cost.slipBps[coins[k]] ?? cost.slipOther) / 1e4;
-  let w = new Array(K).fill(0), entries = 0, prevRaw = null, tax0 = 0, taxFee = 0, Ep = 0;
+  let rebDay = false, w = new Array(K).fill(0), entries = 0, prevRaw = null, tax0 = 0, taxFee = 0, Ep = 0;
   const same = (a, b) => a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) < 1e-12);
   for (let d = 1; d < days.length; d++){
     // יום d: בפתיחה מבצעים את מה שהוחלט בסגירת d−1
@@ -181,7 +183,10 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
           }
         }
       }
-      if (prevRaw && same(raw, prevRaw)) tgt = wo.slice();
+      const reb = !!(rebal && rebal(d - 1));
+      if (prevRaw && !reb && same(raw, prevRaw)) tgt = wo.slice();
+      else if (prevRaw && !reb && partial) tgt = raw.map((x, k) => (Math.abs(x - prevRaw[k]) < 1e-12 ? wo[k] : x));
+      rebDay = reb;
     }
     prevRaw = raw;
     if (volTarget > 0){ const pv = portVol(A, tgt, d - 1); if (pv > 0) tgt = tgt.map((x) => x * Math.min(1, volTarget / pv)); }
@@ -217,7 +222,7 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
       break;
     }
     if (tx){ cst += taxFee; out.push({ t: days[d], gross: r, cost: cst, fund, tax: tax0, net: r - cst - fund - tax0, turn, exp: expo }); tx.E *= 1 + r - cst - fund - tax0; }
-    else out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo, ...(trace ? { w: tgt.slice() } : {}) }); // trace: משקלות היום (לייחוס רווח למטבע)
+    else out.push({ t: days[d], gross: r, cost: cst, fund, net: r - cst - fund, turn, exp: expo, ...(trace ? { w: tgt.slice(), reb: rebDay } : {}) }); // trace: משקלות היום (לייחוס רווח למטבע)
     if (drift){ let dr = 0; const v = tgt.map((x, k) => { const o = O[k][d], c = C[k][d], m = x && Number.isFinite(o) && Number.isFinite(c) ? c / o : 1; dr += x * (m - 1); return x * m; }); w = v.map((x) => x / (1 + dr)); }
     else w = tgt;
   }
@@ -229,7 +234,7 @@ export function runDaily(A, strat, { funding = {}, costMult = 1, C: cost = DCOST
   }
   return { series: out, entries, liquidated, liqInfo, taxInfo };
 }
-function portVol(A, w, d, n = 30){
+export function portVol(A, w, d, n = 30){
   if (d < n) return 0; const rs = [];
   for (let i = d - n + 1; i <= d; i++){ let r = 0; for (let k = 0; k < w.length; k++) if (w[k]){ const x = A.C[k][i] / A.C[k][i - 1] - 1; if (Number.isFinite(x)) r += w[k] * x; } rs.push(r); }
   const m = rs.reduce((s, x) => s + x, 0) / n; return Math.sqrt(rs.reduce((s, x) => s + (x - m) ** 2, 0) / (n - 1) * 365);

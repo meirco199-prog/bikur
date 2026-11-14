@@ -1,0 +1,32 @@
+# זמני (ops): מחקר 7כד — ביקורת תיק הבסיס + יעד תנודתיות 35% (scripts/research-base-audit.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
+name: research-base-audit
+on:
+  push:
+    branches: [claude/investment-research-platform-thffd8]
+    paths: [.github/workflows/research-base-audit.yml]
+permissions: { contents: write }
+concurrency: { group: research-base-audit, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/cache@v4
+        with: { path: xsra-data.json.gz, key: research-xsra-2016-2026-11-13-v1 }
+      - name: data (אם המטמון לא זמין)
+        run: '[ -f xsra-data.json.gz ] || node invest-api/scripts/research-xs-ra.mjs --data xsra-data.json.gz > /dev/null'
+      - name: tests
+        run: node --test invest-api/tests/base-vt.test.mjs invest-api/tests/research-daily.test.mjs
+      - name: run
+        run: |
+          mkdir -p invest/docs/research/base-audit
+          node invest-api/scripts/research-base-audit.mjs --data xsra-data.json.gz --prev invest/docs/research/base-portfolio/results.json --out invest/docs/research/base-audit/report.md --json invest/docs/research/base-audit/results.json
+      - name: commit results
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/base-audit
+          git commit -m "ops: תוצאות ביקורת תיק הבסיס ויעד התנודתיות (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
