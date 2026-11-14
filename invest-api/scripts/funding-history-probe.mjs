@@ -2,7 +2,10 @@
 // כיוון 2 (אישור מאיר 14/11/2026): איסוף היסטוריית דמי המימון (Funding) של BTC ו-ETH מכמה בורסות — קריאה ציבורית בלבד, בלי מפתחות.
 // לכל מקור: מאיזה תאריך יש נתונים, כמה תצפיות, והאם הגישה חסומה. הפלט: סכום יומי (UTC) של שיעורי המימון לכל מקור ומטבע
 // (חיובי = הלונגים משלמים לשורטים), ודוח קצר. שימוש: node invest-api/scripts/funding-history-probe.mjs --out dir
+// על השרת (Bybit/BitMEX/Binance חוסמות את ה-runner של GitHub): FUND_SRC=bitmex,bybit,binance FUND_STDOUT=1 — הדוח + שורת FUNDJSON:
+// (JSON דחוס ב-gzip ומקודד ב-base64) ליומן, בלי קבצים.
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg('--out', '.'), DAY = 86400e3, NOW = Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), log = (...a) => console.error(...a);
 async function get(url){
@@ -30,7 +33,9 @@ const S = {
     const j = await get(`https://www.deribit.com/api/v2/public/get_funding_rate_history?instrument_name=${sym}&start_timestamp=${s}&end_timestamp=${Math.min(NOW, s + 30 * DAY)}`);
     for (const x of j.result ?? []) out.push([x.timestamp, Number(x.interest_8h)]); await sleep(250); } return out; } },
 };
-mkdirSync(OUT, { recursive: true });
+const ONLY = (process.env.FUND_SRC || '').split(',').filter(Boolean), STDOUT = process.env.FUND_STDOUT === '1';
+if (ONLY.length) for (const k of Object.keys(S)) if (!ONLY.includes(k)) delete S[k];
+if (!STDOUT) mkdirSync(OUT, { recursive: true });
 const RES = {}, DAILY = {}, L = ['# היסטוריית דמי המימון — אילו מקורות זמינים', '', '| מקור | מטבע | מצב | מתאריך | עד | תצפיות | ימים |', '|---|---|---|---|---|---|---|'];
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
 for (const [src, cfg] of Object.entries(S)) for (const c of ['BTC', 'ETH']){
@@ -42,6 +47,7 @@ for (const [src, cfg] of Object.entries(S)) for (const c of ['BTC', 'ETH']){
     L.push(`| ${src} | ${c} | ✅ | ${daily[0]?.[0] ?? '—'} | ${daily.at(-1)?.[0] ?? '—'} | ${rows.length} | ${daily.length} |`); log(src, c, rows.length, daily[0]?.[0]);
   } catch (e){ RES[`${src}:${c}`] = { ok: false, err: String(e.message).slice(0, 120) }; L.push(`| ${src} | ${c} | ❌ ${String(e.message).slice(0, 60)} | | | | |`); log(src, c, e.message); }
 }
-writeFileSync(`${OUT}/funding-sources.md`, L.join('\n') + '\n');
-writeFileSync(`${OUT}/funding-daily.json`, JSON.stringify({ note: 'סכום יומי (UTC) של שיעורי המימון; חיובי = לונגים משלמים. deribit: ממוצע interest_8h × 3', fetched: new Date(NOW).toISOString(), sources: RES, daily: DAILY }));
+const J = JSON.stringify({ note: 'סכום יומי (UTC) של שיעורי המימון; חיובי = לונגים משלמים. deribit: ממוצע interest_8h × 3', fetched: new Date(NOW).toISOString(), sources: RES, daily: DAILY });
 console.log(L.join('\n'));
+if (STDOUT) console.log('FUNDJSON:' + gzipSync(J).toString('base64'));
+else { writeFileSync(`${OUT}/funding-sources.md`, L.join('\n') + '\n'); writeFileSync(`${OUT}/funding-daily.json`, J); }
