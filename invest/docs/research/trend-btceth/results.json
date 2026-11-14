@@ -1,0 +1,5768 @@
+{
+ "meta": {
+  "start": "2016-12-04",
+  "first": "2016-05-18",
+  "windows": {
+   "train": [
+    "2016-12-04",
+    "2022-11-17"
+   ],
+   "val": [
+    "2022-11-18",
+    "2024-11-11"
+   ],
+   "test": [
+    "2024-11-12",
+    "2026-11-12"
+   ],
+   "s22": [
+    "2022-01-01",
+    "2026-11-12"
+   ],
+   "all": [
+    "2016-12-04",
+    "2026-11-12"
+   ]
+  },
+  "pass": {
+   "cagr": 0.2,
+   "maxDD": 0.35,
+   "gridShare": 0.5
+  },
+  "bps": 12
+ },
+ "bench": {
+  "BTC": {
+   "train": {
+    "cagr": 0.677,
+    "sharpe": 1.052,
+    "ci": [
+     0.248,
+     1.855
+    ],
+    "maxDD": 0.838,
+    "vol": 0.794,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 1080,
+    "years": 5.959,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "val": {
+    "cagr": 1.32,
+    "sharpe": 1.982,
+    "ci": [
+     0.587,
+     3.376
+    ],
+    "maxDD": 0.262,
+    "vol": 0.483,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 238,
+    "years": 1.986,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "test": {
+    "cagr": -0.103,
+    "sharpe": -0.034,
+    "ci": [
+     -1.419,
+     1.351
+    ],
+    "maxDD": 0.531,
+    "vol": 0.434,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 402,
+    "years": 2.003,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "s22": {
+    "cagr": 0.093,
+    "sharpe": 0.429,
+    "ci": [
+     -0.459,
+     1.318
+    ],
+    "maxDD": 0.67,
+    "vol": 0.505,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 770,
+    "years": 4.868,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "all": {
+    "cagr": 0.577,
+    "sharpe": 1.012,
+    "ci": [
+     0.391,
+     1.634
+    ],
+    "maxDD": 0.838,
+    "vol": 0.68,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 1080,
+    "years": 9.948,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "yearly": {
+    "2016": 0.269,
+    "2017": 13.238,
+    "2018": -0.734,
+    "2019": 0.941,
+    "2020": 3.046,
+    "2021": 0.594,
+    "2022": -0.642,
+    "2023": 1.558,
+    "2024": 1.208,
+    "2025": -0.063,
+    "2026": -0.184
+   }
+  },
+  "ETH": {
+   "train": {
+    "cagr": 1.326,
+    "sharpe": 1.324,
+    "ci": [
+     0.52,
+     2.128
+    ],
+    "maxDD": 0.94,
+    "vol": 1.067,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 1107,
+    "years": 5.959,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "val": {
+    "cagr": 0.684,
+    "sharpe": 1.212,
+    "ci": [
+     -0.18,
+     2.604
+    ],
+    "maxDD": 0.453,
+    "vol": 0.556,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 245,
+    "years": 1.986,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "test": {
+    "cagr": -0.227,
+    "sharpe": -0.034,
+    "ci": [
+     -1.419,
+     1.351
+    ],
+    "maxDD": 0.676,
+    "vol": 0.687,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 447,
+    "years": 2.003,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "s22": {
+    "cagr": -0.116,
+    "sharpe": 0.161,
+    "ci": [
+     -0.727,
+     1.049
+    ],
+    "maxDD": 0.741,
+    "vol": 0.685,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 795,
+    "years": 4.868,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "all": {
+    "cagr": 0.747,
+    "sharpe": 1.065,
+    "ci": [
+     0.443,
+     1.687
+    ],
+    "maxDD": 0.94,
+    "vol": 0.916,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0,
+    "rec": 1383,
+    "years": 9.948,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "yearly": {
+    "2016": 0.039,
+    "2017": 89.927,
+    "2018": -0.824,
+    "2019": -0.016,
+    "2020": 4.742,
+    "2021": 3.983,
+    "2022": -0.675,
+    "2023": 0.908,
+    "2024": 0.46,
+    "2025": -0.109,
+    "2026": -0.32
+   }
+  },
+  "P5050": {
+   "train": {
+    "cagr": 1.182,
+    "sharpe": 1.339,
+    "ci": [
+     0.535,
+     2.142
+    ],
+    "maxDD": 0.875,
+    "vol": 0.87,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0.008,
+    "rec": 1069,
+    "years": 5.959,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "val": {
+    "cagr": 0.991,
+    "sharpe": 1.638,
+    "ci": [
+     0.245,
+     3.032
+    ],
+    "maxDD": 0.356,
+    "vol": 0.495,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0.001,
+    "rec": 245,
+    "years": 1.986,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "test": {
+    "cagr": -0.147,
+    "sharpe": -0.028,
+    "ci": [
+     -1.413,
+     1.357
+    ],
+    "maxDD": 0.602,
+    "vol": 0.538,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0.001,
+    "rec": 402,
+    "years": 2.003,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "s22": {
+    "cagr": 0.001,
+    "sharpe": 0.287,
+    "ci": [
+     -0.601,
+     1.175
+    ],
+    "maxDD": 0.682,
+    "vol": 0.571,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0.003,
+    "rec": 785,
+    "years": 4.868,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "all": {
+    "cagr": 0.773,
+    "sharpe": 1.143,
+    "ci": [
+     0.521,
+     1.765
+    ],
+    "maxDD": 0.875,
+    "vol": 0.749,
+    "turnYr": 0,
+    "exposure": 1,
+    "costTotal": 0.01,
+    "rec": 1099,
+    "years": 9.948,
+    "trades": 0,
+    "tradesYr": 0,
+    "win": null,
+    "avgTrade": null
+   },
+   "yearly": {
+    "2016": 0.154,
+    "2017": 47.122,
+    "2018": -0.754,
+    "2019": 0.419,
+    "2020": 4.017,
+    "2021": 2.05,
+    "2022": -0.651,
+    "2023": 1.223,
+    "2024": 0.813,
+    "2025": -0.048,
+    "2026": -0.251
+   }
+  }
+ },
+ "methods": {
+  "TF": {
+   "primary": {
+    "id": "TF-100-20",
+    "comb": {
+     "train": {
+      "cagr": 1.424,
+      "sharpe": 1.764,
+      "ci": [
+       0.959,
+       2.568
+      ],
+      "maxDD": 0.538,
+      "vol": 0.606,
+      "turnYr": 7.521,
+      "exposure": 0.495,
+      "costTotal": 0.058,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 50,
+      "tradesYr": 8.4,
+      "win": 0.32,
+      "avgTrade": 0.563
+     },
+     "val": {
+      "cagr": 0.303,
+      "sharpe": 0.912,
+      "ci": [
+       -0.48,
+       2.303
+      ],
+      "maxDD": 0.292,
+      "vol": 0.362,
+      "turnYr": 10.119,
+      "exposure": 0.562,
+      "costTotal": 0.025,
+      "rec": 302,
+      "years": 1.986,
+      "trades": 20,
+      "tradesYr": 10.1,
+      "win": 0.3,
+      "avgTrade": 0.05
+     },
+     "test": {
+      "cagr": -0.032,
+      "sharpe": 0.028,
+      "ci": [
+       -1.357,
+       1.413
+      ],
+      "maxDD": 0.321,
+      "vol": 0.283,
+      "turnYr": 10.803,
+      "exposure": 0.369,
+      "costTotal": 0.027,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 23,
+      "tradesYr": 11.5,
+      "win": 0.17,
+      "avgTrade": -0.005
+     },
+     "s22": {
+      "cagr": 0.078,
+      "sharpe": 0.4,
+      "ci": [
+       -0.488,
+       1.289
+      ],
+      "maxDD": 0.321,
+      "vol": 0.297,
+      "turnYr": 9.172,
+      "exposure": 0.384,
+      "costTotal": 0.055,
+      "rec": 456,
+      "years": 4.868,
+      "trades": 46,
+      "tradesYr": 9.4,
+      "win": 0.22,
+      "avgTrade": 0.024
+     },
+     "all": {
+      "cagr": 0.78,
+      "sharpe": 1.381,
+      "ci": [
+       0.758,
+       2.003
+      ],
+      "maxDD": 0.538,
+      "vol": 0.513,
+      "turnYr": 8.701,
+      "exposure": 0.483,
+      "costTotal": 0.109,
+      "rec": 1031,
+      "years": 9.948,
+      "trades": 93,
+      "tradesYr": 9.3,
+      "win": 0.28,
+      "avgTrade": 0.317
+     },
+     "yearly": {
+      "2016": 0.135,
+      "2017": 23.457,
+      "2018": -0.088,
+      "2019": 1.012,
+      "2020": 1.075,
+      "2021": 1.042,
+      "2022": -0.093,
+      "2023": 0.145,
+      "2024": 0.571,
+      "2025": 0.033,
+      "2026": -0.146
+     }
+    },
+    "BTC": {
+     "train": {
+      "cagr": 1.095,
+      "sharpe": 1.577,
+      "ci": [
+       0.773,
+       2.382
+      ],
+      "maxDD": 0.503,
+      "vol": 0.571,
+      "turnYr": 6.88,
+      "exposure": 0.491,
+      "costTotal": 0.049,
+      "rec": 583,
+      "years": 5.959,
+      "trades": 21,
+      "tradesYr": 3.5,
+      "win": 0.33,
+      "avgTrade": 0.456
+     },
+     "val": {
+      "cagr": 0.467,
+      "sharpe": 1.173,
+      "ci": [
+       -0.219,
+       2.565
+      ],
+      "maxDD": 0.264,
+      "vol": 0.391,
+      "turnYr": 10.572,
+      "exposure": 0.606,
+      "costTotal": 0.025,
+      "rec": 269,
+      "years": 1.986,
+      "trades": 10,
+      "tradesYr": 5,
+      "win": 0.4,
+      "avgTrade": 0.063
+     },
+     "test": {
+      "cagr": -0.085,
+      "sharpe": -0.255,
+      "ci": [
+       -1.64,
+       1.13
+      ],
+      "maxDD": 0.303,
+      "vol": 0.238,
+      "turnYr": 12.483,
+      "exposure": 0.397,
+      "costTotal": 0.03,
+      "rec": 660,
+      "years": 2.003,
+      "trades": 13,
+      "tradesYr": 6.5,
+      "win": 0.15,
+      "avgTrade": -0.013
+     },
+     "s22": {
+      "cagr": 0.127,
+      "sharpe": 0.554,
+      "ci": [
+       -0.334,
+       1.443
+      ],
+      "maxDD": 0.303,
+      "vol": 0.293,
+      "turnYr": 9.449,
+      "exposure": 0.41,
+      "costTotal": 0.055,
+      "rec": 660,
+      "years": 4.868,
+      "trades": 23,
+      "tradesYr": 4.7,
+      "win": 0.26,
+      "avgTrade": 0.039
+     },
+     "all": {
+      "cagr": 0.652,
+      "sharpe": 1.27,
+      "ci": [
+       0.648,
+       1.892
+      ],
+      "maxDD": 0.503,
+      "vol": 0.488,
+      "turnYr": 8.746,
+      "exposure": 0.495,
+      "costTotal": 0.104,
+      "rec": 1049,
+      "years": 9.948,
+      "trades": 44,
+      "tradesYr": 4.4,
+      "win": 0.3,
+      "avgTrade": 0.238
+     },
+     "yearly": {
+      "2016": 0.269,
+      "2017": 9.596,
+      "2018": -0.271,
+      "2019": 1.311,
+      "2020": 1.398,
+      "2021": 0.512,
+      "2022": 0,
+      "2023": 0.173,
+      "2024": 0.92,
+      "2025": -0.095,
+      "2026": -0.121
+     }
+    },
+    "ETH": {
+     "train": {
+      "cagr": 1.286,
+      "sharpe": 1.423,
+      "ci": [
+       0.619,
+       2.227
+      ],
+      "maxDD": 0.688,
+      "vol": 0.814,
+      "turnYr": 9.733,
+      "exposure": 0.496,
+      "costTotal": 0.07,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 29,
+      "tradesYr": 4.9,
+      "win": 0.31,
+      "avgTrade": 0.64
+     },
+     "val": {
+      "cagr": 0.139,
+      "sharpe": 0.528,
+      "ci": [
+       -0.863,
+       1.919
+      ],
+      "maxDD": 0.344,
+      "vol": 0.391,
+      "turnYr": 10.069,
+      "exposure": 0.517,
+      "costTotal": 0.024,
+      "rec": 304,
+      "years": 1.986,
+      "trades": 10,
+      "tradesYr": 5,
+      "win": 0.2,
+      "avgTrade": 0.036
+     },
+     "test": {
+      "cagr": -0.005,
+      "sharpe": 0.173,
+      "ci": [
+       -1.212,
+       1.558
+      ],
+      "maxDD": 0.441,
+      "vol": 0.377,
+      "turnYr": 9.986,
+      "exposure": 0.339,
+      "costTotal": 0.024,
+      "rec": 447,
+      "years": 2.003,
+      "trades": 10,
+      "tradesYr": 5,
+      "win": 0.2,
+      "avgTrade": 0.006
+     },
+     "s22": {
+      "cagr": 0.009,
+      "sharpe": 0.205,
+      "ci": [
+       -0.684,
+       1.093
+      ],
+      "maxDD": 0.522,
+      "vol": 0.357,
+      "turnYr": 9.449,
+      "exposure": 0.357,
+      "costTotal": 0.055,
+      "rec": 520,
+      "years": 4.868,
+      "trades": 23,
+      "tradesYr": 4.7,
+      "win": 0.17,
+      "avgTrade": 0.01
+     },
+     "all": {
+      "cagr": 0.682,
+      "sharpe": 1.108,
+      "ci": [
+       0.486,
+       1.729
+      ],
+      "maxDD": 0.691,
+      "vol": 0.675,
+      "turnYr": 9.851,
+      "exposure": 0.469,
+      "costTotal": 0.118,
+      "rec": 2011,
+      "years": 9.948,
+      "trades": 49,
+      "tradesYr": 4.9,
+      "win": 0.27,
+      "avgTrade": 0.387
+     },
+     "yearly": {
+      "2016": 0,
+      "2017": 26.825,
+      "2018": -0.029,
+      "2019": 0.718,
+      "2020": 0.556,
+      "2021": 1.338,
+      "2022": -0.183,
+      "2023": 0.108,
+      "2024": 0.266,
+      "2025": 0.107,
+      "2026": -0.175
+     }
+    },
+    "cost2": {
+     "train": {
+      "cagr": 1.401,
+      "sharpe": 1.748,
+      "ci": [
+       0.943,
+       2.552
+      ],
+      "maxDD": 0.543,
+      "vol": 0.607,
+      "turnYr": 7.516,
+      "exposure": 0.495,
+      "costTotal": 0.117,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 50,
+      "tradesYr": 8.4,
+      "win": 0.32,
+      "avgTrade": 0.559
+     },
+     "val": {
+      "cagr": 0.287,
+      "sharpe": 0.878,
+      "ci": [
+       -0.514,
+       2.269
+      ],
+      "maxDD": 0.298,
+      "vol": 0.362,
+      "turnYr": 10.116,
+      "exposure": 0.562,
+      "costTotal": 0.049,
+      "rec": 302,
+      "years": 1.986,
+      "trades": 20,
+      "tradesYr": 10.1,
+      "win": 0.25,
+      "avgTrade": 0.047
+     },
+     "test": {
+      "cagr": -0.044,
+      "sharpe": -0.019,
+      "ci": [
+       -1.404,
+       1.366
+      ],
+      "maxDD": 0.33,
+      "vol": 0.283,
+      "turnYr": 10.794,
+      "exposure": 0.37,
+      "costTotal": 0.053,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 23,
+      "tradesYr": 11.5,
+      "win": 0.17,
+      "avgTrade": -0.007
+     },
+     "s22": {
+      "cagr": 0.066,
+      "sharpe": 0.363,
+      "ci": [
+       -0.526,
+       1.251
+      ],
+      "maxDD": 0.33,
+      "vol": 0.297,
+      "turnYr": 9.167,
+      "exposure": 0.384,
+      "costTotal": 0.109,
+      "rec": 456,
+      "years": 4.868,
+      "trades": 46,
+      "tradesYr": 9.4,
+      "win": 0.2,
+      "avgTrade": 0.022
+     },
+     "all": {
+      "cagr": 0.761,
+      "sharpe": 1.359,
+      "ci": [
+       0.737,
+       1.981
+      ],
+      "maxDD": 0.543,
+      "vol": 0.513,
+      "turnYr": 8.695,
+      "exposure": 0.483,
+      "costTotal": 0.219,
+      "rec": 1035,
+      "years": 9.948,
+      "trades": 93,
+      "tradesYr": 9.3,
+      "win": 0.27,
+      "avgTrade": 0.314
+     },
+     "yearly": {
+      "2016": 0.135,
+      "2017": 23.114,
+      "2018": -0.092,
+      "2019": 1.002,
+      "2020": 1.044,
+      "2021": 1.009,
+      "2022": -0.096,
+      "2023": 0.126,
+      "2024": 0.558,
+      "2025": 0.013,
+      "2026": -0.151
+     }
+    },
+    "pass": {
+     "c1": false,
+     "c2": false,
+     "c3": false,
+     "c4": false,
+     "all": false
+    },
+    "riskMatched": {
+     "train": {
+      "x": 0.7,
+      "cagr": 0.869,
+      "maxDD": 0.745,
+      "sharpe": 1.339
+     },
+     "val": {
+      "x": 0.73,
+      "cagr": 0.695,
+      "maxDD": 0.263,
+      "sharpe": 1.638
+     },
+     "test": {
+      "x": 0.53,
+      "cagr": -0.047,
+      "maxDD": 0.367,
+      "sharpe": -0.028
+     },
+     "s22": {
+      "x": 0.52,
+      "cagr": 0.042,
+      "maxDD": 0.422,
+      "sharpe": 0.287
+     }
+    }
+   },
+   "grid": [
+    {
+     "id": "TF-50-10",
+     "p": {
+      "n": 50,
+      "s": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.627,
+      "sharpe": 1.583,
+      "ci": [
+       0.189,
+       2.976
+      ],
+      "maxDD": 0.317,
+      "vol": 0.345,
+      "turnYr": 13.412,
+      "exposure": 0.484,
+      "costTotal": 0.033,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 26,
+      "tradesYr": 13.1,
+      "win": 0.35,
+      "avgTrade": 0.066
+     },
+     "test": {
+      "cagr": 0.197,
+      "sharpe": 0.751,
+      "ci": [
+       -0.634,
+       2.137
+      ],
+      "maxDD": 0.225,
+      "vol": 0.298,
+      "turnYr": 12.285,
+      "exposure": 0.427,
+      "costTotal": 0.03,
+      "rec": 373,
+      "years": 2.003,
+      "trades": 26,
+      "tradesYr": 13,
+      "win": 0.35,
+      "avgTrade": 0.034
+     },
+     "train": {
+      "cagr": 1.376,
+      "sharpe": 1.832,
+      "ci": [
+       1.027,
+       2.636
+      ],
+      "maxDD": 0.511,
+      "vol": 0.557,
+      "turnYr": 10.907,
+      "exposure": 0.465,
+      "costTotal": 0.082,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 68,
+      "tradesYr": 11.4,
+      "win": 0.37,
+      "avgTrade": 0.508
+     },
+     "s22": {
+      "cagr": 0.257,
+      "sharpe": 0.892,
+      "ci": [
+       0.003,
+       1.78
+      ],
+      "maxDD": 0.317,
+      "vol": 0.31,
+      "turnYr": 11.74,
+      "exposure": 0.404,
+      "costTotal": 0.07,
+      "rec": 374,
+      "years": 4.868,
+      "trades": 58,
+      "tradesYr": 11.9,
+      "win": 0.34,
+      "avgTrade": 0.049
+     },
+     "all": {
+      "cagr": 0.919,
+      "sharpe": 1.604,
+      "ci": [
+       0.981,
+       2.226
+      ],
+      "maxDD": 0.511,
+      "vol": 0.477,
+      "turnYr": 11.685,
+      "exposure": 0.461,
+      "costTotal": 0.144,
+      "rec": 936,
+      "years": 9.948,
+      "trades": 120,
+      "tradesYr": 12.1,
+      "win": 0.37,
+      "avgTrade": 0.315
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-50-20",
+     "p": {
+      "n": 50,
+      "s": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.555,
+      "sharpe": 1.478,
+      "ci": [
+       0.085,
+       2.871
+      ],
+      "maxDD": 0.26,
+      "vol": 0.337,
+      "turnYr": 13.49,
+      "exposure": 0.45,
+      "costTotal": 0.033,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 26,
+      "tradesYr": 13.1,
+      "win": 0.35,
+      "avgTrade": 0.056
+     },
+     "test": {
+      "cagr": 0.143,
+      "sharpe": 0.608,
+      "ci": [
+       -0.777,
+       1.993
+      ],
+      "maxDD": 0.246,
+      "vol": 0.286,
+      "turnYr": 12.267,
+      "exposure": 0.395,
+      "costTotal": 0.03,
+      "rec": 402,
+      "years": 2.003,
+      "trades": 26,
+      "tradesYr": 13,
+      "win": 0.31,
+      "avgTrade": 0.028
+     },
+     "train": {
+      "cagr": 1.395,
+      "sharpe": 1.854,
+      "ci": [
+       1.049,
+       2.658
+      ],
+      "maxDD": 0.5,
+      "vol": 0.554,
+      "turnYr": 10.717,
+      "exposure": 0.443,
+      "costTotal": 0.08,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 67,
+      "tradesYr": 11.2,
+      "win": 0.34,
+      "avgTrade": 0.528
+     },
+     "s22": {
+      "cagr": 0.193,
+      "sharpe": 0.739,
+      "ci": [
+       -0.15,
+       1.628
+      ],
+      "maxDD": 0.342,
+      "vol": 0.299,
+      "turnYr": 11.761,
+      "exposure": 0.368,
+      "costTotal": 0.07,
+      "rec": 610,
+      "years": 4.868,
+      "trades": 58,
+      "tradesYr": 11.9,
+      "win": 0.31,
+      "avgTrade": 0.04
+     },
+     "all": {
+      "cagr": 0.893,
+      "sharpe": 1.586,
+      "ci": [
+       0.964,
+       2.209
+      ],
+      "maxDD": 0.511,
+      "vol": 0.472,
+      "turnYr": 11.582,
+      "exposure": 0.435,
+      "costTotal": 0.143,
+      "rec": 1023,
+      "years": 9.948,
+      "trades": 119,
+      "tradesYr": 12,
+      "win": 0.34,
+      "avgTrade": 0.322
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-50-40",
+     "p": {
+      "n": 50,
+      "s": 40
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.382,
+      "sharpe": 1.158,
+      "ci": [
+       -0.234,
+       2.55
+      ],
+      "maxDD": 0.246,
+      "vol": 0.325,
+      "turnYr": 14.492,
+      "exposure": 0.413,
+      "costTotal": 0.035,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 28,
+      "tradesYr": 14.1,
+      "win": 0.25,
+      "avgTrade": 0.036
+     },
+     "test": {
+      "cagr": 0.131,
+      "sharpe": 0.605,
+      "ci": [
+       -0.78,
+       1.99
+      ],
+      "maxDD": 0.258,
+      "vol": 0.259,
+      "turnYr": 9.805,
+      "exposure": 0.35,
+      "costTotal": 0.024,
+      "rec": 401,
+      "years": 2.003,
+      "trades": 21,
+      "tradesYr": 10.5,
+      "win": 0.29,
+      "avgTrade": 0.03
+     },
+     "train": {
+      "cagr": 1.368,
+      "sharpe": 1.86,
+      "ci": [
+       1.055,
+       2.665
+      ],
+      "maxDD": 0.543,
+      "vol": 0.542,
+      "turnYr": 10.413,
+      "exposure": 0.415,
+      "costTotal": 0.078,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 65,
+      "tradesYr": 10.9,
+      "win": 0.32,
+      "avgTrade": 0.535
+     },
+     "s22": {
+      "cagr": 0.121,
+      "sharpe": 0.552,
+      "ci": [
+       -0.336,
+       1.441
+      ],
+      "maxDD": 0.318,
+      "vol": 0.276,
+      "turnYr": 10.964,
+      "exposure": 0.324,
+      "costTotal": 0.065,
+      "rec": 686,
+      "years": 4.868,
+      "trades": 54,
+      "tradesYr": 11.1,
+      "win": 0.26,
+      "avgTrade": 0.029
+     },
+     "all": {
+      "cagr": 0.833,
+      "sharpe": 1.548,
+      "ci": [
+       0.925,
+       2.17
+      ],
+      "maxDD": 0.561,
+      "vol": 0.459,
+      "turnYr": 11.105,
+      "exposure": 0.402,
+      "costTotal": 0.136,
+      "rec": 1305,
+      "years": 9.948,
+      "trades": 114,
+      "tradesYr": 11.5,
+      "win": 0.31,
+      "avgTrade": 0.325
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-100-10",
+     "p": {
+      "n": 100,
+      "s": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.287,
+      "sharpe": 0.872,
+      "ci": [
+       -0.519,
+       2.264
+      ],
+      "maxDD": 0.345,
+      "vol": 0.366,
+      "turnYr": 11.134,
+      "exposure": 0.581,
+      "costTotal": 0.027,
+      "rec": 302,
+      "years": 1.986,
+      "trades": 22,
+      "tradesYr": 11.1,
+      "win": 0.27,
+      "avgTrade": 0.041
+     },
+     "test": {
+      "cagr": -0.017,
+      "sharpe": 0.084,
+      "ci": [
+       -1.301,
+       1.469
+      ],
+      "maxDD": 0.322,
+      "vol": 0.287,
+      "turnYr": 10.816,
+      "exposure": 0.39,
+      "costTotal": 0.027,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 23,
+      "tradesYr": 11.5,
+      "win": 0.17,
+      "avgTrade": -0.001
+     },
+     "train": {
+      "cagr": 1.48,
+      "sharpe": 1.793,
+      "ci": [
+       0.988,
+       2.598
+      ],
+      "maxDD": 0.488,
+      "vol": 0.611,
+      "turnYr": 7.871,
+      "exposure": 0.505,
+      "costTotal": 0.061,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 52,
+      "tradesYr": 8.7,
+      "win": 0.31,
+      "avgTrade": 0.575
+     },
+     "s22": {
+      "cagr": 0.079,
+      "sharpe": 0.403,
+      "ci": [
+       -0.486,
+       1.291
+      ],
+      "maxDD": 0.345,
+      "vol": 0.301,
+      "turnYr": 9.592,
+      "exposure": 0.401,
+      "costTotal": 0.057,
+      "rec": 516,
+      "years": 4.868,
+      "trades": 48,
+      "tradesYr": 9.9,
+      "win": 0.21,
+      "avgTrade": 0.024
+     },
+     "all": {
+      "cagr": 0.806,
+      "sharpe": 1.401,
+      "ci": [
+       0.779,
+       2.024
+      ],
+      "maxDD": 0.488,
+      "vol": 0.517,
+      "turnYr": 9.116,
+      "exposure": 0.497,
+      "costTotal": 0.115,
+      "rec": 1023,
+      "years": 9.948,
+      "trades": 97,
+      "tradesYr": 9.8,
+      "win": 0.27,
+      "avgTrade": 0.322
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-100-20",
+     "p": {
+      "n": 100,
+      "s": 20
+     },
+     "primary": true,
+     "val": {
+      "cagr": 0.303,
+      "sharpe": 0.912,
+      "ci": [
+       -0.48,
+       2.303
+      ],
+      "maxDD": 0.292,
+      "vol": 0.362,
+      "turnYr": 10.119,
+      "exposure": 0.562,
+      "costTotal": 0.025,
+      "rec": 302,
+      "years": 1.986,
+      "trades": 20,
+      "tradesYr": 10.1,
+      "win": 0.3,
+      "avgTrade": 0.05
+     },
+     "test": {
+      "cagr": -0.032,
+      "sharpe": 0.028,
+      "ci": [
+       -1.357,
+       1.413
+      ],
+      "maxDD": 0.321,
+      "vol": 0.283,
+      "turnYr": 10.803,
+      "exposure": 0.369,
+      "costTotal": 0.027,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 23,
+      "tradesYr": 11.5,
+      "win": 0.17,
+      "avgTrade": -0.005
+     },
+     "train": {
+      "cagr": 1.424,
+      "sharpe": 1.764,
+      "ci": [
+       0.959,
+       2.568
+      ],
+      "maxDD": 0.538,
+      "vol": 0.606,
+      "turnYr": 7.521,
+      "exposure": 0.495,
+      "costTotal": 0.058,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 50,
+      "tradesYr": 8.4,
+      "win": 0.32,
+      "avgTrade": 0.563
+     },
+     "s22": {
+      "cagr": 0.078,
+      "sharpe": 0.4,
+      "ci": [
+       -0.488,
+       1.289
+      ],
+      "maxDD": 0.321,
+      "vol": 0.297,
+      "turnYr": 9.172,
+      "exposure": 0.384,
+      "costTotal": 0.055,
+      "rec": 456,
+      "years": 4.868,
+      "trades": 46,
+      "tradesYr": 9.4,
+      "win": 0.22,
+      "avgTrade": 0.024
+     },
+     "all": {
+      "cagr": 0.78,
+      "sharpe": 1.381,
+      "ci": [
+       0.758,
+       2.003
+      ],
+      "maxDD": 0.538,
+      "vol": 0.513,
+      "turnYr": 8.701,
+      "exposure": 0.483,
+      "costTotal": 0.109,
+      "rec": 1031,
+      "years": 9.948,
+      "trades": 93,
+      "tradesYr": 9.3,
+      "win": 0.28,
+      "avgTrade": 0.317
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-100-40",
+     "p": {
+      "n": 100,
+      "s": 40
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.235,
+      "sharpe": 0.775,
+      "ci": [
+       -0.616,
+       2.166
+      ],
+      "maxDD": 0.321,
+      "vol": 0.352,
+      "turnYr": 12.564,
+      "exposure": 0.538,
+      "costTotal": 0.03,
+      "rec": 302,
+      "years": 1.986,
+      "trades": 25,
+      "tradesYr": 12.6,
+      "win": 0.24,
+      "avgTrade": 0.033
+     },
+     "test": {
+      "cagr": -0.037,
+      "sharpe": -0.005,
+      "ci": [
+       -1.39,
+       1.38
+      ],
+      "maxDD": 0.297,
+      "vol": 0.268,
+      "turnYr": 10.34,
+      "exposure": 0.331,
+      "costTotal": 0.025,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 22,
+      "tradesYr": 11,
+      "win": 0.14,
+      "avgTrade": -0.004
+     },
+     "train": {
+      "cagr": 1.36,
+      "sharpe": 1.738,
+      "ci": [
+       0.933,
+       2.542
+      ],
+      "maxDD": 0.587,
+      "vol": 0.597,
+      "turnYr": 7.693,
+      "exposure": 0.474,
+      "costTotal": 0.059,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 51,
+      "tradesYr": 8.6,
+      "win": 0.31,
+      "avgTrade": 0.539
+     },
+     "s22": {
+      "cagr": 0.052,
+      "sharpe": 0.32,
+      "ci": [
+       -0.568,
+       1.209
+      ],
+      "maxDD": 0.367,
+      "vol": 0.286,
+      "turnYr": 9.98,
+      "exposure": 0.359,
+      "costTotal": 0.059,
+      "rec": 519,
+      "years": 4.868,
+      "trades": 50,
+      "tradesYr": 10.3,
+      "win": 0.18,
+      "avgTrade": 0.018
+     },
+     "all": {
+      "cagr": 0.732,
+      "sharpe": 1.343,
+      "ci": [
+       0.72,
+       1.965
+      ],
+      "maxDD": 0.587,
+      "vol": 0.503,
+      "turnYr": 9.199,
+      "exposure": 0.458,
+      "costTotal": 0.115,
+      "rec": 1028,
+      "years": 9.948,
+      "trades": 98,
+      "tradesYr": 9.9,
+      "win": 0.26,
+      "avgTrade": 0.291
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-150-10",
+     "p": {
+      "n": 150,
+      "s": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.453,
+      "sharpe": 1.15,
+      "ci": [
+       -0.242,
+       2.542
+      ],
+      "maxDD": 0.293,
+      "vol": 0.391,
+      "turnYr": 6.713,
+      "exposure": 0.631,
+      "costTotal": 0.016,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 13,
+      "tradesYr": 6.5,
+      "win": 0.54,
+      "avgTrade": 0.133
+     },
+     "test": {
+      "cagr": -0.1,
+      "sharpe": -0.224,
+      "ci": [
+       -1.609,
+       1.161
+      ],
+      "maxDD": 0.313,
+      "vol": 0.286,
+      "turnYr": 4.89,
+      "exposure": 0.412,
+      "costTotal": 0.012,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 11,
+      "tradesYr": 5.5,
+      "win": 0.18,
+      "avgTrade": -0.036
+     },
+     "train": {
+      "cagr": 1.436,
+      "sharpe": 1.737,
+      "ci": [
+       0.933,
+       2.542
+      ],
+      "maxDD": 0.545,
+      "vol": 0.625,
+      "turnYr": 4.145,
+      "exposure": 0.498,
+      "costTotal": 0.035,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 27,
+      "tradesYr": 4.5,
+      "win": 0.37,
+      "avgTrade": 1.485
+     },
+     "s22": {
+      "cagr": 0.113,
+      "sharpe": 0.5,
+      "ci": [
+       -0.388,
+       1.389
+      ],
+      "maxDD": 0.34,
+      "vol": 0.31,
+      "turnYr": 4.955,
+      "exposure": 0.427,
+      "costTotal": 0.03,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 25,
+      "tradesYr": 5.1,
+      "win": 0.4,
+      "avgTrade": 0.062
+     },
+     "all": {
+      "cagr": 0.798,
+      "sharpe": 1.371,
+      "ci": [
+       0.748,
+       1.993
+      ],
+      "maxDD": 0.545,
+      "vol": 0.531,
+      "turnYr": 4.808,
+      "exposure": 0.507,
+      "costTotal": 0.064,
+      "rec": 1009,
+      "years": 9.948,
+      "trades": 51,
+      "tradesYr": 5.1,
+      "win": 0.39,
+      "avgTrade": 0.817
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-150-20",
+     "p": {
+      "n": 150,
+      "s": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.486,
+      "sharpe": 1.22,
+      "ci": [
+       -0.172,
+       2.612
+      ],
+      "maxDD": 0.242,
+      "vol": 0.385,
+      "turnYr": 6.213,
+      "exposure": 0.627,
+      "costTotal": 0.015,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 12,
+      "tradesYr": 6,
+      "win": 0.58,
+      "avgTrade": 0.136
+     },
+     "test": {
+      "cagr": -0.152,
+      "sharpe": -0.446,
+      "ci": [
+       -1.831,
+       0.939
+      ],
+      "maxDD": 0.358,
+      "vol": 0.281,
+      "turnYr": 4.933,
+      "exposure": 0.399,
+      "costTotal": 0.012,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 11,
+      "tradesYr": 5.5,
+      "win": 0.18,
+      "avgTrade": -0.058
+     },
+     "train": {
+      "cagr": 1.403,
+      "sharpe": 1.718,
+      "ci": [
+       0.913,
+       2.522
+      ],
+      "maxDD": 0.599,
+      "vol": 0.624,
+      "turnYr": 4.164,
+      "exposure": 0.491,
+      "costTotal": 0.035,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 27,
+      "tradesYr": 4.5,
+      "win": 0.37,
+      "avgTrade": 1.454
+     },
+     "s22": {
+      "cagr": 0.096,
+      "sharpe": 0.453,
+      "ci": [
+       -0.436,
+       1.341
+      ],
+      "maxDD": 0.358,
+      "vol": 0.305,
+      "turnYr": 4.769,
+      "exposure": 0.42,
+      "costTotal": 0.029,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 24,
+      "tradesYr": 4.9,
+      "win": 0.42,
+      "avgTrade": 0.057
+     },
+     "all": {
+      "cagr": 0.77,
+      "sharpe": 1.345,
+      "ci": [
+       0.723,
+       1.967
+      ],
+      "maxDD": 0.599,
+      "vol": 0.528,
+      "turnYr": 4.728,
+      "exposure": 0.5,
+      "costTotal": 0.062,
+      "rec": 1021,
+      "years": 9.948,
+      "trades": 50,
+      "tradesYr": 5,
+      "win": 0.4,
+      "avgTrade": 0.813
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-150-40",
+     "p": {
+      "n": 150,
+      "s": 40
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.379,
+      "sharpe": 1.052,
+      "ci": [
+       -0.339,
+       2.444
+      ],
+      "maxDD": 0.264,
+      "vol": 0.37,
+      "turnYr": 6.201,
+      "exposure": 0.581,
+      "costTotal": 0.015,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 12,
+      "tradesYr": 6,
+      "win": 0.58,
+      "avgTrade": 0.11
+     },
+     "test": {
+      "cagr": -0.155,
+      "sharpe": -0.48,
+      "ci": [
+       -1.865,
+       0.905
+      ],
+      "maxDD": 0.357,
+      "vol": 0.273,
+      "turnYr": 4.923,
+      "exposure": 0.395,
+      "costTotal": 0.012,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 11,
+      "tradesYr": 5.5,
+      "win": 0.09,
+      "avgTrade": -0.058
+     },
+     "train": {
+      "cagr": 1.268,
+      "sharpe": 1.641,
+      "ci": [
+       0.837,
+       2.446
+      ],
+      "maxDD": 0.623,
+      "vol": 0.614,
+      "turnYr": 4.162,
+      "exposure": 0.475,
+      "costTotal": 0.035,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 27,
+      "tradesYr": 4.5,
+      "win": 0.37,
+      "avgTrade": 1.311
+     },
+     "s22": {
+      "cagr": 0.062,
+      "sharpe": 0.35,
+      "ci": [
+       -0.538,
+       1.239
+      ],
+      "maxDD": 0.395,
+      "vol": 0.294,
+      "turnYr": 4.759,
+      "exposure": 0.4,
+      "costTotal": 0.029,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 24,
+      "tradesYr": 4.9,
+      "win": 0.38,
+      "avgTrade": 0.037
+     },
+     "all": {
+      "cagr": 0.683,
+      "sharpe": 1.264,
+      "ci": [
+       0.642,
+       1.886
+      ],
+      "maxDD": 0.623,
+      "vol": 0.518,
+      "turnYr": 4.722,
+      "exposure": 0.48,
+      "costTotal": 0.062,
+      "rec": 1023,
+      "years": 9.948,
+      "trades": 50,
+      "tradesYr": 5,
+      "win": 0.38,
+      "avgTrade": 0.726
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-200-10",
+     "p": {
+      "n": 200,
+      "s": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.498,
+      "sharpe": 1.198,
+      "ci": [
+       -0.194,
+       2.59
+      ],
+      "maxDD": 0.246,
+      "vol": 0.406,
+      "turnYr": 4.695,
+      "exposure": 0.672,
+      "costTotal": 0.012,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 9,
+      "tradesYr": 4.5,
+      "win": 0.67,
+      "avgTrade": 0.191
+     },
+     "test": {
+      "cagr": -0.167,
+      "sharpe": -0.447,
+      "ci": [
+       -1.833,
+       0.938
+      ],
+      "maxDD": 0.429,
+      "vol": 0.304,
+      "turnYr": 7.178,
+      "exposure": 0.45,
+      "costTotal": 0.018,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 16,
+      "tradesYr": 8,
+      "win": 0.06,
+      "avgTrade": -0.045
+     },
+     "train": {
+      "cagr": 1.115,
+      "sharpe": 1.484,
+      "ci": [
+       0.679,
+       2.288
+      ],
+      "maxDD": 0.804,
+      "vol": 0.646,
+      "turnYr": 4.013,
+      "exposure": 0.519,
+      "costTotal": 0.034,
+      "rec": 1089,
+      "years": 5.959,
+      "trades": 26,
+      "tradesYr": 4.4,
+      "win": 0.27,
+      "avgTrade": 2.307
+     },
+     "s22": {
+      "cagr": 0.086,
+      "sharpe": 0.414,
+      "ci": [
+       -0.474,
+       1.303
+      ],
+      "maxDD": 0.429,
+      "vol": 0.325,
+      "turnYr": 4.967,
+      "exposure": 0.461,
+      "costTotal": 0.03,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 26,
+      "tradesYr": 5.3,
+      "win": 0.31,
+      "avgTrade": 0.045
+     },
+     "all": {
+      "cagr": 0.637,
+      "sharpe": 1.172,
+      "ci": [
+       0.55,
+       1.794
+      ],
+      "maxDD": 0.804,
+      "vol": 0.55,
+      "turnYr": 4.787,
+      "exposure": 0.536,
+      "costTotal": 0.063,
+      "rec": 1089,
+      "years": 9.948,
+      "trades": 51,
+      "tradesYr": 5.1,
+      "win": 0.29,
+      "avgTrade": 1.201
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-200-20",
+     "p": {
+      "n": 200,
+      "s": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.47,
+      "sharpe": 1.157,
+      "ci": [
+       -0.235,
+       2.549
+      ],
+      "maxDD": 0.26,
+      "vol": 0.402,
+      "turnYr": 5.711,
+      "exposure": 0.667,
+      "costTotal": 0.014,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 11,
+      "tradesYr": 5.5,
+      "win": 0.55,
+      "avgTrade": 0.151
+     },
+     "test": {
+      "cagr": -0.181,
+      "sharpe": -0.522,
+      "ci": [
+       -1.907,
+       0.863
+      ],
+      "maxDD": 0.436,
+      "vol": 0.297,
+      "turnYr": 7.169,
+      "exposure": 0.432,
+      "costTotal": 0.018,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 16,
+      "tradesYr": 8,
+      "win": 0.06,
+      "avgTrade": -0.049
+     },
+     "train": {
+      "cagr": 1.107,
+      "sharpe": 1.486,
+      "ci": [
+       0.681,
+       2.29
+      ],
+      "maxDD": 0.8,
+      "vol": 0.64,
+      "turnYr": 3.832,
+      "exposure": 0.509,
+      "costTotal": 0.033,
+      "rec": 1088,
+      "years": 5.959,
+      "trades": 25,
+      "tradesYr": 4.2,
+      "win": 0.28,
+      "avgTrade": 2.32
+     },
+     "s22": {
+      "cagr": 0.07,
+      "sharpe": 0.369,
+      "ci": [
+       -0.519,
+       1.257
+      ],
+      "maxDD": 0.436,
+      "vol": 0.321,
+      "turnYr": 5.378,
+      "exposure": 0.452,
+      "costTotal": 0.033,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 28,
+      "tradesYr": 5.8,
+      "win": 0.29,
+      "avgTrade": 0.038
+     },
+     "all": {
+      "cagr": 0.621,
+      "sharpe": 1.16,
+      "ci": [
+       0.538,
+       1.782
+      ],
+      "maxDD": 0.8,
+      "vol": 0.544,
+      "turnYr": 4.879,
+      "exposure": 0.525,
+      "costTotal": 0.065,
+      "rec": 1088,
+      "years": 9.948,
+      "trades": 52,
+      "tradesYr": 5.2,
+      "win": 0.29,
+      "avgTrade": 1.137
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "TF-200-40",
+     "p": {
+      "n": 200,
+      "s": 40
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.413,
+      "sharpe": 1.078,
+      "ci": [
+       -0.314,
+       2.47
+      ],
+      "maxDD": 0.252,
+      "vol": 0.392,
+      "turnYr": 5.72,
+      "exposure": 0.638,
+      "costTotal": 0.014,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 11,
+      "tradesYr": 5.5,
+      "win": 0.55,
+      "avgTrade": 0.152
+     },
+     "test": {
+      "cagr": -0.207,
+      "sharpe": -0.685,
+      "ci": [
+       -2.071,
+       0.7
+      ],
+      "maxDD": 0.441,
+      "vol": 0.281,
+      "turnYr": 7.219,
+      "exposure": 0.396,
+      "costTotal": 0.018,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 16,
+      "tradesYr": 8,
+      "win": 0.06,
+      "avgTrade": -0.055
+     },
+     "train": {
+      "cagr": 1.061,
+      "sharpe": 1.459,
+      "ci": [
+       0.655,
+       2.263
+      ],
+      "maxDD": 0.787,
+      "vol": 0.634,
+      "turnYr": 4.172,
+      "exposure": 0.492,
+      "costTotal": 0.035,
+      "rec": 1088,
+      "years": 5.959,
+      "trades": 27,
+      "tradesYr": 4.5,
+      "win": 0.22,
+      "avgTrade": 1.914
+     },
+     "s22": {
+      "cagr": 0.039,
+      "sharpe": 0.277,
+      "ci": [
+       -0.612,
+       1.165
+      ],
+      "maxDD": 0.505,
+      "vol": 0.309,
+      "turnYr": 5.402,
+      "exposure": 0.425,
+      "costTotal": 0.033,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 28,
+      "tradesYr": 5.8,
+      "win": 0.29,
+      "avgTrade": 0.029
+     },
+     "all": {
+      "cagr": 0.577,
+      "sharpe": 1.118,
+      "ci": [
+       0.496,
+       1.74
+      ],
+      "maxDD": 0.787,
+      "vol": 0.536,
+      "turnYr": 5.094,
+      "exposure": 0.502,
+      "costTotal": 0.067,
+      "rec": 1088,
+      "years": 9.948,
+      "trades": 54,
+      "tradesYr": 5.4,
+      "win": 0.26,
+      "avgTrade": 0.973
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    }
+   ],
+   "gridShare": 0,
+   "gridMedian": {
+    "val": {
+     "cagr": 0.453,
+     "maxDD": 0.264,
+     "sharpe": 1.157
+    },
+    "test": {
+     "cagr": -0.037,
+     "maxDD": 0.322,
+     "sharpe": -0.005
+    },
+    "s22": {
+     "cagr": 0.086,
+     "maxDD": 0.358,
+     "sharpe": 0.414
+    }
+   }
+  },
+  "BR": {
+   "primary": {
+    "id": "BR-20-2-10",
+    "comb": {
+     "train": {
+      "cagr": 0.882,
+      "sharpe": 1.565,
+      "ci": [
+       0.761,
+       2.369
+      ],
+      "maxDD": 0.404,
+      "vol": 0.476,
+      "turnYr": 12.399,
+      "exposure": 0.333,
+      "costTotal": 0.091,
+      "rec": 511,
+      "years": 5.959,
+      "trades": 76,
+      "tradesYr": 12.8,
+      "win": 0.49,
+      "avgTrade": 0.178
+     },
+     "val": {
+      "cagr": 0.277,
+      "sharpe": 1.038,
+      "ci": [
+       -0.354,
+       2.43
+      ],
+      "maxDD": 0.278,
+      "vol": 0.271,
+      "turnYr": 15.29,
+      "exposure": 0.342,
+      "costTotal": 0.037,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 30,
+      "tradesYr": 15.1,
+      "win": 0.37,
+      "avgTrade": 0.034
+     },
+     "test": {
+      "cagr": 0.037,
+      "sharpe": 0.268,
+      "ci": [
+       -1.117,
+       1.653
+      ],
+      "maxDD": 0.367,
+      "vol": 0.242,
+      "turnYr": 12.549,
+      "exposure": 0.273,
+      "costTotal": 0.031,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 26,
+      "tradesYr": 13,
+      "win": 0.42,
+      "avgTrade": 0.009
+     },
+     "s22": {
+      "cagr": 0.034,
+      "sharpe": 0.26,
+      "ci": [
+       -0.629,
+       1.148
+      ],
+      "maxDD": 0.412,
+      "vol": 0.264,
+      "turnYr": 13.645,
+      "exposure": 0.288,
+      "costTotal": 0.081,
+      "rec": 695,
+      "years": 4.868,
+      "trades": 67,
+      "tradesYr": 13.8,
+      "win": 0.34,
+      "avgTrade": 0.011
+     },
+     "all": {
+      "cagr": 0.545,
+      "sharpe": 1.279,
+      "ci": [
+       0.657,
+       1.901
+      ],
+      "maxDD": 0.447,
+      "vol": 0.403,
+      "turnYr": 13.006,
+      "exposure": 0.323,
+      "costTotal": 0.159,
+      "rec": 846,
+      "years": 9.948,
+      "trades": 132,
+      "tradesYr": 13.3,
+      "win": 0.45,
+      "avgTrade": 0.114
+     },
+     "yearly": {
+      "2016": 0.135,
+      "2017": 21.329,
+      "2018": -0.143,
+      "2019": 0.295,
+      "2020": 1.091,
+      "2021": 0.09,
+      "2022": -0.375,
+      "2023": 0.477,
+      "2024": 0.278,
+      "2025": 0.228,
+      "2026": -0.187
+     }
+    },
+    "BTC": {
+     "train": {
+      "cagr": 0.558,
+      "sharpe": 1.178,
+      "ci": [
+       0.374,
+       1.981
+      ],
+      "maxDD": 0.677,
+      "vol": 0.469,
+      "turnYr": 13.929,
+      "exposure": 0.351,
+      "costTotal": 0.1,
+      "rec": 634,
+      "years": 5.959,
+      "trades": 42,
+      "tradesYr": 7,
+      "win": 0.48,
+      "avgTrade": 0.092
+     },
+     "val": {
+      "cagr": 0.516,
+      "sharpe": 1.472,
+      "ci": [
+       0.079,
+       2.865
+      ],
+      "maxDD": 0.243,
+      "vol": 0.316,
+      "turnYr": 15.607,
+      "exposure": 0.37,
+      "costTotal": 0.037,
+      "rec": 243,
+      "years": 1.986,
+      "trades": 15,
+      "tradesYr": 7.6,
+      "win": 0.33,
+      "avgTrade": 0.053
+     },
+     "test": {
+      "cagr": -0.068,
+      "sharpe": -0.251,
+      "ci": [
+       -1.636,
+       1.134
+      ],
+      "maxDD": 0.322,
+      "vol": 0.2,
+      "turnYr": 13.482,
+      "exposure": 0.294,
+      "costTotal": 0.032,
+      "rec": 478,
+      "years": 2.003,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.29,
+      "avgTrade": -0.008
+     },
+     "s22": {
+      "cagr": 0.029,
+      "sharpe": 0.239,
+      "ci": [
+       -0.649,
+       1.128
+      ],
+      "maxDD": 0.451,
+      "vol": 0.27,
+      "turnYr": 14.789,
+      "exposure": 0.313,
+      "costTotal": 0.086,
+      "rec": 657,
+      "years": 4.868,
+      "trades": 36,
+      "tradesYr": 7.4,
+      "win": 0.25,
+      "avgTrade": 0.011
+     },
+     "all": {
+      "cagr": 0.398,
+      "sharpe": 1.035,
+      "ci": [
+       0.413,
+       1.657
+      ],
+      "maxDD": 0.689,
+      "vol": 0.4,
+      "turnYr": 14.174,
+      "exposure": 0.343,
+      "costTotal": 0.169,
+      "rec": 2090,
+      "years": 9.948,
+      "trades": 71,
+      "tradesYr": 7.1,
+      "win": 0.41,
+      "avgTrade": 0.067
+     },
+     "yearly": {
+      "2016": 0.269,
+      "2017": 8.299,
+      "2018": -0.191,
+      "2019": 0.645,
+      "2020": 0.784,
+      "2021": -0.132,
+      "2022": -0.443,
+      "2023": 0.881,
+      "2024": 0.378,
+      "2025": -0.041,
+      "2026": -0.172
+     }
+    },
+    "ETH": {
+     "train": {
+      "cagr": 0.953,
+      "sharpe": 1.365,
+      "ci": [
+       0.561,
+       2.169
+      ],
+      "maxDD": 0.517,
+      "vol": 0.633,
+      "turnYr": 11.411,
+      "exposure": 0.299,
+      "costTotal": 0.082,
+      "rec": 648,
+      "years": 5.959,
+      "trades": 34,
+      "tradesYr": 5.7,
+      "win": 0.5,
+      "avgTrade": 0.285
+     },
+     "val": {
+      "cagr": 0.051,
+      "sharpe": 0.314,
+      "ci": [
+       -1.077,
+       1.705
+      ],
+      "maxDD": 0.323,
+      "vol": 0.3,
+      "turnYr": 15.103,
+      "exposure": 0.31,
+      "costTotal": 0.036,
+      "rec": 310,
+      "years": 1.986,
+      "trades": 15,
+      "tradesYr": 7.6,
+      "win": 0.4,
+      "avgTrade": 0.014
+     },
+     "test": {
+      "cagr": 0.127,
+      "sharpe": 0.516,
+      "ci": [
+       -0.87,
+       1.901
+      ],
+      "maxDD": 0.434,
+      "vol": 0.34,
+      "turnYr": 11.984,
+      "exposure": 0.248,
+      "costTotal": 0.029,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 12,
+      "tradesYr": 6,
+      "win": 0.58,
+      "avgTrade": 0.029
+     },
+     "s22": {
+      "cagr": 0.019,
+      "sharpe": 0.217,
+      "ci": [
+       -0.671,
+       1.106
+      ],
+      "maxDD": 0.434,
+      "vol": 0.324,
+      "turnYr": 12.735,
+      "exposure": 0.258,
+      "costTotal": 0.074,
+      "rec": 571,
+      "years": 4.868,
+      "trades": 31,
+      "tradesYr": 6.4,
+      "win": 0.45,
+      "avgTrade": 0.011
+     },
+     "all": {
+      "cagr": 0.545,
+      "sharpe": 1.077,
+      "ci": [
+       0.455,
+       1.699
+      ],
+      "maxDD": 0.517,
+      "vol": 0.53,
+      "turnYr": 12.264,
+      "exposure": 0.291,
+      "costTotal": 0.146,
+      "rec": 648,
+      "years": 9.948,
+      "trades": 61,
+      "tradesYr": 6.1,
+      "win": 0.49,
+      "avgTrade": 0.168
+     },
+     "yearly": {
+      "2016": 0,
+      "2017": 29.956,
+      "2018": -0.119,
+      "2019": -0.058,
+      "2020": 1.24,
+      "2021": 0.201,
+      "2022": -0.305,
+      "2023": 0.137,
+      "2024": 0.155,
+      "2025": 0.506,
+      "2026": -0.203
+     }
+    },
+    "cost2": {
+     "train": {
+      "cagr": 0.853,
+      "sharpe": 1.533,
+      "ci": [
+       0.729,
+       2.337
+      ],
+      "maxDD": 0.416,
+      "vol": 0.476,
+      "turnYr": 12.4,
+      "exposure": 0.333,
+      "costTotal": 0.183,
+      "rec": 677,
+      "years": 5.959,
+      "trades": 76,
+      "tradesYr": 12.8,
+      "win": 0.49,
+      "avgTrade": 0.175
+     },
+     "val": {
+      "cagr": 0.254,
+      "sharpe": 0.969,
+      "ci": [
+       -0.423,
+       2.36
+      ],
+      "maxDD": 0.286,
+      "vol": 0.271,
+      "turnYr": 15.292,
+      "exposure": 0.342,
+      "costTotal": 0.074,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 30,
+      "tradesYr": 15.1,
+      "win": 0.37,
+      "avgTrade": 0.031
+     },
+     "test": {
+      "cagr": 0.021,
+      "sharpe": 0.204,
+      "ci": [
+       -1.181,
+       1.589
+      ],
+      "maxDD": 0.375,
+      "vol": 0.242,
+      "turnYr": 12.55,
+      "exposure": 0.273,
+      "costTotal": 0.061,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 26,
+      "tradesYr": 13,
+      "win": 0.38,
+      "avgTrade": 0.007
+     },
+     "s22": {
+      "cagr": 0.017,
+      "sharpe": 0.196,
+      "ci": [
+       -0.692,
+       1.085
+      ],
+      "maxDD": 0.42,
+      "vol": 0.264,
+      "turnYr": 13.646,
+      "exposure": 0.288,
+      "costTotal": 0.161,
+      "rec": 695,
+      "years": 4.868,
+      "trades": 67,
+      "tradesYr": 13.8,
+      "win": 0.33,
+      "avgTrade": 0.009
+     },
+     "all": {
+      "cagr": 0.52,
+      "sharpe": 1.239,
+      "ci": [
+       0.617,
+       1.861
+      ],
+      "maxDD": 0.459,
+      "vol": 0.403,
+      "turnYr": 13.008,
+      "exposure": 0.323,
+      "costTotal": 0.318,
+      "rec": 1150,
+      "years": 9.948,
+      "trades": 132,
+      "tradesYr": 13.3,
+      "win": 0.44,
+      "avgTrade": 0.111
+     },
+     "yearly": {
+      "2016": 0.135,
+      "2017": 21.002,
+      "2018": -0.151,
+      "2019": 0.276,
+      "2020": 1.05,
+      "2021": 0.071,
+      "2022": -0.384,
+      "2023": 0.448,
+      "2024": 0.256,
+      "2025": 0.212,
+      "2026": -0.199
+     }
+    },
+    "pass": {
+     "c1": false,
+     "c2": false,
+     "c3": false,
+     "c4": false,
+     "all": false
+    },
+    "riskMatched": {
+     "train": {
+      "x": 0.55,
+      "cagr": 0.687,
+      "maxDD": 0.648,
+      "sharpe": 1.339
+     },
+     "val": {
+      "x": 0.55,
+      "cagr": 0.503,
+      "maxDD": 0.197,
+      "sharpe": 1.638
+     },
+     "test": {
+      "x": 0.45,
+      "cagr": -0.035,
+      "maxDD": 0.321,
+      "sharpe": -0.028
+     },
+     "s22": {
+      "x": 0.46,
+      "cagr": 0.042,
+      "maxDD": 0.384,
+      "sharpe": 0.287
+     }
+    }
+   },
+   "grid": [
+    {
+     "id": "BR-20-1-10",
+     "p": {
+      "n": 20,
+      "t": 0.01,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.33,
+      "sharpe": 1.202,
+      "ci": [
+       -0.19,
+       2.594
+      ],
+      "maxDD": 0.225,
+      "vol": 0.266,
+      "turnYr": 13.747,
+      "exposure": 0.326,
+      "costTotal": 0.033,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 27,
+      "tradesYr": 13.6,
+      "win": 0.41,
+      "avgTrade": 0.042
+     },
+     "test": {
+      "cagr": 0.102,
+      "sharpe": 0.529,
+      "ci": [
+       -0.856,
+       1.914
+      ],
+      "maxDD": 0.287,
+      "vol": 0.236,
+      "turnYr": 10.582,
+      "exposure": 0.246,
+      "costTotal": 0.026,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 22,
+      "tradesYr": 11,
+      "win": 0.45,
+      "avgTrade": 0.022
+     },
+     "train": {
+      "cagr": 0.846,
+      "sharpe": 1.55,
+      "ci": [
+       0.746,
+       2.354
+      ],
+      "maxDD": 0.413,
+      "vol": 0.465,
+      "turnYr": 12.054,
+      "exposure": 0.311,
+      "costTotal": 0.089,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 74,
+      "tradesYr": 12.4,
+      "win": 0.46,
+      "avgTrade": 0.179
+     },
+     "s22": {
+      "cagr": 0.078,
+      "sharpe": 0.42,
+      "ci": [
+       -0.468,
+       1.309
+      ],
+      "maxDD": 0.412,
+      "vol": 0.259,
+      "turnYr": 12.206,
+      "exposure": 0.27,
+      "costTotal": 0.072,
+      "rec": 695,
+      "years": 4.868,
+      "trades": 60,
+      "tradesYr": 12.3,
+      "win": 0.37,
+      "avgTrade": 0.019
+     },
+     "all": {
+      "cagr": 0.559,
+      "sharpe": 1.323,
+      "ci": [
+       0.7,
+       1.945
+      ],
+      "maxDD": 0.456,
+      "vol": 0.393,
+      "turnYr": 12.096,
+      "exposure": 0.301,
+      "costTotal": 0.148,
+      "rec": 1027,
+      "years": 9.948,
+      "trades": 123,
+      "tradesYr": 12.4,
+      "win": 0.45,
+      "avgTrade": 0.123
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-20-1-20",
+     "p": {
+      "n": 20,
+      "t": 0.01,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.323,
+      "sharpe": 1.041,
+      "ci": [
+       -0.351,
+       2.433
+      ],
+      "maxDD": 0.289,
+      "vol": 0.317,
+      "turnYr": 10.645,
+      "exposure": 0.457,
+      "costTotal": 0.026,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 21,
+      "tradesYr": 10.6,
+      "win": 0.43,
+      "avgTrade": 0.049
+     },
+     "test": {
+      "cagr": 0.253,
+      "sharpe": 0.91,
+      "ci": [
+       -0.476,
+       2.295
+      ],
+      "maxDD": 0.292,
+      "vol": 0.294,
+      "turnYr": 8.588,
+      "exposure": 0.382,
+      "costTotal": 0.021,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 18,
+      "tradesYr": 9,
+      "win": 0.44,
+      "avgTrade": 0.062
+     },
+     "train": {
+      "cagr": 1.374,
+      "sharpe": 1.846,
+      "ci": [
+       1.041,
+       2.651
+      ],
+      "maxDD": 0.583,
+      "vol": 0.55,
+      "turnYr": 8.299,
+      "exposure": 0.437,
+      "costTotal": 0.063,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 52,
+      "tradesYr": 8.7,
+      "win": 0.42,
+      "avgTrade": 0.635
+     },
+     "s22": {
+      "cagr": 0.092,
+      "sharpe": 0.441,
+      "ci": [
+       -0.448,
+       1.329
+      ],
+      "maxDD": 0.51,
+      "vol": 0.308,
+      "turnYr": 10.108,
+      "exposure": 0.386,
+      "costTotal": 0.06,
+      "rec": 700,
+      "years": 4.868,
+      "trades": 50,
+      "tradesYr": 10.3,
+      "win": 0.34,
+      "avgTrade": 0.028
+     },
+     "all": {
+      "cagr": 0.857,
+      "sharpe": 1.556,
+      "ci": [
+       0.933,
+       2.178
+      ],
+      "maxDD": 0.616,
+      "vol": 0.468,
+      "turnYr": 8.825,
+      "exposure": 0.43,
+      "costTotal": 0.11,
+      "rec": 1527,
+      "years": 9.948,
+      "trades": 91,
+      "tradesYr": 9.1,
+      "win": 0.43,
+      "avgTrade": 0.39
+     },
+     "pass": {
+      "c1": true,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-20-2-10",
+     "p": {
+      "n": 20,
+      "t": 0.02,
+      "k": 10
+     },
+     "primary": true,
+     "val": {
+      "cagr": 0.277,
+      "sharpe": 1.038,
+      "ci": [
+       -0.354,
+       2.43
+      ],
+      "maxDD": 0.278,
+      "vol": 0.271,
+      "turnYr": 15.29,
+      "exposure": 0.342,
+      "costTotal": 0.037,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 30,
+      "tradesYr": 15.1,
+      "win": 0.37,
+      "avgTrade": 0.034
+     },
+     "test": {
+      "cagr": 0.037,
+      "sharpe": 0.268,
+      "ci": [
+       -1.117,
+       1.653
+      ],
+      "maxDD": 0.367,
+      "vol": 0.242,
+      "turnYr": 12.549,
+      "exposure": 0.273,
+      "costTotal": 0.031,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 26,
+      "tradesYr": 13,
+      "win": 0.42,
+      "avgTrade": 0.009
+     },
+     "train": {
+      "cagr": 0.882,
+      "sharpe": 1.565,
+      "ci": [
+       0.761,
+       2.369
+      ],
+      "maxDD": 0.404,
+      "vol": 0.476,
+      "turnYr": 12.399,
+      "exposure": 0.333,
+      "costTotal": 0.091,
+      "rec": 511,
+      "years": 5.959,
+      "trades": 76,
+      "tradesYr": 12.8,
+      "win": 0.49,
+      "avgTrade": 0.178
+     },
+     "s22": {
+      "cagr": 0.034,
+      "sharpe": 0.26,
+      "ci": [
+       -0.629,
+       1.148
+      ],
+      "maxDD": 0.412,
+      "vol": 0.264,
+      "turnYr": 13.645,
+      "exposure": 0.288,
+      "costTotal": 0.081,
+      "rec": 695,
+      "years": 4.868,
+      "trades": 67,
+      "tradesYr": 13.8,
+      "win": 0.34,
+      "avgTrade": 0.011
+     },
+     "all": {
+      "cagr": 0.545,
+      "sharpe": 1.279,
+      "ci": [
+       0.657,
+       1.901
+      ],
+      "maxDD": 0.447,
+      "vol": 0.403,
+      "turnYr": 13.006,
+      "exposure": 0.323,
+      "costTotal": 0.159,
+      "rec": 846,
+      "years": 9.948,
+      "trades": 132,
+      "tradesYr": 13.3,
+      "win": 0.45,
+      "avgTrade": 0.114
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-20-2-20",
+     "p": {
+      "n": 20,
+      "t": 0.02,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.275,
+      "sharpe": 0.917,
+      "ci": [
+       -0.475,
+       2.308
+      ],
+      "maxDD": 0.335,
+      "vol": 0.321,
+      "turnYr": 11.657,
+      "exposure": 0.476,
+      "costTotal": 0.028,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 23,
+      "tradesYr": 11.6,
+      "win": 0.39,
+      "avgTrade": 0.038
+     },
+     "test": {
+      "cagr": 0.164,
+      "sharpe": 0.654,
+      "ci": [
+       -0.731,
+       2.04
+      ],
+      "maxDD": 0.377,
+      "vol": 0.3,
+      "turnYr": 10.053,
+      "exposure": 0.406,
+      "costTotal": 0.025,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 21,
+      "tradesYr": 10.5,
+      "win": 0.38,
+      "avgTrade": 0.04
+     },
+     "train": {
+      "cagr": 1.446,
+      "sharpe": 1.881,
+      "ci": [
+       1.076,
+       2.686
+      ],
+      "maxDD": 0.54,
+      "vol": 0.558,
+      "turnYr": 8.321,
+      "exposure": 0.458,
+      "costTotal": 0.063,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 52,
+      "tradesYr": 8.7,
+      "win": 0.46,
+      "avgTrade": 0.648
+     },
+     "s22": {
+      "cagr": 0.044,
+      "sharpe": 0.294,
+      "ci": [
+       -0.594,
+       1.182
+      ],
+      "maxDD": 0.51,
+      "vol": 0.312,
+      "turnYr": 11.124,
+      "exposure": 0.403,
+      "costTotal": 0.066,
+      "rec": 700,
+      "years": 4.868,
+      "trades": 55,
+      "tradesYr": 11.3,
+      "win": 0.31,
+      "avgTrade": 0.018
+     },
+     "all": {
+      "cagr": 0.85,
+      "sharpe": 1.531,
+      "ci": [
+       0.909,
+       2.153
+      ],
+      "maxDD": 0.576,
+      "vol": 0.475,
+      "turnYr": 9.336,
+      "exposure": 0.451,
+      "costTotal": 0.116,
+      "rec": 1526,
+      "years": 9.948,
+      "trades": 96,
+      "tradesYr": 9.7,
+      "win": 0.43,
+      "avgTrade": 0.372
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-20-4-10",
+     "p": {
+      "n": 20,
+      "t": 0.04,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.33,
+      "sharpe": 1.164,
+      "ci": [
+       -0.228,
+       2.556
+      ],
+      "maxDD": 0.285,
+      "vol": 0.278,
+      "turnYr": 15.306,
+      "exposure": 0.369,
+      "costTotal": 0.037,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 30,
+      "tradesYr": 15.1,
+      "win": 0.37,
+      "avgTrade": 0.041
+     },
+     "test": {
+      "cagr": 0.017,
+      "sharpe": 0.188,
+      "ci": [
+       -1.197,
+       1.573
+      ],
+      "maxDD": 0.375,
+      "vol": 0.243,
+      "turnYr": 13.025,
+      "exposure": 0.286,
+      "costTotal": 0.032,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 27,
+      "tradesYr": 13.5,
+      "win": 0.41,
+      "avgTrade": 0.006
+     },
+     "train": {
+      "cagr": 1.203,
+      "sharpe": 1.831,
+      "ci": [
+       1.026,
+       2.635
+      ],
+      "maxDD": 0.404,
+      "vol": 0.499,
+      "turnYr": 12.214,
+      "exposure": 0.357,
+      "costTotal": 0.09,
+      "rec": 374,
+      "years": 5.959,
+      "trades": 75,
+      "tradesYr": 12.6,
+      "win": 0.53,
+      "avgTrade": 0.213
+     },
+     "s22": {
+      "cagr": 0.043,
+      "sharpe": 0.292,
+      "ci": [
+       -0.597,
+       1.18
+      ],
+      "maxDD": 0.412,
+      "vol": 0.267,
+      "turnYr": 13.847,
+      "exposure": 0.304,
+      "costTotal": 0.082,
+      "rec": 692,
+      "years": 4.868,
+      "trades": 68,
+      "tradesYr": 14,
+      "win": 0.34,
+      "avgTrade": 0.013
+     },
+     "all": {
+      "cagr": 0.705,
+      "sharpe": 1.477,
+      "ci": [
+       0.855,
+       2.099
+      ],
+      "maxDD": 0.447,
+      "vol": 0.42,
+      "turnYr": 12.995,
+      "exposure": 0.345,
+      "costTotal": 0.159,
+      "rec": 841,
+      "years": 9.948,
+      "trades": 132,
+      "tradesYr": 13.3,
+      "win": 0.47,
+      "avgTrade": 0.133
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-20-4-20",
+     "p": {
+      "n": 20,
+      "t": 0.04,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.335,
+      "sharpe": 1.049,
+      "ci": [
+       -0.343,
+       2.441
+      ],
+      "maxDD": 0.342,
+      "vol": 0.326,
+      "turnYr": 11.682,
+      "exposure": 0.498,
+      "costTotal": 0.028,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 23,
+      "tradesYr": 11.6,
+      "win": 0.39,
+      "avgTrade": 0.049
+     },
+     "test": {
+      "cagr": 0.14,
+      "sharpe": 0.584,
+      "ci": [
+       -0.802,
+       1.969
+      ],
+      "maxDD": 0.384,
+      "vol": 0.301,
+      "turnYr": 10.533,
+      "exposure": 0.418,
+      "costTotal": 0.026,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 22,
+      "tradesYr": 11,
+      "win": 0.36,
+      "avgTrade": 0.035
+     },
+     "train": {
+      "cagr": 1.518,
+      "sharpe": 1.923,
+      "ci": [
+       1.118,
+       2.728
+      ],
+      "maxDD": 0.531,
+      "vol": 0.562,
+      "turnYr": 8.171,
+      "exposure": 0.467,
+      "costTotal": 0.062,
+      "rec": 483,
+      "years": 5.959,
+      "trades": 51,
+      "tradesYr": 8.6,
+      "win": 0.47,
+      "avgTrade": 0.668
+     },
+     "s22": {
+      "cagr": 0.055,
+      "sharpe": 0.327,
+      "ci": [
+       -0.561,
+       1.215
+      ],
+      "maxDD": 0.51,
+      "vol": 0.315,
+      "turnYr": 11.331,
+      "exposure": 0.418,
+      "costTotal": 0.068,
+      "rec": 695,
+      "years": 4.868,
+      "trades": 56,
+      "tradesYr": 11.5,
+      "win": 0.3,
+      "avgTrade": 0.02
+     },
+     "all": {
+      "cagr": 0.891,
+      "sharpe": 1.569,
+      "ci": [
+       0.947,
+       2.192
+      ],
+      "maxDD": 0.567,
+      "vol": 0.479,
+      "turnYr": 9.347,
+      "exposure": 0.463,
+      "costTotal": 0.116,
+      "rec": 847,
+      "years": 9.948,
+      "trades": 96,
+      "tradesYr": 9.7,
+      "win": 0.43,
+      "avgTrade": 0.378
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-40-1-10",
+     "p": {
+      "n": 40,
+      "t": 0.01,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.361,
+      "sharpe": 1.417,
+      "ci": [
+       0.024,
+       2.809
+      ],
+      "maxDD": 0.179,
+      "vol": 0.237,
+      "turnYr": 9.738,
+      "exposure": 0.279,
+      "costTotal": 0.023,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 19,
+      "tradesYr": 9.6,
+      "win": 0.42,
+      "avgTrade": 0.062
+     },
+     "test": {
+      "cagr": -0.1,
+      "sharpe": -0.611,
+      "ci": [
+       -1.996,
+       0.774
+      ],
+      "maxDD": 0.314,
+      "vol": 0.153,
+      "turnYr": 7.65,
+      "exposure": 0.148,
+      "costTotal": 0.019,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 16,
+      "tradesYr": 8,
+      "win": 0.31,
+      "avgTrade": -0.025
+     },
+     "train": {
+      "cagr": 0.539,
+      "sharpe": 1.223,
+      "ci": [
+       0.419,
+       2.027
+      ],
+      "maxDD": 0.437,
+      "vol": 0.426,
+      "turnYr": 9.312,
+      "exposure": 0.239,
+      "costTotal": 0.069,
+      "rec": 677,
+      "years": 5.959,
+      "trades": 57,
+      "tradesYr": 9.6,
+      "win": 0.46,
+      "avgTrade": 0.167
+     },
+     "s22": {
+      "cagr": 0.018,
+      "sharpe": 0.191,
+      "ci": [
+       -0.697,
+       1.079
+      ],
+      "maxDD": 0.314,
+      "vol": 0.209,
+      "turnYr": 8.353,
+      "exposure": 0.196,
+      "costTotal": 0.049,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 41,
+      "tradesYr": 8.4,
+      "win": 0.32,
+      "avgTrade": 0.012
+     },
+     "all": {
+      "cagr": 0.348,
+      "sharpe": 1.02,
+      "ci": [
+       0.399,
+       1.642
+      ],
+      "maxDD": 0.437,
+      "vol": 0.353,
+      "turnYr": 9.063,
+      "exposure": 0.229,
+      "costTotal": 0.111,
+      "rec": 1150,
+      "years": 9.948,
+      "trades": 92,
+      "tradesYr": 9.2,
+      "win": 0.42,
+      "avgTrade": 0.115
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-40-1-20",
+     "p": {
+      "n": 40,
+      "t": 0.01,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.398,
+      "sharpe": 1.287,
+      "ci": [
+       -0.105,
+       2.679
+      ],
+      "maxDD": 0.211,
+      "vol": 0.294,
+      "turnYr": 7.216,
+      "exposure": 0.387,
+      "costTotal": 0.018,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.5,
+      "avgTrade": 0.087
+     },
+     "test": {
+      "cagr": -0.033,
+      "sharpe": -0.066,
+      "ci": [
+       -1.451,
+       1.319
+      ],
+      "maxDD": 0.307,
+      "vol": 0.201,
+      "turnYr": 6.626,
+      "exposure": 0.24,
+      "costTotal": 0.016,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.21,
+      "avgTrade": -0.007
+     },
+     "train": {
+      "cagr": 0.857,
+      "sharpe": 1.499,
+      "ci": [
+       0.695,
+       2.303
+      ],
+      "maxDD": 0.501,
+      "vol": 0.494,
+      "turnYr": 6.546,
+      "exposure": 0.338,
+      "costTotal": 0.05,
+      "rec": 553,
+      "years": 5.959,
+      "trades": 41,
+      "tradesYr": 6.9,
+      "win": 0.44,
+      "avgTrade": 0.696
+     },
+     "s22": {
+      "cagr": 0.049,
+      "sharpe": 0.316,
+      "ci": [
+       -0.572,
+       1.205
+      ],
+      "maxDD": 0.316,
+      "vol": 0.251,
+      "turnYr": 6.898,
+      "exposure": 0.28,
+      "costTotal": 0.041,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 34,
+      "tradesYr": 7,
+      "win": 0.29,
+      "avgTrade": 0.023
+     },
+     "all": {
+      "cagr": 0.539,
+      "sharpe": 1.246,
+      "ci": [
+       0.624,
+       1.868
+      ],
+      "maxDD": 0.502,
+      "vol": 0.414,
+      "turnYr": 6.696,
+      "exposure": 0.328,
+      "costTotal": 0.084,
+      "rec": 914,
+      "years": 9.948,
+      "trades": 69,
+      "tradesYr": 6.9,
+      "win": 0.41,
+      "avgTrade": 0.435
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-40-2-10",
+     "p": {
+      "n": 40,
+      "t": 0.02,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.351,
+      "sharpe": 1.363,
+      "ci": [
+       -0.029,
+       2.756
+      ],
+      "maxDD": 0.192,
+      "vol": 0.242,
+      "turnYr": 10.252,
+      "exposure": 0.287,
+      "costTotal": 0.025,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 20,
+      "tradesYr": 10.1,
+      "win": 0.4,
+      "avgTrade": 0.06
+     },
+     "test": {
+      "cagr": -0.117,
+      "sharpe": -0.707,
+      "ci": [
+       -2.093,
+       0.678
+      ],
+      "maxDD": 0.339,
+      "vol": 0.158,
+      "turnYr": 9.136,
+      "exposure": 0.171,
+      "costTotal": 0.022,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 19,
+      "tradesYr": 9.5,
+      "win": 0.32,
+      "avgTrade": -0.025
+     },
+     "train": {
+      "cagr": 0.616,
+      "sharpe": 1.328,
+      "ci": [
+       0.524,
+       2.132
+      ],
+      "maxDD": 0.406,
+      "vol": 0.431,
+      "turnYr": 9.478,
+      "exposure": 0.251,
+      "costTotal": 0.07,
+      "rec": 677,
+      "years": 5.959,
+      "trades": 58,
+      "tradesYr": 9.7,
+      "win": 0.5,
+      "avgTrade": 0.178
+     },
+     "s22": {
+      "cagr": 0.009,
+      "sharpe": 0.149,
+      "ci": [
+       -0.74,
+       1.037
+      ],
+      "maxDD": 0.339,
+      "vol": 0.212,
+      "turnYr": 9.173,
+      "exposure": 0.209,
+      "costTotal": 0.054,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 45,
+      "tradesYr": 9.2,
+      "win": 0.31,
+      "avgTrade": 0.008
+     },
+     "all": {
+      "cagr": 0.381,
+      "sharpe": 1.079,
+      "ci": [
+       0.457,
+       1.701
+      ],
+      "maxDD": 0.406,
+      "vol": 0.358,
+      "turnYr": 9.563,
+      "exposure": 0.242,
+      "costTotal": 0.116,
+      "rec": 1145,
+      "years": 9.948,
+      "trades": 97,
+      "tradesYr": 9.8,
+      "win": 0.44,
+      "avgTrade": 0.116
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-40-2-20",
+     "p": {
+      "n": 40,
+      "t": 0.02,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.398,
+      "sharpe": 1.287,
+      "ci": [
+       -0.105,
+       2.679
+      ],
+      "maxDD": 0.211,
+      "vol": 0.294,
+      "turnYr": 7.216,
+      "exposure": 0.387,
+      "costTotal": 0.018,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.5,
+      "avgTrade": 0.087
+     },
+     "test": {
+      "cagr": -0.062,
+      "sharpe": -0.208,
+      "ci": [
+       -1.593,
+       1.177
+      ],
+      "maxDD": 0.336,
+      "vol": 0.205,
+      "turnYr": 7.607,
+      "exposure": 0.259,
+      "costTotal": 0.019,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 16,
+      "tradesYr": 8,
+      "win": 0.19,
+      "avgTrade": -0.013
+     },
+     "train": {
+      "cagr": 1.136,
+      "sharpe": 1.729,
+      "ci": [
+       0.924,
+       2.533
+      ],
+      "maxDD": 0.427,
+      "vol": 0.516,
+      "turnYr": 6.351,
+      "exposure": 0.363,
+      "costTotal": 0.049,
+      "rec": 491,
+      "years": 5.959,
+      "trades": 40,
+      "tradesYr": 6.7,
+      "win": 0.5,
+      "avgTrade": 0.775
+     },
+     "s22": {
+      "cagr": 0.038,
+      "sharpe": 0.273,
+      "ci": [
+       -0.615,
+       1.162
+      ],
+      "maxDD": 0.336,
+      "vol": 0.253,
+      "turnYr": 7.301,
+      "exposure": 0.288,
+      "costTotal": 0.043,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 36,
+      "tradesYr": 7.4,
+      "win": 0.28,
+      "avgTrade": 0.019
+     },
+     "all": {
+      "cagr": 0.663,
+      "sharpe": 1.396,
+      "ci": [
+       0.773,
+       2.018
+      ],
+      "maxDD": 0.428,
+      "vol": 0.431,
+      "turnYr": 6.777,
+      "exposure": 0.347,
+      "costTotal": 0.085,
+      "rec": 905,
+      "years": 9.948,
+      "trades": 70,
+      "tradesYr": 7,
+      "win": 0.43,
+      "avgTrade": 0.462
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-40-4-10",
+     "p": {
+      "n": 40,
+      "t": 0.04,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.343,
+      "sharpe": 1.332,
+      "ci": [
+       -0.06,
+       2.725
+      ],
+      "maxDD": 0.193,
+      "vol": 0.243,
+      "turnYr": 10.249,
+      "exposure": 0.293,
+      "costTotal": 0.025,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 20,
+      "tradesYr": 10.1,
+      "win": 0.4,
+      "avgTrade": 0.058
+     },
+     "test": {
+      "cagr": -0.069,
+      "sharpe": -0.338,
+      "ci": [
+       -1.723,
+       1.047
+      ],
+      "maxDD": 0.296,
+      "vol": 0.168,
+      "turnYr": 10.124,
+      "exposure": 0.196,
+      "costTotal": 0.025,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 21,
+      "tradesYr": 10.5,
+      "win": 0.38,
+      "avgTrade": -0.012
+     },
+     "train": {
+      "cagr": 0.837,
+      "sharpe": 1.564,
+      "ci": [
+       0.76,
+       2.368
+      ],
+      "maxDD": 0.382,
+      "vol": 0.455,
+      "turnYr": 9.439,
+      "exposure": 0.274,
+      "costTotal": 0.07,
+      "rec": 525,
+      "years": 5.959,
+      "trades": 58,
+      "tradesYr": 9.7,
+      "win": 0.52,
+      "avgTrade": 0.212
+     },
+     "s22": {
+      "cagr": 0.035,
+      "sharpe": 0.269,
+      "ci": [
+       -0.62,
+       1.157
+      ],
+      "maxDD": 0.296,
+      "vol": 0.217,
+      "turnYr": 9.577,
+      "exposure": 0.223,
+      "costTotal": 0.057,
+      "rec": 610,
+      "years": 4.868,
+      "trades": 47,
+      "tradesYr": 9.7,
+      "win": 0.34,
+      "avgTrade": 0.013
+     },
+     "all": {
+      "cagr": 0.505,
+      "sharpe": 1.274,
+      "ci": [
+       0.652,
+       1.896
+      ],
+      "maxDD": 0.382,
+      "vol": 0.376,
+      "turnYr": 9.739,
+      "exposure": 0.262,
+      "costTotal": 0.119,
+      "rec": 904,
+      "years": 9.948,
+      "trades": 99,
+      "tradesYr": 10,
+      "win": 0.46,
+      "avgTrade": 0.136
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-40-4-20",
+     "p": {
+      "n": 40,
+      "t": 0.04,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.397,
+      "sharpe": 1.285,
+      "ci": [
+       -0.108,
+       2.677
+      ],
+      "maxDD": 0.212,
+      "vol": 0.294,
+      "turnYr": 7.216,
+      "exposure": 0.389,
+      "costTotal": 0.018,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.5,
+      "avgTrade": 0.087
+     },
+     "test": {
+      "cagr": 0.034,
+      "sharpe": 0.261,
+      "ci": [
+       -1.124,
+       1.646
+      ],
+      "maxDD": 0.271,
+      "vol": 0.226,
+      "turnYr": 7.565,
+      "exposure": 0.29,
+      "costTotal": 0.019,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 16,
+      "tradesYr": 8,
+      "win": 0.25,
+      "avgTrade": 0.013
+     },
+     "train": {
+      "cagr": 1.135,
+      "sharpe": 1.719,
+      "ci": [
+       0.914,
+       2.524
+      ],
+      "maxDD": 0.462,
+      "vol": 0.52,
+      "turnYr": 6.351,
+      "exposure": 0.369,
+      "costTotal": 0.049,
+      "rec": 524,
+      "years": 5.959,
+      "trades": 40,
+      "tradesYr": 6.7,
+      "win": 0.5,
+      "avgTrade": 0.776
+     },
+     "s22": {
+      "cagr": 0.087,
+      "sharpe": 0.45,
+      "ci": [
+       -0.439,
+       1.338
+      ],
+      "maxDD": 0.307,
+      "vol": 0.261,
+      "turnYr": 7.283,
+      "exposure": 0.303,
+      "costTotal": 0.043,
+      "rec": 610,
+      "years": 4.868,
+      "trades": 36,
+      "tradesYr": 7.4,
+      "win": 0.31,
+      "avgTrade": 0.032
+     },
+     "all": {
+      "cagr": 0.695,
+      "sharpe": 1.429,
+      "ci": [
+       0.807,
+       2.052
+      ],
+      "maxDD": 0.462,
+      "vol": 0.435,
+      "turnYr": 6.768,
+      "exposure": 0.357,
+      "costTotal": 0.085,
+      "rec": 905,
+      "years": 9.948,
+      "trades": 70,
+      "tradesYr": 7,
+      "win": 0.44,
+      "avgTrade": 0.469
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-55-1-10",
+     "p": {
+      "n": 55,
+      "t": 0.01,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.377,
+      "sharpe": 1.466,
+      "ci": [
+       0.073,
+       2.859
+      ],
+      "maxDD": 0.177,
+      "vol": 0.237,
+      "turnYr": 9.239,
+      "exposure": 0.273,
+      "costTotal": 0.022,
+      "rec": 280,
+      "years": 1.986,
+      "trades": 18,
+      "tradesYr": 9.1,
+      "win": 0.44,
+      "avgTrade": 0.068
+     },
+     "test": {
+      "cagr": -0.075,
+      "sharpe": -0.442,
+      "ci": [
+       -1.827,
+       0.943
+      ],
+      "maxDD": 0.275,
+      "vol": 0.15,
+      "turnYr": 6.148,
+      "exposure": 0.124,
+      "costTotal": 0.015,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 13,
+      "tradesYr": 6.5,
+      "win": 0.38,
+      "avgTrade": -0.022
+     },
+     "train": {
+      "cagr": 0.505,
+      "sharpe": 1.231,
+      "ci": [
+       0.427,
+       2.035
+      ],
+      "maxDD": 0.406,
+      "vol": 0.394,
+      "turnYr": 8.172,
+      "exposure": 0.19,
+      "costTotal": 0.06,
+      "rec": 677,
+      "years": 5.959,
+      "trades": 50,
+      "tradesYr": 8.4,
+      "win": 0.4,
+      "avgTrade": 0.185
+     },
+     "s22": {
+      "cagr": 0.063,
+      "sharpe": 0.411,
+      "ci": [
+       -0.477,
+       1.3
+      ],
+      "maxDD": 0.275,
+      "vol": 0.193,
+      "turnYr": 7.115,
+      "exposure": 0.172,
+      "costTotal": 0.042,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 35,
+      "tradesYr": 7.2,
+      "win": 0.37,
+      "avgTrade": 0.025
+     },
+     "all": {
+      "cagr": 0.34,
+      "sharpe": 1.051,
+      "ci": [
+       0.429,
+       1.672
+      ],
+      "maxDD": 0.406,
+      "vol": 0.33,
+      "turnYr": 7.978,
+      "exposure": 0.193,
+      "costTotal": 0.097,
+      "rec": 1145,
+      "years": 9.948,
+      "trades": 81,
+      "tradesYr": 8.1,
+      "win": 0.41,
+      "avgTrade": 0.129
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-55-1-20",
+     "p": {
+      "n": 55,
+      "t": 0.01,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.392,
+      "sharpe": 1.274,
+      "ci": [
+       -0.118,
+       2.667
+      ],
+      "maxDD": 0.21,
+      "vol": 0.293,
+      "turnYr": 7.219,
+      "exposure": 0.378,
+      "costTotal": 0.018,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.5,
+      "avgTrade": 0.085
+     },
+     "test": {
+      "cagr": -0.086,
+      "sharpe": -0.41,
+      "ci": [
+       -1.795,
+       0.975
+      ],
+      "maxDD": 0.305,
+      "vol": 0.18,
+      "turnYr": 5.618,
+      "exposure": 0.185,
+      "costTotal": 0.014,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 12,
+      "tradesYr": 6,
+      "win": 0.25,
+      "avgTrade": -0.029
+     },
+     "train": {
+      "cagr": 0.76,
+      "sharpe": 1.455,
+      "ci": [
+       0.651,
+       2.259
+      ],
+      "maxDD": 0.434,
+      "vol": 0.461,
+      "turnYr": 5.735,
+      "exposure": 0.272,
+      "costTotal": 0.043,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 36,
+      "tradesYr": 6,
+      "win": 0.44,
+      "avgTrade": 0.748
+     },
+     "s22": {
+      "cagr": 0.053,
+      "sharpe": 0.337,
+      "ci": [
+       -0.551,
+       1.226
+      ],
+      "maxDD": 0.305,
+      "vol": 0.232,
+      "turnYr": 6.069,
+      "exposure": 0.242,
+      "costTotal": 0.036,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 30,
+      "tradesYr": 6.2,
+      "win": 0.33,
+      "avgTrade": 0.025
+     },
+     "all": {
+      "cagr": 0.472,
+      "sharpe": 1.187,
+      "ci": [
+       0.565,
+       1.809
+      ],
+      "maxDD": 0.434,
+      "vol": 0.389,
+      "turnYr": 6.008,
+      "exposure": 0.276,
+      "costTotal": 0.075,
+      "rec": 1023,
+      "years": 9.948,
+      "trades": 62,
+      "tradesYr": 6.2,
+      "win": 0.42,
+      "avgTrade": 0.453
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-55-2-10",
+     "p": {
+      "n": 55,
+      "t": 0.02,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.367,
+      "sharpe": 1.412,
+      "ci": [
+       0.019,
+       2.804
+      ],
+      "maxDD": 0.191,
+      "vol": 0.242,
+      "turnYr": 9.753,
+      "exposure": 0.282,
+      "costTotal": 0.023,
+      "rec": 280,
+      "years": 1.986,
+      "trades": 19,
+      "tradesYr": 9.6,
+      "win": 0.42,
+      "avgTrade": 0.065
+     },
+     "test": {
+      "cagr": -0.077,
+      "sharpe": -0.448,
+      "ci": [
+       -1.833,
+       0.937
+      ],
+      "maxDD": 0.278,
+      "vol": 0.152,
+      "turnYr": 7.143,
+      "exposure": 0.141,
+      "costTotal": 0.017,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 15,
+      "tradesYr": 7.5,
+      "win": 0.4,
+      "avgTrade": -0.02
+     },
+     "train": {
+      "cagr": 0.537,
+      "sharpe": 1.271,
+      "ci": [
+       0.467,
+       2.075
+      ],
+      "maxDD": 0.408,
+      "vol": 0.4,
+      "turnYr": 8.501,
+      "exposure": 0.2,
+      "costTotal": 0.062,
+      "rec": 677,
+      "years": 5.959,
+      "trades": 52,
+      "tradesYr": 8.7,
+      "win": 0.44,
+      "avgTrade": 0.184
+     },
+     "s22": {
+      "cagr": 0.06,
+      "sharpe": 0.396,
+      "ci": [
+       -0.492,
+       1.285
+      ],
+      "maxDD": 0.278,
+      "vol": 0.196,
+      "turnYr": 7.736,
+      "exposure": 0.183,
+      "costTotal": 0.046,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 38,
+      "tradesYr": 7.8,
+      "win": 0.37,
+      "avgTrade": 0.022
+     },
+     "all": {
+      "cagr": 0.355,
+      "sharpe": 1.071,
+      "ci": [
+       0.449,
+       1.693
+      ],
+      "maxDD": 0.408,
+      "vol": 0.335,
+      "turnYr": 8.477,
+      "exposure": 0.205,
+      "costTotal": 0.103,
+      "rec": 1145,
+      "years": 9.948,
+      "trades": 86,
+      "tradesYr": 8.6,
+      "win": 0.43,
+      "avgTrade": 0.125
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-55-2-20",
+     "p": {
+      "n": 55,
+      "t": 0.02,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.392,
+      "sharpe": 1.274,
+      "ci": [
+       -0.118,
+       2.667
+      ],
+      "maxDD": 0.21,
+      "vol": 0.293,
+      "turnYr": 7.219,
+      "exposure": 0.378,
+      "costTotal": 0.018,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.5,
+      "avgTrade": 0.085
+     },
+     "test": {
+      "cagr": -0.095,
+      "sharpe": -0.451,
+      "ci": [
+       -1.836,
+       0.934
+      ],
+      "maxDD": 0.306,
+      "vol": 0.183,
+      "turnYr": 6.114,
+      "exposure": 0.199,
+      "costTotal": 0.015,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 13,
+      "tradesYr": 6.5,
+      "win": 0.23,
+      "avgTrade": -0.03
+     },
+     "train": {
+      "cagr": 0.972,
+      "sharpe": 1.642,
+      "ci": [
+       0.837,
+       2.446
+      ],
+      "maxDD": 0.382,
+      "vol": 0.485,
+      "turnYr": 5.707,
+      "exposure": 0.296,
+      "costTotal": 0.044,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 36,
+      "tradesYr": 6,
+      "win": 0.47,
+      "avgTrade": 0.802
+     },
+     "s22": {
+      "cagr": 0.051,
+      "sharpe": 0.328,
+      "ci": [
+       -0.56,
+       1.217
+      ],
+      "maxDD": 0.306,
+      "vol": 0.233,
+      "turnYr": 6.276,
+      "exposure": 0.247,
+      "costTotal": 0.037,
+      "rec": 696,
+      "years": 4.868,
+      "trades": 31,
+      "tradesYr": 6.4,
+      "win": 0.32,
+      "avgTrade": 0.024
+     },
+     "all": {
+      "cagr": 0.573,
+      "sharpe": 1.316,
+      "ci": [
+       0.694,
+       1.938
+      ],
+      "maxDD": 0.382,
+      "vol": 0.406,
+      "turnYr": 6.091,
+      "exposure": 0.293,
+      "costTotal": 0.076,
+      "rec": 1022,
+      "years": 9.948,
+      "trades": 63,
+      "tradesYr": 6.3,
+      "win": 0.43,
+      "avgTrade": 0.477
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-55-4-10",
+     "p": {
+      "n": 55,
+      "t": 0.04,
+      "k": 10
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.359,
+      "sharpe": 1.383,
+      "ci": [
+       -0.009,
+       2.776
+      ],
+      "maxDD": 0.191,
+      "vol": 0.243,
+      "turnYr": 9.75,
+      "exposure": 0.286,
+      "costTotal": 0.023,
+      "rec": 280,
+      "years": 1.986,
+      "trades": 19,
+      "tradesYr": 9.6,
+      "win": 0.42,
+      "avgTrade": 0.064
+     },
+     "test": {
+      "cagr": -0.021,
+      "sharpe": -0.046,
+      "ci": [
+       -1.431,
+       1.339
+      ],
+      "maxDD": 0.255,
+      "vol": 0.164,
+      "turnYr": 8.628,
+      "exposure": 0.179,
+      "costTotal": 0.021,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 18,
+      "tradesYr": 9,
+      "win": 0.44,
+      "avgTrade": -0.003
+     },
+     "train": {
+      "cagr": 0.751,
+      "sharpe": 1.531,
+      "ci": [
+       0.727,
+       2.336
+      ],
+      "maxDD": 0.308,
+      "vol": 0.424,
+      "turnYr": 8.464,
+      "exposure": 0.222,
+      "costTotal": 0.062,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 52,
+      "tradesYr": 8.7,
+      "win": 0.48,
+      "avgTrade": 0.222
+     },
+     "s22": {
+      "cagr": 0.084,
+      "sharpe": 0.501,
+      "ci": [
+       -0.387,
+       1.389
+      ],
+      "maxDD": 0.255,
+      "vol": 0.201,
+      "turnYr": 8.346,
+      "exposure": 0.2,
+      "costTotal": 0.049,
+      "rec": 584,
+      "years": 4.868,
+      "trades": 41,
+      "tradesYr": 8.4,
+      "win": 0.39,
+      "avgTrade": 0.026
+     },
+     "all": {
+      "cagr": 0.481,
+      "sharpe": 1.285,
+      "ci": [
+       0.663,
+       1.907
+      ],
+      "maxDD": 0.308,
+      "vol": 0.354,
+      "turnYr": 8.754,
+      "exposure": 0.226,
+      "costTotal": 0.107,
+      "rec": 1015,
+      "years": 9.948,
+      "trades": 89,
+      "tradesYr": 8.9,
+      "win": 0.46,
+      "avgTrade": 0.145
+     },
+     "pass": {
+      "c1": false,
+      "c2": true,
+      "c3": false
+     }
+    },
+    {
+     "id": "BR-55-4-20",
+     "p": {
+      "n": 55,
+      "t": 0.04,
+      "k": 20
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.392,
+      "sharpe": 1.274,
+      "ci": [
+       -0.118,
+       2.667
+      ],
+      "maxDD": 0.21,
+      "vol": 0.293,
+      "turnYr": 7.219,
+      "exposure": 0.378,
+      "costTotal": 0.018,
+      "rec": 284,
+      "years": 1.986,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.5,
+      "avgTrade": 0.085
+     },
+     "test": {
+      "cagr": 0.007,
+      "sharpe": 0.132,
+      "ci": [
+       -1.253,
+       1.517
+      ],
+      "maxDD": 0.222,
+      "vol": 0.201,
+      "turnYr": 6.592,
+      "exposure": 0.244,
+      "costTotal": 0.016,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 14,
+      "tradesYr": 7,
+      "win": 0.29,
+      "avgTrade": 0.005
+     },
+     "train": {
+      "cagr": 0.971,
+      "sharpe": 1.637,
+      "ci": [
+       0.832,
+       2.441
+      ],
+      "maxDD": 0.382,
+      "vol": 0.487,
+      "turnYr": 5.701,
+      "exposure": 0.3,
+      "costTotal": 0.043,
+      "rec": 555,
+      "years": 5.959,
+      "trades": 36,
+      "tradesYr": 6,
+      "win": 0.47,
+      "avgTrade": 0.805
+     },
+     "s22": {
+      "cagr": 0.097,
+      "sharpe": 0.508,
+      "ci": [
+       -0.38,
+       1.397
+      ],
+      "maxDD": 0.225,
+      "vol": 0.239,
+      "turnYr": 6.472,
+      "exposure": 0.266,
+      "costTotal": 0.039,
+      "rec": 607,
+      "years": 4.868,
+      "trades": 32,
+      "tradesYr": 6.6,
+      "win": 0.34,
+      "avgTrade": 0.038
+     },
+     "all": {
+      "cagr": 0.606,
+      "sharpe": 1.362,
+      "ci": [
+       0.74,
+       1.984
+      ],
+      "maxDD": 0.382,
+      "vol": 0.409,
+      "turnYr": 6.183,
+      "exposure": 0.304,
+      "costTotal": 0.077,
+      "rec": 1022,
+      "years": 9.948,
+      "trades": 64,
+      "tradesYr": 6.4,
+      "win": 0.44,
+      "avgTrade": 0.478
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    }
+   ],
+   "gridShare": 0,
+   "gridMedian": {
+    "val": {
+     "cagr": 0.361,
+     "maxDD": 0.211,
+     "sharpe": 1.285
+    },
+    "test": {
+     "cagr": -0.021,
+     "maxDD": 0.306,
+     "sharpe": -0.046
+    },
+    "s22": {
+     "cagr": 0.053,
+     "maxDD": 0.316,
+     "sharpe": 0.328
+    }
+   }
+  },
+  "MP": {
+   "primary": {
+    "id": "MP-8-100",
+    "comb": {
+     "train": {
+      "cagr": 1.024,
+      "sharpe": 1.482,
+      "ci": [
+       0.678,
+       2.286
+      ],
+      "maxDD": 0.633,
+      "vol": 0.595,
+      "turnYr": 17.613,
+      "exposure": 0.428,
+      "costTotal": 0.131,
+      "rec": 1085,
+      "years": 5.959,
+      "trades": 111,
+      "tradesYr": 18.6,
+      "win": 0.47,
+      "avgTrade": 0.199
+     },
+     "val": {
+      "cagr": 0.298,
+      "sharpe": 0.982,
+      "ci": [
+       -0.41,
+       2.373
+      ],
+      "maxDD": 0.252,
+      "vol": 0.317,
+      "turnYr": 19.511,
+      "exposure": 0.381,
+      "costTotal": 0.047,
+      "rec": 270,
+      "years": 1.986,
+      "trades": 39,
+      "tradesYr": 19.6,
+      "win": 0.56,
+      "avgTrade": 0.032
+     },
+     "test": {
+      "cagr": -0.117,
+      "sharpe": -0.472,
+      "ci": [
+       -1.857,
+       0.913
+      ],
+      "maxDD": 0.271,
+      "vol": 0.215,
+      "turnYr": 26.924,
+      "exposure": 0.222,
+      "costTotal": 0.065,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 55,
+      "tradesYr": 27.5,
+      "win": 0.38,
+      "avgTrade": -0.009
+     },
+     "s22": {
+      "cagr": 0.055,
+      "sharpe": 0.34,
+      "ci": [
+       -0.548,
+       1.228
+      ],
+      "maxDD": 0.419,
+      "vol": 0.245,
+      "turnYr": 19.656,
+      "exposure": 0.248,
+      "costTotal": 0.115,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 97,
+      "tradesYr": 19.9,
+      "win": 0.46,
+      "avgTrade": 0.008
+     },
+     "all": {
+      "cagr": 0.567,
+      "sharpe": 1.159,
+      "ci": [
+       0.537,
+       1.781
+      ],
+      "maxDD": 0.633,
+      "vol": 0.492,
+      "turnYr": 19.867,
+      "exposure": 0.377,
+      "costTotal": 0.243,
+      "rec": 1085,
+      "years": 9.948,
+      "trades": 205,
+      "tradesYr": 20.6,
+      "win": 0.46,
+      "avgTrade": 0.111
+     },
+     "yearly": {
+      "2016": 0,
+      "2017": 25.957,
+      "2018": -0.294,
+      "2019": 0.193,
+      "2020": 0.633,
+      "2021": 0.817,
+      "2022": -0.008,
+      "2023": 0.296,
+      "2024": 0.215,
+      "2025": -0.114,
+      "2026": -0.062
+     }
+    },
+    "BTC": {
+     "train": {
+      "cagr": 0.5,
+      "sharpe": 1.01,
+      "ci": [
+       0.206,
+       1.813
+      ],
+      "maxDD": 0.597,
+      "vol": 0.549,
+      "turnYr": 17.453,
+      "exposure": 0.397,
+      "costTotal": 0.125,
+      "rec": 1118,
+      "years": 5.959,
+      "trades": 52,
+      "tradesYr": 8.7,
+      "win": 0.42,
+      "avgTrade": 0.126
+     },
+     "val": {
+      "cagr": 0.276,
+      "sharpe": 0.93,
+      "ci": [
+       -0.462,
+       2.321
+      ],
+      "maxDD": 0.23,
+      "vol": 0.315,
+      "turnYr": 17.117,
+      "exposure": 0.332,
+      "costTotal": 0.041,
+      "rec": 302,
+      "years": 1.986,
+      "trades": 17,
+      "tradesYr": 8.6,
+      "win": 0.65,
+      "avgTrade": 0.034
+     },
+     "test": {
+      "cagr": -0.059,
+      "sharpe": -0.219,
+      "ci": [
+       -1.604,
+       1.166
+      ],
+      "maxDD": 0.202,
+      "vol": 0.193,
+      "turnYr": 26.963,
+      "exposure": 0.226,
+      "costTotal": 0.065,
+      "rec": 660,
+      "years": 2.003,
+      "trades": 27,
+      "tradesYr": 13.5,
+      "win": 0.41,
+      "avgTrade": -0.004
+     },
+     "s22": {
+      "cagr": 0.077,
+      "sharpe": 0.432,
+      "ci": [
+       -0.456,
+       1.321
+      ],
+      "maxDD": 0.332,
+      "vol": 0.236,
+      "turnYr": 18.075,
+      "exposure": 0.228,
+      "costTotal": 0.106,
+      "rec": 974,
+      "years": 4.868,
+      "trades": 44,
+      "tradesYr": 9,
+      "win": 0.5,
+      "avgTrade": 0.011
+     },
+     "all": {
+      "cagr": 0.322,
+      "sharpe": 0.838,
+      "ci": [
+       0.216,
+       1.46
+      ],
+      "maxDD": 0.624,
+      "vol": 0.456,
+      "turnYr": 19.3,
+      "exposure": 0.349,
+      "costTotal": 0.23,
+      "rec": 2039,
+      "years": 9.948,
+      "trades": 96,
+      "tradesYr": 9.7,
+      "win": 0.46,
+      "avgTrade": 0.073
+     },
+     "yearly": {
+      "2016": 0,
+      "2017": 10.785,
+      "2018": -0.386,
+      "2019": 0.125,
+      "2020": 0.547,
+      "2021": -0.11,
+      "2022": 0,
+      "2023": 0.236,
+      "2024": 0.258,
+      "2025": -0.061,
+      "2026": -0.015
+     }
+    },
+    "ETH": {
+     "train": {
+      "cagr": 1.223,
+      "sharpe": 1.397,
+      "ci": [
+       0.593,
+       2.201
+      ],
+      "maxDD": 0.808,
+      "vol": 0.803,
+      "turnYr": 19.802,
+      "exposure": 0.454,
+      "costTotal": 0.142,
+      "rec": 1089,
+      "years": 5.959,
+      "trades": 59,
+      "tradesYr": 9.9,
+      "win": 0.51,
+      "avgTrade": 0.263
+     },
+     "val": {
+      "cagr": 0.311,
+      "sharpe": 0.919,
+      "ci": [
+       -0.473,
+       2.31
+      ],
+      "maxDD": 0.289,
+      "vol": 0.368,
+      "turnYr": 22.152,
+      "exposure": 0.426,
+      "costTotal": 0.053,
+      "rec": 255,
+      "years": 1.986,
+      "trades": 22,
+      "tradesYr": 11.1,
+      "win": 0.5,
+      "avgTrade": 0.031
+     },
+     "test": {
+      "cagr": -0.192,
+      "sharpe": -0.516,
+      "ci": [
+       -1.901,
+       0.869
+      ],
+      "maxDD": 0.406,
+      "vol": 0.317,
+      "turnYr": 27.962,
+      "exposure": 0.215,
+      "costTotal": 0.067,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 28,
+      "tradesYr": 14,
+      "win": 0.36,
+      "avgTrade": -0.014
+     },
+     "s22": {
+      "cagr": 0.019,
+      "sharpe": 0.217,
+      "ci": [
+       -0.672,
+       1.105
+      ],
+      "maxDD": 0.536,
+      "vol": 0.311,
+      "turnYr": 21.773,
+      "exposure": 0.264,
+      "costTotal": 0.127,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 53,
+      "tradesYr": 10.9,
+      "win": 0.43,
+      "avgTrade": 0.005
+     },
+     "all": {
+      "cagr": 0.632,
+      "sharpe": 1.072,
+      "ci": [
+       0.45,
+       1.694
+      ],
+      "maxDD": 0.808,
+      "vol": 0.659,
+      "turnYr": 21.914,
+      "exposure": 0.4,
+      "costTotal": 0.262,
+      "rec": 1089,
+      "years": 9.948,
+      "trades": 109,
+      "tradesYr": 11,
+      "win": 0.47,
+      "avgTrade": 0.145
+     },
+     "yearly": {
+      "2016": 0,
+      "2017": 29.55,
+      "2018": -0.291,
+      "2019": 0.192,
+      "2020": 0.466,
+      "2021": 2.144,
+      "2022": -0.016,
+      "2023": 0.347,
+      "2024": 0.164,
+      "2025": -0.203,
+      "2026": -0.107
+     }
+    },
+    "cost2": {
+     "train": {
+      "cagr": 0.979,
+      "sharpe": 1.444,
+      "ci": [
+       0.64,
+       2.248
+      ],
+      "maxDD": 0.654,
+      "vol": 0.595,
+      "turnYr": 17.583,
+      "exposure": 0.428,
+      "costTotal": 0.261,
+      "rec": 1086,
+      "years": 5.959,
+      "trades": 111,
+      "tradesYr": 18.6,
+      "win": 0.45,
+      "avgTrade": 0.196
+     },
+     "val": {
+      "cagr": 0.268,
+      "sharpe": 0.907,
+      "ci": [
+       -0.484,
+       2.299
+      ],
+      "maxDD": 0.275,
+      "vol": 0.317,
+      "turnYr": 19.503,
+      "exposure": 0.381,
+      "costTotal": 0.093,
+      "rec": 299,
+      "years": 1.986,
+      "trades": 39,
+      "tradesYr": 19.6,
+      "win": 0.54,
+      "avgTrade": 0.03
+     },
+     "test": {
+      "cagr": -0.145,
+      "sharpe": -0.622,
+      "ci": [
+       -2.007,
+       0.763
+      ],
+      "maxDD": 0.303,
+      "vol": 0.215,
+      "turnYr": 26.892,
+      "exposure": 0.222,
+      "costTotal": 0.13,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 55,
+      "tradesYr": 27.5,
+      "win": 0.33,
+      "avgTrade": -0.012
+     },
+     "s22": {
+      "cagr": 0.03,
+      "sharpe": 0.244,
+      "ci": [
+       -0.645,
+       1.132
+      ],
+      "maxDD": 0.471,
+      "vol": 0.245,
+      "turnYr": 19.639,
+      "exposure": 0.248,
+      "costTotal": 0.231,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 97,
+      "tradesYr": 19.9,
+      "win": 0.42,
+      "avgTrade": 0.005
+     },
+     "all": {
+      "cagr": 0.529,
+      "sharpe": 1.109,
+      "ci": [
+       0.487,
+       1.731
+      ],
+      "maxDD": 0.654,
+      "vol": 0.492,
+      "turnYr": 19.841,
+      "exposure": 0.377,
+      "costTotal": 0.485,
+      "rec": 1086,
+      "years": 9.948,
+      "trades": 205,
+      "tradesYr": 20.6,
+      "win": 0.43,
+      "avgTrade": 0.109
+     },
+     "yearly": {
+      "2016": 0,
+      "2017": 25.483,
+      "2018": -0.317,
+      "2019": 0.169,
+      "2020": 0.613,
+      "2021": 0.735,
+      "2022": -0.012,
+      "2023": 0.277,
+      "2024": 0.175,
+      "2025": -0.159,
+      "2026": -0.073
+     }
+    },
+    "pass": {
+     "c1": false,
+     "c2": false,
+     "c3": false,
+     "c4": false,
+     "all": false
+    },
+    "riskMatched": {
+     "train": {
+      "x": 0.68,
+      "cagr": 0.855,
+      "maxDD": 0.738,
+      "sharpe": 1.339
+     },
+     "val": {
+      "x": 0.64,
+      "cagr": 0.598,
+      "maxDD": 0.23,
+      "sharpe": 1.638
+     },
+     "test": {
+      "x": 0.4,
+      "cagr": -0.029,
+      "maxDD": 0.289,
+      "sharpe": -0.028
+     },
+     "s22": {
+      "x": 0.43,
+      "cagr": 0.041,
+      "maxDD": 0.361,
+      "sharpe": 0.287
+     }
+    }
+   },
+   "grid": [
+    {
+     "id": "MP-5-50",
+     "p": {
+      "dd": 0.05,
+      "e": 50
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.242,
+      "sharpe": 0.87,
+      "ci": [
+       -0.521,
+       2.261
+      ],
+      "maxDD": 0.282,
+      "vol": 0.301,
+      "turnYr": 64.062,
+      "exposure": 0.395,
+      "costTotal": 0.153,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 127,
+      "tradesYr": 63.9,
+      "win": 0.46,
+      "avgTrade": 0.006
+     },
+     "test": {
+      "cagr": -0.127,
+      "sharpe": -0.516,
+      "ci": [
+       -1.901,
+       0.87
+      ],
+      "maxDD": 0.331,
+      "vol": 0.217,
+      "turnYr": 56.458,
+      "exposure": 0.25,
+      "costTotal": 0.136,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 116,
+      "tradesYr": 57.9,
+      "win": 0.41,
+      "avgTrade": -0.005
+     },
+     "train": {
+      "cagr": 0.902,
+      "sharpe": 1.426,
+      "ci": [
+       0.622,
+       2.23
+      ],
+      "maxDD": 0.637,
+      "vol": 0.561,
+      "turnYr": 46.673,
+      "exposure": 0.386,
+      "costTotal": 0.338,
+      "rec": 560,
+      "years": 5.959,
+      "trades": 290,
+      "tradesYr": 48.7,
+      "win": 0.46,
+      "avgTrade": 0.075
+     },
+     "s22": {
+      "cagr": 0.026,
+      "sharpe": 0.228,
+      "ci": [
+       -0.661,
+       1.116
+      ],
+      "maxDD": 0.369,
+      "vol": 0.238,
+      "turnYr": 49.977,
+      "exposure": 0.265,
+      "costTotal": 0.293,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 246,
+      "tradesYr": 50.5,
+      "win": 0.44,
+      "avgTrade": 0.002
+     },
+     "all": {
+      "cagr": 0.493,
+      "sharpe": 1.094,
+      "ci": [
+       0.472,
+       1.716
+      ],
+      "maxDD": 0.637,
+      "vol": 0.466,
+      "turnYr": 52.115,
+      "exposure": 0.36,
+      "costTotal": 0.627,
+      "rec": 1035,
+      "years": 9.948,
+      "trades": 533,
+      "tradesYr": 53.6,
+      "win": 0.45,
+      "avgTrade": 0.042
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "MP-5-100",
+     "p": {
+      "dd": 0.05,
+      "e": 100
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.367,
+      "sharpe": 1.08,
+      "ci": [
+       -0.312,
+       2.472
+      ],
+      "maxDD": 0.27,
+      "vol": 0.344,
+      "turnYr": 28.865,
+      "exposure": 0.484,
+      "costTotal": 0.069,
+      "rec": 269,
+      "years": 1.986,
+      "trades": 57,
+      "tradesYr": 28.7,
+      "win": 0.49,
+      "avgTrade": 0.023
+     },
+     "test": {
+      "cagr": -0.103,
+      "sharpe": -0.317,
+      "ci": [
+       -1.702,
+       1.068
+      ],
+      "maxDD": 0.295,
+      "vol": 0.247,
+      "turnYr": 31.059,
+      "exposure": 0.314,
+      "costTotal": 0.075,
+      "rec": 696,
+      "years": 2.003,
+      "trades": 64,
+      "tradesYr": 32,
+      "win": 0.38,
+      "avgTrade": -0.007
+     },
+     "train": {
+      "cagr": 1.12,
+      "sharpe": 1.548,
+      "ci": [
+       0.743,
+       2.352
+      ],
+      "maxDD": 0.624,
+      "vol": 0.603,
+      "turnYr": 18.644,
+      "exposure": 0.451,
+      "costTotal": 0.138,
+      "rec": 556,
+      "years": 5.959,
+      "trades": 117,
+      "tradesYr": 19.6,
+      "win": 0.46,
+      "avgTrade": 0.191
+     },
+     "s22": {
+      "cagr": 0.079,
+      "sharpe": 0.416,
+      "ci": [
+       -0.473,
+       1.304
+      ],
+      "maxDD": 0.325,
+      "vol": 0.271,
+      "turnYr": 25.169,
+      "exposure": 0.327,
+      "costTotal": 0.148,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 124,
+      "tradesYr": 25.5,
+      "win": 0.43,
+      "avgTrade": 0.009
+     },
+     "all": {
+      "cagr": 0.633,
+      "sharpe": 1.225,
+      "ci": [
+       0.603,
+       1.847
+      ],
+      "maxDD": 0.624,
+      "vol": 0.504,
+      "turnYr": 23.185,
+      "exposure": 0.43,
+      "costTotal": 0.282,
+      "rec": 1028,
+      "years": 9.948,
+      "trades": 238,
+      "tradesYr": 23.9,
+      "win": 0.45,
+      "avgTrade": 0.099
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "MP-8-50",
+     "p": {
+      "dd": 0.08,
+      "e": 50
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.141,
+      "sharpe": 0.664,
+      "ci": [
+       -0.727,
+       2.056
+      ],
+      "maxDD": 0.229,
+      "vol": 0.242,
+      "turnYr": 48.117,
+      "exposure": 0.254,
+      "costTotal": 0.115,
+      "rec": 245,
+      "years": 1.986,
+      "trades": 96,
+      "tradesYr": 48.3,
+      "win": 0.53,
+      "avgTrade": 0.006
+     },
+     "test": {
+      "cagr": -0.072,
+      "sharpe": -0.339,
+      "ci": [
+       -1.724,
+       1.046
+      ],
+      "maxDD": 0.235,
+      "vol": 0.175,
+      "turnYr": 47.295,
+      "exposure": 0.137,
+      "costTotal": 0.114,
+      "rec": 447,
+      "years": 2.003,
+      "trades": 96,
+      "tradesYr": 47.9,
+      "win": 0.48,
+      "avgTrade": -0.003
+     },
+     "train": {
+      "cagr": 0.654,
+      "sharpe": 1.205,
+      "ci": [
+       0.402,
+       2.009
+      ],
+      "maxDD": 0.607,
+      "vol": 0.537,
+      "turnYr": 42.668,
+      "exposure": 0.326,
+      "costTotal": 0.309,
+      "rec": 587,
+      "years": 5.959,
+      "trades": 266,
+      "tradesYr": 44.6,
+      "win": 0.46,
+      "avgTrade": 0.075
+     },
+     "s22": {
+      "cagr": 0.021,
+      "sharpe": 0.203,
+      "ci": [
+       -0.686,
+       1.091
+      ],
+      "maxDD": 0.312,
+      "vol": 0.191,
+      "turnYr": 39.808,
+      "exposure": 0.161,
+      "costTotal": 0.233,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 195,
+      "tradesYr": 40.1,
+      "win": 0.51,
+      "avgTrade": 0.002
+     },
+     "all": {
+      "cagr": 0.367,
+      "sharpe": 0.934,
+      "ci": [
+       0.312,
+       1.556
+      ],
+      "maxDD": 0.607,
+      "vol": 0.436,
+      "turnYr": 44.687,
+      "exposure": 0.274,
+      "costTotal": 0.538,
+      "rec": 2011,
+      "years": 9.948,
+      "trades": 458,
+      "tradesYr": 46,
+      "win": 0.48,
+      "avgTrade": 0.044
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "MP-8-100",
+     "p": {
+      "dd": 0.08,
+      "e": 100
+     },
+     "primary": true,
+     "val": {
+      "cagr": 0.298,
+      "sharpe": 0.982,
+      "ci": [
+       -0.41,
+       2.373
+      ],
+      "maxDD": 0.252,
+      "vol": 0.317,
+      "turnYr": 19.511,
+      "exposure": 0.381,
+      "costTotal": 0.047,
+      "rec": 270,
+      "years": 1.986,
+      "trades": 39,
+      "tradesYr": 19.6,
+      "win": 0.56,
+      "avgTrade": 0.032
+     },
+     "test": {
+      "cagr": -0.117,
+      "sharpe": -0.472,
+      "ci": [
+       -1.857,
+       0.913
+      ],
+      "maxDD": 0.271,
+      "vol": 0.215,
+      "turnYr": 26.924,
+      "exposure": 0.222,
+      "costTotal": 0.065,
+      "rec": 456,
+      "years": 2.003,
+      "trades": 55,
+      "tradesYr": 27.5,
+      "win": 0.38,
+      "avgTrade": -0.009
+     },
+     "train": {
+      "cagr": 1.024,
+      "sharpe": 1.482,
+      "ci": [
+       0.678,
+       2.286
+      ],
+      "maxDD": 0.633,
+      "vol": 0.595,
+      "turnYr": 17.613,
+      "exposure": 0.428,
+      "costTotal": 0.131,
+      "rec": 1085,
+      "years": 5.959,
+      "trades": 111,
+      "tradesYr": 18.6,
+      "win": 0.47,
+      "avgTrade": 0.199
+     },
+     "s22": {
+      "cagr": 0.055,
+      "sharpe": 0.34,
+      "ci": [
+       -0.548,
+       1.228
+      ],
+      "maxDD": 0.419,
+      "vol": 0.245,
+      "turnYr": 19.656,
+      "exposure": 0.248,
+      "costTotal": 0.115,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 97,
+      "tradesYr": 19.9,
+      "win": 0.46,
+      "avgTrade": 0.008
+     },
+     "all": {
+      "cagr": 0.567,
+      "sharpe": 1.159,
+      "ci": [
+       0.537,
+       1.781
+      ],
+      "maxDD": 0.633,
+      "vol": 0.492,
+      "turnYr": 19.867,
+      "exposure": 0.377,
+      "costTotal": 0.243,
+      "rec": 1085,
+      "years": 9.948,
+      "trades": 205,
+      "tradesYr": 20.6,
+      "win": 0.46,
+      "avgTrade": 0.111
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "MP-12-50",
+     "p": {
+      "dd": 0.12,
+      "e": 50
+     },
+     "primary": false,
+     "val": {
+      "cagr": -0.021,
+      "sharpe": -0.089,
+      "ci": [
+       -1.48,
+       1.302
+      ],
+      "maxDD": 0.157,
+      "vol": 0.135,
+      "turnYr": 14.415,
+      "exposure": 0.054,
+      "costTotal": 0.034,
+      "rec": 323,
+      "years": 1.986,
+      "trades": 29,
+      "tradesYr": 14.6,
+      "win": 0.52,
+      "avgTrade": -0.003
+     },
+     "test": {
+      "cagr": 0.042,
+      "sharpe": 0.378,
+      "ci": [
+       -1.007,
+       1.763
+      ],
+      "maxDD": 0.098,
+      "vol": 0.131,
+      "turnYr": 19.798,
+      "exposure": 0.068,
+      "costTotal": 0.048,
+      "rec": 447,
+      "years": 2.003,
+      "trades": 40,
+      "tradesYr": 20,
+      "win": 0.55,
+      "avgTrade": 0.004
+     },
+     "train": {
+      "cagr": 0.472,
+      "sharpe": 1.022,
+      "ci": [
+       0.219,
+       1.826
+      ],
+      "maxDD": 0.622,
+      "vol": 0.501,
+      "turnYr": 35.468,
+      "exposure": 0.229,
+      "costTotal": 0.257,
+      "rec": 1133,
+      "years": 5.959,
+      "trades": 223,
+      "tradesYr": 37.4,
+      "win": 0.48,
+      "avgTrade": 0.073
+     },
+     "s22": {
+      "cagr": 0.004,
+      "sharpe": 0.094,
+      "ci": [
+       -0.795,
+       0.982
+      ],
+      "maxDD": 0.157,
+      "vol": 0.121,
+      "turnYr": 14.229,
+      "exposure": 0.05,
+      "costTotal": 0.083,
+      "rec": 499,
+      "years": 4.868,
+      "trades": 70,
+      "tradesYr": 14.4,
+      "win": 0.53,
+      "avgTrade": 0.001
+     },
+     "all": {
+      "cagr": 0.266,
+      "sharpe": 0.792,
+      "ci": [
+       0.17,
+       1.414
+      ],
+      "maxDD": 0.622,
+      "vol": 0.397,
+      "turnYr": 28.11,
+      "exposure": 0.162,
+      "costTotal": 0.339,
+      "rec": 2011,
+      "years": 9.948,
+      "trades": 292,
+      "tradesYr": 29.4,
+      "win": 0.49,
+      "avgTrade": 0.056
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    },
+    {
+     "id": "MP-12-100",
+     "p": {
+      "dd": 0.12,
+      "e": 100
+     },
+     "primary": false,
+     "val": {
+      "cagr": 0.283,
+      "sharpe": 1.053,
+      "ci": [
+       -0.339,
+       2.444
+      ],
+      "maxDD": 0.238,
+      "vol": 0.272,
+      "turnYr": 6.013,
+      "exposure": 0.259,
+      "costTotal": 0.014,
+      "rec": 302,
+      "years": 1.986,
+      "trades": 12,
+      "tradesYr": 6,
+      "win": 0.75,
+      "avgTrade": 0.095
+     },
+     "test": {
+      "cagr": -0.03,
+      "sharpe": -0.089,
+      "ci": [
+       -1.474,
+       1.296
+      ],
+      "maxDD": 0.172,
+      "vol": 0.173,
+      "turnYr": 13.149,
+      "exposure": 0.121,
+      "costTotal": 0.032,
+      "rec": 447,
+      "years": 2.003,
+      "trades": 27,
+      "tradesYr": 13.5,
+      "win": 0.48,
+      "avgTrade": -0.005
+     },
+     "train": {
+      "cagr": 0.68,
+      "sharpe": 1.22,
+      "ci": [
+       0.416,
+       2.023
+      ],
+      "maxDD": 0.606,
+      "vol": 0.549,
+      "turnYr": 15.717,
+      "exposure": 0.347,
+      "costTotal": 0.117,
+      "rec": 1133,
+      "years": 5.959,
+      "trades": 99,
+      "tradesYr": 16.6,
+      "win": 0.44,
+      "avgTrade": 0.171
+     },
+     "s22": {
+      "cagr": 0.089,
+      "sharpe": 0.515,
+      "ci": [
+       -0.374,
+       1.403
+      ],
+      "maxDD": 0.27,
+      "vol": 0.206,
+      "turnYr": 8.066,
+      "exposure": 0.156,
+      "costTotal": 0.047,
+      "rec": 976,
+      "years": 4.868,
+      "trades": 40,
+      "tradesYr": 8.2,
+      "win": 0.55,
+      "avgTrade": 0.024
+     },
+     "all": {
+      "cagr": 0.425,
+      "sharpe": 1.014,
+      "ci": [
+       0.392,
+       1.636
+      ],
+      "maxDD": 0.606,
+      "vol": 0.449,
+      "turnYr": 13.262,
+      "exposure": 0.284,
+      "costTotal": 0.163,
+      "rec": 1133,
+      "years": 9.948,
+      "trades": 138,
+      "tradesYr": 13.9,
+      "win": 0.48,
+      "avgTrade": 0.13
+     },
+     "pass": {
+      "c1": false,
+      "c2": false,
+      "c3": false
+     }
+    }
+   ],
+   "gridShare": 0,
+   "gridMedian": {
+    "val": {
+     "cagr": 0.283,
+     "maxDD": 0.252,
+     "sharpe": 0.982
+    },
+    "test": {
+     "cagr": -0.072,
+     "maxDD": 0.271,
+     "sharpe": -0.317
+    },
+    "s22": {
+     "cagr": 0.055,
+     "maxDD": 0.325,
+     "sharpe": 0.34
+    }
+   }
+  }
+ }
+}
