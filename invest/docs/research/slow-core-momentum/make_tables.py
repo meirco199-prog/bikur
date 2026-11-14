@@ -7,12 +7,12 @@ W = [("since_2022", "מ-2022"), ("training", "אימון*"), ("validation", "א�
 NAMES = [("base", "Slow Core Momentum (הראשית)"), ("double_slippage", "עמידות: החלקה כפולה"), ("delay_two_days", "עמידות: ביצוע מאוחר ביום"),
          ("info_fee_0.10pct", "מידע: עמלה 0.1% (כמו XSRA-7)"), ("bench_btc_matched", "ביטקוין קנה-והחזק (מאותו יום)"),
          ("bench_eq3_passive", "שליש ביטקוין/אתריום/סולאנה, קנה-והחזק")]
-L = ["| | " + " | ".join(f"{n}: תשואה / ירידה / שארפ" for _, n in W) + " | מחזור בשנה (מ-2022) | עלויות מ-2022 | חשיפה |", "|---|" + "---|" * (len(W) + 3)]
+L = ["| | " + " | ".join(f"{n}: תשואה / ירידה / שארפ" for _, n in W) + " | מחזור בשנה (מ-2022) | עלויות מ-2022 (מההון ההתחלתי) | חשיפה |", "|---|" + "---|" * (len(W) + 3)]
 for k, n in NAMES:
     r = R[k]; cells = []
     for w, _ in W:
         m = r[w]; cells.append("—" if m["status"] != "MEASURED" else f"{pct(m['cagr'])} / {pct(m['max_drawdown'])} / {f2(m['sharpe'])}")
-    s = r["since_2022"]; L.append(f"| {n} | " + " | ".join(cells) + f" | פי {s['annual_turnover']:.1f} | {pct(-s['cost_pct_of_start'])} | {round(s['exposure'] * 100)}% |")
+    s = r["since_2022"]; L.append(f"| {n} | " + " | ".join(cells) + f" | פי {s['annual_turnover']:.1f} | {abs(s['cost_pct_of_start']) * 100:.1f}% | {round(s['exposure'] * 100)}% |")
 cov = R["base"]["training"]; L += ["", f"*אימון: לפי הפרוטוקול המסחר מתחיל ב-1/1/2022, ולכן בפועל נמדדו רק {cov.get('days', 0)} ימים ({cov.get('first', '—')} → {cov.get('last', '—')}) מתוך 2016-07 → 2022-07.", ""]
 # XSRA-7 — frozen research outputs (7כ, שכבה 3, פקודה של 5,000$; 7כו לפי שנה). לא מסונתז מחדש.
 try:

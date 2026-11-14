@@ -1,0 +1,41 @@
+# זמני (ops): ענף המחקר Slow Core Momentum — בדיקות, הרצה על הנתונים ההיסטוריים של הפרויקט ושמירת התוצאות בענף הזה בלבד.
+# מחקר בלבד — אין כסף, אין פקודות, אין מפתחות; לא נוגע במעקב של XSRA-7 או במשימות המתוזמנות.
+# הרצה 3: אימות בדיקת השעות (חצות UTC) בכל שלושת הנכסים על הנתונים האמיתיים + טבלאות (ממצא 1–2 בסבב GPT 1 של #277). בלי הרצה מחדש של הסימולציה.
+name: research-slow-core-momentum
+on:
+  push:
+    branches: [research/slow-core-momentum]
+    paths: [.github/workflows/research-slow-core-momentum.yml]
+permissions: { contents: write }
+concurrency: { group: research-slow-core-momentum, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults: { run: { working-directory: . } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: python -m pip install -q pandas numpy
+      - uses: actions/cache@v4
+        with: { path: xsra-data.json.gz, key: research-xsra-2016-2026-11-13-v1 }
+      - name: data (אם המטמון לא זמין — אותו סקריפט ואותו מקור כמו במחקרים 7יח–7כז)
+        run: '[ -f xsra-data.json.gz ] && echo "cache hit" || node invest-api/scripts/research-xs-ra.mjs --data xsra-data.json.gz > /dev/null'
+      - name: tests
+        working-directory: invest/docs/research/slow-core-momentum
+        run: python -m unittest -v test_backtest.py
+      - name: run
+        working-directory: invest/docs/research/slow-core-momentum
+        run: |
+          python export_csv.py ../../../../xsra-data.json.gz /tmp/core.csv | tee data_provenance.json
+          python make_tables.py results.json > tables.md
+          cat tables.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit results
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/slow-core-momentum
+          git commit -m "research: Slow Core Momentum — provenance check + tables (run ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
