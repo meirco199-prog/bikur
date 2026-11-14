@@ -26,6 +26,21 @@ export const VERSIONS = Object.freeze([
   { key: 'AC', lab: 'א+ג', capCoin: PROTECT.capCoin, btcFixed: PROTECT.btcFixed },
 ]);
 const NS = 7;
+// בדיקה אחת של איזון חודשי (בקשת מאיר 14/11/2026, אחרי הצעת GPT להקטין מחזור/עמלות/מס). cycle = { n, step, off }: מנה j מוחלפת ביום
+// שבו (מספר היום מ-1970 + off − j·step) מתחלק ב-n. { n: 7, step: 1, off: 4 } = בדיוק ההחלפה השבועית (יום j בשבוע; 1/1/1970 = יום חמישי).
+// חודשי: כל מנה כל 28 ימים, המנות מדורגות כל 4 ימים. רבעוני (מידע בלבד): כל 84 ימים, כל 12 ימים. כל השאר — אותם כללים בדיוק.
+export const CYCLES = Object.freeze({ weekly: null, monthly: { n: 28, step: 4, off: 4 }, quarterly: { n: 84, step: 12, off: 4 } });
+// הקריטריון — נקבע ונשמר כאן לפני ההרצה. חודשי מול שבועי, אותה גרסה, הגרסה המציאותית (Bybit, תאריכי רישום, ספר פקודות 5,000$).
+export const MONTHLY_PASS = Object.freeze({
+  primary: 'AB',     // הגרסה הראשית: א+ב
+  feeRatio: 0.60,    // (1) עמלות מ-2022 ≤ 60% מאלה של השבועי
+  cagrGap: 0.03,     // (2) תשואה שנתית מ-2022 (לפני מס) לא נמוכה ביותר מ-3 נקודות
+  // (3) תשואה שנתית מ-2022 אחרי מס (פרטי 25%, חצי-שנתי, העברת הפסדים) ≥ השבועי
+  ddGap: 0.05,       // (4) ירידה מקסימלית מ-2022 לא גדולה ביותר מ-5 נקודות
+  robust: ['base', 'A'], // (5) (2) ו-(4) מתקיימים גם בתקופת המבחן, וגם בגרסה המקורית ובגרסה א'
+});
+const DAYMS = 86400e3;
+export const cycReb = (c, j) => (t) => { const n = Math.floor(t / DAYMS); return (((n + c.off - j * c.step) % c.n) + c.n) % c.n === 0; };
 const same = (a, b) => !!a && !!b && a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) < 1e-12);
 
 // תנודתיות שנתית של סל (משקלות w) לפי n הימים עד d כולל (תשואות סגירה-לסגירה)
@@ -44,7 +59,8 @@ export function simulate(A, opt = {}){
   const cap = opt.capCoin || 0, vt = opt.volTarget || 0, fixed = opt.btcFixed || 0, altCap = opt.altCap || 0;
   const start = Math.max(1, opt.startIdx ?? 1);
   const mk = (st) => ({ V: new Float64Array(K), cash: (1 - fixed) / NS, prevSig: null, st });
-  const strat = Array.from({ length: NS }, (_, j) => xsRiskAdj(coins, { dow: j, P, rng: opt.rng ? opt.rng(j) : null, allow: opt.allow || null }));
+  const cyc = opt.cycle || null, rebF = Array.from({ length: NS }, (_, j) => (cyc ? cycReb(cyc, j) : null));
+  const strat = Array.from({ length: NS }, (_, j) => xsRiskAdj(coins, { dow: j, P, rng: opt.rng ? opt.rng(j) : null, allow: opt.allow || null, isReb: rebF[j] }));
   const sl = Array.from({ length: NS }, () => mk({}));
   const fb = { V: 0, cash: fixed }; // החלק הקבוע ב-BTC
   const tx = opt.tax ? { ...opt.tax, B: new Float64Array(K), real: 0, carry: 0, paid: 0, per: null } : null;
@@ -105,7 +121,7 @@ export function simulate(A, opt = {}){
       const s = sl[j], i = d - 1, first = d === start;
       if (first && start > 1) s.st = {}; // משקיע חדש: בחירה טרייה ביום הראשון
       const raw = strat[j].weights(A, i, s.st).map((x) => (Number.isFinite(x) ? x : 0));
-      const reb = new Date(days[i]).getUTCDay() === j || first;
+      const reb = (rebF[j] ? rebF[j](days[i]) : new Date(days[i]).getUTCDay() === j) || first;
       let sig = raw;
       if (vt){ if (reb){ const v = basketVol(A, raw, i); const g = v > 0 ? Math.min(1, vt / v) : 1; sig = raw.map((x) => x * g); } else sig = s.prevSig || raw; }
       if (same(sig, s.prevSig)) continue;

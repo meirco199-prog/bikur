@@ -92,10 +92,11 @@ export const XSRA = Object.freeze({ uni: 15, volN: 30, smaMacro: 100, smaMicro: 
 // דירוג בין הנבחרים — אותו ציון (תשואה/תנודתיות). משבצת שלא התמלאה מקבלת BTC (במקום מזומן). המסנן המאקרו (BTC מעל ממוצע 100) נשאר: מתחתיו — מזומן.
 // rng (בדיקת בסיס אקראית, משימת ההגנות 13/11): במקום הדירוג — בחירה אקראית מבין המועמדים שעברו את כל המסננים (אותו מספר מטבעות).
 // allow(k, dayMs) (בדיקת Bybit): מטבע שאינו זמין באותו יום לא נכנס ליקום. ברירות המחדל לא משנות שום דבר.
-export function xsRiskAdj(coins, { dow = 0, P = XSRA, id, rel = false, rng = null, allow = null } = {}){
+// isReb(dayMs) (בדיקת האיזון החודשי, 14/11): יום ההחלפה לפי פונקציה במקום יום בשבוע. ברירת המחדל (null) — יום בשבוע, כמו קודם.
+export function xsRiskAdj(coins, { dow = 0, P = XSRA, id, rel = false, rng = null, allow = null, isReb = null } = {}){
   const K = coins.length, iB = coins.indexOf('BTC');
   return { id: id || `XSRA${rel ? 'rel' : ''}-d${dow}`, family: 'xsra', weights: (A, d, st) => {
-    const reb = new Date(A.days[d]).getUTCDay() === dow;
+    const reb = isReb ? isReb(A.days[d]) : new Date(A.days[d]).getUTCDay() === dow;
     if (st.w && !reb) return st.w;
     const w = new Array(K).fill(0); st.pick = [];
     if (!(iB >= 0 && A.C[iB][d] > sma(A.C[iB], P.smaMacro, d))) return (st.w = w);

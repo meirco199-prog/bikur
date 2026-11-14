@@ -78,3 +78,17 @@ test('xsRiskAdj: rng — אותו מספר מטבעות, בחירה שונה ב�
   const later = pick({ allow: (kk, t) => kk !== k || t >= A.days[d] });
   assert.ok(later[k] > 0, `${coin} זמין`);
 });
+
+test('איזון לפי מחזור (cycle): { n: 7, step: 1, off: 4 } זהה בדיוק לשבועי; חודשי — כל מנה מוחלפת רק פעם ב-28 ימים, והמנות מדורגות כל 4 ימים', async () => {
+  const { CYCLES, cycReb } = await import('../engine/xsra-protect.js');
+  for (const v of [{}, { capCoin: PROTECT.capCoin, volTarget: PROTECT.volTarget }]){
+    const w = simulate(A, v).series, c = simulate(A, { ...v, cycle: { n: 7, step: 1, off: 4 } }).series;
+    assert.deepEqual(c.map((x) => x.net), w.map((x) => x.net), 'שבועי דרך cycle = שבועי');
+  }
+  for (let j = 0; j < 7; j++) for (const t of A.days) assert.equal(cycReb({ n: 7, step: 1, off: 4 }, j)(t), new Date(t).getUTCDay() === j);
+  const M = CYCLES.monthly, hits = [0, 1, 2, 3, 4, 5, 6].map((j) => A.days.filter((t) => cycReb(M, j)(t)));
+  for (const h of hits) for (let i = 1; i < h.length; i++) assert.equal((h[i] - h[i - 1]) / DAY, 28);
+  const first = hits.map((h) => h[0]).sort((a, b) => a - b); for (let i = 1; i < 7; i++) assert.equal((first[i] - first[i - 1]) / DAY, 4);
+  const wk = simulate(A).series, mo = simulate(A, { cycle: M }).series;
+  const turn = (s) => s.reduce((a, x) => a + x.turn, 0); assert.ok(turn(mo) < turn(wk), `מחזור חודשי ${turn(mo)} < שבועי ${turn(wk)}`);
+});
