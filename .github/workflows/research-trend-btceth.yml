@@ -1,4 +1,5 @@
 # זמני (ops): מחקר 7כא — מסחר מגמה על BTC ו-ETH, שלוש שיטות, סבב אחד (scripts/research-trend-btceth.mjs). מחקר בלבד — אין כסף, אין פקודות, אין מפתחות.
+# הרצה 2: + תאריכי הירידה המקסימלית.
 name: research-trend-btceth
 on:
   push:

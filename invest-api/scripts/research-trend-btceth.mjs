@@ -37,6 +37,10 @@ function trades(sr, w){
   if (cur) out.push({ t: cur.t, ret: cur.r - 1, days: cur.n, open: true });
   return out;
 }
+// הירידה המקסימלית בחלון: תאריך השיא, תאריך השפל, ותאריך החזרה לשיא (null = עוד לא חזרה)
+const ddWhen = (sr, w) => { let e = 1, pk = 1, pkT = null, best = 0, out = null; const s = sr.filter((x) => x.t >= w.from && x.t < w.to);
+  for (const x of s){ if (pkT === null) pkT = x.t; e *= 1 + x.net; if (e > pk){ pk = e; pkT = x.t; } const dd = 1 - e / pk; if (dd > best){ best = dd; out = { dd: Math.round(dd * 1000) / 1000, peak: iso(pkT), trough: iso(x.t), pkE: pk }; } }
+  if (out){ let e2 = 1, rec = null; for (const x of s){ e2 *= 1 + x.net; if (x.t > Date.parse(out.trough) && e2 >= out.pkE){ rec = iso(x.t); break; } } out.recovered = rec; delete out.pkE; } return out; };
 const yearly = (sr) => { const m = new Map(); for (const x of sr){ const y = yr(x.t); m.set(y, (m.get(y) ?? 1) * (1 + x.net)); } return Object.fromEntries([...m].map(([y, e]) => [y, Math.round((e - 1) * 1000) / 1000])); };
 function metrics(sr, legs = null){
   const o = {};
@@ -44,7 +48,7 @@ function metrics(sr, legs = null){
     o[k] = { cagr: s.cagr, sharpe: s.sharpe, ci: s.ci, maxDD: s.maxDD, vol: s.vol, turnYr: s.turnYr, exposure: s.exposure, costTotal: s.costTotal, rec: longestRecovery(sr, w), years: s.years,
       trades: tr.length, tradesYr: s.years ? Math.round(tr.length / s.years * 10) / 10 : null, win: tr.length ? Math.round(tr.filter((x) => x.ret > 0).length / tr.length * 100) / 100 : null,
       avgTrade: tr.length ? Math.round(tr.reduce((a, x) => a + x.ret, 0) / tr.length * 1000) / 1000 : null }; }
-  o.yearly = yearly(sr); return o;
+  o.yearly = yearly(sr); o.ddAll = ddWhen(sr, W.all); return o;
 }
 const hold = { id: 'HOLD', weights: () => [1] };
 const leg = (c, strat, costMult = 1) => cut(runDaily(AC[c], strat, { drift: true, costMult }).series);
@@ -90,6 +94,11 @@ L.push('## ירידה מקסימלית ושארפ לפי תקופה', '', '| | �
 const row2 = (name, m) => `| ${name} | ${pct(-m.train.maxDD)} / ${pct(-m.val.maxDD)} / ${pct(-m.test.maxDD)} | ${f2(m.train.sharpe)} ${ci(m.train)} | ${f2(m.val.sharpe)} ${ci(m.val)} | ${f2(m.test.sharpe)} ${ci(m.test)} |`;
 for (const [k, v] of Object.entries(RES.methods)) L.push(row2(NAME[k], v.primary.comb));
 L.push(row2('החזקת 50/50', BENCH.P5050), '');
+L.push('## מתי הייתה הירידה המקסימלית (כל התקופה)', '', '| | ירידה | שיא | שפל | חזרה לשיא |', '|---|---|---|---|---|');
+const row3 = (name, m) => `| ${name} | ${pct(-m.ddAll.dd)} | ${m.ddAll.peak} | ${m.ddAll.trough} | ${m.ddAll.recovered ?? 'עוד לא'} |`;
+for (const [k, v] of Object.entries(RES.methods)){ L.push(row3(NAME[k], v.primary.comb)); for (const c of COINS) L.push(row3(`— ${c === 'BTC' ? 'ביטקוין' : 'אתריום'} לבד`, v.primary[c])); }
+for (const [n, m] of [['ביטקוין', BENCH.BTC], ['אתריום', BENCH.ETH], ['50/50', BENCH.P5050]]) L.push(row3(`החזקת ${n}`, m));
+L.push('');
 L.push('## הקריטריון', '', '| שיטה | (1) 20%+ באימות ובמבחן | (2) ירידה ≤35% | (3) שארפ מעל הפסיבי | (4) רשת | חלק הרשת שעובר (1)+(2) | עוברת? |', '|---|---|---|---|---|---|---|');
 const yn = (b) => (b ? '✅' : '❌');
 for (const [k, v] of Object.entries(RES.methods)){ const p = v.primary.pass; L.push(`| ${NAME[k]} | ${yn(p.c1)} | ${yn(p.c2)} | ${yn(p.c3)} | ${yn(p.c4)} | ${Math.round(v.gridShare * 100)}% | ${p.all ? '**כן**' : '**לא**'} |`); }
