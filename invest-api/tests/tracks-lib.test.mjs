@@ -78,7 +78,11 @@ test('בידוד: מפתחות המסלולים נפרדים לגמרי מ-paper
   // חשבון regB נוצר בקריאה עצל (כמו paper:account) אבל במפתח נפרד לגמרי, ומתחיל מ-200,000 משלו — לא מזין/מוזן מהאמיתי
   const trackAcc = await ctx.db.get('track:regB:paper:account');
   assert.ok(trackAcc && trackAcc.cashIls === 200000);
-  assert.notEqual(trackAcc.createdAt, paperAcc.createdAt, 'שני מסמכי חשבון נפרדים, לא אותה רשומה');
+  // שני מסמכי חשבון נפרדים, לא אותה רשומה: שינוי בחשבון המסלול לא משנה את חשבון התרגול. (קודם הושוו createdAt — נכשל לסירוגין כששני
+  // החשבונות נוצרו באותה אלפית שנייה.)
+  await ctx.db.put('track:regB:paper:account', { ...trackAcc, cashIls: 1 });
+  assert.equal((await ctx.db.get('paper:account')).cashIls, 200000, 'שני מסמכי חשבון נפרדים, לא אותה רשומה');
+  assert.equal((await ctx.db.get('track:regB:paper:account')).cashIls, 1);
 });
 
 test('regB/regC: החלטה לילית → פקודות ממתינות, מילוי ב-09:40, הקצאה מתכנסת ליעד (60/20/10/5/5 ו-40/40/10/5/5)', async () => {
