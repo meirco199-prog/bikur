@@ -52,14 +52,23 @@ export function trendMP({ dd, e }, P = TREND){
   } };
 }
 export const BUILD = { TF: trendTF, BR: trendBR, MP: trendMP };
+// כלל סיכון פשוט לתיק בסיס (בקשת מאיר 14/11/2026, אחרי כיוון 2): מחזיקים כשהסגירה מעל ממוצע n, מזומן כשמתחת. בלי מסנן שיפוע.
+export function smaFilter({ n }){
+  return { id: `SMA-${n}`, weights: (A, d, st) => {
+    const C = A.C[0], c = C[d], m = sma(C, n, d);
+    if (!Number.isFinite(m) || !Number.isFinite(c)) return [st.in ? 1 : 0];
+    if (!st.in && c > m) st.in = true; else if (st.in && c < m) st.in = false;
+    return [st.in ? 1 : 0];
+  } };
+}
 
-// שתי סדרות יומיות (BTC, ETH) → תיק 50/50 שחוזר ל-50/50 בתחילת כל חודש. עלות ההעברה: החלק שעובר בין החלקים × החשיפה של כל חלק
+// שתי סדרות יומיות (BTC, ETH) → תיק 50/50 (או wa/1−wa) שחוזר להקצאה בתחילת כל חודש. עלות ההעברה: החלק שעובר בין החלקים × החשיפה של כל חלק
 // (מזומן עובר בחינם; חלק מושקע קונה/מוכר את המטבע) × bps לכל צד (ברירת מחדל 0 — לבדיקות; המחקר מעביר 10+2).
-export function combine5050(a, b, { bps = 0 } = {}){
+export function combine5050(a, b, { bps = 0, wa = 0.5 } = {}){
   const ts = [...new Set([...a.map((x) => x.t), ...b.map((x) => x.t)])].sort((p, q) => p - q), ma = new Map(a.map((x) => [x.t, x])), mb = new Map(b.map((x) => [x.t, x]));
-  let ea = 0.5, eb = 0.5, prevM = null, xa0 = 0, xb0 = 0; const out = [];
+  let ea = wa, eb = 1 - wa, prevM = null, xa0 = 0, xb0 = 0; const out = [];
   for (const t of ts){ const m = new Date(t).getUTCMonth(), xa = ma.get(t), xb = mb.get(t); let rc = 0;
-    if (prevM !== null && m !== prevM){ const e = ea + eb, dlt = Math.abs(ea - e / 2); rc = dlt * (xa0 + xb0) * bps / 1e4 / e; ea = eb = e * (1 - rc) / 2; }
+    if (prevM !== null && m !== prevM){ const e = ea + eb, dlt = Math.abs(ea - e * wa); rc = dlt * (xa0 + xb0) * bps / 1e4 / e; ea = e * (1 - rc) * wa; eb = e * (1 - rc) * (1 - wa); }
     prevM = m;
     const ra = xa?.net ?? 0, rb = xb?.net ?? 0, e0 = ea + eb;
     const net = (ea * ra + eb * rb) / e0 * (1 - rc) - rc, cost = (ea * (xa?.cost ?? 0) + eb * (xb?.cost ?? 0)) / e0 + rc, turn = (ea * (xa?.turn ?? 0) + eb * (xb?.turn ?? 0)) / e0, exp = (ea * (xa?.exp ?? 0) + eb * (xb?.exp ?? 0)) / e0;
