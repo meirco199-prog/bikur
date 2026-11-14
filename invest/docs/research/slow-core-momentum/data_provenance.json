@@ -1,0 +1,26 @@
+{
+  "source": "Coinbase Exchange public daily candles (api.exchange.coinbase.com, granularity 86400, UTC)",
+  "file": "../../../../xsra-data.json.gz",
+  "midnight_utc_check": {
+    "BTC": true,
+    "ETH": true,
+    "SOL": true
+  },
+  "assets": {
+    "BTC": {
+      "first": "2016-01-01",
+      "last": "2026-11-12",
+      "rows": 3969
+    },
+    "ETH": {
+      "first": "2016-05-18",
+      "last": "2026-11-12",
+      "rows": 3829
+    },
+    "SOL": {
+      "first": "2021-06-17",
+      "last": "2026-11-12",
+      "rows": 1975
+    }
+  }
+}
