@@ -22,7 +22,7 @@ const lcg = (seed) => { let s = seed >>> 0 || 1; return () => ((s = (Math.imul(s
 
 const d0 = JSON.parse(gunzipSync(readFileSync(DATA))), FJ = JSON.parse(readFileSync(FUND, 'utf8'));
 for (const c of COINS) for (const b of d0.bars[c]){ const lo = Math.min(b.o, b.c); if (b.l < 0.1 * lo) b.l = lo; }
-const srcs = ORDER.filter((s) => FJ.daily?.[s]?.BTC?.length && FJ.daily?.[s]?.ETH?.length);
+const srcs = ORDER.filter((s) => FJ.daily?.[s]?.BTC?.length >= 730 && FJ.daily?.[s]?.ETH?.length >= 730); // מקור עם פחות משנתיים — לא בשימוש
 if (!srcs.length) throw new Error('אין מקור מימון עם BTC ו-ETH');
 const firstOf = (s, c) => Date.parse(FJ.daily[s][c][0][0] + 'T00:00:00Z');
 const MAIN = srcs.slice().sort((a, b) => firstOf(a, 'BTC') - firstOf(b, 'BTC') || ORDER.indexOf(a) - ORDER.indexOf(b))[0];
