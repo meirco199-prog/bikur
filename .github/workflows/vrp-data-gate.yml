@@ -1,0 +1,53 @@
+# זמני (ops): שער הנתונים של מחקר VRP (PROTOCOL_v1.1 §3) — הורדה ופתיחה בפועל של דגימות Tardis החינמיות (היום הראשון בחודש,
+# Deribit OPTIONS), בדיקת ארבע הרגליים, ציטוטים, עומק והיתכנות ל-50K$/100K$, ובדיקת מקורות חינמיים לשווי יומי. בלי Backtest, בלי מסחר, בלי מפתחות.
+name: vrp-data-gate
+on:
+  push:
+    branches: [research/vrp-defined-risk-options]
+    paths: [.github/workflows/vrp-data-gate.yml]
+permissions: { contents: write }
+concurrency: { group: vrp-data-gate, cancel-in-progress: false }
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        year: [2020, 2021, 2022, 2023, 2024, 2025, 2026]
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: invest/docs/research/vrp-options }
+      - name: extract
+        run: |
+          D=invest/docs/research/vrp-options/data_gate
+          MONTHS="${MONTHS_OVERRIDE:-03 06 09 12}"; [ "${{ matrix.year }}" = 2026 ] && MONTHS="03 06 09 11"
+          for m in $MONTHS; do bash $D/extract.sh "${{ matrix.year }}-$m" raw; done
+          du -sh raw
+      - uses: actions/upload-artifact@v4
+        with: { name: 'raw-${{ matrix.year }}', path: raw, retention-days: 90 }
+  analyze:
+    needs: extract
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: raw, pattern: 'raw-*', merge-multiple: true }
+      - name: analyze
+        run: |
+          D=invest/docs/research/vrp-options/data_gate; mkdir -p $D/results
+          python3 $D/analyze.py raw $D/results/samples.json $D/results/samples.md
+          python3 $D/probe.py $D/results/samples.json $D/results/probe.json
+          for f in raw/*/*.meta; do echo "$f: $(tr '\n' ' ' < $f)"; done > $D/results/files_meta.txt
+          for u in https://docs.tardis.dev/faq/billing-and-subscriptions https://docs.tardis.dev/downloadable-csv-files https://tardis.dev/; do
+            n=$(echo "$u" | sed 's#https://##; s#[/.]#_#g'); curl -sSL -A 'bikur-research/1.0' "$u" -o "/tmp/$n.html" -w "$u %{http_code} %{size_download}\n" >> $D/results/vendor_pages.txt || true
+            python3 -c "import re,sys,html;t=html.unescape(re.sub(r'<[^>]+>',' ',open(sys.argv[1],errors='ignore').read()));t=re.sub(r'\s+',' ',t);[print('…'+t[max(0,m.start()-160):m.end()+160]+'…') for m in re.finditer(r'\\\$\s?\d[\d,]*|one-off|first day of each month|ordered by|sorted by',t)][:60]" "/tmp/$n.html" >> $D/results/vendor_pages.txt || true
+          done
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/vrp-options/data_gate/results
+          git commit -m "ops(vrp): תוצאות שער הנתונים — דגימות Tardis שנפתחו בפועל (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
