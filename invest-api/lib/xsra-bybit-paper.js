@@ -31,6 +31,9 @@ export async function recordXsrb(db, body, { now = new Date() } = {}){
     if ((prev.daily?.length || 0) > rep.daily.length && rep.daily.length < 1500) throw bad('אין מחיקה של נתוני מעקב');
     if (prev.lastDay && rep.lastDay && rep.lastDay < prev.lastDay) throw bad('הדוח ישן מהשמור');
     for (const k of ['alert', 'kill']) if (prev.flags?.[k] && rep.flags[k] !== prev.flags[k]) throw bad('אין ביטול של התראה או פסילה');
+    // היסטוריה נעולה גם בתוכן: כל יום שכבר נשמר (בטווח של הדוח החדש) חייב להופיע בו בדיוק כמו שנשמר (סבב GPT 1 של #282)
+    const from = rep.daily[0]?.day, got = new Map(rep.daily.map((x) => [x.day, JSON.stringify(x)]));
+    for (const x of prev.daily || []) if (from && x.day >= from && got.get(x.day) !== JSON.stringify(x)) throw bad(`אין שינוי של יום שכבר נשמר (${x.day})`);
   }
   await db.put(XSRB_KEY, { ...rep, receivedAt: now.toISOString() });
   return { ok: true, saved: true, lastDay: rep.lastDay };
