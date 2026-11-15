@@ -61,7 +61,7 @@ const ysR = [...new Set(V.flatMap((v) => Object.keys(RES.yearlyReal[v.key])))].s
 L.push(`## 2. תשואה לפי שנה — הגרסה המציאותית (${VENUE}, מ-2021)`, '', 'בכל תא: תשואה בשנה (העמלות ששולמו באותה שנה, באחוזים מההון בתחילתה).', '', `| גרסה | ${ysR.join(' | ')} |`, `|---|${ysR.map(() => '---').join('|')}|`);
 for (const v of V) L.push(`| ${NAME[v.key]} | ${ysR.map((y) => { const x = RES.yearlyReal[v.key][y]; return x ? `${pct(x.ret)} (${pct(-x.feePct)})` : '—'; }).join(' | ')} |`);
 L.push('', `(${ysR[0]}: לפני הרישום ב-${VENUE} — מזומן; ${ysR.at(-1)} עד ${iso(LASTT)}.)`, '');
-L.push('## 3. תשואה לפי שנה — היסטוריה ארוכה (מחירי Coinbase, אותם 38 מטבעות, כאילו היו זמינים מתחילת המסחר בהם; עלות לפי המודל)', '', '**פחות מציאותי** — רק להראות איך השיטה התנהגה בשנים מוקדמות.', '', `| גרסה | ${ysL.join(' | ')} |`, `|---|${ysL.map(() => '---').join('|')}|`);
+L.push(`## 3. תשואה לפי שנה — היסטוריה ארוכה (מחירי Coinbase, אותם ${Object.keys(byb.listing).length} מטבעות, כאילו היו זמינים מתחילת המסחר בהם; עלות לפי המודל)`, '', '**פחות מציאותי** — רק להראות איך השיטה התנהגה בשנים מוקדמות.', '', `| גרסה | ${ysL.join(' | ')} |`, `|---|${ysL.map(() => '---').join('|')}|`);
 for (const v of V) L.push(`| ${NAME[v.key]} | ${ysL.map((y) => { const x = RES.yearlyLong[v.key][y]; return x ? `${pct(x.ret)} (${pct(-x.feePct)})` : '—'; }).join(' | ')} |`);
 L.push('');
 const md = L.join('\n') + '\n';
