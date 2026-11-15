@@ -4,17 +4,18 @@
 אין Backtest, אין מסחר ואין מפתח. שימוש: probe.py ANALYSIS_JSON OUT_JSON
 """
 import json, sys, time, urllib.request, urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 AN, OUT = sys.argv[1], sys.argv[2]
 UA = {'User-Agent': 'bikur-research/1.0 (data-gate)'}
 
 
-def get(url, method='GET', tries=3):
+def get(url, method='GET', tries=2, timeout=25):
     for k in range(tries):
         try:
             req = urllib.request.Request(url, method=method, headers=UA)
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.status, dict(r.headers), (r.read() if method == 'GET' else b'')
         except urllib.error.HTTPError as e:
             return e.code, dict(e.headers or {}), e.read() if method == 'GET' else b''
@@ -25,15 +26,15 @@ def get(url, method='GET', tries=3):
 
 
 out = {'tardis_head': [], 'deribit': {}}
-# ---- 1. כל החודשים, כל סוגי הקבצים ----
-for y in range(2020, 2027):
-    for m in range(1, 13):
-        if (y, m) > (2026, 11):
-            break
-        for ds in ('options_chain', 'quotes', 'book_snapshot_25', 'trades'):
-            url = f'https://datasets.tardis.dev/v1/deribit/{ds}/{y}/{m:02d}/01/OPTIONS.csv.gz'
-            st, h, _ = get(url, 'HEAD')
-            out['tardis_head'].append({'month': f'{y}-{m:02d}', 'dataset': ds, 'status': st, 'mb': round(int(h.get('Content-Length', h.get('content-length', 0)) or 0) / 1e6, 1)})
+# ---- 1. כל החודשים, כל סוגי הקבצים (במקביל; בריצה הראשונה בקשות HEAD רצופות לקחו יותר מ-20 דקות) ----
+jobs = [(f'{y}-{m:02d}', ds, f'https://datasets.tardis.dev/v1/deribit/{ds}/{y}/{m:02d}/01/OPTIONS.csv.gz')
+        for y in range(2020, 2027) for m in range(1, 13) if (y, m) <= (2026, 11) for ds in ('options_chain', 'quotes', 'book_snapshot_25', 'trades')]
+def head(j):
+    st, h, b = get(j[2], 'HEAD', tries=1, timeout=20)
+    return {'month': j[0], 'dataset': j[1], 'status': st, 'mb': round(int(h.get('Content-Length', h.get('content-length', 0)) or 0) / 1e6, 1), 'error': (b.decode('utf8', 'replace')[:80] if st is None else None)}
+with ThreadPoolExecutor(16) as ex:
+    out['tardis_head'] = list(ex.map(head, jobs))
+print('HEAD done', flush=True)
 # גם יום שאינו הראשון בחודש — כדי לוודא שהגישה החינמית מוגבלת ליום הראשון
 for ds in ('options_chain', 'book_snapshot_25'):
     st, h, _ = get(f'https://datasets.tardis.dev/v1/deribit/{ds}/2024/03/02/OPTIONS.csv.gz', 'HEAD')

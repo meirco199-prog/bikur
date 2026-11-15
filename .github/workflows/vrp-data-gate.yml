@@ -1,4 +1,4 @@
-# זמני (ops): שער הנתונים של מחקר VRP (PROTOCOL_v1.1 §3) — הורדה ופתיחה בפועל של דגימות Tardis החינמיות (היום הראשון בחודש,
+# זמני (ops; ריצה 2 — הגנה מתקיעה בהורדה ובבדיקות): שער הנתונים של מחקר VRP (PROTOCOL_v1.1 §3) — הורדה ופתיחה בפועל של דגימות Tardis החינמיות (היום הראשון בחודש,
 # Deribit OPTIONS), בדיקת ארבע הרגליים, ציטוטים, עומק והיתכנות ל-50K$/100K$, ובדיקת מקורות חינמיים לשווי יומי. בלי Backtest, בלי מסחר, בלי מפתחות.
 name: vrp-data-gate
 on:
@@ -39,10 +39,10 @@ jobs:
         run: |
           D=invest/docs/research/vrp-options/data_gate; mkdir -p $D/results
           python3 $D/analyze.py raw $D/results/samples.json $D/results/samples.md
-          python3 $D/probe.py $D/results/samples.json $D/results/probe.json
+          timeout 900 python3 $D/probe.py $D/results/samples.json $D/results/probe.json || echo "probe נעצר/נכשל ($?)" >> $D/results/vendor_pages.txt
           for f in raw/*/*.meta; do echo "$f: $(tr '\n' ' ' < $f)"; done > $D/results/files_meta.txt
           for u in https://docs.tardis.dev/faq/billing-and-subscriptions https://docs.tardis.dev/downloadable-csv-files https://tardis.dev/; do
-            n=$(echo "$u" | sed 's#https://##; s#[/.]#_#g'); curl -sSL -A 'bikur-research/1.0' "$u" -o "/tmp/$n.html" -w "$u %{http_code} %{size_download}\n" >> $D/results/vendor_pages.txt || true
+            n=$(echo "$u" | sed 's#https://##; s#[/.]#_#g'); curl -sSL --max-time 60 -A 'bikur-research/1.0' "$u" -o "/tmp/$n.html" -w "$u %{http_code} %{size_download}\n" >> $D/results/vendor_pages.txt || true
             python3 -c "import re,sys,html;t=html.unescape(re.sub(r'<[^>]+>',' ',open(sys.argv[1],errors='ignore').read()));t=re.sub(r'\s+',' ',t);[print('…'+t[max(0,m.start()-160):m.end()+160]+'…') for m in re.finditer(r'\\\$\s?\d[\d,]*|one-off|first day of each month|ordered by|sorted by',t)][:60]" "/tmp/$n.html" >> $D/results/vendor_pages.txt || true
           done
       - name: commit

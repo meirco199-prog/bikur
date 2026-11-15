@@ -11,7 +11,11 @@ S=$(( (day0 + 11*3600 + 55*60) * 1000000 )); T0=$(( (day0 + 12*3600) * 1000000 )
 for DS in options_chain book_snapshot_25 quotes; do
   URL="https://datasets.tardis.dev/v1/deribit/$DS/$Y/$MO/01/OPTIONS.csv.gz"; P="$OUT/$M/$DS"
   t=$(date +%s)
-  curl -sS --fail -L --retry 3 "$URL" 2>"$P.curl.err" | gzip -dc 2>/dev/null | awk -F, -v S=$S -v T0=$T0 -v T5=$T5 -v E=$E -v P="$P" '
+  # הגנה מתקיעה: בריצה הראשונה (15/11) הזרימה של שלושה קבצים גדולים מ-2024–2026 עמדה כשעה וחצי בלי נתונים — עכשיו נקטעת אם
+  # הקצב יורד מתחת ל-20KB/s במשך 90 שניות, עד 30 דקות לקובץ, ועד 3 ניסיונות
+  for try in 1 2 3; do
+  rm -f "$P.meta"
+  curl -sS --fail -L --connect-timeout 30 --speed-limit 20000 --speed-time 90 --max-time 1800 "$URL" 2>"$P.curl.err" | gzip -dc 2>/dev/null | awk -F, -v S=$S -v T0=$T0 -v T5=$T5 -v E=$E -v P="$P" '
     NR==1 { hdr=$0; next }
     { ts=$4+0; rows++; if (ts<prev) inv++; prev=ts }
     ts>E { done=1; exit }
@@ -24,10 +28,14 @@ for DS in options_chain book_snapshot_25 quotes; do
       print "symbol,updates_1155_1210" > f3; for (k in w) print k","w[k] > f3
       printf "rows_read=%d\nrows_btc=%d\nreached_1210=%d\nlast_local_ts=%s\nts_inversions=%d\n", rows, nb, done, ts, inv > P".meta"
     }'
+  grep -q "reached_1210=1" "$P.meta" && break
+  echo "ניסיון $try נכשל: $(head -c 200 "$P.curl.err")"
+  done
+  echo "attempts=$try" >> "$P.meta"
   echo "seconds=$(( $(date +%s) - t ))" >> "$P.meta"; echo "url=$URL" >> "$P.meta"
   echo "$M $DS: $(tr '\n' ' ' < "$P.meta")"
 done
 # trades (ביקורת בלבד): כל עסקאות אופציות BTC של היום
 URL="https://datasets.tardis.dev/v1/deribit/trades/$Y/$MO/01/OPTIONS.csv.gz"; P="$OUT/$M/trades"
-curl -sS --fail -L --retry 3 "$URL" 2>"$P.curl.err" | gzip -dc 2>/dev/null | awk -F, 'NR==1 || index($2,"BTC-")==1' | gzip > "$P.btc.csv.gz"
+curl -sS --fail -L --connect-timeout 30 --speed-limit 20000 --speed-time 90 --max-time 1800 --retry 3 "$URL" 2>"$P.curl.err" | gzip -dc 2>/dev/null | awk -F, 'NR==1 || index($2,"BTC-")==1' | gzip > "$P.btc.csv.gz"
 echo "$M trades: $(gzip -dc "$P.btc.csv.gz" | wc -l) rows (כולל כותרת)"

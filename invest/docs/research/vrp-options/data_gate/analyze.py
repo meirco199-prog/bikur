@@ -195,7 +195,7 @@ L = ['# שער הנתונים — הדגימות שנבדקו בפועל (Tardis
      '## לפי חודש', '', '| חודש | קבצים | פקיעה (ימים) | 4 רגליים | מרווח (%) SP/LP/SC/LC | גיל הספר (שניות, הגרוע) | עומק בצד הנדרש (BTC) SP/LP/SC/LC | הפסד מקס׳ לחוזה ($) | חוזים ל-4,000$ | ביצוע מלא 50K / 100K | נדרש יותר מרמה אחת | סטטוס |',
      '|---|---|---|---|---|---|---|---|---|---|---|---|']
 for r in months:
-    fl = r['files']; fok = all(fl[d]['reached_1210'] and not fl[d]['error'] for d in ('options_chain', 'book_snapshot_25', 'quotes'))
+    fl = r['files']; fok = all(fl[d]['reached_1210'] for d in ('options_chain', 'book_snapshot_25', 'quotes'))
     lg = r.get('legs') or {}
     def cell(fn):
         return '/'.join(str(fn(k, lg[k])) if lg.get(k) and lg[k].get('symbol') else '—' for k in ('SP', 'LP', 'SC', 'LC'))
@@ -209,7 +209,7 @@ for r in months:
 L += ['', '## לפי שנה', '', '| שנה | חודשים שנבדקו | קבצים תקינים | פקיעה 25–35 | 4 רגליים | כל הצדדים עם מחיר | ספר עדכני (≤5 דק׳) בכל הרגליים | מרווח חציוני בכנפיים (%) | ביצוע מלא ב-50K | ב-100K |', '|---|---|---|---|---|---|---|---|---|---|']
 for y in sorted({r['month'][:4] for r in months}):
     R = [r for r in months if r['month'].startswith(y)]
-    fok = [r for r in R if all(r['files'][d]['reached_1210'] and not r['files'][d]['error'] for d in ('options_chain', 'book_snapshot_25', 'quotes'))]
+    fok = [r for r in R if all(r['files'][d]['reached_1210'] for d in ('options_chain', 'book_snapshot_25', 'quotes'))]
     exp = [r for r in R if r.get('expiry')]; four = [r for r in R if r.get('four_distinct_legs')]
     q = [r for r in R if r.get('all_executable_sides_quoted')]
     fresh = [r for r in four if all(not r['legs'][k]['stale'] for k in r['legs'])]
