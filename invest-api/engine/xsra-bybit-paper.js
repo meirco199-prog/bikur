@@ -8,7 +8,7 @@
 // (עמלה 0.1% + החלקה לפי ספר הפקודות של Bybit בפקודה של 5,000$, C5 של scripts/research-bybit-horizons.mjs). אין אופטימיזציה.
 // משקיע חדש מיום ההתחלה (startIdx, כמו בחלונות של 7ל): ההחלטה בסגירת יום d−1, הביצוע בפתיחת יום d.
 //
-// יום ההתחלה נקבע בריצה הראשונה: היום שאחרי הנר הסגור האחרון — כך העסקה הראשונה מתבצעת במחיר שעוד לא היה ידוע בזמן ההחלטה.
+// יום ההתחלה נקבע בריצה הראשונה: חצות UTC שאחרי הריצה — כך העסקה הראשונה מתבצעת במחיר שעוד לא היה ידוע בזמן הפתיחה.
 // היסטוריה נעולה: ימים שכבר נשמרו לא משתנים. הימים החדשים נשרשרים לשווי האחרון שנשמר לפי התשואה היומית של ההרצה מחדש,
 // כך שתיקון קטן של נרות ישנים אצל Coinbase לא משכתב את העבר (הפער נמדד ונשמר ב-replayDrift).
 import { align, DCOST } from './research-daily.js';
@@ -65,9 +65,11 @@ export function step(prev, bars, xsraRep = null, nowMs = Date.now(), P = XSRB){
   const A = alignBars(bars, P), iB = A.coins.indexOf('BTC');
   if (iB < 0) throw new Error('אין נרות BTC');
   if (!(prev && prev.v === P.version && prev.id === P.id && prev.startDay)){
-    // ריצה ראשונה: קובעים את יום ההתחלה (היום שאחרי הנר הסגור האחרון) ולא סוחרים עדיין
+    // ריצה ראשונה: קובעים את יום ההתחלה ולא סוחרים עדיין. יום ההתחלה = חצות UTC הבאה (וגם אחרי הנר הסגור האחרון), כך שמחיר
+    // הפתיחה של העסקה הראשונה עוד לא היה ידוע בזמן הפתיחה
     const last = A.days.filter((d) => Number.isFinite(A.C[iB][A.days.indexOf(d)])).at(-1);
-    return { state: newState(dayIso(last + DAY), nowMs, P), processed: 0, created: true, events: [] };
+    const start = Math.max(last + DAY, Math.floor(nowMs / DAY) * DAY + DAY);
+    return { state: newState(dayIso(start), nowMs, P), processed: 0, created: true, events: [] };
   }
   const s = JSON.parse(JSON.stringify(prev)), startMs = Date.parse(s.startDay + 'T00:00:00Z');
   if (A.days.indexOf(startMs) < 0) return { state: s, processed: 0, events: [], waiting: true };
