@@ -21,6 +21,7 @@ import { recordPaper, XSPAPER_KEY } from './lib/xsmom-paper.js';
 import { recordVbo, VBOPAPER_KEY } from './lib/vbo-paper.js';
 import { recordDc, DCPAPER_KEY } from './lib/dc-paper.js';
 import { recordXsra, XSRAPAPER_KEY } from './lib/xsra-paper.js';
+import { recordXsrb, XSRB_KEY } from './lib/xsra-bybit-paper.js';
 import { notifyOwner } from './lib/notify.js';
 import { AGENT_POLICY_PROFILES } from './engine/agent-sim-policy.js';
 import { policyHash } from './engine/order-gate.js';
@@ -244,6 +245,16 @@ async function handle(req, env0, ctx){
     if (req.method === 'POST'){
       const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
       try { return json(await recordXsra(db, body)); } catch (e) { if (!e.status) await db.logError('xsra-paper', e.message); return err('מעקב Paper: ' + e.message, e.status || 500); }
+    }
+    return err('not found', 404);
+  }
+  // מעקב וירטואלי שני — מומנטום 7ל על 38 מטבעות Bybit + 2 הגנות (lib/xsra-bybit-paper.js), נפרד מ-/xsra: GET /xsrb ציבורי = המצב;
+  // POST /xsrb = עדכון יומי מ-Actions (scripts/xsra-bybit-paper.mjs) עם סוד ה-cron
+  if (r0 === 'xsrb' && !p1){
+    if (req.method === 'GET') return json((await db.get(XSRB_KEY)) || null);
+    if (req.method === 'POST'){
+      const bySecret = !!(env.CRON_SECRET && q.secret === env.CRON_SECRET); if (!bySecret) needAuth();
+      try { return json(await recordXsrb(db, body)); } catch (e) { if (!e.status) await db.logError('xsrb-paper', e.message); return err('מעקב 2: ' + e.message, e.status || 500); }
     }
     return err('not found', 404);
   }

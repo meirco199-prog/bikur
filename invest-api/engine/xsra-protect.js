@@ -75,9 +75,12 @@ export function simulate(A, opt = {}){
   // העלות (בקנייה) או מקטינה את התמורה (במכירה). שתי הדרכים עקביות: העמלה נספרת פעם אחת בדיוק — או בשווי הפוזיציה או בבסיס.
   // defer: העמלה לא יורדת כאן מהמזומן אלא נצברת, ובסוף ההחלפה של המנה יורדת באופן יחסי מכל המנה (כמו במנוע המחקר) — ואז היא כבר
   // מקטינה את שווי הפוזיציות, ולכן לא נכנסת שוב לבסיס העלות (אחרת הייתה נספרת פעמיים במס)
+  // onTrade (המעקב הווירטואלי של 7ל, engine/xsra-bybit-paper.js): קריאה לכל קנייה/מכירה לתיעוד — לא משנה שום חישוב
+  const onTrade = opt.onTrade || null; let curD = 0;
+  const note = (who, k, side, x, f, isFixed) => onTrade && onTrade({ d: curD, sleeve: isFixed ? -1 : sl.indexOf(who), k, side, usd: x, fee: f });
   let defer = false, pend = 0;
-  const buy = (who, k, x, isFixed) => { if (!(x > 1e-12)) return; const f = x * rate(k); if (isFixed) fb.V += x; else who.V[k] += x; who.cash -= x; if (defer) pend += f; else who.cash -= f; fees += f; trades += 1; if (tx) tx.B[k] += x + (defer ? 0 : f); };
-  const sell = (who, k, x, isFixed) => { if (!(x > 1e-12)) return; const tot = held(k), f = x * rate(k); if (tx && tot > 0){ const b = tx.B[k] * x / tot; tx.real += x - b - (defer ? 0 : f); tx.B[k] -= b; }
+  const buy = (who, k, x, isFixed) => { if (!(x > 1e-12)) return; const f = x * rate(k); note(who, k, 'buy', x, f, isFixed); if (isFixed) fb.V += x; else who.V[k] += x; who.cash -= x; if (defer) pend += f; else who.cash -= f; fees += f; trades += 1; if (tx) tx.B[k] += x + (defer ? 0 : f); };
+  const sell = (who, k, x, isFixed) => { if (!(x > 1e-12)) return; const tot = held(k), f = x * rate(k); note(who, k, 'sell', x, f, isFixed); if (tx && tot > 0){ const b = tx.B[k] * x / tot; tx.real += x - b - (defer ? 0 : f); tx.B[k] -= b; }
     if (isFixed) fb.V -= x; else who.V[k] -= x; who.cash += x; if (defer) pend += f; else who.cash -= f; fees += f; trades += 1; };
   const payTax = (amt, E) => { if (!(amt > 0)) return; const g = 1 - amt / E, parts = [...sl.map((s) => ({ s })), ...(fixed ? [{ fixed: true }] : [])];
     // מורידים את המזומן הנדרש: מכירה יחסית של הכול (ואז ה-cash כולל את התמורה), ואז מנכים את המס מהמזומן באופן יחסי
@@ -87,13 +90,13 @@ export function simulate(A, opt = {}){
   const settle = (E) => { const base = tx.real + (tx.carry ? tx.carryAmt || 0 : 0); const due = Math.max(0, base) * tx.rate; tx.carryAmt = tx.carry ? Math.min(0, base) : 0; tx.real = 0; payTax(due, E); return due; };
   const perOf = (t) => { const dt = new Date(t), y = dt.getUTCFullYear(); return tx.period === 'semi' ? `${y}-${dt.getUTCMonth() < 6 ? 1 : 2}` : `${y}`; };
   for (let d = 1; d < D; d++){
-    const t = days[d], pnl = trace ? new Float64Array(K) : null; let traded = 0;
+    const t = days[d], pnl = trace ? new Float64Array(K) : null; let traded = 0; curD = d;
     // לילה: סגירה קודמת → פתיחה; מטבע בלי מחיר (ירד מהמסחר) — נמכר בשווי האחרון בלי עלות (כמו במנוע המחקר)
     for (const s of [...sl, null]){
       const ks = s ? [...Array(K).keys()] : (fixed ? [iB] : []);
       for (const k of ks){ const v = s ? s.V[k] : fb.V; if (!(v > 0)) continue; const o = O[k][d], c0 = C[k][d - 1];
         if (Number.isFinite(o) && Number.isFinite(c0)){ const nv = v * o / c0; if (pnl) pnl[k] += nv - v; if (s) s.V[k] = nv; else fb.V = nv; }
-        else if (!Number.isFinite(C[k][d])){ if (tx){ const tot = held(k); const b = tot > 0 ? tx.B[k] * v / tot : 0; tx.real += v - b; tx.B[k] -= b; } if (s){ s.cash += v; s.V[k] = 0; } else { fb.cash += v; fb.V = 0; } } }
+        else if (!Number.isFinite(C[k][d])){ if (tx){ const tot = held(k); const b = tot > 0 ? tx.B[k] * v / tot : 0; tx.real += v - b; tx.B[k] -= b; } if (onTrade) onTrade({ d, sleeve: s ? sl.indexOf(s) : -1, k, side: 'delist', usd: v, fee: 0 }); if (s){ s.cash += v; s.V[k] = 0; } else { fb.cash += v; fb.V = 0; } } }
     }
     if (d < start){ out.push({ t, gross: 0, cost: 0, fund: 0, net: 0, turn: 0, exp: 0, alt: 0, altOpen: 0 }); continue; }
     let Eo = equity(); const fees0 = fees;
