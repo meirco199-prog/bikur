@@ -10,6 +10,7 @@ import { align, DCOST } from '../engine/research-daily.js';
 import { simulate, VERSIONS, CYCLES } from '../engine/xsra-protect.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
+const VENUE = arg('--venue', 'Bybit'); // --venue Binance: אותו חישוב על רשימת המטבעות והעלויות של בורסה אחרת (קובץ בדיקה באותו מבנה)
 const CYC = arg('--cycle', 'weekly'), CY = CYCLES[CYC] ? { cycle: CYCLES[CYC] } : {}; // --cycle monthly: אותו חישוב לאיזון החודשי (7כז)
 const DATA = arg('--data', 'xsra-data.json.gz'), BYB = arg('--bybit', 'invest/docs/research/xs-protect/bybit-probe.json'), OUT = arg('--out', ''), JOUT = arg('--json', '');
 const DAY = 86400e3, T21 = Date.UTC(2021, 0, 1), CAP = 50000, log = (...a) => console.error(...a);
@@ -48,7 +49,7 @@ for (const v of V){
 const L = [];
 L.push(`# מומנטום משודרג (7 מנות) עם ההגנות — תשואה לפי שנה, ו-50,000$ מנקודות התחלה שונות${CYC === 'monthly' ? ' — איזון חודשי (7כז)' : ''}`, '',
   `נתונים עד ${iso(LASTT)}. **אותם כללים בדיוק כמו בסעיפים 7יט–7כ — בלי שום שינוי.** מחקר בלבד: אין פקודות ואין כסף אמיתי. **בלי מס** (במס של 25% נשאר בערך שליש פחות מהרווח — סעיף 7יז).`, '',
-  '**הגרסה המציאותית:** 38 המטבעות שנסחרים בספוט של Bybit, כל מטבע רק מהיום שנרשם שם (לפני 7/2021 — מזומן), ועלות מסחר לפי ספר הפקודות של Bybit (עמלה 0.1% + החלקה לפי פקודה של 5,000$, ' +
+  `**הגרסה המציאותית:** ${Object.keys(byb.listing).length} המטבעות (מתוך 50 המועמדים) שנסחרים בספוט של ${VENUE}, כל מטבע רק מהיום שנרשם שם (ולא לפני 1/2021), ועלות מסחר לפי ספר הפקודות של ${VENUE} (עמלה 0.1% + החלקה לפי פקודה של 5,000$, ` +
   'שמרני לתיק של 50,000$). משקיע חדש קונה הכול ביום הראשון, והעמלות של הקנייה הראשונה כלולות.', '');
 L.push('## 1. 50,000$ — כמה היה היום (הגרסה המציאותית)', '');
 for (const v of V){
@@ -57,9 +58,9 @@ for (const v of V){
   L.push('');
 }
 const ysR = [...new Set(V.flatMap((v) => Object.keys(RES.yearlyReal[v.key])))].sort(), ysL = [...new Set(V.flatMap((v) => Object.keys(RES.yearlyLong[v.key])))].sort();
-L.push('## 2. תשואה לפי שנה — הגרסה המציאותית (Bybit, מ-2021)', '', 'בכל תא: תשואה בשנה (העמלות ששולמו באותה שנה, באחוזים מההון בתחילתה).', '', `| גרסה | ${ysR.join(' | ')} |`, `|---|${ysR.map(() => '---').join('|')}|`);
+L.push(`## 2. תשואה לפי שנה — הגרסה המציאותית (${VENUE}, מ-2021)`, '', 'בכל תא: תשואה בשנה (העמלות ששולמו באותה שנה, באחוזים מההון בתחילתה).', '', `| גרסה | ${ysR.join(' | ')} |`, `|---|${ysR.map(() => '---').join('|')}|`);
 for (const v of V) L.push(`| ${NAME[v.key]} | ${ysR.map((y) => { const x = RES.yearlyReal[v.key][y]; return x ? `${pct(x.ret)} (${pct(-x.feePct)})` : '—'; }).join(' | ')} |`);
-L.push('', `(${ysR[0]}: עד 7/2021 אין מטבעות רשומים ב-Bybit — מזומן; ${ysR.at(-1)} עד ${iso(LASTT)}.)`, '');
+L.push('', `(${ysR[0]}: לפני הרישום ב-${VENUE} — מזומן; ${ysR.at(-1)} עד ${iso(LASTT)}.)`, '');
 L.push('## 3. תשואה לפי שנה — היסטוריה ארוכה (מחירי Coinbase, אותם 38 מטבעות, כאילו היו זמינים מתחילת המסחר בהם; עלות לפי המודל)', '', '**פחות מציאותי** — רק להראות איך השיטה התנהגה בשנים מוקדמות.', '', `| גרסה | ${ysL.join(' | ')} |`, `|---|${ysL.map(() => '---').join('|')}|`);
 for (const v of V) L.push(`| ${NAME[v.key]} | ${ysL.map((y) => { const x = RES.yearlyLong[v.key][y]; return x ? `${pct(x.ret)} (${pct(-x.feePct)})` : '—'; }).join(' | ')} |`);
 L.push('');

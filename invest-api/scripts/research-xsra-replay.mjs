@@ -11,6 +11,7 @@ import { align, DCOST } from '../engine/research-daily.js';
 import { simulate, VERSIONS } from '../engine/xsra-protect.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
+const VENUE = arg('--venue', 'Bybit');
 const DATA = arg('--data', 'xsra-data.json.gz'), BYB = arg('--bybit', 'invest/docs/research/xs-protect/bybit-probe.json'), OUT = arg('--out', ''), JOUT = arg('--json', '');
 const DAY = 86400e3, CAP = 50000, log = (...a) => console.error(...a);
 const d0 = JSON.parse(gunzipSync(readFileSync(DATA))), byb = JSON.parse(readFileSync(BYB, 'utf8'));
@@ -55,7 +56,7 @@ const L = ['# XSRA-7 — 50,000$ מתחילת 2026 ומתחילת 2025', '',
 for (const r of REP) L.push(`| ${r.lab} (${r.start}) | ${usd(r.equity)} | ${usd(r.equity - CAP)} (${pct(r.equity / CAP - 1)}) | ${usd(r.costs)} | ${pct(-r.maxDD)} | ${usd(r.btc)} (${pct(r.btc / CAP - 1)}) / ${pct(-r.btcMaxDD)} | ${r.changes} |`);
 L.push('', '**לפי שנה (מהשחזור מתחילת 2025):** ' + Object.entries(REP[1].years).map(([y, v]) => `${y}: ${pct(v.ret)} (ביטקוין ${pct(v.btc)})`).join(' · '));
 L.push('', `**המטבעות שנקנו הכי הרבה פעמים (מתחילת 2025):** ${REP[1].held.map(([c, n]) => `${c} (${n})`).join(', ')}`, `**מה מחזיק היום:** ${Object.keys(REP[0].now).length ? Object.entries(REP[0].now).map(([c, w]) => `${c} ${Math.round(w * 100)}%`).join(', ') : 'מזומן'}`, '');
-L.push('## 2. לשם השוואה — הגרסה המציאותית ב-Bybit (38 מטבעות, תאריכי רישום, ספר פקודות)', '', '| גרסה | התחלה | שווה היום | רווח | עמלות | ירידה מקסימלית |', '|---|---|---|---|---|---|');
+L.push(`## 2. לשם השוואה — הגרסה המציאותית ב-${VENUE} (${Object.keys(byb.listing).length} מטבעות, תאריכי רישום, ספר פקודות)`, '', '| גרסה | התחלה | שווה היום | רווח | עמלות | ירידה מקסימלית |', '|---|---|---|---|---|---|');
 for (const k of ['base', 'AB']) for (const r of REAL[k]) L.push(`| ${k === 'base' ? 'בלי הגנות א+ב' : 'עם א+ב'} | ${r.lab} | ${usd(r.equity)} | ${usd(r.equity - CAP)} (${pct(r.equity / CAP - 1)}) | ${usd(r.fee)} | ${pct(-r.dd)} |`);
 const md = L.join('\n') + '\n'; if (OUT) writeFileSync(OUT, md); else process.stdout.write(md);
 if (JOUT) writeFileSync(JOUT, JSON.stringify({ replay: REP, real: REAL }, null, 1));
