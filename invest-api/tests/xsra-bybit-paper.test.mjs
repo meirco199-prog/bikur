@@ -106,6 +106,10 @@ test('בידוד מ-XSRA-7: מפתח, מזהה ונתיב אחרים; ה-Worker 
   assert.deepEqual([...new Set(puts)], [XSRB_KEY]);
   await assert.rejects(recordXsrb(db, { ...s, startDay: '2030-01-01' }), /נעול/);
   await assert.rejects(recordXsrb(db, { ...s, daily: s.daily.slice(0, 3) }), /מחיקה/);
+  const edited = s.daily.map((x, i) => (i === 4 ? { ...x, equity: x.equity + 1000 } : x));
+  await assert.rejects(recordXsrb(db, { ...s, daily: edited }), /יום שכבר נשמר/); // אותו אורך, ערך ישן שונה
+  const s2 = step(s, upto(START + 16)).state; await recordXsrb(db, s2); // הוספה של יום חדש — מותרת
+  s = s2;
   await recordXsrb(db, { ...s, flags: { alert: '2024-08-01', kill: '2024-08-02' } });
   await assert.rejects(recordXsrb(db, { ...s, flags: { alert: null, kill: null } }), /פסילה/);
   assert.throws(() => cleanXsrb({ ...s, id: XSRAP.id }), /לא תקין/);
@@ -130,4 +134,7 @@ test('סיכום הקריפטו היומי: שורות מעקב 2 נוספות �
   assert.equal((await req('/xsrb', 'POST', JSON.stringify(s))).status, 401);
   assert.equal((await req('/xsrb?secret=wrong', 'POST', JSON.stringify(s))).status, 401);
   assert.equal((await req('/xsrb')).status, 200);
+  const ok = await req('/xsrb?secret=right', 'POST', JSON.stringify(s)); // מסלול ההצלחה (סבב GPT 1 של #282)
+  assert.equal(ok.status, 200); assert.deepEqual(await ok.json(), { ok: true, saved: true, lastDay: s.lastDay });
+  assert.equal((await req('/xsrb?secret=right', 'POST', JSON.stringify({ ...s, id: 'XSRA-7' }))).status, 400);
 });

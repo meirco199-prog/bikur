@@ -68,7 +68,8 @@ const RULES = { alertDd: 0.35, killDd: 0.45, months: 12, lagPts: 0.20 };
 const DAY = 864e5;
 
 function verdict(s){
-  const r = s.equity / s.startUsd - 1, b = s.btcEquity / s.startUsd - 1, months = (Date.now() - Date.parse(s.startDay + 'T00:00:00Z')) / (30.44 * DAY);
+  // חודשים לפי היום האחרון שנרשם (לא לפי השעון), כדי שעיכוב בעדכון לא יציג בחינה לפני שהנתונים הגיעו לשם (סבב GPT 1 של #282)
+  const r = s.equity / s.startUsd - 1, b = s.btcEquity / s.startUsd - 1, months = (Date.parse((s.lastDay || s.startDay) + 'T00:00:00Z') - Date.parse(s.startDay + 'T00:00:00Z')) / (30.44 * DAY);
   if (s.flags?.kill) return ['bad', `🛑 המועמד נפסל ב-${s.flags.kill}: ירידה של 45% מהשיא. הנתונים ממשיכים להיאסף ולא נמחקים.`];
   if (months < RULES.months) return s.flags?.alert ? ['warn', `⚠️ התראה מ-${s.flags.alert}: הירידה מהשיא עברה 35%`] : ['good', `פעיל — ${months.toFixed(1)} מתוך 12 חודשים`];
   if (b - r > RULES.lagPts && s.maxDD > s.btcMaxDD) return ['bad', '🛑 12 חודשים: מפגר אחרי ביטקוין ביותר מ-20 נק׳ עם ירידה גדולה יותר — נכשל'];
