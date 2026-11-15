@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מעקב 2 — מומנטום Bybit</title>
+<style>
+:root{color-scheme:light;--bg:#f6f6f4;--surface-1:#fcfcfb;--border:#e3e2de;--text-primary:#0b0b0b;--text-secondary:#52514e;--muted:#8a8984;--grid:#ecebe7;
+  --series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--good:#0a7d32;--warn:#b26b00;--bad:#c62828}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;--bg:#121211;--surface-1:#1a1a19;--border:#2f2f2d;--text-primary:#f0efec;--text-secondary:#c3c2b7;--muted:#8d8c86;--grid:#262624;
+  --series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--good:#3ccf6e;--warn:#e8a33a;--bad:#ef5350}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#121211;--surface-1:#1a1a19;--border:#2f2f2d;--text-primary:#f0efec;--text-secondary:#c3c2b7;--muted:#8d8c86;--grid:#262624;
+  --series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--good:#3ccf6e;--warn:#e8a33a;--bad:#ef5350}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text-primary);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}h1{font-size:21px;margin:4px 0}h2{font-size:17px;margin:26px 0 8px}h3{font-size:15px;margin:16px 0 6px}
+.sub{color:var(--text-secondary);margin:0 0 12px}.card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:14px;margin:10px 0}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--text-secondary)}
+.band{border-inline-start:4px solid var(--series-1)}.band.hist{border-inline-start-color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.kpi .l{color:var(--text-secondary);font-size:13px}.kpi .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi .s{color:var(--muted);font-size:12px}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:start}
+th{color:var(--text-secondary);font-weight:500}.scroll{overflow-x:auto}.status{font-weight:600}.status.good{color:var(--good)}.status.warn{color:var(--warn)}.status.bad{color:var(--bad)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);margin-bottom:6px}.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-inline-end:6px}
+#chart{position:relative}#chart svg{width:100%;height:auto;display:block;direction:ltr}.tip{position:absolute;pointer-events:none;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap;display:none}
+button,a.btn{font:inherit;font-size:13px;background:none;border:1px solid var(--border);color:var(--text-primary);border-radius:8px;padding:4px 10px;cursor:pointer;text-decoration:none}
+a{color:var(--series-1)}.muted{color:var(--muted)}.empty{color:var(--text-secondary);padding:12px 0}
+</style>
+</head>
+<body>
+<main>
+  <span class="tag">תיק וירטואלי — אין כסף, אין פקודות</span>
+  <h1>מעקב 2 — מומנטום 7ל על 38 המטבעות של Bybit, עם שתי ההגנות</h1>
+  <p class="sub">7 מנות, החלפה שבועית, תקרה של 15% למטבע ויעד תנודתיות של 40%. אותה פונקציה בדיוק כמו במחקר 7ל, בלי אופטימיזציה נוספת. נפרד לגמרי מ-XSRA-7 המקורי.</p>
+
+  <section class="card band">
+    <h2 style="margin-top:0">ביצועים חדשים — רק מאז פתיחת המעקב</h2>
+    <div id="live"><div class="empty">טוען…</div></div>
+  </section>
+
+  <section class="card band hist">
+    <h2 style="margin-top:0">תוצאות היסטוריות — מחקר בדיעבד, לא ביצועים</h2>
+    <p class="sub">הבדיקה לאחור של מחקר 7ל (נרות של Coinbase עד 12/11/2026, עלות לפי ספר הפקודות של Bybit, 50,000$ בתחילת כל חלון). מוצג כאן רק כרקע. הנתונים האלה כבר נבדקו בהרבה גרסאות, ולכן הם לא תחזית.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>תחילת השקעה</th><th>השיטה עם 2 ההגנות</th><th>ירידה מקס׳</th><th>ביטקוין</th></tr></thead>
+      <tbody>
+        <tr><td>לפני שנה</td><td>45,064$ (−9.9%)</td><td>−15.8%</td><td>34,598$ (−30.8%)</td></tr>
+        <tr><td>לפני שנתיים</td><td>57,739$ (+15.5%)</td><td>−26.0%</td><td>40,151$ (−19.7%)</td></tr>
+        <tr><td>לפני 5 שנים</td><td>89,348$ (+78.7%)</td><td>−35.0%</td><td>54,997$ (+10.0%)</td></tr>
+        <tr><td>מתחילת 2022</td><td>93,739$ (+87.5%)</td><td>−32.2%</td><td>77,129$ (+54.3%)</td></tr>
+      </tbody>
+    </table></div>
+    <h3>בדיקת רגישות (מחקר 7לא)</h3>
+    <ul class="sub" style="margin:0;padding-inline-start:18px">
+      <li><b>השמטת מטבע אחד:</b> 38 הרצות. מ-2022 התוצאה נעה בין 82,735$ (בלי SHIB) ל-112,059$ (בלי ביטקוין). בכל ההשמטות היא מעל 50,000$ ומעל ביטקוין (77,129$). לכן התוצאה לא תלויה במטבע בודד, אבל המרווח במקרה הגרוע קטן.</li>
+      <li><b>ריכוז הרווח:</b> מ-2022, ‏5 המטבעות המובילים (XRP, XLM, SHIB, ביטקוין, DOGE) הביאו 46,621$ — יותר מכל הרווח הנטו (43,739$). השאר יחד הפסידו.</li>
+    </ul>
+    <p class="sub">דוחות מלאים: <a href="https://github.com/meirco199-prog/bikur/blob/main/invest/docs/research/bybit-horizons/report.md">מחקר 7ל</a> · <a href="https://github.com/meirco199-prog/bikur/blob/main/invest/docs/research/bybit-loo/report.md">בדיקת הרגישות 7לא</a></p>
+  </section>
+</main>
+<script>
+const API = 'https://invest-api.meirco199.workers.dev';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const LRM = '‎'; // מספרים עם סימן בתוך טקסט מימין לשמאל
+const usd = (x) => (x == null ? '—' : `${LRM}${x < 0 ? '−' : ''}${Math.round(Math.abs(x)).toLocaleString('en-US')}$${LRM}`);
+const pct = (x) => (x == null || !isFinite(x) ? '—' : `${LRM}${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toFixed(1)}%${LRM}`);
+const SIDE = { buy: 'קנייה', sell: 'מכירה', delist: 'יצא מהמסחר' };
+const RULES = { alertDd: 0.35, killDd: 0.45, months: 12, lagPts: 0.20 };
+const DAY = 864e5;
+
+function verdict(s){
+  const r = s.equity / s.startUsd - 1, b = s.btcEquity / s.startUsd - 1, months = (Date.now() - Date.parse(s.startDay + 'T00:00:00Z')) / (30.44 * DAY);
+  if (s.flags?.kill) return ['bad', `🛑 המועמד נפסל ב-${s.flags.kill}: ירידה של 45% מהשיא. הנתונים ממשיכים להיאסף ולא נמחקים.`];
+  if (months < RULES.months) return s.flags?.alert ? ['warn', `⚠️ התראה מ-${s.flags.alert}: הירידה מהשיא עברה 35%`] : ['good', `פעיל — ${months.toFixed(1)} מתוך 12 חודשים`];
+  if (b - r > RULES.lagPts && s.maxDD > s.btcMaxDD) return ['bad', '🛑 12 חודשים: מפגר אחרי ביטקוין ביותר מ-20 נק׳ עם ירידה גדולה יותר — נכשל'];
+  return r > b && s.maxDD < s.btcMaxDD ? ['good', '✅ 12 חודשים: מנצח את ביטקוין עם ירידה קטנה יותר — החלטה של מאיר'] : ['warn', '⏳ 12 חודשים עברו — החלטה של מאיר'];
+}
+function kpi(l, v, s = ''){ return `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`; }
+function csv(name, rows){ const blob = new Blob(['﻿' + rows.map((r) => r.map((x) => `"${String(x ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
+
+function chart(s){
+  const base = s.xsraBase?.equity, rows = [{ day: s.startDay, a: 100, b: 100, c: base ? 100 : null }, ...s.daily.map((x) => ({ day: x.day, a: x.equity / s.startUsd * 100, b: x.btc / s.startUsd * 100, c: base && x.xsra ? x.xsra / base * 100 : null }))];
+  if (rows.length < 3) return '<div class="empty">הגרף יופיע אחרי כמה ימי מעקב.</div>';
+  const W = 900, H = 300, P = { l: 48, r: 92, t: 12, b: 28 }, vals = rows.flatMap((r) => [r.a, r.b, r.c]).filter((x) => x != null);
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.08 || 2; lo -= pad; hi += pad;
+  const X = (i) => P.l + (W - P.l - P.r) * i / (rows.length - 1), Y = (v) => P.t + (H - P.t - P.b) * (1 - (v - lo) / (hi - lo));
+  const path = (k) => { let d = '', on = false; rows.forEach((r, i) => { if (r[k] == null){ on = false; return; } d += `${on ? 'L' : 'M'}${X(i).toFixed(1)},${Y(r[k]).toFixed(1)}`; on = true; }); return d; };
+  const ticks = 4, gl = Array.from({ length: ticks + 1 }, (_, i) => lo + (hi - lo) * i / ticks);
+  const S = [['a', 'var(--series-1)', 'מעקב 2'], ['b', 'var(--series-2)', 'ביטקוין'], ['c', 'var(--series-3)', 'XSRA-7 המקורי']];
+  const last = (k) => { for (let i = rows.length - 1; i >= 0; i--) if (rows[i][k] != null) return [i, rows[i][k]]; return null; };
+  return `<div class="legend">${S.filter(([k]) => last(k)).map(([, c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join('')}<span class="muted">(100 = יום הפתיחה)</span></div>
+  <div id="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="שווי מעקב 2 מול ביטקוין ו-XSRA-7 המקורי, 100 ביום הפתיחה">
+    ${gl.map((v) => `<line x1="${P.l}" x2="${W - P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${P.l - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v.toFixed(0)}</text>`).join('')}
+    <text x="${P.l}" y="${H - 8}" font-size="11" fill="var(--muted)">${rows[0].day}</text><text x="${W - P.r}" y="${H - 8}" text-anchor="end" font-size="11" fill="var(--muted)">${rows.at(-1).day}</text>
+    ${S.map(([k, c]) => `<path d="${path(k)}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`).join('')}
+    ${S.map(([k, c, l]) => { const p = last(k); return p ? `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="${c}" stroke="var(--surface-1)" stroke-width="2"/><text x="${X(p[0]) + 8}" y="${Y(p[1]) + 4}" font-size="12" fill="var(--text-secondary)">${l}</text>` : ''; }).join('')}
+    <line id="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
+    <rect id="hit" x="${P.l}" y="0" width="${W - P.l - P.r}" height="${H}" fill="transparent"/>
+  </svg><div class="tip" id="tip"></div></div>`;
+  // ההאזנה מחוברת אחרי ההכנסה ל-DOM (hover)
+}
+function hover(s){
+  const svg = document.querySelector('#chart svg'); if (!svg) return;
+  const base = s.xsraBase?.equity, rows = [{ day: s.startDay, a: s.startUsd, b: s.startUsd, c: base ? 0 : null }, ...s.daily.map((x) => ({ day: x.day, a: x.equity, b: x.btc, c: base && x.xsra ? x.xsra / base - 1 : null }))];
+  const W = 900, P = { l: 48, r: 92 }, tip = $('#tip'), xh = $('#xh');
+  $('#hit').addEventListener('pointermove', (e) => { const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) * W / r.width, i = Math.max(0, Math.min(rows.length - 1, Math.round((x - P.l) / (W - P.l - P.r) * (rows.length - 1)))), px = P.l + (W - P.l - P.r) * i / (rows.length - 1);
+    xh.setAttribute('x1', px); xh.setAttribute('x2', px); xh.setAttribute('visibility', 'visible'); const q = rows[i];
+    tip.innerHTML = `<b>${q.day}</b><br>מעקב 2: ${usd(q.a)} (${pct(q.a / s.startUsd - 1)})<br>ביטקוין: ${usd(q.b)} (${pct(q.b / s.startUsd - 1)})${q.c != null ? `<br>XSRA-7 המקורי: ${pct(q.c)}` : ''}`;
+    tip.style.display = 'block'; const left = px * r.width / W; tip.style.left = `${Math.min(r.width - tip.offsetWidth, Math.max(0, left - tip.offsetWidth / 2))}px`; tip.style.top = '8px'; });
+  $('#hit').addEventListener('pointerleave', () => { tip.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); });
+}
+
+function render(s){
+  if (!s){ $('#live').innerHTML = '<div class="empty">המעקב עוד לא נפתח. הריצה הראשונה קובעת את יום ההתחלה.</div>'; return; }
+  if (!s.daily?.length){ $('#live').innerHTML = `<div class="empty">המעקב נפתח. העסקה הראשונה תתבצע בפתיחת ${esc(s.startDay)} (שעון UTC), עם ${usd(s.startUsd)} וירטואליים. השורה הראשונה תופיע אחרי שהיום הזה ייסגר.</div>`; return; }
+  const [cls, txt] = verdict(s), r = s.equity / s.startUsd - 1, b = s.btcEquity / s.startUsd - 1, last = s.daily.at(-1);
+  const xr = s.xsraBase && last.xsra ? last.xsra / s.xsraBase.equity - 1 : null;
+  const con = Object.entries(s.contrib || {}).sort((a, b) => b[1] - a[1]), tot = con.reduce((a, [, x]) => a + x, 0), top = con.slice(0, 5), topSum = top.reduce((a, [, x]) => a + x, 0);
+  const w = Object.entries(s.weights || {}).sort((a, b) => b[1] - a[1]), inv = w.reduce((a, [, x]) => a + x, 0);
+  const tr = (s.trades || []).slice().reverse();
+  $('#live').innerHTML = `
+    <p class="status ${cls}">${esc(txt)}</p>
+    <p class="sub">נפתח ב-${esc(s.startDay)} · עודכן עד ${esc(s.lastDay)} · ${s.daily.length} ימים${s.replayDrift ? ` · פער הרצה מחדש ${pct(s.replayDrift)}` : ''}</p>
+    <div class="grid">
+      ${kpi('שווי התיק', usd(s.equity), pct(r) + ' מ-50,000$')}
+      ${kpi('ביטקוין פסיבי, אותם מועדים', usd(s.btcEquity), pct(b))}
+      ${kpi('XSRA-7 המקורי, אותם מועדים', pct(xr), xr == null ? 'אין עדיין נתון להשוואה' : 'תשואה מאותו יום')}
+      ${kpi('ירידה מקסימלית', pct(-s.maxDD), `ביטקוין ${pct(-s.btcMaxDD)}`)}
+      ${kpi('עלויות מצטברות', usd(s.costsUsd), `מחזור ${LRM}×${(s.turnover || 0).toFixed(2)}${LRM} מההון`)}
+      ${kpi('מושקע עכשיו', `${Math.round(inv * 100)}%`, w.length ? w.slice(0, 3).map(([c]) => c).join(', ') : 'הכול במזומן')}
+    </div>
+    <h3>שווי לאורך זמן</h3>${chart(s)}
+    <h3>כללים שנקבעו מראש</h3>
+    <ul class="sub" style="margin:0;padding-inline-start:18px"><li>התראה בירידה של 35% מהשיא${s.flags?.alert ? ` — <b>הופעלה ב-${esc(s.flags.alert)}</b>` : ''}</li>
+      <li>פסילת המועמד בירידה של 45% מהשיא${s.flags?.kill ? ` — <b>הופעלה ב-${esc(s.flags.kill)}</b>` : ''}. גם אחרי פסילה הנתונים לא נמחקים.</li>
+      <li>בחינה אחרי 12 חודשים: פיגור מול ביטקוין והסיכון היחסי. נכשל אם מפגר ביותר מ-20 נק׳ וגם הירידה גדולה משל ביטקוין; עבר אם מנצח עם ירידה קטנה יותר; אחרת — החלטה של מאיר.</li></ul>
+    <h3>משקלות עכשיו</h3>
+    ${w.length ? `<div class="scroll"><table><thead><tr><th>מטבע</th><th>משקל</th></tr></thead><tbody>${w.map(([c, x]) => `<tr><td>${esc(c)}</td><td>${(x * 100).toFixed(1)}%</td></tr>`).join('')}<tr><td>מזומן</td><td>${((1 - inv) * 100).toFixed(1)}%</td></tr></tbody></table></div>` : '<div class="empty">הכול במזומן.</div>'}
+    <h3>תרומת רווח לפי מטבע (לפני עמלות, מאז הפתיחה)</h3>
+    ${con.length ? `<p class="sub">5 המובילים: ${usd(topSum)}${tot > 0 ? ` = ${Math.round(topSum / tot * 100)}% מסך התרומה` : ''}. סך התרומה ${usd(tot)}, פחות עלויות ${usd(s.costsUsd)}.</p>
+      <div class="scroll"><table><thead><tr><th>מטבע</th><th>תרומה</th></tr></thead><tbody>${con.map(([c, x]) => `<tr><td>${esc(c)}</td><td>${usd(x)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">עוד אין.</div>'}
+    <h3>עסקאות (${tr.length})</h3>
+    <p><button id="dlT">הורדת כל העסקאות (CSV)</button> <button id="dlD">הורדת השורות היומיות (CSV)</button></p>
+    ${tr.length ? `<div class="scroll"><table><thead><tr><th>יום</th><th>מנה</th><th>פעולה</th><th>מטבע</th><th>סכום</th><th>עלות</th></tr></thead><tbody>${tr.slice(0, 60).map((t) => `<tr><td>${esc(t.day)}</td><td>${t.sleeve + 1}</td><td>${SIDE[t.side] || esc(t.side)}</td><td>${esc(t.coin)}</td><td>${usd(t.usd)}</td><td>${usd(t.fee)}</td></tr>`).join('')}</tbody></table></div>${tr.length > 60 ? '<p class="muted">מוצגות 60 האחרונות; הקובץ כולל את כולן.</p>' : ''}` : '<div class="empty">עוד אין עסקאות.</div>'}`;
+  hover(s);
+  $('#dlT').onclick = () => csv('xsrb-trades.csv', [['יום', 'מנה', 'פעולה', 'מטבע', 'סכום$', 'עלות$'], ...(s.trades || []).map((t) => [t.day, t.sleeve + 1, SIDE[t.side] || t.side, t.coin, t.usd, t.fee])]);
+  $('#dlD').onclick = () => csv('xsrb-daily.csv', [['יום', 'שווי$', 'ביטקוין$', 'XSRA-7 המקורי$', 'ירידה מהשיא', 'מושקע', 'עלות היום$'], ...s.daily.map((x) => [x.day, x.equity, x.btc, x.xsra, x.dd, x.exp, x.cost])]);
+}
+fetch(API + '/xsrb').then((r) => r.json()).then(render).catch((e) => { $('#live').innerHTML = `<div class="empty">אין חיבור לשרת: ${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>
