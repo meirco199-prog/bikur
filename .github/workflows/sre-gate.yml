@@ -1,0 +1,28 @@
+# זמני (ops): שער נתונים — Dual-Momentum Sector Rotation (PROTOCOL_v1.0.md). בדיקת נתונים בלבד, בלי סימולציה. ענף מחקר בלבד; יוסר בסוף.
+name: sre-gate
+on:
+  push:
+    branches: [research/sector-rotation-etf]
+    paths: [.github/workflows/sre-gate.yml]
+permissions: { contents: write }
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch + check
+        run: |
+          D=invest/docs/research/sector-rotation-etf/data_gate
+          python3 $D/probe.py fetch raw
+          python3 $D/probe.py check raw $D/results
+          cp raw/fred_attempts.json $D/results/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: sre-raw, path: raw, retention-days: 30 }
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/sector-rotation-etf/data_gate/results
+          git commit -m "ops(sre): שער נתונים לפי PROTOCOL_v1.0 (ריצה ${GITHUB_RUN_ID})" || exit 0
+          git push origin "HEAD:${GITHUB_REF_NAME}"
