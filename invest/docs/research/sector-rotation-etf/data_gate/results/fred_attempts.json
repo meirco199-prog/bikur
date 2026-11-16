@@ -1,0 +1,26 @@
+[
+ {
+  "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3&cosd=1998-01-01",
+  "status": null,
+  "bytes": 28,
+  "seconds": 120.1,
+  "ok": false,
+  "note": "The read operation timed out"
+ },
+ {
+  "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3",
+  "status": null,
+  "bytes": 28,
+  "seconds": 120.2,
+  "ok": false,
+  "note": "The read operation timed out"
+ },
+ {
+  "url": "https://fred.stlouisfed.org/data/DTB3.txt",
+  "status": null,
+  "bytes": 28,
+  "seconds": 120.1,
+  "ok": false,
+  "note": "The read operation timed out"
+ }
+]

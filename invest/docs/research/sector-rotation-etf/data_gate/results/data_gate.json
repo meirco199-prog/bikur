@@ -1,0 +1,422 @@
+{
+ "generated": "2026-11-16T21:13:24Z",
+ "calendar": [
+  "1998-12-01",
+  "2026-11-16",
+  7033
+ ],
+ "errors": {},
+ "yahoo": {
+  "XLK": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [
+    [
+     "2001-01-03",
+     0.161
+    ]
+   ],
+   "stale_days_same_open_close_as_prev": 0,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 85,
+   "first_dividend": "1999-12-17",
+   "splits": {
+    "2025-12-05": "2.0:1.0"
+   },
+   "meta": {
+    "symbol": "XLK",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLV": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 2,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 106,
+   "first_dividend": "1999-12-20",
+   "splits": {},
+   "meta": {
+    "symbol": "XLV",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLF": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [
+    [
+     "2008-10-28",
+     0.1571
+    ],
+    [
+     "2008-11-24",
+     0.1519
+    ],
+    [
+     "2008-12-01",
+     -0.1667
+    ],
+    [
+     "2009-01-20",
+     -0.1653
+    ],
+    [
+     "2009-03-23",
+     0.1646
+    ],
+    [
+     "2009-04-09",
+     0.1554
+    ]
+   ],
+   "stale_days_same_open_close_as_prev": 1,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 111,
+   "first_dividend": "1999-03-19",
+   "splits": {
+    "2016-09-19": "1231.0:1000.0"
+   },
+   "meta": {
+    "symbol": "XLF",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLE": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [
+    [
+     "2008-10-13",
+     0.1647
+    ],
+    [
+     "2008-10-28",
+     0.1525
+    ],
+    [
+     "2020-03-09",
+     -0.2014
+    ],
+    [
+     "2020-03-24",
+     0.1604
+    ]
+   ],
+   "stale_days_same_open_close_as_prev": 0,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 112,
+   "first_dividend": "1999-03-19",
+   "splits": {
+    "2025-12-05": "2.0:1.0"
+   },
+   "meta": {
+    "symbol": "XLE",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLI": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 0,
+   "zero_volume_days": 1,
+   "flat_bar_days_by_year": {
+    "1999": 1
+   },
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 110,
+   "first_dividend": "1999-03-19",
+   "splits": {},
+   "meta": {
+    "symbol": "XLI",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLP": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 2,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 111,
+   "first_dividend": "1999-03-19",
+   "splits": {},
+   "meta": {
+    "symbol": "XLP",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLY": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 1,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 111,
+   "first_dividend": "1999-03-19",
+   "splits": {
+    "2025-12-05": "2.0:1.0"
+   },
+   "meta": {
+    "symbol": "XLY",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLU": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 2,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 112,
+   "first_dividend": "1999-03-19",
+   "splits": {
+    "2025-12-05": "2.0:1.0"
+   },
+   "meta": {
+    "symbol": "XLU",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "XLB": {
+   "first_valid": "1998-12-22",
+   "last": "2026-11-16",
+   "rows": 7018,
+   "cal_days_since_first": 7018,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 1,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {
+    "1998": 1,
+    "1999": 1
+   },
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 111,
+   "first_dividend": "1999-03-19",
+   "splits": {
+    "2025-12-05": "2.0:1.0"
+   },
+   "meta": {
+    "symbol": "XLB",
+    "firstTradeDate": 914337000,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "SPY": {
+   "first_valid": "1998-12-01",
+   "last": "2026-11-16",
+   "rows": 7033,
+   "cal_days_since_first": 7033,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 0,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {},
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 113,
+   "first_dividend": "1998-12-18",
+   "splits": {},
+   "meta": {
+    "symbol": "SPY",
+    "firstTradeDate": 728317800,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": true
+  },
+  "BIL": {
+   "first_valid": "2007-05-30",
+   "last": "2026-11-16",
+   "rows": 4899,
+   "cal_days_since_first": 4899,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "bad_values": 0,
+   "bad_sample": [],
+   "extra_days_not_in_spy": [],
+   "jumps_gt_15pct": [],
+   "stale_days_same_open_close_as_prev": 840,
+   "zero_volume_days": 0,
+   "flat_bar_days_by_year": {
+    "2007": 5,
+    "2017": 1,
+    "2025": 2,
+    "2026": 3
+   },
+   "adj_ratio_changes_without_event": 0,
+   "adj_unexplained_sample": [],
+   "dividends": 129,
+   "first_dividend": "2007-07-02",
+   "splits": {
+    "2017-11-30": "1.0:2.0"
+   },
+   "meta": {
+    "symbol": "BIL",
+    "firstTradeDate": 1180531800,
+    "exchangeName": "PCX",
+    "instrumentType": "ETF"
+   },
+   "first_1999_trading_day_present": false
+  }
+ },
+ "fred_dtb3": {
+  "attempts": [
+   {
+    "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3&cosd=1998-01-01",
+    "status": null,
+    "bytes": 28,
+    "seconds": 120.1,
+    "ok": false,
+    "note": "The read operation timed out"
+   },
+   {
+    "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3",
+    "status": null,
+    "bytes": 28,
+    "seconds": 120.2,
+    "ok": false,
+    "note": "The read operation timed out"
+   },
+   {
+    "url": "https://fred.stlouisfed.org/data/DTB3.txt",
+    "status": null,
+    "bytes": 28,
+    "seconds": 120.1,
+    "ok": false,
+    "note": "The read operation timed out"
+   }
+  ],
+  "available": false
+ },
+ "irx_reference_only": {
+  "first": "1998-12-01",
+  "last": "2026-11-16",
+  "n": 7025,
+  "spy_days_without_value_since_1999": 8
+ },
+ "bil_dtb3_handoff": {
+  "bil_first": "2007-05-30",
+  "dtb3_covers_until_bil": false
+ },
+ "all9_valid_days_since_1999": [
+  7011,
+  7011
+ ]
+}
