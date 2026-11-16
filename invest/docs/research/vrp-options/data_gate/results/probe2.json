@@ -1,0 +1,2238 @@
+{
+ "legs_daily": [
+  {
+   "month": "2020-03",
+   "expiry": "2020-03-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27MAR20-8000-P",
+     "trades": 940,
+     "pages": 1,
+     "days_with_trade": 23,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "LP": {
+     "symbol": "BTC-27MAR20-7000-P",
+     "trades": 969,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-27MAR20-10000-C",
+     "trades": 1156,
+     "pages": 2,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LC": {
+     "symbol": "BTC-27MAR20-11500-C",
+     "trades": 176,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 3
+    }
+   },
+   "days_all_four_traded": 21,
+   "share_all_four": 0.778,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2020-05",
+   "expiry": "2020-05-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29MAY20-8000-P",
+     "trades": 1433,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-29MAY20-6500-P",
+     "trades": 336,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "SC": {
+     "symbol": "BTC-29MAY20-11000-C",
+     "trades": 737,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-29MAY20-12000-C",
+     "trades": 450,
+     "pages": 1,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 26,
+   "share_all_four": 0.897,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2020-07",
+   "expiry": "2020-07-31 08:00",
+   "hold_days": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31JUL20-8500-P",
+     "trades": 1018,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-31JUL20-7500-P",
+     "trades": 428,
+     "pages": 1,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-31JUL20-10500-C",
+     "trades": 1619,
+     "pages": 2,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-31JUL20-11500-C",
+     "trades": 1239,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 28,
+   "share_all_four": 0.903,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2020-08",
+   "expiry": "2020-08-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28AUG20-10500-P",
+     "trades": 975,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-28AUG20-9500-P",
+     "trades": 513,
+     "pages": 1,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-28AUG20-14000-C",
+     "trades": 1007,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LC": {
+     "symbol": "BTC-28AUG20-16000-C",
+     "trades": 109,
+     "pages": 1,
+     "days_with_trade": 21,
+     "error": null,
+     "longest_gap_days": 7
+    }
+   },
+   "days_all_four_traded": 21,
+   "share_all_four": 0.75,
+   "longest_gap_all_four_days": 7
+  },
+  {
+   "month": "2020-10",
+   "expiry": "2020-10-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30OCT20-10000-P",
+     "trades": 1052,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-30OCT20-9000-P",
+     "trades": 957,
+     "pages": 1,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-30OCT20-12000-C",
+     "trades": 1926,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-30OCT20-14000-C",
+     "trades": 1798,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 28,
+   "share_all_four": 0.933,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2020-11",
+   "expiry": "2020-11-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27NOV20-12500-P",
+     "trades": 409,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-27NOV20-11000-P",
+     "trades": 583,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-27NOV20-16000-C",
+     "trades": 3104,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-27NOV20-18000-C",
+     "trades": 3526,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 24,
+   "share_all_four": 0.889,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2021-01",
+   "expiry": "2021-01-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29JAN21-26000-P",
+     "trades": 2069,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-29JAN21-22000-P",
+     "trades": 1079,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-29JAN21-36000-C",
+     "trades": 5736,
+     "pages": 6,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29JAN21-48000-C",
+     "trades": 2792,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 28,
+   "share_all_four": 0.966,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2021-04",
+   "expiry": "2021-04-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30APR21-52000-P",
+     "trades": 5821,
+     "pages": 6,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-30APR21-48000-P",
+     "trades": 4091,
+     "pages": 5,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-30APR21-72000-C",
+     "trades": 2933,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LC": {
+     "symbol": "BTC-30APR21-84000-C",
+     "trades": 911,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.833,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2021-05",
+   "expiry": "2021-05-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28MAY21-52000-P",
+     "trades": 1676,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-28MAY21-45000-P",
+     "trades": 3699,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-28MAY21-70000-C",
+     "trades": 2086,
+     "pages": 3,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "LC": {
+     "symbol": "BTC-28MAY21-80000-C",
+     "trades": 1186,
+     "pages": 2,
+     "days_with_trade": 22,
+     "error": null,
+     "longest_gap_days": 5
+    }
+   },
+   "days_all_four_traded": 21,
+   "share_all_four": 0.75,
+   "longest_gap_all_four_days": 5
+  },
+  {
+   "month": "2021-07",
+   "expiry": "2021-07-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30JUL21-28000-P",
+     "trades": 1751,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-30JUL21-24000-P",
+     "trades": 1100,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 4
+    },
+    "SC": {
+     "symbol": "BTC-30JUL21-40000-C",
+     "trades": 4590,
+     "pages": 5,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-30JUL21-50000-C",
+     "trades": 874,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 22,
+   "share_all_four": 0.733,
+   "longest_gap_all_four_days": 4
+  },
+  {
+   "month": "2021-08",
+   "expiry": "2021-08-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27AUG21-38000-P",
+     "trades": 1433,
+     "pages": 2,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-27AUG21-32000-P",
+     "trades": 721,
+     "pages": 1,
+     "days_with_trade": 21,
+     "error": null,
+     "longest_gap_days": 6
+    },
+    "SC": {
+     "symbol": "BTC-27AUG21-50000-C",
+     "trades": 3444,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-27AUG21-60000-C",
+     "trades": 1347,
+     "pages": 2,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 3
+    }
+   },
+   "days_all_four_traded": 21,
+   "share_all_four": 0.778,
+   "longest_gap_all_four_days": 6
+  },
+  {
+   "month": "2021-10",
+   "expiry": "2021-10-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29OCT21-40000-P",
+     "trades": 1065,
+     "pages": 2,
+     "days_with_trade": 23,
+     "error": null,
+     "longest_gap_days": 6
+    },
+    "LP": {
+     "symbol": "BTC-29OCT21-35000-P",
+     "trades": 574,
+     "pages": 1,
+     "days_with_trade": 22,
+     "error": null,
+     "longest_gap_days": 4
+    },
+    "SC": {
+     "symbol": "BTC-29OCT21-55000-C",
+     "trades": 1610,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29OCT21-65000-C",
+     "trades": 2303,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 21,
+   "share_all_four": 0.724,
+   "longest_gap_all_four_days": 7
+  },
+  {
+   "month": "2021-12",
+   "expiry": "2021-12-31 08:00",
+   "hold_days": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31DEC21-50000-P",
+     "trades": 1246,
+     "pages": 2,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-31DEC21-44000-P",
+     "trades": 1192,
+     "pages": 2,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-31DEC21-70000-C",
+     "trades": 744,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 4
+    },
+    "LC": {
+     "symbol": "BTC-31DEC21-80000-C",
+     "trades": 468,
+     "pages": 1,
+     "days_with_trade": 23,
+     "error": null,
+     "longest_gap_days": 6
+    }
+   },
+   "days_all_four_traded": 21,
+   "share_all_four": 0.677,
+   "longest_gap_all_four_days": 8
+  },
+  {
+   "month": "2022-01",
+   "expiry": "2022-01-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28JAN22-42000-P",
+     "trades": 1284,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-28JAN22-38000-P",
+     "trades": 1968,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-28JAN22-54000-C",
+     "trades": 372,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LC": {
+     "symbol": "BTC-28JAN22-65000-C",
+     "trades": 240,
+     "pages": 1,
+     "days_with_trade": 21,
+     "error": null,
+     "longest_gap_days": 3
+    }
+   },
+   "days_all_four_traded": 20,
+   "share_all_four": 0.714,
+   "longest_gap_all_four_days": 4
+  },
+  {
+   "month": "2022-04",
+   "expiry": "2022-04-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29APR22-40000-P",
+     "trades": 2121,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-29APR22-36000-P",
+     "trades": 1592,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-29APR22-51000-C",
+     "trades": 311,
+     "pages": 1,
+     "days_with_trade": 22,
+     "error": null,
+     "longest_gap_days": 4
+    },
+    "LC": {
+     "symbol": "BTC-29APR22-55000-C",
+     "trades": 360,
+     "pages": 1,
+     "days_with_trade": 19,
+     "error": null,
+     "longest_gap_days": 5
+    }
+   },
+   "days_all_four_traded": 17,
+   "share_all_four": 0.586,
+   "longest_gap_all_four_days": 10
+  },
+  {
+   "month": "2022-05",
+   "expiry": "2022-05-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27MAY22-34000-P",
+     "trades": 1016,
+     "pages": 2,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-27MAY22-30000-P",
+     "trades": 3475,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-27MAY22-42000-C",
+     "trades": 1107,
+     "pages": 2,
+     "days_with_trade": 20,
+     "error": null,
+     "longest_gap_days": 7
+    },
+    "LC": {
+     "symbol": "BTC-27MAY22-46000-C",
+     "trades": 324,
+     "pages": 1,
+     "days_with_trade": 20,
+     "error": null,
+     "longest_gap_days": 4
+    }
+   },
+   "days_all_four_traded": 17,
+   "share_all_four": 0.63,
+   "longest_gap_all_four_days": 8
+  },
+  {
+   "month": "2022-07",
+   "expiry": "2022-07-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29JUL22-17000-P",
+     "trades": 961,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-29JUL22-14000-P",
+     "trades": 589,
+     "pages": 1,
+     "days_with_trade": 23,
+     "error": null,
+     "longest_gap_days": 6
+    },
+    "SC": {
+     "symbol": "BTC-29JUL22-22000-C",
+     "trades": 2159,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29JUL22-25000-C",
+     "trades": 4129,
+     "pages": 5,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 23,
+   "share_all_four": 0.793,
+   "longest_gap_all_four_days": 6
+  },
+  {
+   "month": "2022-09",
+   "expiry": "2022-09-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30SEP22-18000-P",
+     "trades": 6689,
+     "pages": 7,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-30SEP22-15000-P",
+     "trades": 2077,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-30SEP22-23000-C",
+     "trades": 1753,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-30SEP22-26000-C",
+     "trades": 999,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 3
+    }
+   },
+   "days_all_four_traded": 24,
+   "share_all_four": 0.8,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2022-10",
+   "expiry": "2022-10-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28OCT22-17000-P",
+     "trades": 2191,
+     "pages": 3,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-28OCT22-15000-P",
+     "trades": 849,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-28OCT22-22000-C",
+     "trades": 2957,
+     "pages": 3,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-28OCT22-24000-C",
+     "trades": 914,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 24,
+   "share_all_four": 0.857,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2022-12",
+   "expiry": "2022-12-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30DEC22-15000-P",
+     "trades": 2064,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-30DEC22-14000-P",
+     "trades": 941,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-30DEC22-19000-C",
+     "trades": 2053,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LC": {
+     "symbol": "BTC-30DEC22-21000-C",
+     "trades": 680,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.833,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2023-01",
+   "expiry": "2023-01-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27JAN23-15000-P",
+     "trades": 1011,
+     "pages": 2,
+     "days_with_trade": 20,
+     "error": null,
+     "longest_gap_days": 4
+    },
+    "LP": {
+     "symbol": "BTC-27JAN23-14000-P",
+     "trades": 862,
+     "pages": 1,
+     "days_with_trade": 21,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "SC": {
+     "symbol": "BTC-27JAN23-18000-C",
+     "trades": 1959,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-27JAN23-19000-C",
+     "trades": 1497,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 18,
+   "share_all_four": 0.667,
+   "longest_gap_all_four_days": 9
+  },
+  {
+   "month": "2023-03",
+   "expiry": "2023-03-31 08:00",
+   "hold_days": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31MAR23-22000-P",
+     "trades": 1674,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-31MAR23-20000-P",
+     "trades": 1850,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-31MAR23-27000-C",
+     "trades": 2086,
+     "pages": 3,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-31MAR23-30000-C",
+     "trades": 9491,
+     "pages": 10,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 28,
+   "share_all_four": 0.903,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2023-04",
+   "expiry": "2023-04-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28APR23-26000-P",
+     "trades": 1537,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-28APR23-23000-P",
+     "trades": 463,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-28APR23-32000-C",
+     "trades": 2063,
+     "pages": 3,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-28APR23-36000-C",
+     "trades": 360,
+     "pages": 1,
+     "days_with_trade": 22,
+     "error": null,
+     "longest_gap_days": 5
+    }
+   },
+   "days_all_four_traded": 19,
+   "share_all_four": 0.679,
+   "longest_gap_all_four_days": 5
+  },
+  {
+   "month": "2023-06",
+   "expiry": "2023-06-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30JUN23-25000-P",
+     "trades": 2104,
+     "pages": 3,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "LP": {
+     "symbol": "BTC-30JUN23-22000-P",
+     "trades": 833,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-30JUN23-29000-C",
+     "trades": 2237,
+     "pages": 3,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-30JUN23-32000-C",
+     "trades": 2894,
+     "pages": 3,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.833,
+   "longest_gap_all_four_days": 5
+  },
+  {
+   "month": "2023-07",
+   "expiry": "2023-07-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28JUL23-29000-P",
+     "trades": 2962,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-28JUL23-26000-P",
+     "trades": 651,
+     "pages": 1,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-28JUL23-34000-C",
+     "trades": 1908,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-28JUL23-38000-C",
+     "trades": 579,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 26,
+   "share_all_four": 0.929,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2023-09",
+   "expiry": "2023-09-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29SEP23-24500-P",
+     "trades": 1511,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-29SEP23-23000-P",
+     "trades": 1930,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-29SEP23-28000-C",
+     "trades": 2496,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29SEP23-30000-C",
+     "trades": 1440,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 29,
+   "share_all_four": 1.0,
+   "longest_gap_all_four_days": 0
+  },
+  {
+   "month": "2023-10",
+   "expiry": "2023-10-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27OCT23-26000-P",
+     "trades": 1948,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-27OCT23-24000-P",
+     "trades": 1019,
+     "pages": 2,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-27OCT23-29000-C",
+     "trades": 2730,
+     "pages": 3,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-27OCT23-32000-C",
+     "trades": 3046,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.926,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2023-12",
+   "expiry": "2023-12-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29DEC23-36000-P",
+     "trades": 1525,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-29DEC23-33000-P",
+     "trades": 974,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-29DEC23-43000-C",
+     "trades": 3724,
+     "pages": 4,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29DEC23-50000-C",
+     "trades": 2891,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 26,
+   "share_all_four": 0.897,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2024-03",
+   "expiry": "2024-03-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29MAR24-57000-P",
+     "trades": 1143,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-29MAR24-51000-P",
+     "trades": 576,
+     "pages": 1,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-29MAR24-75000-C",
+     "trades": 3865,
+     "pages": 4,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29MAR24-85000-C",
+     "trades": 2288,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 26,
+   "share_all_four": 0.897,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2024-05",
+   "expiry": "2024-05-31 08:00",
+   "hold_days": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31MAY24-52000-P",
+     "trades": 554,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "LP": {
+     "symbol": "BTC-31MAY24-46000-P",
+     "trades": 301,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "SC": {
+     "symbol": "BTC-31MAY24-66000-C",
+     "trades": 1177,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-31MAY24-75000-C",
+     "trades": 1925,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 24,
+   "share_all_four": 0.774,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2024-06",
+   "expiry": "2024-06-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28JUN24-62000-P",
+     "trades": 2735,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-28JUN24-58000-P",
+     "trades": 1456,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-28JUN24-75000-C",
+     "trades": 2949,
+     "pages": 3,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-28JUN24-85000-C",
+     "trades": 1421,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 27,
+   "share_all_four": 0.964,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2024-08",
+   "expiry": "2024-08-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30AUG24-60000-P",
+     "trades": 1812,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-30AUG24-55000-P",
+     "trades": 1768,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-30AUG24-72000-C",
+     "trades": 809,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LC": {
+     "symbol": "BTC-30AUG24-80000-C",
+     "trades": 655,
+     "pages": 1,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 3
+    }
+   },
+   "days_all_four_traded": 27,
+   "share_all_four": 0.9,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2024-09",
+   "expiry": "2024-09-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27SEP24-54000-P",
+     "trades": 917,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-27SEP24-49000-P",
+     "trades": 700,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-27SEP24-64000-C",
+     "trades": 2329,
+     "pages": 3,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-27SEP24-70000-C",
+     "trades": 1775,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.926,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2024-11",
+   "expiry": "2024-11-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29NOV24-64000-P",
+     "trades": 432,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-29NOV24-57000-P",
+     "trades": 216,
+     "pages": 1,
+     "days_with_trade": 21,
+     "error": null,
+     "longest_gap_days": 3
+    },
+    "SC": {
+     "symbol": "BTC-29NOV24-80000-C",
+     "trades": 2200,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29NOV24-90000-C",
+     "trades": 2920,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 20,
+   "share_all_four": 0.69,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2024-12",
+   "expiry": "2024-12-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27DEC24-90000-P",
+     "trades": 4170,
+     "pages": 5,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-27DEC24-82000-P",
+     "trades": 564,
+     "pages": 1,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-27DEC24-110000-C",
+     "trades": 3193,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-27DEC24-125000-C",
+     "trades": 926,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 26,
+   "share_all_four": 0.963,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2025-01",
+   "expiry": "2025-01-31 08:00",
+   "hold_days": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31JAN25-86000-P",
+     "trades": 552,
+     "pages": 1,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-31JAN25-76000-P",
+     "trades": 341,
+     "pages": 1,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-31JAN25-108000-C",
+     "trades": 2426,
+     "pages": 3,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-31JAN25-122000-C",
+     "trades": 803,
+     "pages": 1,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 28,
+   "share_all_four": 0.903,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2025-02",
+   "expiry": "2025-02-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28FEB25-95000-P",
+     "trades": 1387,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-28FEB25-86000-P",
+     "trades": 1958,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-28FEB25-114000-C",
+     "trades": 617,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-28FEB25-125000-C",
+     "trades": 507,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.893,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2025-03",
+   "expiry": "2025-03-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28MAR25-78000-P",
+     "trades": 1686,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-28MAR25-70000-P",
+     "trades": 1702,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-28MAR25-94000-C",
+     "trades": 1774,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-28MAR25-105000-C",
+     "trades": 828,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 3
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.893,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2025-05",
+   "expiry": "2025-05-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30MAY25-90000-P",
+     "trades": 1768,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-30MAY25-82000-P",
+     "trades": 622,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-30MAY25-106000-C",
+     "trades": 2304,
+     "pages": 3,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-30MAY25-115000-C",
+     "trades": 3413,
+     "pages": 4,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    }
+   },
+   "days_all_four_traded": 28,
+   "share_all_four": 0.933,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2025-06",
+   "expiry": "2025-06-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27JUN25-97000-P",
+     "trades": 2519,
+     "pages": 3,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-27JUN25-90000-P",
+     "trades": 924,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-27JUN25-115000-C",
+     "trades": 3016,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-27JUN25-125000-C",
+     "trades": 1433,
+     "pages": 2,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 25,
+   "share_all_four": 0.926,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2025-08",
+   "expiry": "2025-08-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29AUG25-108000-P",
+     "trades": 2808,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-29AUG25-100000-P",
+     "trades": 778,
+     "pages": 1,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-29AUG25-124000-C",
+     "trades": 1527,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-29AUG25-132000-C",
+     "trades": 603,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 28,
+   "share_all_four": 0.966,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2025-10",
+   "expiry": "2025-10-31 08:00",
+   "hold_days": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31OCT25-110000-P",
+     "trades": 4491,
+     "pages": 5,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-31OCT25-102000-P",
+     "trades": 2292,
+     "pages": 3,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-31OCT25-126000-C",
+     "trades": 3009,
+     "pages": 4,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-31OCT25-135000-C",
+     "trades": 1218,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 30,
+   "share_all_four": 0.968,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2025-11",
+   "expiry": "2025-11-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28NOV25-102000-P",
+     "trades": 2126,
+     "pages": 3,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-28NOV25-95000-P",
+     "trades": 4002,
+     "pages": 5,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-28NOV25-120000-C",
+     "trades": 2793,
+     "pages": 3,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 4
+    },
+    "LC": {
+     "symbol": "BTC-28NOV25-128000-C",
+     "trades": 529,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 24,
+   "share_all_four": 0.857,
+   "longest_gap_all_four_days": 4
+  },
+  {
+   "month": "2026-01",
+   "expiry": "2026-01-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30JAN26-82000-P",
+     "trades": 1976,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-30JAN26-75000-P",
+     "trades": 1925,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-30JAN26-96000-C",
+     "trades": 2081,
+     "pages": 3,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-30JAN26-104000-C",
+     "trades": 845,
+     "pages": 1,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 29,
+   "share_all_four": 0.967,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2026-02",
+   "expiry": "2026-02-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27FEB26-75000-P",
+     "trades": 1564,
+     "pages": 2,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-27FEB26-65000-P",
+     "trades": 3255,
+     "pages": 4,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "SC": {
+     "symbol": "BTC-27FEB26-86000-C",
+     "trades": 669,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-27FEB26-92000-C",
+     "trades": 282,
+     "pages": 1,
+     "days_with_trade": 22,
+     "error": null,
+     "longest_gap_days": 2
+    }
+   },
+   "days_all_four_traded": 19,
+   "share_all_four": 0.704,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2026-03",
+   "expiry": "2026-03-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27MAR26-60000-P",
+     "trades": 2146,
+     "pages": 3,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-27MAR26-54000-P",
+     "trades": 239,
+     "pages": 1,
+     "days_with_trade": 24,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "SC": {
+     "symbol": "BTC-27MAR26-74000-C",
+     "trades": 1623,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-27MAR26-80000-C",
+     "trades": 2276,
+     "pages": 3,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 24,
+   "share_all_four": 0.889,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2026-05",
+   "expiry": "2026-05-29 08:00",
+   "hold_days": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29MAY26-72000-P",
+     "trades": 1202,
+     "pages": 2,
+     "days_with_trade": 29,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LP": {
+     "symbol": "BTC-29MAY26-67000-P",
+     "trades": 339,
+     "pages": 1,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-29MAY26-83000-C",
+     "trades": 1110,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LC": {
+     "symbol": "BTC-29MAY26-88000-C",
+     "trades": 556,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 27,
+   "share_all_four": 0.931,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2026-07",
+   "expiry": "2026-07-31 08:00",
+   "hold_days": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31JUL26-54000-P",
+     "trades": 768,
+     "pages": 1,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "LP": {
+     "symbol": "BTC-31JUL26-48000-P",
+     "trades": 241,
+     "pages": 1,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-31JUL26-64000-C",
+     "trades": 1649,
+     "pages": 2,
+     "days_with_trade": 31,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-31JUL26-68000-C",
+     "trades": 3289,
+     "pages": 4,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 30,
+   "share_all_four": 0.968,
+   "longest_gap_all_four_days": 1
+  },
+  {
+   "month": "2026-08",
+   "expiry": "2026-08-28 08:00",
+   "hold_days": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28AUG26-59000-P",
+     "trades": 365,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-28AUG26-55000-P",
+     "trades": 300,
+     "pages": 1,
+     "days_with_trade": 25,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-28AUG26-67000-C",
+     "trades": 1174,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-28AUG26-71000-C",
+     "trades": 1011,
+     "pages": 2,
+     "days_with_trade": 27,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 23,
+   "share_all_four": 0.821,
+   "longest_gap_all_four_days": 3
+  },
+  {
+   "month": "2026-10",
+   "expiry": "2026-10-30 08:00",
+   "hold_days": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30OCT26-79000-P",
+     "trades": 1584,
+     "pages": 2,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 2
+    },
+    "LP": {
+     "symbol": "BTC-30OCT26-73000-P",
+     "trades": 969,
+     "pages": 1,
+     "days_with_trade": 28,
+     "error": null,
+     "longest_gap_days": 1
+    },
+    "SC": {
+     "symbol": "BTC-30OCT26-90000-C",
+     "trades": 1287,
+     "pages": 2,
+     "days_with_trade": 30,
+     "error": null,
+     "longest_gap_days": 0
+    },
+    "LC": {
+     "symbol": "BTC-30OCT26-96000-C",
+     "trades": 528,
+     "pages": 1,
+     "days_with_trade": 26,
+     "error": null,
+     "longest_gap_days": 1
+    }
+   },
+   "days_all_four_traded": 23,
+   "share_all_four": 0.767,
+   "longest_gap_all_four_days": 2
+  },
+  {
+   "month": "2026-11",
+   "expiry": "2026-11-27 08:00",
+   "hold_days": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27NOV26-73000-P",
+     "trades": 941,
+     "pages": 1,
+     "days_with_trade": 15,
+     "error": null,
+     "longest_gap_days": 12
+    },
+    "LP": {
+     "symbol": "BTC-27NOV26-67000-P",
+     "trades": 479,
+     "pages": 1,
+     "days_with_trade": 14,
+     "error": null,
+     "longest_gap_days": 12
+    },
+    "SC": {
+     "symbol": "BTC-27NOV26-84000-C",
+     "trades": 785,
+     "pages": 1,
+     "days_with_trade": 15,
+     "error": null,
+     "longest_gap_days": 12
+    },
+    "LC": {
+     "symbol": "BTC-27NOV26-89000-C",
+     "trades": 287,
+     "pages": 1,
+     "days_with_trade": 15,
+     "error": null,
+     "longest_gap_days": 12
+    }
+   },
+   "days_all_four_traded": 14,
+   "share_all_four": 0.519,
+   "longest_gap_all_four_days": 12
+  }
+ ],
+ "mark_price_history": [
+  {
+   "month": "2020-03",
+   "symbol": "BTC-27MAR20-8000-P",
+   "status": 400,
+   "points": 0,
+   "error": "Invalid params",
+   "first": null,
+   "last": null
+  },
+  {
+   "month": "2020-03",
+   "symbol": "BTC-27MAR20-11500-C",
+   "status": 400,
+   "points": 0,
+   "error": "Invalid params",
+   "first": null,
+   "last": null
+  },
+  {
+   "month": "2023-09",
+   "symbol": "BTC-29SEP23-24500-P",
+   "status": 400,
+   "points": 0,
+   "error": "Invalid params",
+   "first": null,
+   "last": null
+  },
+  {
+   "month": "2023-09",
+   "symbol": "BTC-29SEP23-30000-C",
+   "status": 400,
+   "points": 0,
+   "error": "Invalid params",
+   "first": null,
+   "last": null
+  },
+  {
+   "month": "2026-11",
+   "symbol": "BTC-27NOV26-73000-P",
+   "status": 200,
+   "points": 0,
+   "error": null,
+   "first": null,
+   "last": null
+  },
+  {
+   "month": "2026-11",
+   "symbol": "BTC-27NOV26-89000-C",
+   "status": 200,
+   "points": 0,
+   "error": null,
+   "first": null,
+   "last": null
+  }
+ ],
+ "tardis_day2_get": [
+  {
+   "url": "https://datasets.tardis.dev/v1/deribit/options_chain/2024/03/02/OPTIONS.csv.gz",
+   "status": 401,
+   "bytes": 355,
+   "body_head": "{\n  \"code\": 10,\n  \"message\": \"For unauthorized requests, only historical CSV market datasets for the first day of each month are available (dataset for '2024-03"
+  },
+  {
+   "url": "https://datasets.tardis.dev/v1/deribit/book_snapshot_25/2024/03/02/OPTIONS.csv.gz",
+   "status": 401,
+   "bytes": 358,
+   "body_head": "{\n  \"code\": 10,\n  \"message\": \"For unauthorized requests, only historical CSV market datasets for the first day of each month are available (dataset for '2024-03"
+  },
+  {
+   "url": "https://datasets.tardis.dev/v1/deribit/options_chain/2024/03/01/OPTIONS.csv.gz",
+   "status": 206,
+   "bytes": 2048,
+   "body_head": null
+  }
+ ],
+ "trades_recheck": [
+  {
+   "month": "2026-02",
+   "status": 200,
+   "bytes": 413859,
+   "rows": 24897,
+   "btc_rows": 14661
+  },
+  {
+   "month": "2026-07",
+   "status": 200,
+   "bytes": 291923,
+   "rows": 17415,
+   "btc_rows": 11773
+  }
+ ]
+}
