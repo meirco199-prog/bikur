@@ -1,0 +1,40 @@
+URL https://cryptostruct.com/analyze/orderbook?i=14945279&amp;date=2026-11-05&amp;s=deribit-btc-options
+STATUS 200 text/html; charset=utf-8
+
+ Analyze · Orderbook Replay — CryptoStruct Market Data Analytics Historical Data Historical Day Bundles Bundles Real-Time Data Real-Time Pricing Analyze Exchange Status Status Enterprise Cart Analyze Overview Exchanges Scanner Cross-Venue Liquidity Movers Replay Status Orderbook Replay Replay any purchased day tick by tick — L2 book, trade tape, bid/ask + trade chart. Your files replay any purchased tick day Sign in to open your purchased days from your file list — or open a replay straight from your order page's download list. Free samples no purchase needed Every curated sample day on the download page has a Replay button — including flagship venues. Open the sample table → ● Archive online │ coverage 39 venues files 49.1M + │ bulk pricing · automated sync · info@cryptostruct.com │ exchanges · assets · predictions · samples & docs │ contact & feedback · terms · data license invoice on checkout Shop Bundles Realtime Analyze Pricing 
+
+LINKS
+https://clerk.cryptostruct.com
+https://clerk.cryptostruct.com/npm/@clerk/ui@1/dist/ui.browser.js
+https://cryptostruct.com/
+https://cryptostruct.com/_next/static/chunks/0kn67oa7xk2pg.css
+https://cryptostruct.com/_next/static/chunks/0m7khvbm4rg08.css
+https://cryptostruct.com/_next/static/chunks/0sbhlz13u924f.css
+https://cryptostruct.com/_next/static/chunks/0tk1-yeb_ilv4.css
+https://cryptostruct.com/_next/static/chunks/0tx_lt3d7s6yo.js
+https://cryptostruct.com/account/files
+https://cryptostruct.com/analyze
+https://cryptostruct.com/analyze/cross-venue
+https://cryptostruct.com/analyze/exchanges
+https://cryptostruct.com/analyze/instrument
+https://cryptostruct.com/analyze/liquidity
+https://cryptostruct.com/analyze/movers
+https://cryptostruct.com/analyze/orderbook
+https://cryptostruct.com/assets
+https://cryptostruct.com/contact
+https://cryptostruct.com/download
+https://cryptostruct.com/enterprise
+https://cryptostruct.com/exchanges
+https://cryptostruct.com/feed
+https://cryptostruct.com/fonts/OpenSans-v1.woff2
+https://cryptostruct.com/fonts/SpaceMono-Regular-v1.woff2
+https://cryptostruct.com/icon.svg?icon.0om94wcgt.ekl.svg
+https://cryptostruct.com/license
+https://cryptostruct.com/prediction-markets
+https://cryptostruct.com/pricing
+https://cryptostruct.com/shop
+https://cryptostruct.com/shop/bundles
+https://cryptostruct.com/shop/realtime
+https://cryptostruct.com/status
+https://cryptostruct.com/terms
+mailto:info@cryptostruct.com?subject=Bulk%20access%20%26%20sync
