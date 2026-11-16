@@ -11,11 +11,12 @@ S=$(( (day0 + 11*3600 + 55*60) * 1000000 )); T0=$(( (day0 + 12*3600) * 1000000 )
 for DS in options_chain book_snapshot_25 quotes; do
   URL="https://datasets.tardis.dev/v1/deribit/$DS/$Y/$MO/01/OPTIONS.csv.gz"; P="$OUT/$M/$DS"
   t=$(date +%s)
-  # הגנה מתקיעה: בריצה הראשונה (15/11) הזרימה של שלושה קבצים גדולים מ-2024–2026 עמדה כשעה וחצי בלי נתונים — עכשיו נקטעת אם
-  # הקצב יורד מתחת ל-20KB/s במשך 90 שניות, עד 30 דקות לקובץ, ועד 3 ניסיונות
+  # הגנה מתקיעה: בשתי הריצות הראשונות (15/11) קובץ בודד (למשל 2024-12 quotes, 2025-09 ו-2026-09 book_snapshot_25) נתקע עד ביטול,
+  # בעוד שכל השאר הסתיימו ב-1–3 דקות. לכן כל ניסיון נהרג בכוח אחרי 10 דקות (כל קבוצת התהליכים: curl, gzip, awk), עד 3 ניסיונות.
+  # אם awk כבר הגיע ל-12:10 וכתב את הקבצים לפני שהצינור נתקע — הניסיון נחשב תקין.
   for try in 1 2 3; do
   rm -f "$P.meta"
-  curl -sS --fail -L --connect-timeout 30 --speed-limit 20000 --speed-time 90 --max-time 1800 "$URL" 2>"$P.curl.err" | gzip -dc 2>/dev/null | awk -F, -v S=$S -v T0=$T0 -v T5=$T5 -v E=$E -v P="$P" '
+  timeout -k 15 600 bash -c 'curl -sS --fail -L --connect-timeout 30 --speed-limit 20000 --speed-time 90 --max-time 600 "$0" 2>"$1.curl.err" | gzip -dc 2>/dev/null | awk -F, -v S=$2 -v T0=$3 -v T5=$4 -v E=$5 -v P="$1" '"'"'
     NR==1 { hdr=$0; next }
     { ts=$4+0; rows++; if (ts<prev) inv++; prev=ts }
     ts>E { done=1; exit }
@@ -27,15 +28,17 @@ for DS in options_chain book_snapshot_25 quotes; do
       print hdr > f2; for (k in b) print b[k] > f2
       print "symbol,updates_1155_1210" > f3; for (k in w) print k","w[k] > f3
       printf "rows_read=%d\nrows_btc=%d\nreached_1210=%d\nlast_local_ts=%s\nts_inversions=%d\n", rows, nb, done, ts, inv > P".meta"
-    }'
-  grep -q "reached_1210=1" "$P.meta" && break
-  echo "ניסיון $try נכשל: $(head -c 200 "$P.curl.err")"
+    }'"'"'' "$URL" "$P" "$S" "$T0" "$T5" "$E"
+  echo "timeout_rc=$?" > "$P.rc"
+  grep -qs "reached_1210=1" "$P.meta" && break
+  echo "ניסיון $try נכשל ($(cat "$P.rc")): $(head -c 200 "$P.curl.err")"
   done
+  [ -f "$P.meta" ] || echo "reached_1210=0" > "$P.meta"
   echo "attempts=$try" >> "$P.meta"
   echo "seconds=$(( $(date +%s) - t ))" >> "$P.meta"; echo "url=$URL" >> "$P.meta"
   echo "$M $DS: $(tr '\n' ' ' < "$P.meta")"
 done
 # trades (ביקורת בלבד): כל עסקאות אופציות BTC של היום
 URL="https://datasets.tardis.dev/v1/deribit/trades/$Y/$MO/01/OPTIONS.csv.gz"; P="$OUT/$M/trades"
-curl -sS --fail -L --connect-timeout 30 --speed-limit 20000 --speed-time 90 --max-time 1800 --retry 3 "$URL" 2>"$P.curl.err" | gzip -dc 2>/dev/null | awk -F, 'NR==1 || index($2,"BTC-")==1' | gzip > "$P.btc.csv.gz"
+timeout -k 15 900 bash -c 'curl -sS --fail -L --connect-timeout 30 --speed-limit 20000 --speed-time 90 --max-time 880 "$0" 2>"$1.curl.err" | gzip -dc 2>/dev/null | awk -F, '"'"'NR==1 || index($2,"BTC-")==1'"'"' | gzip > "$1.btc.csv.gz"' "$URL" "$P" || echo "$M trades: נקטע ($?)"
 echo "$M trades: $(gzip -dc "$P.btc.csv.gz" | wc -l) rows (כולל כותרת)"

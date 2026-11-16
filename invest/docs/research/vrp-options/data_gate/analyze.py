@@ -79,11 +79,15 @@ def month(mdir):
         res['files'][ds] = {'rows_read': int(mt.get('rows_read', 0) or 0), 'rows_btc': int(mt.get('rows_btc', 0) or 0), 'reached_1210': mt.get('reached_1210') == '1', 'seconds': mt.get('seconds'), 'error': err[:200]}
     tr = f'{mdir}/trades.btc.csv.gz'
     trades = {}
+    tr_err = None
     if os.path.exists(tr):
-        with gzip.open(tr, 'rt', newline='') as fh:
-            for row in csv.DictReader(fh):
-                trades.setdefault(row['symbol'], []).append(int(row['timestamp']))
-    res['files']['trades'] = {'btc_option_trades_day': sum(len(v) for v in trades.values())}
+        try:  # קובץ שנקטע בהורדה (הריגה אחרי מגבלת זמן) — נספר עד נקודת הקטיעה ומסומן
+            with gzip.open(tr, 'rt', newline='') as fh:
+                for row in csv.DictReader(fh):
+                    trades.setdefault(row['symbol'], []).append(int(row['timestamp']))
+        except (EOFError, OSError, ValueError, KeyError) as e:
+            tr_err = f'קובץ חלקי: {type(e).__name__}'
+    res['files']['trades'] = {'btc_option_trades_day': sum(len(v) for v in trades.values()), 'error': tr_err}
     chain = read_rows(f'{mdir}/options_chain.t1200.csv')
     book = read_rows(f'{mdir}/book_snapshot_25.t1205.csv')
     quotes = read_rows(f'{mdir}/quotes.t1205.csv')
