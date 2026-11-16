@@ -1,0 +1,90 @@
+{
+ "hl_status": 200,
+ "hl_n": 235,
+ "hl_delisted": 56,
+ "bn_n": 1011,
+ "pairs_n": 214,
+ "pairs_delisted_hl": 41,
+ "unmatched_hl": [
+  "HPOS",
+  "RLB",
+  "UNIBOT",
+  "OX",
+  "FRIEND",
+  "SHIA",
+  "CANTO",
+  "REQ",
+  "NFTI",
+  "PANDORA",
+  "MNT",
+  "BLAST",
+  "kDOGS",
+  "kNEIRO",
+  "PURR",
+  "JELLY",
+  "LAUNCHCOIN",
+  "YZY",
+  "APEX",
+  "CASHCAT",
+  "XTEN"
+ ],
+ "bn_files": {
+  "https://data.binance.vision/data/futures/um/monthly/klines/BTCUSDT/1h/BTCUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/markPriceKlines/BTCUSDT/1h/BTCUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/premiumIndexKlines/BTCUSDT/1h/BTCUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/daily/bookDepth/BTCUSDT/BTCUSDT-bookDepth-2024-03-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/bookTicker/BTCUSDT/BTCUSDT-bookTicker-2023-03.zip": 404,
+  "https://data.binance.vision/data/futures/um/daily/bookTicker/BTCUSDT/BTCUSDT-bookTicker-2024-03-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/fundingRate/BTCUSDT/BTCUSDT-fundingRate-2023-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/fundingRate/BTCUSDT/BTCUSDT-fundingRate-2026-10.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/klines/SOLUSDT/1h/SOLUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/markPriceKlines/SOLUSDT/1h/SOLUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/premiumIndexKlines/SOLUSDT/1h/SOLUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/daily/bookDepth/SOLUSDT/SOLUSDT-bookDepth-2024-03-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/bookTicker/SOLUSDT/SOLUSDT-bookTicker-2023-03.zip": 404,
+  "https://data.binance.vision/data/futures/um/daily/bookTicker/SOLUSDT/SOLUSDT-bookTicker-2024-03-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/fundingRate/SOLUSDT/SOLUSDT-fundingRate-2023-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/fundingRate/SOLUSDT/SOLUSDT-fundingRate-2026-10.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/klines/MATICUSDT/1h/MATICUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/markPriceKlines/MATICUSDT/1h/MATICUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/premiumIndexKlines/MATICUSDT/1h/MATICUSDT-1h-2024-03.zip": 200,
+  "https://data.binance.vision/data/futures/um/daily/bookDepth/MATICUSDT/MATICUSDT-bookDepth-2024-03-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/bookTicker/MATICUSDT/MATICUSDT-bookTicker-2023-03.zip": 404,
+  "https://data.binance.vision/data/futures/um/daily/bookTicker/MATICUSDT/MATICUSDT-bookTicker-2024-03-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/fundingRate/MATICUSDT/MATICUSDT-fundingRate-2023-01.zip": 200,
+  "https://data.binance.vision/data/futures/um/monthly/fundingRate/MATICUSDT/MATICUSDT-fundingRate-2026-10.zip": 200
+ },
+ "hl_candles": {
+  "BTC/1d": {
+   "status": 200,
+   "n": 1416,
+   "first": "2023-01-01"
+  },
+  "BTC/1h": {
+   "status": 200,
+   "n": 5004,
+   "first": "2026-04-22"
+  },
+  "SOL/1d": {
+   "status": 200,
+   "n": 1416,
+   "first": "2023-01-01"
+  },
+  "SOL/1h": {
+   "status": 200,
+   "n": 5003,
+   "first": "2026-04-22"
+  },
+  "MATIC/1d": {
+   "status": 200,
+   "n": 618,
+   "first": "2023-01-01"
+  },
+  "MATIC/1h": {
+   "status": 200,
+   "n": 5000,
+   "first": "2024-02-14"
+  }
+ },
+ "hl_l2_history": "ארכיון S3 של Hyperliquid (requester-pays) — דורש חשבון AWS ותשלום לפי שליפה; לא נבדק"
+}
