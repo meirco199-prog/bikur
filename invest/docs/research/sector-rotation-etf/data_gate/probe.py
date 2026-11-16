@@ -27,13 +27,14 @@ def get(u, tries=3, timeout=90):
     return err
 
 
-def fetch(raw):
+def fetch(raw, fred=True):
     os.makedirs(raw, exist_ok=True)
     p2 = int(time.time())
     for s in ALL + ['^IRX']:
         st, b, sec = get(f'https://query1.finance.yahoo.com/v8/finance/chart/{s.replace("^", "%5E")}?period1={P1}&period2={p2}&interval=1d&events=div,splits&includeAdjustedClose=true')
         open(f'{raw}/{s.replace("^", "_")}.json', 'wb').write(b if st == 200 else json.dumps({'error': [st, b.decode('utf8', 'replace')]}).encode())
         print(s, st, len(b), sec, flush=True); time.sleep(2)
+    if not fred: return
     attempts = []
     for u in ['https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3&cosd=1998-01-01',
               'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3',
@@ -167,5 +168,5 @@ def main(raw, out):
 
 
 if __name__ == '__main__':
-    if sys.argv[1] == 'fetch': fetch(sys.argv[2])
+    if sys.argv[1] == 'fetch': fetch(sys.argv[2], fred='--no-fred' not in sys.argv)
     else: main(sys.argv[2], sys.argv[3])

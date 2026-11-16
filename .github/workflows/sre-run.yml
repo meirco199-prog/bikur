@@ -1,0 +1,27 @@
+# זמני (ops): Dual-Momentum Sector Rotation — הרצה אחת לפי PROTOCOL_v1.0.md (כללים נעולים ב-87e3afa). ענף מחקר בלבד; יוסר בסוף.
+name: sre-run
+on:
+  push:
+    branches: [research/sector-rotation-etf]
+    paths: [.github/workflows/sre-run.yml]
+permissions: { contents: write }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch + run
+        run: |
+          D=invest/docs/research/sector-rotation-etf
+          python3 $D/data_gate/probe.py fetch raw --no-fred
+          python3 $D/sre.py run raw $D/results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: sre-run-raw, path: raw, retention-days: 90 }
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/sector-rotation-etf/results
+          git commit -m "ops(sre): הרצה אחת לפי PROTOCOL_v1.0 (ריצה ${GITHUB_RUN_ID})" || exit 0
+          git push origin "HEAD:${GITHUB_REF_NAME}"
