@@ -1,72 +1,150 @@
-# DATA GATE REPORT — VRP Defined-Risk BTC Options, protocol v1.1
-**Date:** 2026-11-15 UTC  
-**Verdict:** **INCONCLUSIVE**. **STOP: no backtest authorized or performed.**
+# דוח שער הנתונים — VRP, Iron Condor מוגדר-סיכון על אופציות ביטקוין (פרוטוקול v1.1)
 
-## Executive decision
-Public authoritative documentation confirms that free first-of-month Deribit options files **should be available** from Tardis, with historical quotes, options chain and top-25 order-book snapshots. However **actual file records were not obtained from this execution environment**, and therefore availability for the needed BTC strikes, valid timely bids and offers, quantities and per-leg depth **at 12:00–12:05 UTC across 2020–2026 is not verified**. Furthermore free first-day-of-month samples alone cannot provide daily marked-to-market valuations through monthly option holding periods. There is no basis for realistic profit, CAGR, drawdown, fills or PASS at this stage.
+**תאריך:** 2026-11-16 UTC (מחליף את הגרסה מ-15/11, שבה לא הורד אף קובץ)
+**פסיקה:** **INCONCLUSIVE — שער הנתונים לא עבר. עצירה: לא נכתב ולא הורץ Backtest, לא חושבה תשואה.**
 
-## Direct availability checks attempted (NOT successful downloads)
-- Tried direct dataset HTTP retrieval of `https://datasets.tardis.dev/v1/deribit/options_chain/2020/03/01/OPTIONS.csv.gz` using an execution-container HTTPS request. **Outcome:** DNS name resolution blocked in this environment. No data downloaded.
-- Tried opening the above URL with web retrieval; **outcome:** binary gzip inaccessible via browsing interface.
-- Tried `https://datasets.tardis.dev/v1/deribit/book_snapshot_25/2025/03/01/OPTIONS.csv.gz`; same binary-access limitation.
-- Tried `https://api.tardis.dev/v1/exchanges/deribit`; access limitation.
-- **Do not misclassify this tool/connectivity problem as absent vendor data**. Actual file GET/CRC, row counts, timestamps, symbol coverage, book coverage and completeness remain **unverified**.
+> מה השתנה מהגרסה הקודמת: הפעם כל קובצי הדגימה החינמיים של Tardis הורדו ונפתחו בפועל (81 חודשים, 2020-03 עד 2026-11, 324 קבצים),
+> ונבדקו בפועל המקורות החינמיים של Deribit לשווי יומי. הפרוטוקול וקריטריוני ההצלחה לא שונו.
 
-## Verified through vendor/exchange documentation (NOT row-level audited)
-1. Tardis Deribit coverage is documented from **2019-03-30** and docs list `OPTIONS` sample datasets for `trades`, `quotes`, `options_chain`, `book_snapshot_25`, with examples dated **2020-03-01**.
-2. Tardis explicitly documents **no-key first-day-of-each-month CSV downloads**; datasets are gzip and split by calendar day, per dataset channel and exchange.
-3. `options_chain` schema is documented with listed instrument, strike, expiration, bid/ask/IV/Greeks, but not proof those fields are non-null at the chosen execution minute.
-4. `book_snapshot_25` is listed for OPTIONS; depth at the specified time, frequency, stale/empty snapshots and 10-delta wing liquidity remain untested.
-5. Deribit public historical trade endpoints exist (e.g. https://history.deribit.com/api/v2/public/get_last_trades_by_instrument_and_time ) but trade prints are **not** reconstructable contemporaneous 4-leg L2 depth.
-6. Deribit inverse BTC options are BTC-settled. BTC USDC linear options were added **2025-08-19** and cannot be back-projected into earlier years. The BTC inverse exercise/settlement process changed **2026-08-01**; accounting needs historically accurate rules.
+## 1. השורה התחתונה
 
-## Reproducible sample URL manifest
-All URLs are **vendor-documented format**, not proof of file/row content:
-- 2020-03-01: https://datasets.tardis.dev/v1/deribit/options_chain/2020/03/01/OPTIONS.csv.gz
-- 2020-09-01: https://datasets.tardis.dev/v1/deribit/quotes/2020/09/01/OPTIONS.csv.gz
-- 2021-03-01: https://datasets.tardis.dev/v1/deribit/book_snapshot_25/2021/03/01/OPTIONS.csv.gz
-- 2022-03-01: https://datasets.tardis.dev/v1/deribit/options_chain/2022/03/01/OPTIONS.csv.gz
-- 2023-03-01: https://datasets.tardis.dev/v1/deribit/quotes/2023/03/01/OPTIONS.csv.gz
-- 2024-03-01: https://datasets.tardis.dev/v1/deribit/book_snapshot_25/2024/03/01/OPTIONS.csv.gz
-- 2025-03-01: https://datasets.tardis.dev/v1/deribit/book_snapshot_25/2025/03/01/OPTIONS.csv.gz
-- 2026-03-01: https://datasets.tardis.dev/v1/deribit/options_chain/2026/03/01/OPTIONS.csv.gz
+| שאלה | תשובה | רמת ראיה |
+|---|---|---|
+| האם יש נתוני כניסה אמיתיים (קנייה/מכירה, עומק) ב-12:00–12:05 UTC? | **כן, בכל 81 החודשים** | הורד ונבדק |
+| האם אפשר לבחור את 4 הרגליים לפי הכללים הנעולים? | **כן ב-51 מתוך 81 חודשים**; ב-30 חודשים אין פקיעה בטווח 25–35 יום (הכלל מחייב דילוג) | הורד ונבדק |
+| האם עסקה בסיכון של 4,000$ (50K) ניתנת לביצוע לפי הספר? | **כן, בכל 51 החודשים**, וגם 8,000$ (100K) | הורד ונבדק |
+| האם אפשר לקבוע עלות ביצוע ריאלית לכניסה? | **כן** — מחירי קנייה/מכירה בפועל והליכה בספר; עמלות לפי הלוח הנוכחי (ההיסטוריה שלו לא אומתה) | הורד ונבדק / לא אומת (עמלות) |
+| האם יש שווי יומי לכל ארבע הרגליים לאורך חיי העסקה (נדרש לירידה מקסימלית יומית)? | **לא בחינם.** ממחירי הסימון שבעסקאות הציבוריות: לכל 4 הרגליים יחד רק ב-89% מהימים (חציון), חודש אחד מתוך 51 מכוסה במלואו, פערים עד 12 ימים | הורד ונבדק |
+| האם יש היסטוריה של כללי הביטחונות והמרג'ין (Deribit, אופציות הפוכות) שמאפשרת חישוב יומי? | **לא** — יש תיעוד של הכללים הנוכחיים בלבד | טענת ספק / לא אומת |
 
-## Specific unresolved variables
-| Need | Supported by published documentation | Verified on actual records? | Consequence |
-|---|---|---|---|
-| Exact listed monthly 25/10 delta four-leg BTC instruments | May be derived from chain | **No** | Cannot identify tradable legs |
-| Fresh bid/ask **12:00–12:05 UTC** | Quotes documented | **No** | No executable credit |
-| Top-25 depth at 12:05 | Snapshots documented | **No** | No size-capacity or walking-book model |
-| Historical combo or staggered-leg execution | COMBOS feed may exist in more recent periods | **No** | Cannot bound legging risk |
-| Daily continuous marks throughout ~30-day hold | First-day sample alone **insufficient** | **No** | No legitimate daily max DD |
-| Historical BTC collateral and margin state | Exchange docs partially cover rules | **No** | Forced-liquidation risk unresolved |
-| Synchronized raw timestamp and feed integrity | Vendor docs describe timestamps/order | **No** | Need file audit |
+לפי §3 בפרוטוקול, PASS דורש שגם השווי היומי וגם מנגנוני המרג'ין ניתנים לאמידה אמינה. לכן הפסיקה **INCONCLUSIVE**: הנתונים לא מראים
+שהאסטרטגיה בלתי ניתנת לביצוע (אין עילה ל-FAIL) — להפך, הכניסה ניתנת לביצוע בכל חודש שבו הכלל מאפשר עסקה — אבל השווי היומי והמרג'ין
+אינם ניתנים לבנייה אמינה מהמקורות החינמיים.
 
-## Cost to obtain more data (published list, quote required)
-Vendor: https://tardis.dev/ , Options category page (2026-11-15 search snapshot):
-- **Free first-of-month samples: $0**, constrained to one day per month.
-- **Solo Options: listed around $700 per month**; CSV downloads, annual billing includes **four years** of history, not the full 2020–2026 range. Monthly access typically only **four months**. An annual commitment at that advertised monthly rate approximates **$8,400**, subject to vendor terms.
-- **Business Options: listed around $3,000 per month**, yearly billing accesses all historical records; annual cost approximately **$36,000** at the listed rate, subject to quotation.
-- **Academic Options: listed around $350/month** with eligibility restrictions and quarterly/yearly minimum, generally not usable without proof of academic status.
-- Other vendors (Amberdata and other reseller quotes): **cost NOT VERIFIED**, do not assert a specific dollar range.
-- Ask provider about a *limited date-range/single-exchange historical extract or evaluation trial* before considering an expensive plan. Any purchase requires explicit authorization.
+## 2. מה הורד ונבדק בפועל (קטגוריה א')
 
-## What can be done for FREE (only after a session with dataset download access)
-A. Download `options_chain`, `quotes`, `book_snapshot_25` for 1st-of-month samples in representative years 2020–2026.
-B. Validate file integrity and row timestamps; restrict to 11:55–12:15 UTC; count available BTC inverse 25/10 delta strikes and check listed expiries 25–35 days.
-C. Check positive bid/ask, quote age, spread relative to premium, displayed depth of all four options, and whether a $4k worst-case-loss position can fit (with actual contract lot increments) at opening.
-D. Compare multiple calendar samples, report coverage by year and specifically detect missing 10-delta protective offers.
-E. Determine whether any **no-cost** source provides daily synchronized option marks and margin information across the intervening ~30 days. If not, Data Gate cannot become PASS for performance research solely on monthly samples.
-**Do not produce CAGR, PnL or maximum drawdown from the samples alone.**
+**שיטה.** ב-GitHub Actions (ענף המחקר בלבד; קובץ ההרצה הזמני הוסר בסוף), ליום הראשון של כל חודש מ-2020-03 עד 2026-11 (81 חודשים):
+`options_chain`, `book_snapshot_25` ו-`quotes` של Deribit OPTIONS הורדו בזרימה ונקראו עד 12:10 UTC (הקבצים ממוינים לפי `local_timestamp`;
+0 היפוכי סדר בכל 243 הקבצים). `trades` הורד במלואו (ביקורת בלבד). סקריפטים: `data_gate/extract.sh`, `data_gate/analyze.py`, `data_gate/probe.py`,
+`data_gate/probe2.py`. תוצאות: `data_gate/results/` (`samples.md` — טבלה לכל חודש, `samples.json`, `files_meta.txt`, `probe.json`, `probe2.json`, `vendor_pages.txt`).
 
-## Final determination
-**INCONCLUSIVE, DATA GATE NOT PASSED.** Documented free sample availability is sufficiently promising to justify **download-and-inspect feasibility**, not a $50k executable backtest. This environment could not verify byte-level datasets; no purchase, no option data simulation, no code trading engine and no interaction with existing automated systems.
+**כללי הבחירה (מהפרוטוקול, בלי שינוי):** החלטה לפי המצב האחרון של `options_chain` עד 12:00; ביצוע לפי הספר האחרון (`book_snapshot_25`) עד 12:05;
+הפקיעה הקרובה ל-30 יום בטווח 25–35 (שוויון: המוקדמת); רגליים לפי הדלתא של הבורסה, הסטרייק הקרוב ביותר (שוויון: הרחוק יותר מהכסף);
+מכירה במחיר הקנייה (bid) וקנייה במחיר המכירה (ask), הליכה בספר לכל הכמות. **אין מילוי במחיר האמצע.**
 
-## Sources
-- https://docs.tardis.dev/historical-data-details/deribit
-- https://docs.tardis.dev/downloadable-csv-files
-- https://docs.tardis.dev/faq/billing-and-subscriptions
-- https://tardis.dev/
-- https://insights.deribit.com/education/usdc-settled-btc-eth-options-launch/
-- https://support.deribit.com/hc/en-us/articles/31424939096093-Inverse-Options
-- https://static.deribit.com/files/DeribitInstitutionalSetupGuide.pdf
+### טבלה לפי שנה
+
+| שנה | חודשים שנבדקו | חודשים עם קבצים תקינים | פקיעה 25–35 + 4 רגליים | כיסוי סביב 12:05 — גיל הספר בשניות (חציון / גרוע) | מרווח חציוני (%) נמכרות / כנפיים | עומק מינימלי בצד הנדרש (BTC, 25 רמות) | ביצוע מלא 50K / 100K | חודשים שדרשו יותר מרמה אחת (50K) | שווי יומי (חינמי) | מגבלות |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2020 | 10 | 10 | 6 | 100 / 289 | 6.4 / 14.9 | 35.7 | 6/6 / 6/6 | 3 | חלקי: 4 רגליים ב-89% מהימים (חציון), פער עד 7 ימים | שוק דליל: גיל ספר עד 289 ש׳; מרווח כנפיים עד 18% |
+| 2021 | 12 | 12 | 7 | 12 / 72 | 4.6 / 11.4 | 51.2 | 7/7 / 7/7 | 1 | חלקי: 75%, פער עד 8 ימים | הפסד לחוזה גבוה → 0.3–0.5 חוזים (גרנולריות) |
+| 2022 | 12 | 12 | 7 | 98 / 694 | 3.6 / 8.2 | 69.9 | 7/7 / 7/7 | 1 | חלקי: 79%, פער עד 10 ימים | 2022-10: ספר מיושן ברגל הקנויה (694 ש׳) |
+| 2023 | 12 | 12 | 8 | 49 / 106 | 4.6 / 8.7 | 38.2 | 8/8 / 8/8 | 2 | חלקי: 90%, פער עד 9 ימים | — |
+| 2024 | 12 | 12 | 7 | 15 / 47 | 4.5 / 12.5 | 134.1 | 7/7 / 7/7 | 0 | חלקי: 90%, פער עד 3 ימים | — |
+| 2025 | 12 | 12 | 8 | 23 / 233 | 4.8 / 7.4 | 138.3 | 8/8 / 8/8 | 5 | חלקי: 91%, פער עד 4 ימים | — |
+| 2026 | 11 | 11 | 8 | 27 / 45 | 6.1 / 9.0 | 335.5 | 8/8 / 8/8 | 1 | חלקי: 86%, פער עד 12 ימים | מעבר מנגנון סליקה 2026-08-01 (טענה); אופציות USDC ליניאריות לא בשימוש |
+
+הטבלה המלאה לכל חודש — סימבולים, מחירי קנייה/מכירה לכל רגל, עומק, גודל ברמה הראשונה, גיל הציטוט, מספר עדכונים 11:55–12:10, חוזים ל-4,000$,
+החלקה בהליכה בספר, הפסד מקסימלי לחוזה — ב-`data_gate/results/samples.md` וב-`samples.json`.
+
+### ממצאים מרכזיים (א')
+1. **קיום ושלמות:** 81/81 חודשים × 3 סוגי קבצים הגיעו ל-12:10 UTC; 0 היפוכי סדר; כל הרגליים שנבחרו נמצאו גם בספר וגם ב-`quotes`, עם מחירים זהים
+   (0 אי-התאמות ב-204 רגליים). חותמות זמן במיקרו-שניות, UTC. הגישה החינמית מוגבלת ליום הראשון בחודש — אומת: בקשה ליום 2 מחזירה 401
+   ("only historical CSV market datasets for the first day of each month are available").
+2. **פקיעה 25–35 יום:** קיימת רק ב-51/81 חודשים. בחודשים החסרים לוח הפקיעות של Deribit לא כלל פקיעה כזו (למשל 2026-09: 16.8, 23.8, 58.8 ימים) —
+   זו תכונה של הבורסה, לא חוסר בנתונים. לפי הכלל הנעול — מזומן באותו חודש. לפי תקופות הפרוטוקול: אימון 2020–2022 — 20/34; אימות 2023–2024 — 15/24;
+   מבחן 2025–2026 — 16/23; מצטבר מ-2022 — 38/59. **זה לפני מסנן IV/RV ≥ 1.20**, שיקטין עוד את מספר העסקאות (לא חושב כאן). מספר עסקאות של עשרות בודדות
+   הוא מגבלה מהותית לתנאי 6 ב-§12 (מספיק הזדמנויות בלתי תלויות).
+3. **ארבע רגליים:** בכל 51 החודשים נמצאו 4 סטרייקים שונים בסדר הנכון; סטייה מקסימלית מדלתא היעד 0.07 (חציון 0.01). IV ליד הכסף זמין בכל החודשים.
+4. **מחירים אמיתיים:** לכל הצדדים הנדרשים היה מחיר בפועל. מרווח קנייה/מכירה חציוני: נמכרות ~4.7%, כנפיים ~9.5% ממחיר האופציה (עד 18.2%).
+   עלות חציית חצי-המרווח בכל 4 הרגליים: 3.6%–13.0% מהפרמיה לפי מחיר האמצע (חציון 6.1%). עמלות: 2.5%–9.6% מהפרמיה (חציון 4.8%).
+5. **עדכניות:** ב-50/51 חודשים כל הרגליים עודכנו בספר בתוך 5 דקות לפני 12:05. חריג: 2022-10 (פוט קנוי — 694 שניות, פוט נמכר — 299 שניות).
+6. **גודל ועומק:** הפסד מקסימלי לחוזה (רוחב − פרמיה + עמלות) 804$–12,312$, ולכן 0.3–4.9 חוזים ל-4,000$. בכל 51 החודשים הכמות מולאה במלואה
+   לפי הספר, גם ב-50K וגם ב-100K. ב-13 חודשים (50K) נדרשה יותר מרמה אחת; ההחלקה המקסימלית 52.9$ לעסקה. העומק המינימלי בצד הנדרש: 35.7 BTC (2020) —
+   פי 7 ומעלה מהנדרש. **שתי הכנפיים ניתנות לקנייה בכל החודשים.**
+7. **גרנולריות:** חוזה = 1 BTC, מינימום 0.1. כשההפסד לחוזה ~12,000$, צעד של 0.1 חוזה = ~1,200$ סיכון — הגודל בפועל יכול להיות עד ~30% מתחת ל-4,000$.
+8. **עסקאות היום (ביקורת):** 1,850–28,834 עסקאות אופציות BTC ביום. 9 מתוך 204 רגליים לא נסחרו כלל ביום הכניסה (ציטוטים היו, מסחר לא).
+   בשני חודשים (2026-02, 2026-07) נספרו תחילה 0 עסקאות — התברר כקובץ שלא ירד; בהורדה חוזרת: 14,661 ו-11,773 עסקאות.
+
+### סיכון מילוי חלקי ורגליים נפרדות
+הבדיקה מניחה ביצוע אגרסיבי של 4 פקודות נפרדות על אותו ספר (12:05). אין בנתוני הדגימה ראיה לביצוע כקומבו אטומי, ולכן קיים סיכון רגליים
+(השוק זז בין הפקודות). בחודשים שנבדקו הכמות הנדרשת קטנה מאוד ביחס לעומק, ולכן סיכון מילוי חלקי בכמות נמוך. סיכון התזוזה בין רגליים לא נמדד;
+אפשר לחסום אותו ביום הכניסה מהנתונים הרציפים שבקבצים החינמיים (עד 12:10), אבל זה לא בוצע כאן.
+
+## 3. שווי יומי, ביטחונות ומרג'ין (שלב 4)
+
+נבדק בפועל (`probe.json`, `probe2.json`) על הרגליים שנבחרו בכל 51 החודשים:
+
+| מקור חינמי | מה נמצא | שימושי לשווי יומי? |
+|---|---|---|
+| עסקאות היסטוריות — history.deribit.com (כל העסקאות, דפדוף מלא) | לכל עסקה מצורף מחיר הסימון של הבורסה. רגל בודדת: עסקה ב-96% מהימים (חציון), מינימום 52%. **כל 4 הרגליים באותו יום: 89% (חציון), 52% (מינימום); רק 1/51 חודשים מכוסה במלואו; הפער הארוך ביותר 12 ימים** (2026), עד 10 ב-2022 | **חלקית בלבד** — ימים חסרים ידרשו השלמה במודל, וזה לא "שווי יומי אמין" לפי §6 |
+| `get_mark_price_history` (Deribit) | אופציות שפקעו: "Invalid params"; אופציות פעילות (2026-11): 0 נקודות | **לא** |
+| `get_last_settlements_by_currency` / `by_instrument` | חוזים עתידיים בלבד (0 אופציות בתוצאות); לפי מכשיר: "Invalid params" | **לא** |
+| נרות יומיים לפי עסקאות (`get_tradingview_chart_data`) | נר לכל יום, אבל מבוסס עסקאות — ביום בלי עסקה המחיר נגרר | **לא** (לא מחיר סימון) |
+| מדד התנודתיות DVOL | יומי, זמין (הבקשה הוגבלה ל-1,000 ימים אחרונים; לפי הספק מ-2021-04) | קלט ל-IV30 בלבד, לא שווי של הרגליים |
+| מחירי ביטקוין יומיים | זמינים בחינם (מקורות רבים) | שווי הביטחונות ב-BTC — כן |
+
+- **שווי ארבע הרגליים:** קיים בחינם רק ביום הכניסה (קובצי היום הראשון) ובימים שבהם כל רגל נסחרה. אין מקור חינמי מלא. **הדגימות החודשיות מאפשרות לבדוק
+  נזילות כניסה, אבל לא שווי יומי.**
+- **מקור מלא (בתשלום):** `options_chain` של Tardis לכל יום כולל מחיר סימון ו-IV לכל מכשיר — היה סוגר את הפער (טענת ספק לגבי היקף; הפורמט אומת בקבצים שהורדו).
+- **ביטחונות ומרג'ין:** באופציות ההפוכות הביטחונות ב-BTC, כך שהשווי הדולרי של התיק תלוי במחיר הביטקוין (מחירים יומיים זמינים). דרישת המרג'ין, מחיר החיסול
+  וכללי המרג'ין הסטנדרטי/תיק **בהיסטוריה** — לא נמצא מקור; יש תיעוד של הכללים הנוכחיים בלבד (טענת בורסה).
+- **שינויי תנאים:** מעבר מנגנון הסליקה של אופציות BTC ההפוכות ב-2026-08-01 (טענת בורסה); אופציות USDC ליניאריות מ-2025-08-19 — לא נעשה בהן שימוש לפני
+  התאריך, כנדרש.
+- **הערה (לא שינוי פרוטוקול):** במבנה מוגדר-סיכון, הפסד השוק של האופציות בכל רגע חסום מלמעלה על ידי ההפסד המקסימלי בפקיעה (8% מהתיק). לכן אפשר לחשב
+  **חסם עליון שמרני** לירידה היומית בלי שווי יומי — אבל הפרוטוקול דורש שווי יומי ולא חסם, ולכן זו החלטה של מאיר, לא שלי.
+
+## 4. מקורות נוספים ומחירים (שלב 5)
+
+**מחירון שנקרא מהדף עצמו (tardis.dev, נשלף ב-GitHub Actions ב-2026-11-16) — מחיר מחירון, לא הצעת מחיר:**
+
+| תוכנית Tardis — נתוני אופציות (Deribit, OKX, Binance ועוד) | מחיר מחירון לחודש |
+|---|---|
+| Academic (סטודנטים/חוקרים; חיוב רבעוני או שנתי בלבד) | 450$ |
+| Solo | 900$ |
+| Professional | 1,350$ |
+| Business | 3,500$ |
+
+- **אומת בדף:** "Do you offer one-off purchases or custom data exports? **No**" (שאלות נפוצות). מינימום הזמנה בקופה: 300$. היום הראשון בכל חודש חינם לכל
+  בורסה וסוג נתונים. קיים חודש ניסיון (פרטיו המלאים לא נשלפו). עומק היסטוריה: "a quarterly subscription started on 2026-01-01 includes data since 2025-01-01".
+- **טענת ספק / צד ג' (לא אומת בדף):** מנוי שנתי כולל ~4 שנים אחורה (5 בתשלום בהעברה); Business שנתי — כל ההיסטוריה; חודש הניסיון = 10 ימי נתונים;
+  `options_chain` מ-2020-03-01. (בסיכום הקודם הופיעו 350/700/1,000/3,000$ — אלה מחירי תוכנית ה-Spot, לא תוכנית האופציות.)
+- **עלות משוערת לפי מחירון בלבד:** Business שנתי ≈ 3,500$ × 12 = **42,000$**, שאמור לכסות את כל התקופות בפרוטוקול (2020-03 עד 2026-11), אם הטענה על
+  כל ההיסטוריה נכונה. Solo שנתי ≈ 900$ × 12 = **10,800$** — לפי הטענה ~4 שנים בלבד (מ-~2022-11), כלומר בלי תקופת האימון ובלי תחילת "מצטבר מ-2022-01-01".
+  Academic רבעוני ≈ 1,350$ — שנה אחורה בלבד ובכפוף לזכאות. **אף אחד מהסכומים אינו הצעת מחיר. לא נרכש דבר.**
+- **Amberdata** — אופציות Deribit מ-2018 (טענת ספק); מחיר **לא אומת**. **Laevitas**, **CryptoDataDownload** — מחירים **לא אומתו**, ולא ידוע אם הם כוללים
+  ספרים או ציטוטים היסטוריים.
+- **Deribit** — אין ציטוטים או ספרים היסטוריים ציבוריים; יש עסקאות היסטוריות עם מחיר הסימון (סעיף 3).
+
+## 5. הפרדה לפי רמת ראיה
+
+**(א) הורד ונבדק בפועל:** כל סעיף 2 וטבלת השנים; כיסוי מחירי הסימון מעסקאות ציבוריות (סעיף 3); היעדר נתונים ב-`get_mark_price_history` ובסליקות;
+הגבלת הגישה החינמית ליום הראשון בחודש; מחירון האופציות של Tardis כפי שמופיע בדף, ו"אין רכישה חד-פעמית".
+
+**(ב) טענות ספק או בורסה (תיעוד, לא נבדק ברמת שורה):** לוח העמלות (0.03% מהבסיס, תקרה 12.5% ממחיר האופציה; מסירה 0.015%) — הלוח הנוכחי, ההיסטוריה
+לא אומתה; מעבר מנגנון הסליקה ב-2026-08-01; אופציות USDC ליניאריות מ-2025-08-19; כללי מרג'ין סטנדרטי/תיק; עומק ההיסטוריה לפי תקופת חיוב; שתמונות
+`book_snapshot_25` נבנות כל ~500ms מ-2026-05-21 (נצפה ב-OKX, לא אושר ל-Deribit).
+
+**(ג) לא אומת:** עמלות היסטוריות בפועל; מרג'ין ומחיר חיסול היסטוריים; ביצוע קומבו אטומי; סיכון התזוזה בין רגליים; שווי יומי בימים בלי מסחר;
+ערך ה-IV30 המדויק לפי הגדרת הפרוטוקול (נבדקה זמינות הקלט בלבד); מחירי Amberdata, Laevitas ו-CryptoDataDownload.
+
+## 6. החלטה והמלצה
+
+**INCONCLUSIVE.** הכניסה לעסקה ניתנת לבדיקה אמינה על נתוני אמת חינמיים — בכל 51 החודשים שבהם הכלל מאפשר עסקה יש ציטוטים אמיתיים, עומק מספיק
+ל-50K ול-100K ועלות ביצוע ניתנת לחישוב. אבל שני רכיבים שהפרוטוקול מחייב ל-PASS חסרים: **שווי יומי של ארבע הרגליים** (חינם רק ב-89% מהימים, ופערים
+של עד 12 ימים) ו**מנגנוני מרג'ין היסטוריים**. לפי הפרוטוקול — עוצרים.
+
+**המלצה על הכדאיות הכלכלית:** הדרך היחידה ל-PASS מלא שנמצאה היא מנוי בתשלום (מחירון: ~10,800$ לשנה ב-Solo, בלי תקופת האימון; ~42,000$ לשנה ב-Business
+לכל התקופות) — וגם אז ההיסטוריה של כללי המרג'ין לא נפתרת. מול זה עומדים: פרוטוקול שמאפשר לכל היותר 51 עסקאות ב-81 חודשים לפני המסנן (כנראה עשרות בודדות
+אחריו), תיק ייחוס של 50,000$, ויעד של 20% לשנה. **לדעתי רכישה ב-42,000$ או 10,800$ אינה מוצדקת כלכלית למחקר הזה.** אם מאיר רוצה להמשיך בכל זאת,
+החלופה הזולה היא החלטת בעלים על שינוי מתועד של דרישת השווי היומי (למשל: מחיר הסימון מהעסקאות בימים שיש, וחסם עליון שמרני בימים שאין) — זו החלטה
+שמשנה את §6 בפרוטוקול הנעול, ולכן לא נעשתה כאן.
+
+**עצירה:** לא נכתב מנוע מסחר, לא בוצע Backtest, לא חושבה תשואה, לא נרכש מידע, הענף לא מוזג ל-main, ולא נגעו ב-XSRA-7, במעקב Bybit, ב-Slow Core Momentum
+או בשום בוט או משימה מתוזמנת. כל המשך דורש הוראה נפרדת ממאיר.
+
+## מקורות
+- קבצים: `https://datasets.tardis.dev/v1/deribit/{options_chain,book_snapshot_25,quotes,trades}/YYYY/MM/01/OPTIONS.csv.gz` (81 חודשים; רשימה מלאה ב-`files_meta.txt`)
+- https://docs.tardis.dev/faq/billing-and-subscriptions · https://docs.tardis.dev/downloadable-csv-files · https://tardis.dev/ (נשלפו ב-2026-11-16; קטעים ב-`vendor_pages.txt`)
+- https://history.deribit.com/api/v2/public/get_last_trades_by_instrument_and_time · https://www.deribit.com/api/v2/public/get_mark_price_history
+- https://insights.deribit.com/education/usdc-settled-btc-eth-options-launch/ · https://support.deribit.com/hc/en-us/articles/31424939096093-Inverse-Options
