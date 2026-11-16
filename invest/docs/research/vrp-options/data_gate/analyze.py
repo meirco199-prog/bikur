@@ -107,6 +107,7 @@ def month(mdir):
     dte = {e: (e - T0) / 86400e6 for e in exps}
     cand = sorted([e for e in exps if 25 <= dte[e] <= 35], key=lambda e: (abs(dte[e] - 30), e))
     res['expiries_listed'] = len(exps)
+    res['expiries_dte'] = sorted(round(d, 2) for d in dte.values())  # כל הפקיעות הרשומות (ימים) — לבדיקה אם חוסר פקיעה בטווח נובע מלוח הפקיעות של הבורסה
     res['nearest_dte'] = round(min(dte.values(), key=lambda d: abs(d - 30)), 2) if dte else None
     if not cand:
         res['status'] = 'אין פקיעה בטווח 25–35 יום'; return res
