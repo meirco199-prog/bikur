@@ -1,0 +1,316 @@
+{
+ "bundles_status": 200,
+ "btc_bundle": [
+  {
+   "bundle_id": 9000000708,
+   "series_key": "deribit-btc-options",
+   "label": "BTC options · inverse, USD strikes (Deribit)",
+   "short_label": "BTC options (inverse)",
+   "asset": "BTC",
+   "interval": "chain",
+   "category": "Options",
+   "class": "option",
+   "price_cents": 100,
+   "exchange_code": "deribit",
+   "exchange_name": "Deribit",
+   "days": 1100,
+   "first_day": "2023-10-12",
+   "last_day": "2026-11-14",
+   "total_bytes": 2369547731658,
+   "latest_file_count": 1082,
+   "max_file_count": 1331,
+   "max_day_bytes": 7929460762,
+   "avg_file_count": 900
+  },
+  {
+   "bundle_id": 9000000712,
+   "series_key": "deribit-btc-usdc-options",
+   "label": "BTC options · USDC-settled linear (Deribit)",
+   "short_label": "BTC options (USDC linear)",
+   "asset": "BTC",
+   "interval": "chain",
+   "category": "Options",
+   "class": "option",
+   "price_cents": 100,
+   "exchange_code": "deribit",
+   "exchange_name": "Deribit",
+   "days": 453,
+   "first_day": "2025-08-19",
+   "last_day": "2026-11-14",
+   "total_bytes": 744461497229,
+   "latest_file_count": 716,
+   "max_file_count": 824,
+   "max_day_bytes": 4335868547,
+   "avg_file_count": 588
+  },
+  {
+   "bundle_id": 9000001888,
+   "series_key": "deribit-btc-futures",
+   "label": "BTC futures curve · inverse, every expiry (Deribit)",
+   "short_label": "BTC futures (inverse)",
+   "asset": "BTC",
+   "interval": "curve",
+   "category": "Futures",
+   "class": "future",
+   "price_cents": 100,
+   "exchange_code": "deribit",
+   "exchange_name": "Deribit",
+   "days": 1100,
+   "first_day": "2023-10-12",
+   "last_day": "2026-11-14",
+   "total_bytes": 458112028468,
+   "latest_file_count": 13,
+   "max_file_count": 17,
+   "max_day_bytes": 1518777638,
+   "avg_file_count": 8
+  },
+  {
+   "bundle_id": 9000001890,
+   "series_key": "deribit-btc-usdc-futures",
+   "label": "BTC futures curve · USDC-settled linear, every expiry (Deribit)",
+   "short_label": "BTC futures (USDC linear)",
+   "asset": "BTC",
+   "interval": "curve",
+   "category": "Futures",
+   "class": "future",
+   "price_cents": 100,
+   "exchange_code": "deribit",
+   "exchange_name": "Deribit",
+   "days": 453,
+   "first_day": "2025-08-19",
+   "last_day": "2026-11-14",
+   "total_bytes": 41972326181,
+   "latest_file_count": 9,
+   "max_file_count": 14,
+   "max_day_bytes": 393698569,
+   "avg_file_count": 5
+  }
+ ],
+ "days_first_page_sample": "{\"bundle_id\": 9000000708, \"series_key\": \"deribit-btc-options\", \"days\": [{\"date\": \"2026-11-14\", \"file_count\": 1082, \"total_bytes\": 7559462313, \"trades\": 15114, \"turnover_usd\": 139099752.84614176, \"contracts_traded\": 689, \"turnover_buy_usd\": 74686683.5340888, \"book_updates\": 84144662, \"spread_avg\": 0.0021248339524455023, \"top1_depth_usd\": 104300.2578766103, \"turnover_call_usd\": 17781141.60975591, \"turnover_put_usd\": 121318611.23638585, \"contracts_call\": 421, \"contracts_put\": 268}, {\"date\": \"2026-11-13\", \"file_count\": 1044, \"total_bytes\": 7929460762, \"trades\": 15715, \"turnover_usd\": 191847110.51871207, \"contracts_traded\": 677, \"turnover_buy_usd\": 86074376.68631443, \"book_updates\": 110483984, \"spread_avg\": 0.002627525268961668, \"top1_depth_usd\": 175417.33418218407, \"turnover_call_usd\": 4908131",
+ "n_days": 1100,
+ "first": "2023-10-12",
+ "last": "2026-11-14",
+ "missing_days": [
+  "2023-12-28",
+  "2023-12-29",
+  "2023-12-30",
+  "2023-12-31",
+  "2024-01-01",
+  "2024-01-02",
+  "2024-01-03",
+  "2024-01-04",
+  "2024-01-05",
+  "2024-01-06",
+  "2024-01-07",
+  "2024-01-08",
+  "2024-01-09",
+  "2024-04-19",
+  "2024-04-20",
+  "2024-04-21",
+  "2024-04-22",
+  "2024-04-23",
+  "2024-04-24",
+  "2024-04-25",
+  "2024-04-26",
+  "2024-04-27",
+  "2024-04-28",
+  "2024-04-29",
+  "2024-04-30",
+  "2024-05-01",
+  "2024-05-02",
+  "2024-07-10",
+  "2024-07-11",
+  "2024-07-21"
+ ],
+ "n_missing": 30,
+ "smallest_days": [],
+ "hold_periods": [
+  {
+   "month": "2023-10",
+   "hold_days": 27,
+   "missing": [
+    "2023-10-01",
+    "2023-10-02",
+    "2023-10-03",
+    "2023-10-04",
+    "2023-10-05",
+    "2023-10-06",
+    "2023-10-07",
+    "2023-10-08",
+    "2023-10-09",
+    "2023-10-10",
+    "2023-10-11"
+   ],
+   "before_coverage": 11
+  },
+  {
+   "month": "2023-12",
+   "hold_days": 29,
+   "missing": [
+    "2023-12-28",
+    "2023-12-29"
+   ],
+   "before_coverage": 0
+  },
+  {
+   "month": "2024-03",
+   "hold_days": 29,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2024-05",
+   "hold_days": 31,
+   "missing": [
+    "2024-05-01",
+    "2024-05-02"
+   ],
+   "before_coverage": 0
+  },
+  {
+   "month": "2024-06",
+   "hold_days": 28,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2024-08",
+   "hold_days": 30,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2024-09",
+   "hold_days": 27,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2024-11",
+   "hold_days": 29,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2024-12",
+   "hold_days": 27,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-01",
+   "hold_days": 31,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-02",
+   "hold_days": 28,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-03",
+   "hold_days": 28,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-05",
+   "hold_days": 30,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-06",
+   "hold_days": 27,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-08",
+   "hold_days": 29,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-10",
+   "hold_days": 31,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2025-11",
+   "hold_days": 28,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-01",
+   "hold_days": 30,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-02",
+   "hold_days": 27,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-03",
+   "hold_days": 27,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-05",
+   "hold_days": 29,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-07",
+   "hold_days": 31,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-08",
+   "hold_days": 28,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-10",
+   "hold_days": 30,
+   "missing": [],
+   "before_coverage": 0
+  },
+  {
+   "month": "2026-11",
+   "hold_days": 27,
+   "missing": [
+    "2026-11-15",
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-20",
+    "2026-11-21",
+    "2026-11-22",
+    "2026-11-23",
+    "2026-11-24",
+    "2026-11-25",
+    "2026-11-26",
+    "2026-11-27"
+   ],
+   "before_coverage": 0
+  }
+ ],
+ "hold_periods_complete": 21,
+ "samples_status": 200,
+ "samples_n": 0,
+ "samples_deribit": [],
+ "samples_head": "{\"files\": [{\"instrumentId\": 67824, \"date\": \"2026-07-06\", \"code\": \"BTCUSDT-PERP\", \"venue\": \"Binance USDT-M\", \"exchange_code\": \"binance_swap\"}, {\"instrumentId\": 67824, \"date\": \"2026-11-09\", \"code\": \"BTCUSDT-PERP\", \"venue\": \"Binance USDT-M\", \"exchange_code\": \"binance_swap\"}, {\"instrumentId\": 2449, \"date\": \"2026-11-09\", \"code\": \"BTCUSDT-PERP\", \"venue\": \"Bybit\", \"exchange_code\": \"bybit\"}, {\"instrumentId\": 360000, \"date\": \"2026-11-09\", \"code\": \"BTC-PERP\", \"venue\": \"Hyperliquid\", \"exchange_code\": \"hyperliquid\"}, {\"instrumentId\": 380986, \"date\": \"2026-11-09\", \"code\": \"BTC-USDT-PERP\", \"venue\": \"BingX\", \"exchange_code\": \"bingx\"}, {\"instrumentId\": 17015, \"date\": \"2026-11-09\", \"code\": \"PF_XBTUSD-PERP\", \"venue\": \"Kraken Futures\", \"exchange_code\": \"kraken_future\"}, {\"instrumentId\": 8702, \"date\": \"2026-11-09\", \"code\": \"TSLAUSDT-PERP\", \"venue\": \"Binance USDT-M\", \"exchange_code\": \"binance_swap\"}, {\"instrumentId\": 8745, \"date\": \"2026-11-09\", \"code\": \"SNDKUSDT-PERP\", \"venue\": \"Binance USDT-M\", \"exchange_code\": \"binance_swap\"}, {\"instrumentId\": 26010017, \"date\": \"2026-11-06\", \"code\": \"KXBTC15M-26NOV061015-15\", \"venue\": \"Kalshi\", \"exchange_code\": \"kalshi\"}, {\"instrumentId\": 25784823, \"date\": \"2026-11-05\", \"code\": \"btc-updown-5m-1793898600\", \"venue\": \"Polymarket\", \"exchange_code\": \"polymarket\"}, {\"instrumentId\": 14945279, \"date\": \"2026-11-05\", \"code\": \"BTC-27NOV26-74000-P-PUT\", \"venue\": \"Deribit\", \"exchange_code\": \"deribit\"}, {\"instrumentId\": 3381816, \"date\": \"2026-11-09\", \"code\": \"ETH-26MAR27-140"
+}
