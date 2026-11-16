@@ -1,4 +1,4 @@
-# זמני (ops; ריצה 2 — ימים זמינים ודגימות דרך הממשק הציבורי): שער הנתונים של מחקר VRP — בדיקת ספק נתונים בלבד (CryptoStruct, QuantStrix, תיעוד מרג'ין של Deribit).
+# זמני (ops; ריצה 3 — דגימה חינמית של אופציה (סטטיסטיקה בלבד) וכיסוי יומי של כל רגל): שער הנתונים של מחקר VRP — בדיקת ספק נתונים בלבד (CryptoStruct, QuantStrix, תיעוד מרג'ין של Deribit).
 # שליפת דפים ציבוריים בלבד: בלי רכישה, בלי הרשמה, בלי מפתחות, בלי Backtest. יוסר בסוף הבדיקה.
 name: vrp-vendor-check
 on:
@@ -9,14 +9,15 @@ permissions: { contents: write }
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: probe3
+      - name: probe4
         run: |
           D=invest/docs/research/vrp-options/data_gate
-          timeout 900 python3 $D/probe3.py $D/results/samples.json $D/results/probe3_cryptostruct.json || true
-          timeout 300 python3 $D/vendor_fetch.py $D/results/vendors https://cryptostruct.com/llms.txt https://cryptostruct.com/docs/api.md https://cryptostruct.com/download https://cryptostruct.com/shop/coverage || true
+          command -v zstd || sudo apt-get install -y zstd
+          timeout 1500 python3 $D/probe4.py $D/results/samples.json $D/results/probe4_cryptostruct.json || true
+          timeout 120 python3 $D/vendor_fetch.py $D/results/vendors https://cryptostruct.com/skills/cryptostruct-market-data/references/day-file-format.md || true
       - name: commit
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
