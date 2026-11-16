@@ -1,4 +1,4 @@
-# זמני (ops): מחקר Cross-Asset Momentum + Risk Parity — שער נתונים (Yahoo/FRED) ואם PASS הרצה לפי PROTOCOL_v1.0.md. ענף מחקר בלבד; יוסר בסוף.
+# זמני (ops; ריצה 2 — מקורות ריבית חלופיים כש-FRED לא מגיב): מחקר Cross-Asset Momentum + Risk Parity — שער נתונים (Yahoo/FRED) ואם PASS הרצה לפי PROTOCOL_v1.0.md. ענף מחקר בלבד; יוסר בסוף.
 name: carp-run
 on:
   push:

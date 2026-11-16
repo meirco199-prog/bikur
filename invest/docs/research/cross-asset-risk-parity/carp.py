@@ -7,6 +7,8 @@ ASSETS = ['SPY', 'TLT', 'GLD', 'DBC']
 ALL = ASSETS + ['BIL', 'QQQ']
 UA = {'User-Agent': 'Mozilla/5.0 (bikur-research)'}
 
+D = lambda ts: dt.datetime.fromtimestamp(ts, dt.timezone.utc).date()
+
 def get(u, tries=4, timeout=90):
     err = None
     for k in range(tries):
@@ -28,12 +30,26 @@ def fetch(raw):
         st, b = get(f'https://query1.finance.yahoo.com/v8/finance/chart/{s}?period1={p1}&period2={p2}&interval=1d&events=div,splits&includeAdjustedClose=true')
         open(f'{raw}/{s}.json', 'wb').write(b if st == 200 else json.dumps({'error': [st, b.decode('utf8', 'replace')]}).encode())
         print(s, st, len(b), flush=True); time.sleep(2)
+    src = {}
     for sid in ('DTB3', 'FEDFUNDS'):
-        st, b = get(f'https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd=2005-01-01')
-        open(f'{raw}/{sid}.csv', 'wb').write(b if st == 200 else b'')
-        print(sid, st, len(b or b''), flush=True)
+        st, b = get(f'https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd=2005-01-01', tries=2, timeout=45)
+        if st == 200 and b and b[:4] != b'<!DO':
+            open(f'{raw}/{sid}.csv', 'wb').write(b); src[sid] = 'FRED'; print(sid, 'FRED ok', flush=True); continue
+        if sid == 'DTB3':
+            st, b = get(f'https://query1.finance.yahoo.com/v8/finance/chart/%5EIRX?period1={p1}&period2={p2}&interval=1d')
+            r = json.loads(b)['chart']['result'][0]
+            rows = [(str(D(t + 4 * 3600)), c) for t, c in zip(r['timestamp'], r['indicators']['quote'][0]['close']) if c is not None]
+            src[sid] = 'Yahoo ^IRX (במקום FRED DTB3)'
+        else:
+            st, b = get('https://markets.newyorkfed.org/api/rates/unsecured/effr/search.json?startDate=2005-01-01&endDate=' + time.strftime('%Y-%m-%d'))
+            refs = json.loads(b)['refRates']; agg = {}
+            for x in refs: agg.setdefault(x['effectiveDate'][:7], []).append(float(x['percentRate']))
+            rows = [(k + '-01', sum(v) / len(v)) for k, v in sorted(agg.items())]
+            src[sid] = 'NY Fed EFFR, ממוצע חודשי (במקום FRED FEDFUNDS)'
+        open(f'{raw}/{sid}.csv', 'w').write('observation_date,' + sid + '\n' + ''.join(f'{d},{v}\n' for d, v in rows))
+        print(sid, src[sid], len(rows), flush=True)
+    json.dump(src, open(f'{raw}/sources.json', 'w'), ensure_ascii=False)
 
-D = lambda ts: dt.datetime.fromtimestamp(ts, dt.timezone.utc).date()
 
 def load(raw):
     px, issues = {}, {}
@@ -47,7 +63,7 @@ def load(raw):
             o, c, a = q['open'][i], q['close'][i], adj[i]
             rows[D(ts + 4 * 3600)] = (o, c, a)  # חותמת זמן של פתיחת המסחר בניו יורק → תאריך המסחר
         divs = {D(int(k) + 4 * 3600): v['amount'] for k, v in (r.get('events', {}).get('dividends') or {}).items()}
-        splits = {D(int(k) + 4 * 3600): f"{v['numerator']}:{v['denominator']}" for k, v in (r.get('events', {}).get('splits') or {}).items()}
+        splits = {str(D(int(k) + 4 * 3600)): f"{v['numerator']}:{v['denominator']}" for k, v in (r.get('events', {}).get('splits') or {}).items()}
         px[s] = {'rows': rows, 'divs': divs, 'splits': splits}
     fred = {}
     for sid in ('DTB3', 'FEDFUNDS'):
@@ -82,6 +98,7 @@ def gate(px, fred, issues):
         if not v or min(v) > dt.date(2006, 1, 31) or max(v) < dt.date(2026, 9, 1): ok = False
     out['verdict'] = 'PASS' if ok else 'INCONCLUSIVE'
     return out
+
 
 # ---------------- מנוע ----------------
 def month_ends(cal):
@@ -211,6 +228,7 @@ def run(raw, outd):
     os.makedirs(outd, exist_ok=True)
     px, fred, issues = load(raw)
     g = gate(px, fred, issues)
+    if os.path.exists(f'{raw}/sources.json'): g['rate_sources'] = json.load(open(f'{raw}/sources.json'))
     json.dump(g, open(f'{outd}/data_gate.json', 'w'), ensure_ascii=False, indent=1, default=str)
     print('GATE', g['verdict'], flush=True)
     if g['verdict'] != 'PASS':
