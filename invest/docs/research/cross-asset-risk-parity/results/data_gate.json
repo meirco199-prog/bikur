@@ -1,0 +1,88 @@
+{
+ "issues": {},
+ "series": {
+  "SPY": {
+   "first": "2006-01-03",
+   "last": "2026-11-16",
+   "days": 5231,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "null_or_bad": 0,
+   "null_sample": [],
+   "dividends": 83,
+   "splits": {}
+  },
+  "TLT": {
+   "first": "2006-01-03",
+   "last": "2026-11-16",
+   "days": 5231,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "null_or_bad": 0,
+   "null_sample": [],
+   "dividends": 249,
+   "splits": {}
+  },
+  "GLD": {
+   "first": "2006-01-03",
+   "last": "2026-11-16",
+   "days": 5231,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "null_or_bad": 0,
+   "null_sample": [],
+   "dividends": 0,
+   "splits": {}
+  },
+  "DBC": {
+   "first": "2006-02-06",
+   "last": "2026-11-16",
+   "days": 5228,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "null_or_bad": 0,
+   "null_sample": [],
+   "dividends": 9,
+   "splits": {}
+  },
+  "BIL": {
+   "first": "2007-05-30",
+   "last": "2026-11-16",
+   "days": 4899,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "null_or_bad": 0,
+   "null_sample": [],
+   "dividends": 129,
+   "splits": {
+    "2017-11-30": "1.0:2.0"
+   }
+  },
+  "QQQ": {
+   "first": "2006-01-03",
+   "last": "2026-11-16",
+   "days": 5231,
+   "missing_vs_spy": 0,
+   "missing_sample": [],
+   "null_or_bad": 0,
+   "null_sample": [],
+   "dividends": 86,
+   "splits": {}
+  },
+  "DTB3": {
+   "n": 5248,
+   "first": "2006-01-03",
+   "last": "2026-11-16"
+  },
+  "FEDFUNDS": {
+   "n": 263,
+   "first": "2005-01-01",
+   "last": "2026-11-01"
+  }
+ },
+ "verdict": "PASS",
+ "rate_sources": {
+  "DTB3": "Yahoo ^IRX (במקום FRED DTB3)",
+  "FEDFUNDS": "NY Fed EFFR, ממוצע חודשי (במקום FRED FEDFUNDS)"
+ }
+}
