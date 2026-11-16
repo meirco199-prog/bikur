@@ -1,0 +1,28 @@
+# זמני (ops): שער הנתונים של מחקר VRP — בדיקת ספק נתונים בלבד (CryptoStruct, QuantStrix, תיעוד מרג'ין של Deribit).
+# שליפת דפים ציבוריים בלבד: בלי רכישה, בלי הרשמה, בלי מפתחות, בלי Backtest. יוסר בסוף הבדיקה.
+name: vrp-vendor-check
+on:
+  push:
+    branches: [research/vrp-defined-risk-options]
+    paths: [.github/workflows/vrp-vendor-check.yml]
+permissions: { contents: write }
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch
+        run: |
+          D=invest/docs/research/vrp-options/data_gate
+          timeout 900 python3 $D/vendor_fetch.py $D/results/vendors \
+            https://cryptostruct.com/options-data/deribit-btc-options https://cryptostruct.com/ \
+            https://www.quantstrix.com/platform/data \
+            https://insights.deribit.com/education/portfolio-margin/ \
+            https://insights.deribit.com/exchange-updates/introducing-changes-to-deribit-portfolio-margin-model/ || true
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/vrp-options/data_gate/results/vendors
+          git commit -m "ops(vrp): בדיקת ספקי נתונים — דפים ציבוריים (ריצה ${GITHUB_RUN_ID})" || exit 0
+          git push origin "HEAD:${GITHUB_REF_NAME}"
