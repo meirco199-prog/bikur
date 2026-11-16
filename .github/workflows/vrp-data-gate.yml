@@ -1,33 +1,25 @@
-# זמני (ops; ריצה 3ב — ניתוח בלבד על הקבצים שהורדו בריצה 3 (43778929330, 81 חודשים, כולם הצליחו); תוצאות ריצה 3 לא נשמרו בגלל התנגשות עם הריצה שבוטלה): שער הנתונים של מחקר VRP (PROTOCOL_v1.1 §3) — הורדה ופתיחה בפועל של דגימות Tardis החינמיות (היום הראשון בחודש,
-# Deribit OPTIONS), בדיקת ארבע הרגליים, ציטוטים, עומק והיתכנות ל-50K$/100K$, ובדיקת מקורות חינמיים לשווי יומי. בלי Backtest, בלי מסחר, בלי מפתחות.
+# זמני (ops; ריצה 4 — בדיקה משלימה לשלב 4 בלבד: שווי יומי מעסקאות ציבוריות של Deribit עם דפדוף מלא, היסטוריית מחיר סימון,
+# בדיקת GET ליום שני בחודש ב-Tardis, ובדיקה חוזרת של קובצי עסקאות). שער הנתונים של מחקר VRP — בלי Backtest, בלי מסחר, בלי מפתחות.
 name: vrp-data-gate
 on:
   push:
     branches: [research/vrp-defined-risk-options]
     paths: [.github/workflows/vrp-data-gate.yml]
-permissions: { contents: write, actions: read }
+permissions: { contents: write }
 concurrency: { group: vrp-data-gate, cancel-in-progress: false }
 jobs:
-  analyze:
+  probe2:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { path: raw, pattern: 'raw-*', merge-multiple: true, run-id: 43778929330, github-token: '${{ github.token }}' }
-      - name: analyze
+      - name: probe2
         run: |
-          D=invest/docs/research/vrp-options/data_gate; mkdir -p $D/results
-          python3 $D/analyze.py raw $D/results/samples.json $D/results/samples.md
-          timeout 900 python3 $D/probe.py $D/results/samples.json $D/results/probe.json || echo "probe נעצר/נכשל ($?)" >> $D/results/vendor_pages.txt
-          for f in raw/*/*.meta; do echo "$f: $(tr '\n' ' ' < $f)"; done > $D/results/files_meta.txt
-          for u in https://docs.tardis.dev/faq/billing-and-subscriptions https://docs.tardis.dev/downloadable-csv-files https://tardis.dev/; do
-            n=$(echo "$u" | sed 's#https://##; s#[/.]#_#g'); curl -sSL --max-time 60 -A 'bikur-research/1.0' "$u" -o "/tmp/$n.html" -w "$u %{http_code} %{size_download}\n" >> $D/results/vendor_pages.txt || true
-            python3 -c "import re,sys,html;t=html.unescape(re.sub(r'<[^>]+>',' ',open(sys.argv[1],errors='ignore').read()));t=re.sub(r'\s+',' ',t);[print('…'+t[max(0,m.start()-160):m.end()+160]+'…') for m in re.finditer(r'\\\$\s?\d[\d,]*|one-off|first day of each month|ordered by|sorted by',t)][:60]" "/tmp/$n.html" >> $D/results/vendor_pages.txt || true
-          done
+          D=invest/docs/research/vrp-options/data_gate
+          timeout 2700 python3 $D/probe2.py $D/results/samples.json $D/results/probe2.json || echo "probe2 נעצר ($?)"
       - name: commit
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          ls raw | wc -l; git add invest/docs/research/vrp-options/data_gate/results
-          git commit -m "ops(vrp): תוצאות שער הנתונים — דגימות Tardis שנפתחו בפועל (ריצה ${GITHUB_RUN_ID}, קבצים מריצה 43778929330)" || exit 0
+          git add invest/docs/research/vrp-options/data_gate/results
+          git commit -m "ops(vrp): שער הנתונים — בדיקה משלימה לשווי יומי (ריצה ${GITHUB_RUN_ID})" || exit 0
           git push origin "HEAD:${GITHUB_REF_NAME}"
