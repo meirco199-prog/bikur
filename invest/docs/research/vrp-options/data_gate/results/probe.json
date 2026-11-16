@@ -1,0 +1,2971 @@
+{
+ "tardis_head": [
+  {
+   "month": "2020-01",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-01",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-01",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-01",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-02",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-02",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-02",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-02",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-03",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-03",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-03",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-03",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-04",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-04",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-04",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-04",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-05",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-05",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-05",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-05",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-06",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-06",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-06",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-06",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-07",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-07",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-07",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-07",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-08",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-08",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-08",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-08",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-09",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-09",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-09",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-09",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-10",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-10",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-10",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-10",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-11",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-11",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-11",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-11",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-12",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-12",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-12",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2020-12",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-01",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-01",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-01",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-01",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-02",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-02",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-02",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-02",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-03",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-03",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-03",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-03",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-04",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-04",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-04",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-04",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-05",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-05",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-05",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-05",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-06",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-06",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-06",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-06",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-07",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-07",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-07",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-07",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-08",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-08",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-08",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-08",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-09",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-09",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-09",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-09",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-10",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-10",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-10",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-10",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-11",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-11",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-11",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-11",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-12",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-12",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-12",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2021-12",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-01",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-01",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-01",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-01",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-02",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-02",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-02",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-02",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-03",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-03",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-03",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-03",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-04",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-04",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-04",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-04",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-05",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-05",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-05",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-05",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-06",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-06",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-06",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-06",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-07",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-07",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-07",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-07",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-08",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-08",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-08",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-08",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-09",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-09",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-09",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-09",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-10",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-10",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-10",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-10",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-11",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-11",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-11",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-11",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-12",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-12",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-12",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2022-12",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-01",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-01",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-01",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-01",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-02",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-02",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-02",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-02",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-03",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-03",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-03",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-03",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-04",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-04",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-04",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-04",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-05",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-05",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-05",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-05",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-06",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-06",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-06",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-06",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-07",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-07",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-07",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-07",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-08",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-08",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-08",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-08",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-09",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-09",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-09",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-09",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-10",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-10",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-10",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-10",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-11",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-11",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-11",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-11",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-12",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-12",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-12",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2023-12",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-01",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-01",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-01",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-01",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-02",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-02",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-02",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-02",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-03",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-03",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-03",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-03",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-04",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-04",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-04",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-04",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-05",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-05",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-05",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-05",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-06",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-06",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-06",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-06",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-07",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-07",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-07",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-07",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-08",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-08",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-08",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-08",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-09",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-09",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-09",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-09",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-10",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-10",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-10",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-10",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-11",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-11",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-11",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-11",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-12",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-12",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-12",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2024-12",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-01",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-01",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-01",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-01",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-02",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-02",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-02",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-02",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-03",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-03",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-03",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-03",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-04",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-04",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-04",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-04",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-05",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-05",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-05",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-05",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-06",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-06",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-06",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-06",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-07",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-07",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-07",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-07",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-08",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-08",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-08",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-08",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-09",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-09",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-09",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-09",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-10",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-10",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-10",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-10",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-11",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-11",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-11",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-11",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-12",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-12",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-12",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2025-12",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-01",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-01",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-01",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-01",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-02",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-02",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-02",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-02",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-03",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-03",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-03",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-03",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-04",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-04",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-04",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-04",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-05",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-05",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-05",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-05",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-06",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-06",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-06",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-06",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-07",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-07",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-07",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-07",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-08",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-08",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-08",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-08",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-09",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-09",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-09",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-09",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-10",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-10",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-10",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-10",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-11",
+   "dataset": "options_chain",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-11",
+   "dataset": "quotes",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-11",
+   "dataset": "book_snapshot_25",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  },
+  {
+   "month": "2026-11",
+   "dataset": "trades",
+   "status": 404,
+   "mb": 0.0,
+   "error": null
+  }
+ ],
+ "deribit": {
+  "legs": [
+   {
+    "month": "2020-03",
+    "leg": "SP",
+    "trades": {
+     "status": 200,
+     "n": 940,
+     "days_with_trade": 23,
+     "hold_days": 25.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 27,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2020-03",
+    "leg": "LP",
+    "trades": {
+     "status": 200,
+     "n": 969,
+     "days_with_trade": 26,
+     "hold_days": 25.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 27,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2020-03",
+    "leg": "SC",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 18,
+     "hold_days": 25.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 27,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2020-03",
+    "leg": "LC",
+    "trades": {
+     "status": 200,
+     "n": 176,
+     "days_with_trade": 24,
+     "hold_days": 25.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 27,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2022-01",
+    "leg": "SP",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 20,
+     "hold_days": 26.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 28,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2022-01",
+    "leg": "LP",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 21,
+     "hold_days": 26.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 28,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2022-01",
+    "leg": "SC",
+    "trades": {
+     "status": 200,
+     "n": 372,
+     "days_with_trade": 24,
+     "hold_days": 26.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 28,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2022-01",
+    "leg": "LC",
+    "trades": {
+     "status": 200,
+     "n": 240,
+     "days_with_trade": 21,
+     "hold_days": 26.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 28,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2024-03",
+    "leg": "SP",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 23,
+     "hold_days": 27.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 29,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2024-03",
+    "leg": "LP",
+    "trades": {
+     "status": 200,
+     "n": 576,
+     "days_with_trade": 27,
+     "hold_days": 27.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 29,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2024-03",
+    "leg": "SC",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 6,
+     "hold_days": 27.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 29,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2024-03",
+    "leg": "LC",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 10,
+     "hold_days": 27.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 29,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2025-01",
+    "leg": "SP",
+    "trades": {
+     "status": 200,
+     "n": 552,
+     "days_with_trade": 31,
+     "hold_days": 29.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 31,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2025-01",
+    "leg": "LP",
+    "trades": {
+     "status": 200,
+     "n": 342,
+     "days_with_trade": 29,
+     "hold_days": 29.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 31,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2025-01",
+    "leg": "SC",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 20,
+     "hold_days": 29.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 31,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2025-01",
+    "leg": "LC",
+    "trades": {
+     "status": 200,
+     "n": 803,
+     "days_with_trade": 30,
+     "hold_days": 29.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 31,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2026-01",
+    "leg": "SP",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 26,
+     "hold_days": 28.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 30,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2026-01",
+    "leg": "LP",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 21,
+     "hold_days": 28.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 30,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2026-01",
+    "leg": "SC",
+    "trades": {
+     "status": 200,
+     "n": 1000,
+     "days_with_trade": 16,
+     "hold_days": 28.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 30,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   },
+   {
+    "month": "2026-01",
+    "leg": "LC",
+    "trades": {
+     "status": 200,
+     "n": 845,
+     "days_with_trade": 29,
+     "hold_days": 28.8,
+     "has_mark_price_field": true
+    },
+    "chart_1d": {
+     "status": 200,
+     "candles": 30,
+     "no_data": "ok",
+     "error": null
+    },
+    "settlements_by_instrument": {
+     "status": 400,
+     "n": 0,
+     "error": "Invalid params",
+     "fields": []
+    }
+   }
+  ],
+  "settlements_by_currency": [
+   {
+    "month": "2020-03",
+    "status": 200,
+    "n": 1000,
+    "options_in_result": 0,
+    "legs_found": [],
+    "error": null,
+    "first_ts": 1555833600165,
+    "last_ts": 1583913600371,
+    "sample": [
+     {
+      "position": 22282740,
+      "timestamp": 1583913600371,
+      "type": "settlement",
+      "index_price": 7867.11,
+      "instrument_name": "BTC-25SEP20",
+      "mark_price": 8246.11,
+      "profit_loss": 0.2148494089999986,
+      "session_profit_loss": 45099.61303099972
+     },
+     {
+      "position": 112146330,
+      "timestamp": 1583913600371,
+      "type": "settlement",
+      "index_price": 7867.11,
+      "instrument_name": "BTC-26JUN20",
+      "mark_price": 8077.36,
+      "profit_loss": 2.581710243000001,
+      "session_profit_loss": 111027.04735267904
+     }
+    ]
+   },
+   {
+    "month": "2022-01",
+    "status": 200,
+    "n": 1000,
+    "options_in_result": 0,
+    "legs_found": [],
+    "error": null,
+    "first_ts": 1630828800010,
+    "last_ts": 1641888000045,
+    "sample": [
+     {
+      "position": 11717760.0,
+      "timestamp": 1641888000045,
+      "type": "settlement",
+      "index_price": 42219.21,
+      "instrument_name": "BTC-14JAN22",
+      "mark_price": 42239.91,
+      "profit_loss": 0.2984551479999997,
+      "session_profit_loss": 13329.227667129993
+     },
+     {
+      "position": 5645310,
+      "timestamp": 1641888000045,
+      "type": "settlement",
+      "index_price": 42219.21,
+      "instrument_name": "BTC-21JAN22",
+      "mark_price": 42298.21,
+      "profit_loss": 0.18994143099999988,
+      "session_profit_loss": 6033.229365122005
+     }
+    ]
+   },
+   {
+    "month": "2024-03",
+    "status": 200,
+    "n": 1000,
+    "options_in_result": 0,
+    "legs_found": [],
+    "error": null,
+    "first_ts": 1698912000026,
+    "last_ts": 1710144000055,
+    "sample": [
+     {
+      "position": 51753450,
+      "timestamp": 1710144000055,
+      "type": "settlement",
+      "index_price": 71026.86,
+      "instrument_name": "BTC-15MAR24",
+      "mark_price": 71552.41,
+      "profit_loss": -0.2036966990000012,
+      "session_profit_loss": 83044.49392608897
+     },
+     {
+      "position": 14375220.0,
+      "timestamp": 1710144000055,
+      "type": "settlement",
+      "index_price": 71026.86,
+      "instrument_name": "BTC-22MAR24",
+      "mark_price": 71943.7,
+      "profit_loss": -0.1627883249999998,
+      "session_profit_loss": 42994.667068117014
+     }
+    ]
+   },
+   {
+    "month": "2025-01",
+    "status": 200,
+    "n": 1000,
+    "options_in_result": 0,
+    "legs_found": [],
+    "error": null,
+    "first_ts": 1725523200098,
+    "last_ts": 1736582400034,
+    "sample": [
+     {
+      "position": 24855400,
+      "timestamp": 1736582400034,
+      "type": "settlement",
+      "index_price": 94215.68,
+      "instrument_name": "BTC-17JAN25",
+      "mark_price": 94373.32,
+      "profit_loss": 0.004885742000000149,
+      "session_profit_loss": 10694.837616144005
+     },
+     {
+      "position": 5159340,
+      "timestamp": 1736582400034,
+      "type": "settlement",
+      "index_price": 94215.68,
+      "instrument_name": "BTC-24JAN25",
+      "mark_price": 94601.4,
+      "profit_loss": 0.022116836999999997,
+      "session_profit_loss": 5266.39731098
+     }
+    ]
+   },
+   {
+    "month": "2026-01",
+    "status": 200,
+    "n": 1000,
+    "options_in_result": 0,
+    "legs_found": [],
+    "error": null,
+    "first_ts": 1757145600029,
+    "last_ts": 1768118400032,
+    "sample": [
+     {
+      "position": 27744830.0,
+      "timestamp": 1768118400032,
+      "type": "settlement",
+      "index_price": 90596.11,
+      "instrument_name": "BTC-16JAN26",
+      "mark_price": 90686.73,
+      "profit_loss": 0.004810013000000023,
+      "session_profit_loss": 1133.4177077400007
+     },
+     {
+      "position": 1825920,
+      "timestamp": 1768118400032,
+      "type": "settlement",
+      "index_price": 90596.11,
+      "instrument_name": "BTC-23JAN26",
+      "mark_price": 90780.03,
+      "profit_loss": -0.004011702999999994,
+      "session_profit_loss": 566.7088538700002
+     }
+    ]
+   }
+  ],
+  "dvol": {
+   "status": 200,
+   "n": 1000,
+   "first": "2024-02-21"
+  }
+ },
+ "tardis_head_day2": [
+  {
+   "dataset": "options_chain",
+   "day": "2024-03-02",
+   "status": 404
+  },
+  {
+   "dataset": "book_snapshot_25",
+   "day": "2024-03-02",
+   "status": 404
+  }
+ ]
+}
