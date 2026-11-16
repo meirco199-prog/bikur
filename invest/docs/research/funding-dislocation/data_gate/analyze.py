@@ -71,6 +71,39 @@ def run(L, pstart, pend):
             fees += (FEE_RT / 2) * (25000 * L / n) / 50000
     yrs = len(hrs) / 8760
     return {'gross_ann': tot / yrs, 'fees_ann': fees / yrs, 'net_ann': (tot - fees) / yrs, 'invested_share': inv / len(hrs), 'avg_open': (sum(nopen) / len(nopen)) if nopen else 0}
+# --- ביקורת (16/11, אחרי הערת ChatGPT): run() המקורי נשמר כמו שהוא כדי לשחזר את התוצאה הנעולה. כאן — אותו מודל בדיוק, עם תיקון
+# שתי שגיאות חשבונאיות מוכחות בלבד, ובנפרד — עלות האיזון שהמודל מניח (משקל 1/n בכל שעה) אבל לא חייב:
+#  (1) עמלת יציאה חושבה לפי מספר הפוזיציות *אחרי* היציאה (cap[h+1]) — הפוזיציה היוצאת הייתה בגודל 1/len(cap[h]).
+#  (2) עסקאות שלא יצאו (מטבע שנמחק / סוף הנתונים) לא חויבו בעמלת יציאה.
+#  (3) איזון: מעבר ממשקל 1/n_h ל-1/n_{h+1} בכל פוזיציה שנשארת = מסחר בשתי הרגליים; מחויב באותה עמלת לוקח (0.0475% לביצוע).
+def run_fixed(L, pstart, pend):
+    hrs = range(pstart, pend); tot = 0.0; fees = 0.0; reb = 0.0; gap_hours = 0
+    entries = collections.defaultdict(list); exits = collections.defaultdict(list)
+    for tr in trades:
+        if pstart <= tr['entry'] < pend: entries[tr['entry']].append(tr)
+        last = tr['exit'] if tr['exit'] else max(series[tr['coin']][0])
+        if pstart <= last < pend: exits[last].append(tr)
+    for h in hrs:
+        c = cap.get(h, {}); c1 = cap.get(h + 1, {})
+        if c: tot += (L / 2) * (sum(c.values()) / len(c)) / 8760
+        for tr in entries.get(h, []):
+            fees += (FEE_RT / 2) * (25000 * L / max(1, len(c1))) / 50000
+        for tr in exits.get(h, []):
+            fees += (FEE_RT / 2) * (25000 * L / max(1, len(c))) / 50000
+        if c and c1:
+            stay = set(c) & set(c1)
+            d = abs(1 / len(c1) - 1 / len(c)) * 25000 * L
+            reb += len(stay) * (FEE_RT / 2) * d / 50000
+    yrs = len(hrs) / 8760
+    return {'gross_ann': tot / yrs, 'fees_ann': fees / yrs, 'net_ann': (tot - fees) / yrs, 'rebalance_ann': reb / yrs, 'net_incl_rebalance_ann': (tot - fees - reb) / yrs}
+def gap_stats(pstart, pend):
+    # שעות שבהן עסקה פתוחה אבל אין פער מימון לאותה שעה (חוסר נתונים) — ההון שלה מחולק בשקט בין האחרות
+    miss = tot = 0
+    for tr in trades:
+        s = series[tr['coin']][0]; end = tr['exit'] or max(s)
+        for h in range(max(tr['entry'] + 1, pstart), min(end + 1, pend)):
+            tot += 1; miss += (h not in s)
+    return {'position_hours': tot, 'missing_hours': miss}
 def uncond_run(pstart, pend, L=2):
     # בלי סינון: בכל המטבעות, תמיד בפנים בכיוון האות האחרון (גולמי, בלי עמלות)
     last, tot, hrs = {}, 0.0, 0
@@ -100,6 +133,7 @@ for name, a, b in PERIODS:
         'share_trades_captured_negative': round(sum(1 for t in T if t['captured_mean'] < 0) / len(T), 3) if T else None,
         'L1': run(1, pa, pb), 'L2': run(2, pa, pb), 'L3': run(3, pa, pb),
         'unfiltered_L2_gross': uncond_run(pa, pb),
+        'audit': {'L1': run_fixed(1, pa, pb), 'L2': run_fixed(2, pa, pb), 'L3': run_fixed(3, pa, pb), 'gaps': gap_stats(pa, pb), 'open_at_end_trades': sum(1 for t in T if not t['exit'])},
         'top5_coins_share': [(k, round(v / totc, 3)) for k, v in top],
     }
 json.dump(res, open(OJ, 'w'), ensure_ascii=False, indent=1, default=str)
@@ -109,5 +143,11 @@ L = ['# שלב 2 — חסם עליון לכדאיות (מימון שמומש ב�
 pc = lambda x: f'{100*x:.1f}%' if x is not None else '—'
 for name, r in res['periods'].items():
     L.append(f"| {name} | {r['trades']} | {r['coins_traded']} | {r['median_hold_days']} | {pc(r['median_entry_spread'])} | {pc(r['median_captured_spread'])} | {pc(r['share_trades_captured_negative'])} | {pc(r['L2']['invested_share'])} | {pc(r['L1']['net_ann'])} | **{pc(r['L2']['net_ann'])}** (ברוטו {pc(r['L2']['gross_ann'])}) | {pc(r['L3']['net_ann'])} | {pc(r['unfiltered_L2_gross'])} | " + ', '.join(f'{k} {pc(v)}' for k, v in r['top5_coins_share']) + ' |')
+L += ['', '## ביקורת חשבונאית (16/11) — אותו מודל, אחרי תיקון שגיאות מוכחות', '',
+      '| תקופה | L=2 נטו כפי שננעל | L=2 נטו אחרי תיקון עמלות (1)+(2) | עלות איזון שלא חויבה (3) | L=2 נטו כולל איזון | עסקאות בלי יציאה | שעות פוזיציה בלי נתון |',
+      '|---|---|---|---|---|---|---|']
+for name, r in res['periods'].items():
+    a = r['audit']; g = a['gaps']
+    L.append(f"| {name} | {pc(r['L2']['net_ann'])} | {pc(a['L2']['net_ann'])} | {pc(a['L2']['rebalance_ann'])} | {pc(a['L2']['net_incl_rebalance_ann'])} | {a['open_at_end_trades']} | {g['missing_hours']} / {g['position_hours']} |")
 open(OM, 'w').write('\n'.join(L) + '\n')
 print('\n'.join(L))

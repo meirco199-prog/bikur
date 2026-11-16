@@ -1,0 +1,29 @@
+# זמני (ops): ביקורת חשבונאית בלבד למחקר פערי המימון — מריץ את analyze.py (המקורי + התיקונים) על אותם נתונים שנמשכו בריצה 43925675764.
+# בלי משיכה חדשה, בלי שינוי ספים או קריטריון, בלי Backtest.
+name: fd-audit
+on:
+  push:
+    branches: [research/funding-dislocation]
+    paths: [.github/workflows/fd-audit.yml]
+permissions: { contents: write, actions: read }
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: d, pattern: 'fd-*', merge-multiple: true, run-id: 43925675764, github-token: '${{ github.token }}' }
+      - uses: actions/download-artifact@v4
+        with: { name: universe, path: u, run-id: 43925675764, github-token: '${{ github.token }}' }
+      - name: audit
+        run: |
+          R=invest/docs/research/funding-dislocation/data_gate/results
+          python3 invest/docs/research/funding-dislocation/data_gate/analyze.py d u/pairs.json $R/feasibility.json $R/feasibility.md
+          cat $R/feasibility.md
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/funding-dislocation/data_gate/results
+          git commit -m "ops(fd): ביקורת חשבונאית — אותם נתונים (ריצה 43925675764), תוצאה נעולה + תיקון עמלות + עלות איזון (ריצה ${GITHUB_RUN_ID})" || exit 0
+          git push origin "HEAD:${GITHUB_REF_NAME}"
