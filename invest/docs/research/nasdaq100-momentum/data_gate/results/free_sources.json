@@ -1,0 +1,197 @@
+{
+ "wikipedia": {
+  "status": 200,
+  "chars": 13354,
+  "section_years": [],
+  "mentions_delisted_word": 0
+ },
+ "pypi nasdaq-100-ticker-history": {
+  "status": 404,
+  "summary": null,
+  "version": null,
+  "pushed_at": null,
+  "release_date": null,
+  "desc": ""
+ },
+ "github jmccarrell/n100tickers": {
+  "status": 200,
+  "summary": "API for a current and a limited historical view of the member companies of the NASDAQ 100",
+  "version": null,
+  "pushed_at": "2026-11-16T16:29:44Z",
+  "release_date": null,
+  "desc": ""
+ },
+ "github jmccarrell/n100tickers contents": {
+  "status": 200,
+  "files": [
+   ".github",
+   ".gitignore",
+   ".vscode",
+   "AGENTS.md",
+   "CHANGELOG.md",
+   "CONTEXT.md",
+   "LICENSE",
+   "README.md",
+   "docs",
+   "justfile",
+   "knope.toml",
+   "prompts",
+   "pyproject.toml",
+   "ruff.toml",
+   "src",
+   "tests",
+   "uv.lock"
+  ]
+ },
+ "yahoo": {
+  "QQQ": {
+   "status": 200,
+   "n": 5503,
+   "first": "2005-01-03",
+   "last": "2026-11-16",
+   "has_adjclose": true,
+   "divs": 88,
+   "splits": 0
+  },
+  "BIL": {
+   "status": 200,
+   "n": 4899,
+   "first": "2007-05-30",
+   "last": "2026-11-16",
+   "has_adjclose": true,
+   "divs": 129,
+   "splits": 1
+  },
+  "SGOV": {
+   "status": 200,
+   "n": 1625,
+   "first": "2020-06-01",
+   "last": "2026-11-16",
+   "has_adjclose": true,
+   "divs": 76,
+   "splits": 0
+  },
+  "AAPL": {
+   "status": 200,
+   "n": 5503,
+   "first": "2005-01-03",
+   "last": "2026-11-16",
+   "has_adjclose": true,
+   "divs": 58,
+   "splits": 3
+  },
+  "XLNX": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "ATVI": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "TWTR": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "CELG": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "SGEN": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "SPLK": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "BBBY": {
+   "status": 200,
+   "n": 86,
+   "first": "2026-07-17",
+   "last": "2026-11-16",
+   "has_adjclose": true,
+   "divs": 0,
+   "splits": 0
+  },
+  "ALXN": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "MXIM": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "CTXS": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "YHOO": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "ESRX": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "DISCA": {
+   "status": 404,
+   "err": "{\"chart\":{\"result\":null,\"error\":{\"code\":\"Not Found\",\"description\":\"No data found, symbol may be delisted\"}}}"
+  },
+  "FB": {
+   "status": 200,
+   "n": 351,
+   "first": "2025-06-26",
+   "last": "2026-11-16",
+   "has_adjclose": true,
+   "divs": 5,
+   "splits": 0
+  },
+  "META": {
+   "status": 200,
+   "n": 3645,
+   "first": "2012-05-18",
+   "last": "2026-11-16",
+   "has_adjclose": true,
+   "divs": 11,
+   "splits": 0
+  }
+ },
+ "stooq": {
+  "xlnx.us": {
+   "status": 200,
+   "rows": 2,
+   "first": "(async()=>",
+   "head": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"no"
+  },
+  "celg.us": {
+   "status": 200,
+   "rows": 2,
+   "first": "(async()=>",
+   "head": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"no"
+  },
+  "twtr.us": {
+   "status": 200,
+   "rows": 2,
+   "first": "(async()=>",
+   "head": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"no"
+  },
+  "atvi.us": {
+   "status": 200,
+   "rows": 2,
+   "first": "(async()=>",
+   "head": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"no"
+  },
+  "aapl.us": {
+   "status": 200,
+   "rows": 2,
+   "first": "(async()=>",
+   "head": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"no"
+  }
+ },
+ "fred_DTB3": {
+  "status": null,
+  "rows": 0,
+  "first": null,
+  "last": "The read operation timed out"
+ }
+}
