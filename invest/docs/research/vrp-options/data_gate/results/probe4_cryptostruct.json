@@ -1,0 +1,1365 @@
+{
+ "sample": {
+  "status": 200,
+  "bytes": 10963431,
+  "lines": 387402,
+  "masterdata_keys": [
+   "instrument",
+   "underlyings"
+  ],
+  "message_types": {
+   "1": 133902,
+   "6": 85935,
+   "7": 85903,
+   "8": 81160,
+   "2": 209,
+   "18": 145,
+   "5": 87,
+   "0": 44,
+   "9": 16
+  },
+  "fields_by_type": {
+   "5": [
+    "int",
+    "int",
+    "int",
+    "str",
+    "str"
+   ],
+   "0": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "list",
+    "bool"
+   ],
+   "6": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "list"
+   ],
+   "8": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "str"
+   ],
+   "7": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "str",
+    "NoneType",
+    "NoneType",
+    "NoneType",
+    "NoneType",
+    "NoneType",
+    "NoneType",
+    "NoneType"
+   ],
+   "18": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "str"
+   ],
+   "1": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "list"
+   ],
+   "2": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "list"
+   ],
+   "9": [
+    "int",
+    "int",
+    "str",
+    "str",
+    "int",
+    "int",
+    "list"
+   ]
+  },
+  "timing_by_type": {
+   "5": {
+    "n": 87,
+    "first_utc": "23:53:31",
+    "last_utc": "23:58:27",
+    "max_gap_s": 22439.9,
+    "median_gap_s": 59.397
+   },
+   "0": {
+    "n": 44,
+    "first_utc": "23:53:31",
+    "last_utc": "23:58:27",
+    "max_gap_s": 22499.1,
+    "median_gap_s": 1078.179
+   },
+   "6": {
+    "n": 85935,
+    "first_utc": "23:53:31",
+    "last_utc": "00:00:57",
+    "max_gap_s": 701.3,
+    "median_gap_s": 0.257
+   },
+   "8": {
+    "n": 81160,
+    "first_utc": "23:53:31",
+    "last_utc": "00:00:58",
+    "max_gap_s": 61.2,
+    "median_gap_s": 0.996
+   },
+   "7": {
+    "n": 85903,
+    "first_utc": "23:53:31",
+    "last_utc": "00:00:58",
+    "max_gap_s": 61.9,
+    "median_gap_s": 1.017
+   },
+   "18": {
+    "n": 145,
+    "first_utc": "23:53:31",
+    "last_utc": "23:58:27",
+    "max_gap_s": 22499.1,
+    "median_gap_s": 16.405
+   },
+   "1": {
+    "n": 133902,
+    "first_utc": "23:53:33",
+    "last_utc": "00:00:57",
+    "max_gap_s": 701.2,
+    "median_gap_s": 0.123
+   },
+   "2": {
+    "n": 209,
+    "first_utc": "00:09:33",
+    "last_utc": "23:15:34",
+    "max_gap_s": 25622.4,
+    "median_gap_s": 0.21
+   },
+   "9": {
+    "n": 16,
+    "first_utc": "00:15:28",
+    "last_utc": "21:06:30",
+    "max_gap_s": 46322.1,
+    "median_gap_s": 1260.007
+   }
+  }
+ },
+ "format_doc_excerpts": [
+  "# CryptoStruct full-day tick file — format reference\n\nComplete reference for the per-instrument, per-day recording files sold in the\n[CryptoStruct Data Shop](https://cryptostruct.com/shop) and offered as\n[free samples](https://cryptostruct.com/download). Distilled from the official\n[Market Data Specification](https://docs.cryptostruct.com/market-data-api/protocol/)\n(version 3.95.1, protocol schema v8) and verified against production files\nfrom multiple recording eras (2025 and 2026). Where the two disagree, this\ndocument describes what real files contain.\n\n## 1. File identity\n\n- One file = **one instrument × one UTC calendar day, plus a small margin**.\n  Verified on production files: recordings start ~8 minutes *before* midnight\n  (e.g. `23:51:55` of the previous day) and end ~1 minute *after* the next\n  midnight — so **consecutive day files overlap**. When stitching multiple",
+  "t reference\n\nComplete reference for the per-instrument, per-day recording files sold in the\n[CryptoStruct Data Shop](https://cryptostruct.com/shop) and offered as\n[free samples](https://cryptostruct.com/download). Distilled from the official\n[Market Data Specification](https://docs.cryptostruct.com/market-data-api/protocol/)\n(version 3.95.1, protocol schema v8) and verified against production files\nfrom multiple recording eras (2025 and 2026). Where the two disagree, this\ndocument describes what real files contain.\n\n## 1. File identity\n\n- One file = **one instrument × one UTC calendar day, plus a small margin**.\n  Verified on production files: recordings start ~8 minutes *before* midnight\n  (e.g. `23:51:55` of the previous day) and end ~1 minute *after* the next\n  midnight — so **consecutive day files overlap**. When stitching multiple\n  days, trim each file to its nominal `[00:00, 24:00)` U",
+  "s you will encounter (identical inner format):\n  - `{instrument_id}_{YYYY-MM-DD}.txt.zst` — canonical (e.g. `1210_2026-06-24.txt.zst`)\n  - `{exchange_code}-{code}-{YYYY-MM-DD}.txt.zst` — as delivered by shop downloads (e.g. `binance_swap-BTCUSDT-2026-06-24.txt.zst`)\n  - `{instrument_id}_{date}_..._{market_type}-master-{a|b}.txt.zst` — older archive naming\n- Container: **zstd** frame ([facebook/zstd](https://github.com/facebook/zstd)).\n  Decompress with `zstd -d file.txt.zst`, or stream with `zstd -dc file.txt.zst | head`,\n  or on-the-fly via any libzstd binding (`pip install zstandard`).\n- Content: UTF-8 text, `\\n` line endings. **Line 1 is a JSON object**\n  (instrument masterdata, section 3). **Every other line is one event**, a\n  JSON array (section 5). Instrument IDs are stable for the lifetime of an\n  instrument and match the IDs used on cryptostruct.com.\n\n## 2. Scale and performance\n\n| ",
+  "Instrument IDs are stable for the lifetime of an\n  instrument and match the IDs used on cryptostruct.com.\n\n## 2. Scale and performance\n\n| Example | Compressed | Events | Composition |\n|---|---|---|---|\n| BitMEX XRPUSDT perp, one day | 59 MB | 1.87 M | 1.83 M book updates, 2.6 k trade events, 15.7 k mark, 15.7 k index, 198 funding, 3 snapshots |\n| Binance BTCUSDT perp, one day | 1–2 GB | tens of millions | plus a top-of-book stream |\n| Small/illiquid instruments | KB–MB | thousands | |\n\nCompression ratio is roughly **4–8×** (a 59 MB file decompresses to ~254 MB of\ntext); flagship days decompress to **many GB**. Consequences:\n\n- **Never** read a whole file into memory; stream line-by-line through a zstd\n  decompressor (the bundled `scripts/cryptostruct_reader.py` does this).\n- Filter by message type *before* JSON-parsing where possible (check the\n  characters between `[` and the first `,`) — a",
+  "ternal lookup is needed to interpret the file. Newer files may add fields;\nread by name, ignore unknowns.\n\n### `instrument` fields\n\n| Field | Meaning |\n|---|---|\n| `id` | CryptoStruct instrument id (matches the filename and shop/API ids) |\n| `code`, `code_alias` | normalized symbol, e.g. `BTCUSDT`; optional alias |\n| `native_code` | venue-native symbol(s), object with key `default` |\n| `exchange_id`, `exchange_code` | venue, e.g. `bitmex`, `binance_swap`, `gateio_spot` |\n| `type` | `spot`, `perpetual`, `future`, … Note: prediction-market contracts (Kalshi/Polymarket) carry `type: \"perpetual\"` inside the raw day file (recorder vocabulary) even though the shop/search APIs class them as `prediction` — match on `exchange_code` if you need to detect them. Prices are event probabilities in 0..1 (Kalshi tick 0.01, Polymarket 0.001). |\n| `state`, `active` | lifecycle state (`open`, …), active flag |\n|",
+  " |\n| `code`, `code_alias` | normalized symbol, e.g. `BTCUSDT`; optional alias |\n| `native_code` | venue-native symbol(s), object with key `default` |\n| `exchange_id`, `exchange_code` | venue, e.g. `bitmex`, `binance_swap`, `gateio_spot` |\n| `type` | `spot`, `perpetual`, `future`, … Note: prediction-market contracts (Kalshi/Polymarket) carry `type: \"perpetual\"` inside the raw day file (recorder vocabulary) even though the shop/search APIs class them as `prediction` — match on `exchange_code` if you need to detect them. Prices are event probabilities in 0..1 (Kalshi tick 0.01, Polymarket 0.001). |\n| `state`, `active` | lifecycle state (`open`, …), active flag |\n| `is_inverse`, `is_quanto` | contract style — see section 4 before computing notionals |\n| `contract_value`, `multiplier` | contract math inputs — see section 4 |\n| `strike_price` | options only, else null |\n| `start`, `expiry` | listi",
+  "ormalized symbol, e.g. `BTCUSDT`; optional alias |\n| `native_code` | venue-native symbol(s), object with key `default` |\n| `exchange_id`, `exchange_code` | venue, e.g. `bitmex`, `binance_swap`, `gateio_spot` |\n| `type` | `spot`, `perpetual`, `future`, … Note: prediction-market contracts (Kalshi/Polymarket) carry `type: \"perpetual\"` inside the raw day file (recorder vocabulary) even though the shop/search APIs class them as `prediction` — match on `exchange_code` if you need to detect them. Prices are event probabilities in 0..1 (Kalshi tick 0.01, Polymarket 0.001). |\n| `state`, `active` | lifecycle state (`open`, …), active flag |\n| `is_inverse`, `is_quanto` | contract style — see section 4 before computing notionals |\n| `contract_value`, `multiplier` | contract math inputs — see section 4 |\n| `strike_price` | options only, else null |\n| `start`, `expiry` | listing/expiry datetimes; perpetua",
+  "e: prediction-market contracts (Kalshi/Polymarket) carry `type: \"perpetual\"` inside the raw day file (recorder vocabulary) even though the shop/search APIs class them as `prediction` — match on `exchange_code` if you need to detect them. Prices are event probabilities in 0..1 (Kalshi tick 0.01, Polymarket 0.001). |\n| `state`, `active` | lifecycle state (`open`, …), active flag |\n| `is_inverse`, `is_quanto` | contract style — see section 4 before computing notionals |\n| `contract_value`, `multiplier` | contract math inputs — see section 4 |\n| `strike_price` | options only, else null |\n| `start`, `expiry` | listing/expiry datetimes; perpetuals carry a far-future sentinel (e.g. `2100-12-25`) — treat as \"no expiry\" |\n| `ticksize` | minimum price increment (the unit behind the minute API's `spread_ticks`) |\n| `tick_table` | optional price-banded ticksizes: `{\"e\":[{\"p\":<band-floor>,\"t\":<ticksize>}",
+  "ies in 0..1 (Kalshi tick 0.01, Polymarket 0.001). |\n| `state`, `active` | lifecycle state (`open`, …), active flag |\n| `is_inverse`, `is_quanto` | contract style — see section 4 before computing notionals |\n| `contract_value`, `multiplier` | contract math inputs — see section 4 |\n| `strike_price` | options only, else null |\n| `start`, `expiry` | listing/expiry datetimes; perpetuals carry a far-future sentinel (e.g. `2100-12-25`) — treat as \"no expiry\" |\n| `ticksize` | minimum price increment (the unit behind the minute API's `spread_ticks`) |\n| `tick_table` | optional price-banded ticksizes: `{\"e\":[{\"p\":<band-floor>,\"t\":<ticksize>},…],\"i\":<bool>}`; when present, the effective increment depends on price level |\n| `significant_digits`, `max_decimals` | price formatting hints, may be null |\n| `lot_size`, `min_order`, `max_order`, `min_value` | quantity grid and order limits (venue-native units) |",
+  "ee section 4 |\n| `strike_price` | options only, else null |\n| `start`, `expiry` | listing/expiry datetimes; perpetuals carry a far-future sentinel (e.g. `2100-12-25`) — treat as \"no expiry\" |\n| `ticksize` | minimum price increment (the unit behind the minute API's `spread_ticks`) |\n| `tick_table` | optional price-banded ticksizes: `{\"e\":[{\"p\":<band-floor>,\"t\":<ticksize>},…],\"i\":<bool>}`; when present, the effective increment depends on price level |\n| `significant_digits`, `max_decimals` | price formatting hints, may be null |\n| `lot_size`, `min_order`, `max_order`, `min_value` | quantity grid and order limits (venue-native units) |\n| `funding_interval` | seconds between funding events **as a string** (e.g. `\"28800\"` = 8 h); null/absent for spot |\n| `base_underlying_id`, `counter_underlying_id`, `valuation_underlying_id`, `fee_underlying_id` | joins into `underlyings[]` |\n\n### `underlyings[]` ",
+  "s | **schema-version-dependent**, documented per type below — ignore anything beyond |\n\n**Iron rule: parse positionally from the front and tolerate unknown trailing\nelements.** The known tails (protocol schema versions in parentheses):\nsnapshots end with a `forceReset` boolean (v6, 2026-era files); mark prices\ncarry 7 greek/volatility fields after the price (v7 — real values for\noptions, `null` otherwise); 2025-era files have neither. All prices and\nquantities inside `data` are **decimal strings** — parse explicitly (keep the\nraw strings when you need exactness); they may use scientific notation\n(`\"1.0E-4\"`), which `float()` handles. Event ids can carry the sentinel\n`\"9223372036854775807\"` (int64 max) meaning \"no id\" — equality-based gap\ndetection is unaffected.\n\n### Message types\n\n| msgType | Name | `data` shape |\n|---|---|---|\n| 0 | Book snapshot | `[[side, price, qty, ordercount], …]` — t",
+  "-dependent**, documented per type below — ignore anything beyond |\n\n**Iron rule: parse positionally from the front and tolerate unknown trailing\nelements.** The known tails (protocol schema versions in parentheses):\nsnapshots end with a `forceReset` boolean (v6, 2026-era files); mark prices\ncarry 7 greek/volatility fields after the price (v7 — real values for\noptions, `null` otherwise); 2025-era files have neither. All prices and\nquantities inside `data` are **decimal strings** — parse explicitly (keep the\nraw strings when you need exactness); they may use scientific notation\n(`\"1.0E-4\"`), which `float()` handles. Event ids can carry the sentinel\n`\"9223372036854775807\"` (int64 max) meaning \"no id\" — equality-based gap\ndetection is unaffected.\n\n### Message types\n\n| msgType | Name | `data` shape |\n|---|---|---|\n| 0 | Book snapshot | `[[side, price, qty, ordercount], …]` — the book state; tail: "
+ ],
+ "format_doc_head": "# CryptoStruct full-day tick file — format reference\n\nComplete reference for the per-instrument, per-day recording files sold in the\n[CryptoStruct Data Shop](https://cryptostruct.com/shop) and offered as\n[free samples](https://cryptostruct.com/download). Distilled from the official\n[Market Data Specification](https://docs.cryptostruct.com/market-data-api/protocol/)\n(version 3.95.1, protocol schema v8) and verified against production files\nfrom multiple recording eras (2025 and 2026). Where the two disagree, this\ndocument describes what real files contain.\n\n## 1. File identity\n\n- One file = **one instrument × one UTC calendar day, plus a small margin**.\n  Verified on production files: recordings start ~8 minutes *before* midnight\n  (e.g. `23:51:55` of the previous day) and end ~1 minute *after* the next\n  midnight — so **consecutive day files overlap**. When stitching multiple\n  days, trim each file to its nominal `[00:00, 24:00)` UTC window (by\n  `adapterTs`) or deduplicate on `eventId`.\n- In the overlap, `eventId` and `exchangeTs` always match, but **`adapterTs`\n  can differ** (µs to tens of ms): two recorder instances, each with its own\n  connection, record every instrument, and each day file is built on its own,\n  so the same message can carry the other instance's receive time (measured on\n  Kraken XBTEUR 2026-10-25 → 26: 16 % of the overlap, all in the lead-in of\n  the later file). Take every event's timestamps from the file of its UTC day.\n  To switch files without comparing two clocks, continue each stream in the\n  next file after the last `eventId` before 00:00.\n- Names you will encounter (identical inner format):\n  - `{instrument_id}_{YYYY-MM-DD}.txt.zst` — canonical (e.g. `1210_2026-06-24.txt.zst`)\n  - `{exchange_code}-{code}-{YYYY-MM-DD}.txt.zst` — as delivered by shop downloads (e.g. `binance_swap-BTCUSDT-2026-06-24.txt.zst`)\n  - `{instrument_id}_{date}_..._{market_type}-master-{a|b}.txt.zst` — older archive naming\n- Container: **zstd** frame ([facebook/zstd](https://github.com/facebook/zstd)).\n  Decompress with `zstd -d file.txt.zst`, or stream with `zstd -dc file.txt.zst | head`,\n  or on-the-fly via any libzstd binding (`pip install zstandard`).\n- Content: UTF-8 text, `\\n` line endings. **Line 1 is a JSON object**\n  (instrument masterdata, section 3). **Every other line is one event**, a\n  JSON array (section 5). Instrument IDs are stable for the lifetime of an\n  instrument and match the IDs used on cryptostruct.com.\n\n## 2. Scale and performance\n\n| Example | Compressed | Events | Composition |\n|---|---|---|---|\n| BitMEX XRPUSDT perp, one day | 59 MB | 1.87 M | 1.83 M book updates, 2.6 k trade events, 15.7 k mark, 15.7 k index, 198 funding, 3 snapshots |\n| Binance BTCUSDT perp, one day | 1–2 GB | tens of millions | plus a top-of-book stream |\n| Small/illiquid instruments | KB–MB | thousands | |\n\nCompression ratio is roughly **4–8×** (a 59 MB file decompresses to ~254 MB of\ntext); flagship days decompress to **many GB**. Consequences:\n",
+ "legs_by_hold": [
+  {
+   "month": "2023-10",
+   "hold_days_checked": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27OCT23-26000-P",
+     "found": true,
+     "instrument_id": 1103062,
+     "code": "BTC-27OCT23-26000-P",
+     "days_status": 200,
+     "days_listed": 16,
+     "missing": [
+      "2023-10-01",
+      "2023-10-02",
+      "2023-10-03",
+      "2023-10-04",
+      "2023-10-05",
+      "2023-10-06",
+      "2023-10-07",
+      "2023-10-08",
+      "2023-10-09",
+      "2023-10-10",
+      "2023-10-11"
+     ]
+    },
+    "LP": {
+     "symbol": "BTC-27OCT23-24000-P",
+     "found": true,
+     "instrument_id": 1103058,
+     "code": "BTC-27OCT23-24000-P",
+     "days_status": 200,
+     "days_listed": 16,
+     "missing": [
+      "2023-10-01",
+      "2023-10-02",
+      "2023-10-03",
+      "2023-10-04",
+      "2023-10-05",
+      "2023-10-06",
+      "2023-10-07",
+      "2023-10-08",
+      "2023-10-09",
+      "2023-10-10",
+      "2023-10-11"
+     ]
+    },
+    "SC": {
+     "symbol": "BTC-27OCT23-29000-C",
+     "found": true,
+     "instrument_id": 1103067,
+     "code": "BTC-27OCT23-29000-C",
+     "days_status": 200,
+     "days_listed": 16,
+     "missing": [
+      "2023-10-01",
+      "2023-10-02",
+      "2023-10-03",
+      "2023-10-04",
+      "2023-10-05",
+      "2023-10-06",
+      "2023-10-07",
+      "2023-10-08",
+      "2023-10-09",
+      "2023-10-10",
+      "2023-10-11"
+     ]
+    },
+    "LC": {
+     "symbol": "BTC-27OCT23-32000-C",
+     "found": true,
+     "instrument_id": 1103073,
+     "code": "BTC-27OCT23-32000-C",
+     "days_status": 200,
+     "days_listed": 16,
+     "missing": [
+      "2023-10-01",
+      "2023-10-02",
+      "2023-10-03",
+      "2023-10-04",
+      "2023-10-05",
+      "2023-10-06",
+      "2023-10-07",
+      "2023-10-08",
+      "2023-10-09",
+      "2023-10-10",
+      "2023-10-11"
+     ]
+    }
+   },
+   "all_legs_all_days": false
+  },
+  {
+   "month": "2023-12",
+   "hold_days_checked": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29DEC23-36000-P",
+     "found": true,
+     "instrument_id": 1080243,
+     "code": "BTC-29DEC23-36000-P",
+     "days_status": 200,
+     "days_listed": 71,
+     "missing": [
+      "2023-12-22",
+      "2023-12-23",
+      "2023-12-24",
+      "2023-12-25",
+      "2023-12-26",
+      "2023-12-27",
+      "2023-12-28",
+      "2023-12-29"
+     ]
+    },
+    "LP": {
+     "symbol": "BTC-29DEC23-33000-P",
+     "found": true,
+     "instrument_id": 1079398,
+     "code": "BTC-29DEC23-33000-P",
+     "days_status": 200,
+     "days_listed": 71,
+     "missing": [
+      "2023-12-22",
+      "2023-12-23",
+      "2023-12-24",
+      "2023-12-25",
+      "2023-12-26",
+      "2023-12-27",
+      "2023-12-28",
+      "2023-12-29"
+     ]
+    },
+    "SC": {
+     "symbol": "BTC-29DEC23-43000-C",
+     "found": true,
+     "instrument_id": 1145072,
+     "code": "BTC-29DEC23-43000-C",
+     "days_status": 200,
+     "days_listed": 59,
+     "missing": [
+      "2023-12-22",
+      "2023-12-23",
+      "2023-12-24",
+      "2023-12-25",
+      "2023-12-26",
+      "2023-12-27",
+      "2023-12-28",
+      "2023-12-29"
+     ]
+    },
+    "LC": {
+     "symbol": "BTC-29DEC23-50000-C",
+     "found": true,
+     "instrument_id": 1067587,
+     "code": "BTC-29DEC23-50000-C",
+     "days_status": 200,
+     "days_listed": 71,
+     "missing": [
+      "2023-12-22",
+      "2023-12-23",
+      "2023-12-24",
+      "2023-12-25",
+      "2023-12-26",
+      "2023-12-27",
+      "2023-12-28",
+      "2023-12-29"
+     ]
+    }
+   },
+   "all_legs_all_days": false
+  },
+  {
+   "month": "2024-03",
+   "hold_days_checked": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29MAR24-57000-P",
+     "found": true,
+     "instrument_id": 1193754,
+     "code": "BTC-29MAR24-57000-P",
+     "days_status": 200,
+     "days_listed": 96,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-29MAR24-51000-P",
+     "found": true,
+     "instrument_id": 1171045,
+     "code": "BTC-29MAR24-51000-P",
+     "days_status": 200,
+     "days_listed": 115,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-29MAR24-75000-C",
+     "found": true,
+     "instrument_id": 1080566,
+     "code": "BTC-29MAR24-75000-C",
+     "days_status": 200,
+     "days_listed": 169,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-29MAR24-85000-C",
+     "found": true,
+     "instrument_id": 1080570,
+     "code": "BTC-29MAR24-85000-C",
+     "days_status": 200,
+     "days_listed": 169,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2024-05",
+   "hold_days_checked": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31MAY24-52000-P",
+     "found": true,
+     "instrument_id": 1210298,
+     "code": "BTC-31MAY24-52000-P",
+     "days_status": 200,
+     "days_listed": 86,
+     "missing": [
+      "2024-05-01",
+      "2024-05-02"
+     ]
+    },
+    "LP": {
+     "symbol": "BTC-31MAY24-46000-P",
+     "found": true,
+     "instrument_id": 1210286,
+     "code": "BTC-31MAY24-46000-P",
+     "days_status": 200,
+     "days_listed": 86,
+     "missing": [
+      "2024-05-01",
+      "2024-05-02"
+     ]
+    },
+    "SC": {
+     "symbol": "BTC-31MAY24-66000-C",
+     "found": true,
+     "instrument_id": 1210319,
+     "code": "BTC-31MAY24-66000-C",
+     "days_status": 200,
+     "days_listed": 86,
+     "missing": [
+      "2024-05-01",
+      "2024-05-02"
+     ]
+    },
+    "LC": {
+     "symbol": "BTC-31MAY24-75000-C",
+     "found": true,
+     "instrument_id": 1210325,
+     "code": "BTC-31MAY24-75000-C",
+     "days_status": 200,
+     "days_listed": 86,
+     "missing": [
+      "2024-05-01",
+      "2024-05-02"
+     ]
+    }
+   },
+   "all_legs_all_days": false
+  },
+  {
+   "month": "2024-06",
+   "hold_days_checked": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28JUN24-62000-P",
+     "found": true,
+     "instrument_id": 1272975,
+     "code": "BTC-28JUN24-62000-P",
+     "days_status": 200,
+     "days_listed": 44,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-28JUN24-58000-P",
+     "found": true,
+     "instrument_id": 1191675,
+     "code": "BTC-28JUN24-58000-P",
+     "days_status": 200,
+     "days_listed": 157,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-28JUN24-75000-C",
+     "found": true,
+     "instrument_id": 1095639,
+     "code": "BTC-28JUN24-75000-C",
+     "days_status": 200,
+     "days_listed": 228,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-28JUN24-85000-C",
+     "found": true,
+     "instrument_id": 1095643,
+     "code": "BTC-28JUN24-85000-C",
+     "days_status": 200,
+     "days_listed": 228,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2024-08",
+   "hold_days_checked": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30AUG24-60000-P",
+     "found": true,
+     "instrument_id": 1282131,
+     "code": "BTC-30AUG24-60000-P",
+     "days_status": 200,
+     "days_listed": 90,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-30AUG24-55000-P",
+     "found": true,
+     "instrument_id": 1298631,
+     "code": "BTC-30AUG24-55000-P",
+     "days_status": 200,
+     "days_listed": 65,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-30AUG24-72000-C",
+     "found": true,
+     "instrument_id": 1282154,
+     "code": "BTC-30AUG24-72000-C",
+     "days_status": 200,
+     "days_listed": 90,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-30AUG24-80000-C",
+     "found": true,
+     "instrument_id": 1282168,
+     "code": "BTC-30AUG24-80000-C",
+     "days_status": 200,
+     "days_listed": 90,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2024-09",
+   "hold_days_checked": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27SEP24-54000-P",
+     "found": true,
+     "instrument_id": 1170663,
+     "code": "BTC-27SEP24-54000-P",
+     "days_status": 200,
+     "days_listed": 263,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-27SEP24-49000-P",
+     "found": true,
+     "instrument_id": 1155767,
+     "code": "BTC-27SEP24-49000-P",
+     "days_status": 200,
+     "days_listed": 287,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-27SEP24-64000-C",
+     "found": true,
+     "instrument_id": 1323983,
+     "code": "BTC-27SEP24-64000-C",
+     "days_status": 200,
+     "days_listed": 58,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-27SEP24-70000-C",
+     "found": true,
+     "instrument_id": 1128476,
+     "code": "BTC-27SEP24-70000-C",
+     "days_status": 200,
+     "days_listed": 316,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2024-11",
+   "hold_days_checked": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29NOV24-64000-P",
+     "found": true,
+     "instrument_id": 1342530,
+     "code": "BTC-29NOV24-64000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-29NOV24-57000-P",
+     "found": true,
+     "instrument_id": 1342516,
+     "code": "BTC-29NOV24-57000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-29NOV24-80000-C",
+     "found": true,
+     "instrument_id": 1342549,
+     "code": "BTC-29NOV24-80000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-29NOV24-90000-C",
+     "found": true,
+     "instrument_id": 1342553,
+     "code": "BTC-29NOV24-90000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2024-12",
+   "hold_days_checked": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27DEC24-90000-P",
+     "found": true,
+     "instrument_id": 1185116,
+     "code": "BTC-27DEC24-90000-P",
+     "days_status": 200,
+     "days_listed": 336,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-27DEC24-82000-P",
+     "found": true,
+     "instrument_id": 1388149,
+     "code": "BTC-27DEC24-82000-P",
+     "days_status": 200,
+     "days_listed": 51,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-27DEC24-110000-C",
+     "found": true,
+     "instrument_id": 1185123,
+     "code": "BTC-27DEC24-110000-C",
+     "days_status": 200,
+     "days_listed": 336,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-27DEC24-125000-C",
+     "found": true,
+     "instrument_id": 1185129,
+     "code": "BTC-27DEC24-125000-C",
+     "days_status": 200,
+     "days_listed": 336,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-01",
+   "hold_days_checked": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31JAN25-86000-P",
+     "found": true,
+     "instrument_id": 1376095,
+     "code": "BTC-31JAN25-86000-P",
+     "days_status": 200,
+     "days_listed": 100,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-31JAN25-76000-P",
+     "found": true,
+     "instrument_id": 1376085,
+     "code": "BTC-31JAN25-76000-P",
+     "days_status": 200,
+     "days_listed": 100,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-31JAN25-108000-C",
+     "found": true,
+     "instrument_id": 1391596,
+     "code": "BTC-31JAN25-108000-C",
+     "days_status": 200,
+     "days_listed": 82,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-31JAN25-122000-C",
+     "found": true,
+     "instrument_id": 1433675,
+     "code": "BTC-31JAN25-122000-C",
+     "days_status": 200,
+     "days_listed": 58,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-02",
+   "hold_days_checked": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28FEB25-95000-P",
+     "found": true,
+     "instrument_id": 1443432,
+     "code": "BTC-28FEB25-95000-P",
+     "days_status": 200,
+     "days_listed": 75,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-28FEB25-86000-P",
+     "found": true,
+     "instrument_id": 1422456,
+     "code": "BTC-28FEB25-86000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-28FEB25-114000-C",
+     "found": true,
+     "instrument_id": 1424100,
+     "code": "BTC-28FEB25-114000-C",
+     "days_status": 200,
+     "days_listed": 92,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-28FEB25-125000-C",
+     "found": true,
+     "instrument_id": 1422487,
+     "code": "BTC-28FEB25-125000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-03",
+   "hold_days_checked": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28MAR25-78000-P",
+     "found": true,
+     "instrument_id": 1497731,
+     "code": "BTC-28MAR25-78000-P",
+     "days_status": 200,
+     "days_listed": 29,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-28MAR25-70000-P",
+     "found": true,
+     "instrument_id": 1238771,
+     "code": "BTC-28MAR25-70000-P",
+     "days_status": 200,
+     "days_listed": 327,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-28MAR25-94000-C",
+     "found": true,
+     "instrument_id": 1474665,
+     "code": "BTC-28MAR25-94000-C",
+     "days_status": 200,
+     "days_listed": 61,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-28MAR25-105000-C",
+     "found": true,
+     "instrument_id": 1395563,
+     "code": "BTC-28MAR25-105000-C",
+     "days_status": 200,
+     "days_listed": 136,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-05",
+   "hold_days_checked": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30MAY25-90000-P",
+     "found": true,
+     "instrument_id": 1497323,
+     "code": "BTC-30MAY25-90000-P",
+     "days_status": 200,
+     "days_listed": 81,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-30MAY25-82000-P",
+     "found": true,
+     "instrument_id": 1497315,
+     "code": "BTC-30MAY25-82000-P",
+     "days_status": 200,
+     "days_listed": 81,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-30MAY25-106000-C",
+     "found": true,
+     "instrument_id": 1499866,
+     "code": "BTC-30MAY25-106000-C",
+     "days_status": 200,
+     "days_listed": 90,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-30MAY25-115000-C",
+     "found": true,
+     "instrument_id": 1497338,
+     "code": "BTC-30MAY25-115000-C",
+     "days_status": 200,
+     "days_listed": 81,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-06",
+   "hold_days_checked": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27JUN25-97000-P",
+     "found": true,
+     "instrument_id": 1532723,
+     "code": "BTC-27JUN25-97000-P",
+     "days_status": 200,
+     "days_listed": 58,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-27JUN25-90000-P",
+     "found": true,
+     "instrument_id": 1300253,
+     "code": "BTC-27JUN25-90000-P",
+     "days_status": 200,
+     "days_listed": 363,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-27JUN25-115000-C",
+     "found": true,
+     "instrument_id": 1412484,
+     "code": "BTC-27JUN25-115000-C",
+     "days_status": 200,
+     "days_listed": 219,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-27JUN25-125000-C",
+     "found": true,
+     "instrument_id": 1443993,
+     "code": "BTC-27JUN25-125000-C",
+     "days_status": 200,
+     "days_listed": 194,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-08",
+   "hold_days_checked": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29AUG25-108000-P",
+     "found": true,
+     "instrument_id": 1548872,
+     "code": "BTC-29AUG25-108000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-29AUG25-100000-P",
+     "found": true,
+     "instrument_id": 1548864,
+     "code": "BTC-29AUG25-100000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-29AUG25-124000-C",
+     "found": true,
+     "instrument_id": 1548887,
+     "code": "BTC-29AUG25-124000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-29AUG25-132000-C",
+     "found": true,
+     "instrument_id": 1586818,
+     "code": "BTC-29AUG25-132000-C",
+     "days_status": 200,
+     "days_listed": 50,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-10",
+   "hold_days_checked": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31OCT25-110000-P",
+     "found": true,
+     "instrument_id": 1602843,
+     "code": "BTC-31OCT25-110000-P",
+     "days_status": 200,
+     "days_listed": 100,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-31OCT25-102000-P",
+     "found": true,
+     "instrument_id": 1613091,
+     "code": "BTC-31OCT25-102000-P",
+     "days_status": 200,
+     "days_listed": 92,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-31OCT25-126000-C",
+     "found": true,
+     "instrument_id": 1602858,
+     "code": "BTC-31OCT25-126000-C",
+     "days_status": 200,
+     "days_listed": 100,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-31OCT25-135000-C",
+     "found": true,
+     "instrument_id": 1612513,
+     "code": "BTC-31OCT25-135000-C",
+     "days_status": 200,
+     "days_listed": 92,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2025-11",
+   "hold_days_checked": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28NOV25-102000-P",
+     "found": true,
+     "instrument_id": 1650237,
+     "code": "BTC-28NOV25-102000-P",
+     "days_status": 200,
+     "days_listed": 92,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-28NOV25-95000-P",
+     "found": true,
+     "instrument_id": 1649670,
+     "code": "BTC-28NOV25-95000-P",
+     "days_status": 200,
+     "days_listed": 92,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-28NOV25-120000-C",
+     "found": true,
+     "instrument_id": 1647914,
+     "code": "BTC-28NOV25-120000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-28NOV25-128000-C",
+     "found": true,
+     "instrument_id": 1671187,
+     "code": "BTC-28NOV25-128000-C",
+     "days_status": 200,
+     "days_listed": 78,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-01",
+   "hold_days_checked": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30JAN26-82000-P",
+     "found": true,
+     "instrument_id": 1826447,
+     "code": "BTC-30JAN26-82000-P",
+     "days_status": 200,
+     "days_listed": 72,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-30JAN26-75000-P",
+     "found": true,
+     "instrument_id": 1776975,
+     "code": "BTC-30JAN26-75000-P",
+     "days_status": 200,
+     "days_listed": 92,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-30JAN26-96000-C",
+     "found": true,
+     "instrument_id": 1786303,
+     "code": "BTC-30JAN26-96000-C",
+     "days_status": 200,
+     "days_listed": 88,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-30JAN26-104000-C",
+     "found": true,
+     "instrument_id": 1772686,
+     "code": "BTC-30JAN26-104000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-02",
+   "hold_days_checked": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27FEB26-75000-P",
+     "found": true,
+     "instrument_id": 1852513,
+     "code": "BTC-27FEB26-75000-P",
+     "days_status": 200,
+     "days_listed": 89,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-27FEB26-65000-P",
+     "found": true,
+     "instrument_id": 1852944,
+     "code": "BTC-27FEB26-65000-P",
+     "days_status": 200,
+     "days_listed": 89,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-27FEB26-86000-C",
+     "found": true,
+     "instrument_id": 1843753,
+     "code": "BTC-27FEB26-86000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-27FEB26-92000-C",
+     "found": true,
+     "instrument_id": 1843759,
+     "code": "BTC-27FEB26-92000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-03",
+   "hold_days_checked": 27,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27MAR26-60000-P",
+     "found": true,
+     "instrument_id": 1513959,
+     "code": "BTC-27MAR26-60000-P",
+     "days_status": 200,
+     "days_listed": 366,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-27MAR26-54000-P",
+     "found": true,
+     "instrument_id": 2275356,
+     "code": "BTC-27MAR26-54000-P",
+     "days_status": 200,
+     "days_listed": 32,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-27MAR26-74000-C",
+     "found": true,
+     "instrument_id": 2056931,
+     "code": "BTC-27MAR26-74000-C",
+     "days_status": 200,
+     "days_listed": 56,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-27MAR26-80000-C",
+     "found": true,
+     "instrument_id": 1513964,
+     "code": "BTC-27MAR26-80000-C",
+     "days_status": 200,
+     "days_listed": 366,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-05",
+   "hold_days_checked": 29,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-29MAY26-72000-P",
+     "found": true,
+     "instrument_id": 2305492,
+     "code": "BTC-29MAY26-72000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-29MAY26-67000-P",
+     "found": true,
+     "instrument_id": 2305482,
+     "code": "BTC-29MAY26-67000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-29MAY26-83000-C",
+     "found": true,
+     "instrument_id": 2474697,
+     "code": "BTC-29MAY26-83000-C",
+     "days_status": 200,
+     "days_listed": 87,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-29MAY26-88000-C",
+     "found": true,
+     "instrument_id": 2305515,
+     "code": "BTC-29MAY26-88000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-07",
+   "hold_days_checked": 31,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-31JUL26-54000-P",
+     "found": true,
+     "instrument_id": 7567971,
+     "code": "BTC-31JUL26-54000-P",
+     "days_status": 200,
+     "days_listed": 60,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-31JUL26-48000-P",
+     "found": true,
+     "instrument_id": 7758787,
+     "code": "BTC-31JUL26-48000-P",
+     "days_status": 200,
+     "days_listed": 57,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-31JUL26-64000-C",
+     "found": true,
+     "instrument_id": 5109150,
+     "code": "BTC-31JUL26-64000-C",
+     "days_status": 200,
+     "days_listed": 100,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-31JUL26-68000-C",
+     "found": true,
+     "instrument_id": 5109156,
+     "code": "BTC-31JUL26-68000-C",
+     "days_status": 200,
+     "days_listed": 100,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-08",
+   "hold_days_checked": 28,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-28AUG26-59000-P",
+     "found": true,
+     "instrument_id": 7580623,
+     "code": "BTC-28AUG26-59000-P",
+     "days_status": 200,
+     "days_listed": 88,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-28AUG26-55000-P",
+     "found": true,
+     "instrument_id": 7682639,
+     "code": "BTC-28AUG26-55000-P",
+     "days_status": 200,
+     "days_listed": 86,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-28AUG26-67000-C",
+     "found": true,
+     "instrument_id": 7256616,
+     "code": "BTC-28AUG26-67000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-28AUG26-71000-C",
+     "found": true,
+     "instrument_id": 7256624,
+     "code": "BTC-28AUG26-71000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-10",
+   "hold_days_checked": 30,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-30OCT26-79000-P",
+     "found": true,
+     "instrument_id": 13974469,
+     "code": "BTC-30OCT26-79000-P",
+     "days_status": 200,
+     "days_listed": 72,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-30OCT26-73000-P",
+     "found": true,
+     "instrument_id": 11751434,
+     "code": "BTC-30OCT26-73000-P",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-30OCT26-90000-C",
+     "found": true,
+     "instrument_id": 11751451,
+     "code": "BTC-30OCT26-90000-C",
+     "days_status": 200,
+     "days_listed": 93,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-30OCT26-96000-C",
+     "found": true,
+     "instrument_id": 14080403,
+     "code": "BTC-30OCT26-96000-C",
+     "days_status": 200,
+     "days_listed": 71,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  },
+  {
+   "month": "2026-11",
+   "hold_days_checked": 14,
+   "legs": {
+    "SP": {
+     "symbol": "BTC-27NOV26-73000-P",
+     "found": true,
+     "instrument_id": 14945277,
+     "code": "BTC-27NOV26-73000-P",
+     "days_status": 200,
+     "days_listed": 80,
+     "missing": []
+    },
+    "LP": {
+     "symbol": "BTC-27NOV26-67000-P",
+     "found": true,
+     "instrument_id": 15138710,
+     "code": "BTC-27NOV26-67000-P",
+     "days_status": 200,
+     "days_listed": 79,
+     "missing": []
+    },
+    "SC": {
+     "symbol": "BTC-27NOV26-84000-C",
+     "found": true,
+     "instrument_id": 14945298,
+     "code": "BTC-27NOV26-84000-C",
+     "days_status": 200,
+     "days_listed": 80,
+     "missing": []
+    },
+    "LC": {
+     "symbol": "BTC-27NOV26-89000-C",
+     "found": true,
+     "instrument_id": 14945308,
+     "code": "BTC-27NOV26-89000-C",
+     "days_status": 200,
+     "days_listed": 80,
+     "missing": []
+    }
+   },
+   "all_legs_all_days": true
+  }
+ ],
+ "holds_all_legs_all_days": 22
+}
