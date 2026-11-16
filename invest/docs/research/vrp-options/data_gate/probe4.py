@@ -33,16 +33,23 @@ if st == 200 and isinstance(b, bytes):
     except Exception as e:
         out['sample']['masterdata_error'] = str(e)
     types = collections.Counter(); keys = {}; ts = collections.defaultdict(list)
+    shapes = collections.Counter()
     for ln in txt[1:]:
         try: m = json.loads(ln)
         except Exception: types['_bad'] += 1; continue
-        t = str(m.get('type') or m.get('t') or m.get('msg') or m.get('kind') or '?')
+        if isinstance(m, dict):
+            t = str(m.get('type') or m.get('t') or m.get('msg') or m.get('kind') or '?')
+            if t not in keys: keys[t] = sorted(m.keys())
+            cand = [m.get(x) for x in ('ts', 'timestamp', 'venue_ts', 'recv_ts', 'time')]
+        elif isinstance(m, list):
+            t = str(m[0]) if m and isinstance(m[0], (str, int)) else '?'
+            if t not in keys: keys[t] = [type(x).__name__ for x in m]  # מבנה בלבד, בלי ערכים
+            cand = m
+        else:
+            t = type(m).__name__; cand = []
         types[t] += 1
-        if t not in keys: keys[t] = sorted(m.keys()) if isinstance(m, dict) else []
-        tsv = m.get('ts') or m.get('timestamp') or m.get('venue_ts') or m.get('recv_ts') or m.get('time')
-        if isinstance(tsv, (int, float, str)):
-            try: ts[t].append(int(tsv))
-            except Exception: pass
+        tsv = next((int(x) for x in cand if isinstance(x, int) and x > 10**18), None)  # חותמת זמן בננו-שניות
+        if tsv: ts[t].append(tsv)
     out['sample']['message_types'] = dict(types.most_common(30)); out['sample']['fields_by_type'] = keys
     span = {}
     for t, v in ts.items():
@@ -52,6 +59,11 @@ if st == 200 and isinstance(b, bytes):
                    'max_gap_s': round(max(gaps) / 1e9, 1) if gaps else None, 'median_gap_s': round(sorted(gaps)[len(gaps) // 2] / 1e9, 3) if gaps else None}
     out['sample']['timing_by_type'] = span
     os.remove('/tmp/s.zst')
+st, fd = get('https://cryptostruct.com/skills/cryptostruct-market-data/references/day-file-format.md', raw=True)
+if isinstance(fd, bytes):
+    t = fd.decode('utf8', 'replace'); import re
+    out['format_doc_excerpts'] = [t[max(0, m.start() - 300):m.end() + 600] for m in re.finditer(r'(?i)mark|greek|implied|index price|option', t)][:12]
+    out['format_doc_head'] = t[:3000]
 # ---- 2. רגליים × ימים ----
 months = [r for r in json.load(open(AN)) if r.get('four_distinct_legs') and r.get('expiry') and r['month'] >= '2023-10']
 legs = []
