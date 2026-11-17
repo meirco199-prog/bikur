@@ -1,0 +1,25 @@
+# זמני (ops): מחקר א — הרצה אחת לפי PROTOCOL_v1.0.md (נעול ב-98c48c8), על נתוני שער הנתונים (ריצה 44147415469). ענף מחקר בלבד; יוסר בסוף.
+name: sse-run
+on:
+  push:
+    branches: [research/single-stock-edge]
+    paths: [.github/workflows/sse-run.yml]
+permissions: { contents: write, actions: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: sse-raw, path: raw, run-id: 44147415469, github-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: run
+        run: |
+          D=invest/docs/research/single-stock-edge
+          python3 $D/sse.py run raw $D/data_gate/results/data_gate.json $D/results
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/single-stock-edge/results
+          git commit -m "ops(sse): הרצה אחת לפי PROTOCOL_v1.0 (ריצה ${GITHUB_RUN_ID})" || exit 0
+          git push origin "HEAD:${GITHUB_REF_NAME}"
