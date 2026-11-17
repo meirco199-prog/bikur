@@ -1,0 +1,28 @@
+# זמני (ops): מחקר א — שער נתונים (PROTOCOL_v1.0.md סעיף 1). בדיקת נתונים בלבד, בלי סימולציה. ענף מחקר בלבד; יוסר בסוף.
+name: sse-gate
+on:
+  push:
+    branches: [research/single-stock-edge]
+    paths: [.github/workflows/sse-gate.yml]
+permissions: { contents: write }
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch + check
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          D=invest/docs/research/single-stock-edge/data_gate
+          python3 $D/gate.py fetch raw
+          python3 $D/gate.py check raw $D/results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: sse-raw, path: raw, retention-days: 30 }
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/single-stock-edge/data_gate/results
+          git commit -m "ops(sse): שער נתונים לפי PROTOCOL_v1.0 (ריצה ${GITHUB_RUN_ID})" || exit 0
+          git push origin "HEAD:${GITHUB_REF_NAME}"
