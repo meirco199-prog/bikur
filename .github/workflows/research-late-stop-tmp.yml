@@ -1,0 +1,34 @@
+# זמני, בענף המחקר בלבד (research/late-stop) — יוסר אחרי ההרצה האחת. מחקר בלבד: אין פקודות, אין מפתחות.
+# הרצה: דחיפה של .github/late-stop/command (תוכן: "run"). נתונים: נרות דקה ציבוריים של Binance, אותו cache כמו research-amit-course.
+name: research-late-stop-tmp
+on:
+  push:
+    branches: [research/late-stop]
+    paths: ['.github/late-stop/command']
+permissions: { contents: write }
+concurrency: { group: research-late-stop, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: unit tests
+        run: node --test invest-api/tests/research-late-stop.test.mjs invest-api/tests/research-amit1-guard.test.mjs invest-api/tests/research-amit2-be.test.mjs
+      - uses: actions/cache@v4
+        with: { path: amit-course-cache, key: binance-um-1m-2020-01-2026-10-29coins-v2, restore-keys: binance-um-1m- }
+      - name: run (once)
+        run: |
+          F=""; [ -f invest/docs/research/late-stop/fees.json ] && F="--fees invest/docs/research/late-stop/fees.json"
+          node --max-old-space-size=6500 invest-api/scripts/research-late-stop.mjs --from 2020-01 --to 2026-10 --cache amit-course-cache --outdir invest/docs/research/late-stop $F > /dev/null
+          cat invest/docs/research/late-stop/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with: { name: late-stop, path: invest/docs/research/late-stop }
+      - name: commit results
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/late-stop
+          git commit -m "ops: תוצאות מחקר סטופ מאוחר (ריצה ${{ github.run_id }})" || true
+          git push origin HEAD:research/late-stop
