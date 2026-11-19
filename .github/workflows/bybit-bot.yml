@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'install (התקנה/עדכון מלא + הפעלה) | update (משיכת קוד + ריסטארט) | status | logs | stop (עצירה מיידית: ביטול פקודות + סגירת פוזיציה) | start (ביטול עצירה) | stop1 / start1 (בוט 1 בלבד) | stop3 / start3 (בוט 3 בלבד) | summary3 (סיכום בוט 3) | summary1 (כל הכניסות והעסקאות שנסגרו של בוט 1, 7 ימים) | probe4 (בדיקת נתונים — חוזי מניות ב-Bybit, קריאה בלבד) | research4 (בדיקה לאחור "כמו עמית" על חוזי המניות, קריאה בלבד, עד 40 דק׳) | analyze1 (ניתוח עומק של עסקאות בוט 1 — מה גורם להפסדים, קריאה בלבד) | probexs (אילו ממטבעות המומנטום המשודרג נסחרים בספוט של Bybit ובדמו — קריאה בלבד) | probefund (היסטוריית דמי המימון של BTC/ETH מ-BitMEX/Bybit/Binance למחקר — קריאה ציבורית בלבד) | probebin (אילו ממטבעות המומנטום נסחרים בספוט של Binance, תאריך רישום ועלות לפי ספר הפקודות — קריאה ציבורית בלבד)'
+        description: 'install (התקנה/עדכון מלא + הפעלה) | update (משיכת קוד + ריסטארט) | status | logs | stop (עצירה מיידית: ביטול פקודות + סגירת פוזיציה) | start (ביטול עצירה) | stop1 / start1 (בוט 1 בלבד) | stop3 / start3 (בוט 3 בלבד) | summary3 (סיכום בוט 3) | summary1 (כל הכניסות והעסקאות שנסגרו של בוט 1, 7 ימים) | probe4 (בדיקת נתונים — חוזי מניות ב-Bybit, קריאה בלבד) | research4 (בדיקה לאחור "כמו עמית" על חוזי המניות, קריאה בלבד, עד 40 דק׳) | analyze1 (ניתוח עומק של עסקאות בוט 1 — מה גורם להפסדים, קריאה בלבד) | probexs (אילו ממטבעות המומנטום המשודרג נסחרים בספוט של Bybit ובדמו — קריאה בלבד) | probefund (היסטוריית דמי המימון של BTC/ETH מ-BitMEX/Bybit/Binance למחקר — קריאה ציבורית בלבד) | probebin (אילו ממטבעות המומנטום נסחרים בספוט של Binance, תאריך רישום ועלות לפי ספר הפקודות — קריאה ציבורית בלבד) | fees (ביקורת עמלות בפועל: כל הביצועים של הבוטים ב-30 הימים האחרונים ושיעורי העמלה של החשבון — קריאה בלבד)'
         required: true
         default: 'status'
         type: choice
-        options: [install, update, status, logs, stop, start, stop1, start1, stop3, start3, summary3, summary1, probe4, research4, analyze1, probexs, probefund, probebin]
+        options: [install, update, status, logs, stop, start, stop1, start1, stop3, start3, summary3, summary1, probe4, research4, analyze1, probexs, probefund, probebin, fees]
 
 permissions:
   contents: read
@@ -57,6 +57,7 @@ jobs:
             probexs) $SSH 'sudo -u bridge node --input-type=module' < invest-api/scripts/bybit-xsra-probe.mjs | tee probexs.md; cat probexs.md >> "$GITHUB_STEP_SUMMARY" ;;
             research4) { cat invest-api/engine/amit4-open.js; grep -v -e "^import .*amit4-open" -e "^#!" invest-api/scripts/research-amit4-open.mjs; } | $SSH 'sudo -u bridge nice -n 10 node --input-type=module' | tee research4.md; cat research4.md >> "$GITHUB_STEP_SUMMARY" ;;
             analyze1) $SSH 'H=$(getent passwd bridge | cut -d: -f6); journalctl -u bikur-bybit --since "10 days ago" -o short-unix --no-pager | grep נכנסנו > /tmp/bikur-entries1.txt || true; chmod 644 /tmp/bikur-entries1.txt; sudo -u bridge env BOT_STATE=$H/.bikur-bybit/state.json ENTRIES=/tmp/bikur-entries1.txt node --input-type=module' < invest-api/scripts/analyze-bot1-trades.mjs | tee analyze1.md; cat analyze1.md >> "$GITHUB_STEP_SUMMARY" ;;
+            fees)    { cat invest-api/engine/fee-audit.js; grep -v -e "^import .*fee-audit" -e "^#!" invest-api/scripts/bybit-fee-audit.mjs; } | $SSH 'sudo -u bridge bash -c "set -a; . /etc/bikur-bybit/bot.env; set +a; node --input-type=module"' | tee fees.md; grep -v '^FEEJSON:' fees.md >> "$GITHUB_STEP_SUMMARY" ;;
             start1)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP1"; systemctl enable -q bikur-bybit; systemctl start bikur-bybit; sleep 5; systemctl is-active bikur-bybit' ;;
             start)   $SSH 'H=$(getent passwd bridge | cut -d: -f6); rm -f "$H/.bikur-bybit/STOP"; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-enabled -q $s && systemctl start $s; done; sleep 5; for s in bikur-bybit bikur-bybit2 bikur-bybit3; do systemctl is-active $s | sed "s/^/$s: /"; done' ;;
           esac
