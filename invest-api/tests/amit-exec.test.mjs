@@ -125,7 +125,7 @@ test('POST /amit/bot בלי סוד = 401; עם סוד הגשר = נשמר; GET /
   assert.equal(r.status, 200); assert.equal((await r.json()).saved, true);
 });
 
-test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כניסה → ביטול הנגדית + דיווח; STOP1 → ביטול הכול וסגירה', async () => {
+test('הבוט עצמו (גרסה 3) מול Bybit מדומה: שטוח → כניסת לונג אחת; כניסה → ביטול הכניסה + יציאה ממתינה + דיווח; STOP1 → ביטול הכול וסגירה', async () => {
   process.env.BYBIT_DEMO_API_KEY = 'k'; process.env.BYBIT_DEMO_API_SECRET = 's'; process.env.BRIDGE_SECRET = 'b';
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bot-')); process.env.BOT_STOP = path.join(dir, 'STOP'); process.env.BOT_STOP1 = path.join(dir, 'STOP1'); process.env.BOT_STATE = path.join(dir, 's.json');
@@ -136,6 +136,7 @@ test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כ
     const u = new URL(url), body = opts.body ? JSON.parse(opts.body) : null;
     calls.push({ host: u.host, path: u.pathname, body });
     const ok = (result) => Response.json({ retCode: 0, retMsg: 'OK', result });
+    if (u.pathname === '/v5/market/tickers'){ assert.equal(u.host, 'api.bybit.com'); return Response.json({ result: { list: [{ bid1Price: '75999.9', ask1Price: '76000' }] } }); }
     if (u.pathname === '/v5/market/kline'){ const now = Date.now(), t0 = Math.floor(now / 60e3) * 60e3; return Response.json({ result: { list: Array.from({ length: 30 }, (_, i) => [String(t0 - i * 60e3), '1', '1', '1', String(76000 + (i % 2 ? 150 : -150))]) } }); }
     assert.equal(u.host === 'api-demo.bybit.com' || u.host === 'invest-api.meirco199.workers.dev', true, 'רק דמו או ה-Worker: ' + u.host);
     if (u.pathname === '/v5/position/list') return ok({ list: pos ? [pos] : [] });
@@ -153,12 +154,14 @@ test('הבוט עצמו מול Bybit מדומה: שטוח → 2 כניסות; כ
     const state = { startedAt: new Date().toISOString(), trades: [], posSinceMs: null, lastBarT: 0, haltDay: null, lastReportMs: 0 }, mem = {};
     await tick(state, mem);
     const creates = calls.filter((c) => c.path === '/v5/order/create');
-    assert.equal(creates.length, 2); assert.ok(creates.every((c) => c.body.stopLoss && c.body.category === 'linear' && c.body.symbol === 'BTCUSDT'));
+    assert.equal(creates.length, 1); assert.ok(creates.every((c) => c.body.side === 'Buy' && c.body.stopLoss && c.body.category === 'linear' && c.body.symbol === 'BTCUSDT'));
     assert.ok(calls.some((c) => c.path === '/amit/bot'), 'דיווח ראשון בהפעלה');
-    // הקנייה התמלאה → הפוזיציה קיימת; הבוט מבטל את פקודת המכירה מיד
-    pos = { side: 'Buy', size: '2.501', avgPrice: '75960', unrealisedPnl: '-50' }; orders = orders.filter((o) => o.side === 'Sell'); calls = [];
+    // הקנייה התמלאה חלקית → הפוזיציה קיימת; הבוט מבטל את שארית פקודת הכניסה ומציב יציאה ממתינה (reduce-only, PostOnly)
+    pos = { side: 'Buy', size: '2.501', avgPrice: '75960', unrealisedPnl: '-50' }; calls = [];
     await tick(state, mem);
-    assert.ok(calls.some((c) => c.path === '/v5/order/cancel'), 'ביטול הנגדית'); assert.ok(state.posSinceMs > 0);
+    assert.ok(calls.some((c) => c.path === '/v5/order/cancel'), 'ביטול שארית הכניסה'); assert.ok(state.posSinceMs > 0);
+    const exit = calls.find((c) => c.path === '/v5/order/create')?.body;
+    assert.equal(exit.side, 'Sell'); assert.equal(exit.reduceOnly, true); assert.equal(exit.timeInForce, 'PostOnly'); assert.equal(exit.qty, '2.501');
     // STOP1 (עצירת בוט 1 בלבד) → ביטול הכול + סגירה בשוק reduce-only
     fs.writeFileSync(process.env.BOT_STOP1, ''); orders.push({ orderId: 'tp', orderLinkId: 'amit-tp-1' }); calls = [];
     await tick(state, mem);
