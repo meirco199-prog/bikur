@@ -4,8 +4,10 @@
 // לחשבון הדמו (BOT.base) ואין בקוד הזה דרך לחשבון האמיתי. התקנה/עצירה: .github/workflows/bybit-bot.yml (פירוט: invest/docs/BYBIT_BOT.md).
 // env: BYBIT_DEMO_API_KEY, BYBIT_DEMO_API_SECRET, WORKER_URL, BRIDGE_SECRET (לדיווח), BOT_STATE (ברירת מחדל ~/.bikur-bybit/state.json).
 // עצירה מיידית: קובץ ~/.bikur-bybit/STOP → מבטל פקודות, סוגר פוזיציה, ולא נכנס לעסקאות עד שהקובץ נמחק.
+// גרסה 3 (20/11/2026, AI_COUNCIL#33): "בדיוק כמו עמית" — ההחלטות ב-engine/amit-exact-exec.js (גרסה 2 נשארת ב-amit-exec.js).
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { BOT, sign, decide, closedKlines, dailyHalt, summarize, ilDay } from '../engine/amit-exec.js';
+import { sign, closedKlines, dailyHalt, summarize, ilDay } from '../engine/amit-exec.js';
+import { BOTX as BOT, decideExact as decide } from '../engine/amit-exact-exec.js';
 
 const KEY = process.env.BYBIT_DEMO_API_KEY || '', SECRET = process.env.BYBIT_DEMO_API_SECRET || '';
 const W = (process.env.WORKER_URL || 'https://invest-api.meirco199.workers.dev').replace(/\/$/, '');
@@ -66,7 +68,7 @@ async function exec(a, pos){
   if (a.type === 'cancel') return bybit('POST', '/v5/order/cancel', { ...C, orderId: a.orderId }).catch((e) => { if (![110001, 170213].includes(e.code)) throw e; }); // כבר בוצעה/בוטלה
   if (a.type === 'cancelAll') return bybit('POST', '/v5/order/cancel-all', C);
   if (a.type === 'close'){ if (!pos) return; log('סגירה בשוק:', a.why); return bybit('POST', '/v5/order/create', { ...C, side: pos.side === 'long' ? 'Sell' : 'Buy', orderType: 'Market', qty: String(pos.size), reduceOnly: true, positionIdx: 0 }); }
-  if (a.type === 'place'){ log('פקודה:', a.order.side, a.order.qty, '@', a.order.price, a.order.reduceOnly ? '(יעד)' : `(כניסה, סטופ ${a.order.stopLoss})`); return bybit('POST', '/v5/order/create', { ...C, positionIdx: 0, ...a.order }); }
+  if (a.type === 'place'){ log('פקודה:', a.order.side, a.order.qty, '@', a.order.price, a.order.reduceOnly ? `(יציאה: ${a.why || 'יעד'})` : `(כניסה, סטופ חירום ${a.order.stopLoss})`); return bybit('POST', '/v5/order/create', { ...C, positionIdx: 0, ...a.order }); }
 }
 
 export async function tick(state, mem){
@@ -88,7 +90,10 @@ export async function tick(state, mem){
     const lastT = bars.at(-1)?.t || 0;
     if (lastT > state.lastBarT){ newBar = true; barT = state.lastBarT = lastT; }
   }
-  const actions = decide({ pos: pos ? { ...pos, sinceMs: state.posSinceMs } : null, orders: await openOrders(), closes, newBar, halt, nowMs: now, barT }, BOT);
+  // מחיר נוכחי — כדי שפקודת היציאה (PostOnly) תמתין בספר ולא תידחה
+  let bid = null, ask = null;
+  if (pos){ try { const t = (await (await fetch(`${BOT.market}/v5/market/tickers?category=linear&symbol=${BOT.symbol}`, { headers: { 'User-Agent': 'bikur-bybit-bot' } })).json())?.result?.list?.[0]; bid = Number(t?.bid1Price) || null; ask = Number(t?.ask1Price) || null; } catch (e) { log('מחיר נוכחי:', e.message); } }
+  const actions = decide({ pos: pos ? { ...pos, sinceMs: state.posSinceMs } : null, orders: await openOrders(), closes, newBar, halt, nowMs: now, barT, bid, ask }, BOT);
   for (const a of actions){ try { await exec(a, pos); } catch (e) { mem.lastError = e.message; log('פעולה נכשלה:', a.type, e.message); } }
   saveState(state);
   if (mem.reportNow || now - (state.lastReportMs || 0) >= REPORT_EVERY_MS){ mem.reportNow = false; await report(state, { pos, halt, lastError: mem.lastError }); saveState(state); }
@@ -98,7 +103,9 @@ async function main(){
   if (!KEY || !SECRET){ console.error('חסרים BYBIT_DEMO_API_KEY / BYBIT_DEMO_API_SECRET'); process.exit(1); }
   if (!BOT.base.includes('api-demo.')){ console.error('הבוט רץ רק מול חשבון הדמו'); process.exit(1); }
   const state = loadState(), mem = {};
-  log('בוט עמית (Bybit דמו) — ', BOT.symbol, 'פוזיציה', BOT.notional, '$ · סטופ', BOT.slPct, '% · מגבלה יומית', BOT.dailyLossUsd, '$');
+  // גרסה חדשה → עצירה יומית של הגרסה הקודמת (לפי מגבלה אחרת) לא חלה; המגבלה של הגרסה הנוכחית נבדקת מחדש בכל tick
+  if (state.version !== BOT.version){ log('גרסה חדשה:', state.version || 2, '→', BOT.version, state.haltDay ? `(עצירה יומית ${state.haltDay} מבוטלת)` : ''); state.version = BOT.version; state.haltDay = null; saveState(state); }
+  log(`בוט עמית גרסה ${BOT.version} "בדיוק כמו עמית" (Bybit דמו) —`, BOT.symbol, 'לונג בלבד · פוזיציה', BOT.notional, '$ · סטופ חירום', BOT.emergencyPct, '% · רדיפה מדקה', BOT.chaseFromMin, '· זמן', BOT.maxMins, '+', BOT.graceMins, 'דק׳ · מגבלה יומית', BOT.dailyLossUsd, '$');
   await bybit('POST', '/v5/position/set-leverage', { ...C, buyLeverage: String(BOT.leverage), sellLeverage: String(BOT.leverage) }).catch((e) => { if (e.code !== 110043) log('מינוף:', e.message); });
   if (process.argv.includes('--check')){ const p = await snapshotPos(); console.log(JSON.stringify({ ok: true, pos: p, orders: (await openOrders()).length })); return; }
   for (;;){
