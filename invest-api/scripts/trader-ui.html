@@ -52,7 +52,7 @@ input,select{width:100%;padding:9px;border-radius:8px;border:1px solid var(--lin
 <section id="t-review" hidden><div id="reviews"></div><div id="audit"></div></section>
 <p class="note">קריאה בלבד — המערכת לא מבצעת פקודות. סטופ, יעד וגודל הם כללי ניהול סיכון, לא איתות רווחי: לא הוכח יתרון סטטיסטי לאף שיטת כניסה.</p>
 <script>
-const $=(s)=>document.querySelector(s), esc=(x)=>String(x??'').replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=(s)=>document.querySelector(s), esc=(x)=>String(x??'').replace(/[&<>"'`]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
 const f$=(x)=>x==null||!isFinite(x)?'—':(x<0?'‎−':'+')+Math.abs(Math.round(x)).toLocaleString('en-US')+'$';
 const fp=(x,d=2)=>x==null||!isFinite(x)?'—':Number(x).toFixed(d), pc=(x)=>x==null||!isFinite(x)?'—':(x*100>0?'+':'')+(x*100).toFixed(1)+'%';
 const cls=(x)=>x==null?'':x<0?'down':x>0?'up':'';
@@ -75,11 +75,11 @@ async function load(){
     <span class="mute">סטופ מומלץ</span><span class="down">${r.stop!=null?fp(r.stop):'—'}</span><span class="mute">יעד</span><span class="up">${r.target!=null?fp(r.target):'—'}</span>
     <span class="mute">גודל מומלץ</span><span>${r.shares!=null?r.shares.toLocaleString('en-US')+' מניות':'—'}</span></div>
     ${p.spike?`<div class="note warn">כניסה אחרי זינוק: ${esc(p.spike)}</div>`:''}<div class="note">${esc(r.note||'')}</div>
-    <div class="seg">${['day','swing','long'].map((c)=>`<button class="${p.cls===c?'on':''}" onclick="setCls('${esc(p.acct)}','${esc(p.sym)}','${c}')">${CL[c]}</button>`).join('')}</div></div>`;}).join('')||'<div class="card mute">אין פוזיציות פתוחות (או שהחיבור לחשבונות עוד לא הוגדר).</div>';
+    <div class="seg">${['day','swing','long'].map((c)=>`<button class="${p.cls===c?'on':''}" data-act="cls" data-acct="${esc(p.acct)}" data-sym="${esc(p.sym)}" data-cls="${c}">${CL[c]}</button>`).join('')}</div></div>`;}).join('')||'<div class="card mute">אין פוזיציות פתוחות (או שהחיבור לחשבונות עוד לא הוגדר).</div>';
   $('#wlist').innerHTML=(ST.watch||[]).map((w)=>`<div class="card"><div class="row"><b>${esc(w.sym)}</b><span class="${cls(w.chg)}">${fp(w.last)} · ${pc(w.chg)}</span></div>
     <div class="grid2"><span class="mute">מעל ממוצע 20 יום</span><span>${w.above20==null?'—':w.above20?'כן':'לא'}</span><span class="mute">ממוצע 20 עולה</span><span>${w.ma20Up==null?'—':w.ma20Up?'כן':'לא'}</span>
     <span class="mute">מעל ממוצע 50 יום</span><span>${w.above50==null?'—':w.above50?'כן':'לא'}</span><span class="mute">מחיר ממוצע היום</span><span>${fp(w.vwap)}</span></div>
-    <div class="seg"><button onclick="calc('${esc(w.sym)}')">בדיקה לפני קנייה</button><button onclick="unwatch('${esc(w.sym)}')">הסר</button></div></div>`).join('');
+    <div class="seg"><button data-act="calc" data-sym="${esc(w.sym)}">בדיקה לפני קנייה</button><button data-act="unwatch" data-sym="${esc(w.sym)}">הסר</button></div></div>`).join('');
   $('#earn').innerHTML='<h2>דוחות קרובים</h2>'+((ST.earnings||[]).map((e)=>`<div class="card row"><b>${esc(e.sym)}</b><span>${esc(e.date)} · ${esc(e.time)}</span></div>`).join('')||'<div class="card mute">אין דוחות בשבועיים הקרובים למניות שלך ובמעקב.</div>');
   $('#news').innerHTML='<h2>חדשות אחרונות</h2>'+(Object.entries(ST.news||{}).map(([s,a])=>a.map((n)=>`<div class="card"><span class="pill">${esc(s)}</span> ${/^https?:\/\//i.test(n.url||'')?`<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(n.h)}</a>`:esc(n.h)}<div class="mute">${new Date(n.t).toLocaleString('he-IL')}</div></div>`).join('')).join('')||'<div class="card mute">אין חדשות.</div>');
   $('#reviews').innerHTML='<h2>סיכומים יומיים · המלצות המערכת מול בפועל</h2>'+((ST.reviews||[]).slice().reverse().map((r)=>`<div class="card"><div class="row"><b>${esc(r.date)}</b><span class="${cls(r.pnl)}">${f$(r.pnl)} · ${r.trades} עסקאות</span></div>
@@ -88,6 +88,9 @@ async function load(){
   $('#audit').innerHTML='<h2>שינויי סיווג</h2>'+((ST.audit||[]).slice().reverse().map((a)=>`<div class="mute">${new Date(a.t*1000).toLocaleString('he-IL')} · ${esc(a.key.split('|')[1])}: ${CL[a.from]||'ברירת מחדל'} → ${CL[a.to]}</div>`).join('')||'<div class="mute">אין שינויים.</div>');
 }
 async function setCls(acct,sym,c){await api('/api/class',{acct,sym,cls:c});load();}
+// בלי מאזינים בתוך ה-HTML: כל הכפתורים הדינמיים דרך data-* ומאזין אחד (אין הזרקת קוד דרך סימול או מספר חשבון)
+document.addEventListener('click',(e)=>{const b=e.target.closest('button[data-act]');if(!b)return;const d=b.dataset;
+  if(d.act==='cls')setCls(d.acct,d.sym,d.cls); else if(d.act==='calc')calc(d.sym); else if(d.act==='unwatch')unwatch(d.sym);});
 async function unwatch(s){await api('/api/watch',{sym:s,op:'del'});load();}
 $('#wadd').onclick=async()=>{const s=$('#wsym').value.trim();if(!s)return;await api('/api/watch',{sym:s});$('#wsym').value='';load();};
 function calc(s){$('#csym').value=s;document.querySelector('#tabs [data-t=calc]').click();$('#cgo').click();}
