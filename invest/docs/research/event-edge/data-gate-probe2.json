@@ -1,0 +1,50 @@
+{
+ "IJH_20171229": {
+  "status": 200,
+  "len": 1578514,
+  "holdings": 0,
+  "sample": []
+ },
+ "IJH_20200630": {
+  "status": 200,
+  "len": 1578514,
+  "holdings": 0,
+  "sample": []
+ },
+ "IJH_20221230": {
+  "status": 200,
+  "len": 1578514,
+  "holdings": 0,
+  "sample": []
+ },
+ "IJH_20241231": {
+  "status": 200,
+  "len": 1578514,
+  "holdings": 0,
+  "sample": []
+ },
+ "IWM_20171229": {
+  "status": 200,
+  "len": 1577052,
+  "holdings": 0,
+  "sample": []
+ },
+ "IWM_20200630": {
+  "status": 200,
+  "len": 1577052,
+  "holdings": 0,
+  "sample": []
+ },
+ "IWM_20221230": {
+  "status": 200,
+  "len": 1577052,
+  "holdings": 0,
+  "sample": []
+ },
+ "IWM_20241231": {
+  "status": 200,
+  "len": 1577052,
+  "holdings": 0,
+  "sample": []
+ }
+}
