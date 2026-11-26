@@ -18,6 +18,11 @@ for (const [sym, st, en] of [['AAPL', '2018-05-01', '2018-05-03'], ['NVDA', '202
   const n = r.b?.news || [];
   out['news_' + sym + '_' + st] = { status: r.s, n: n.length, sample: n.slice(0, 4).map((x) => ({ t: x.created_at, h: x.headline.slice(0, 90), syms: x.symbols.length })) };
 }
+// 2ב. אבחון: חדשות בלי סינון מניה, טווחים שונים, ובפורמט תאריך בלבד
+for (const q of ['start=2024-10-30&end=2024-10-31&limit=5', 'symbols=MSFT&start=2024-10-30&end=2024-11-01&limit=5', 'symbols=AAPL&limit=5', 'symbols=AAPL&start=2019-01-02&end=2019-01-05&limit=5&sort=asc']){
+  const r = await j(`https://data.alpaca.markets/v1beta1/news?${q}`, H);
+  out['news2_' + q] = { status: r.s, n: (r.b?.news || []).length, first: (r.b?.news || [])[0]?.created_at, msg: typeof r.b === 'string' ? r.b : r.b?.message };
+}
 // 3. Alpha Vantage EARNINGS (אם יש מפתח) — לא חובה
 out.alphaVantageKey = !!process.env.ALPHAVANTAGE_KEY;
 console.log(JSON.stringify(out, null, 1));
