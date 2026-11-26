@@ -1,0 +1,1917 @@
+{
+ "protocol": "v1.1",
+ "fetchedAt": "2026-11-26T11:26:24.250Z",
+ "source": "Alpaca SIP (adjustment=split)",
+ "years": {
+  "2018": {
+   "asOf": "2017-12-29",
+   "members": 505,
+   "withData": 503,
+   "missing": 2,
+   "renamed": 1,
+   "selected": [
+    "AAPL",
+    "AMZN",
+    "FB",
+    "NVDA",
+    "MSFT",
+    "BAC",
+    "GOOGL",
+    "MU",
+    "JPM",
+    "GOOG",
+    "GE",
+    "T",
+    "NFLX",
+    "INTC",
+    "C",
+    "WFC",
+    "CMCSA",
+    "XOM",
+    "VZ",
+    "WMT",
+    "BA",
+    "V",
+    "JNJ",
+    "HD",
+    "DIS",
+    "BKNG",
+    "AVGO",
+    "MRK",
+    "IBM",
+    "CHTR",
+    "ORCL",
+    "CSCO",
+    "CELG",
+    "CVX",
+    "CVS",
+    "BRK-B",
+    "UNH",
+    "PG",
+    "QCOM",
+    "PYPL",
+    "GILD",
+    "GS",
+    "TWX",
+    "GM",
+    "PFE",
+    "NKE",
+    "SLB",
+    "AMAT",
+    "WBA",
+    "AGN",
+    "DWDP",
+    "LOW",
+    "AMD",
+    "SBUX",
+    "COST",
+    "MCD",
+    "AMGN",
+    "MA",
+    "LRCX",
+    "PM"
+   ],
+   "missingSample": [
+    "APTV",
+    "STI"
+   ]
+  },
+  "2019": {
+   "asOf": "2018-12-24",
+   "members": 505,
+   "withData": 504,
+   "missing": 1,
+   "renamed": 0,
+   "selected": [
+    "AMZN",
+    "AAPL",
+    "MSFT",
+    "FB",
+    "NFLX",
+    "NVDA",
+    "GOOGL",
+    "GOOG",
+    "BAC",
+    "AMD",
+    "JPM",
+    "V",
+    "BA",
+    "INTC",
+    "XOM",
+    "C",
+    "WFC",
+    "CSCO",
+    "T",
+    "MU",
+    "JNJ",
+    "HD",
+    "BRK-B",
+    "PFE",
+    "ADBE",
+    "GE",
+    "VZ",
+    "PG",
+    "MRK",
+    "UNH",
+    "MA",
+    "QCOM",
+    "ORCL",
+    "CRM",
+    "DIS",
+    "WMT",
+    "CVX",
+    "CMCSA",
+    "AVGO",
+    "SBUX",
+    "PYPL",
+    "GS",
+    "BKNG",
+    "TXN",
+    "CAT",
+    "IBM",
+    "DWDP",
+    "MCD",
+    "UNP",
+    "KO",
+    "TWTR",
+    "UTX",
+    "CVS",
+    "PEP",
+    "COST",
+    "SLB",
+    "AMGN",
+    "NKE",
+    "MS",
+    "ABBV"
+   ],
+   "missingSample": [
+    "STI"
+   ]
+  },
+  "2020": {
+   "asOf": "2019-12-23",
+   "members": 505,
+   "withData": 503,
+   "missing": 2,
+   "renamed": 1,
+   "selected": [
+    "AAPL",
+    "AMZN",
+    "MSFT",
+    "FB",
+    "AMD",
+    "GOOGL",
+    "NFLX",
+    "GOOG",
+    "NVDA",
+    "BAC",
+    "BA",
+    "V",
+    "JPM",
+    "DIS",
+    "T",
+    "INTC",
+    "UNH",
+    "JNJ",
+    "WFC",
+    "XOM",
+    "HD",
+    "CSCO",
+    "PG",
+    "MA",
+    "BRK-B",
+    "C",
+    "BMY",
+    "MU",
+    "CMCSA",
+    "CRM",
+    "MCD",
+    "QCOM",
+    "MRK",
+    "PYPL",
+    "VZ",
+    "ADBE",
+    "PFE",
+    "CVX",
+    "AVGO",
+    "KO",
+    "ABBV",
+    "NKE",
+    "WMT",
+    "TXN",
+    "BKNG",
+    "ORCL",
+    "SBUX",
+    "COST",
+    "GE",
+    "BIIB",
+    "NOW",
+    "AMGN",
+    "UNP",
+    "PEP",
+    "TGT",
+    "IBM",
+    "CHTR",
+    "MMM",
+    "GS",
+    "HON"
+   ],
+   "missingSample": [
+    "PEAK",
+    "VIAC"
+   ]
+  },
+  "2021": {
+   "asOf": "2020-12-21",
+   "members": 505,
+   "withData": 504,
+   "missing": 1,
+   "renamed": 0,
+   "selected": [
+    "TSLA",
+    "AMZN",
+    "AAPL",
+    "MSFT",
+    "FB",
+    "NVDA",
+    "AMD",
+    "BA",
+    "GOOG",
+    "GOOGL",
+    "NFLX",
+    "PYPL",
+    "V",
+    "INTC",
+    "JPM",
+    "CRM",
+    "PFE",
+    "DIS",
+    "BAC",
+    "ADBE",
+    "T",
+    "MA",
+    "BRK-B",
+    "XOM",
+    "C",
+    "JNJ",
+    "UNH",
+    "QCOM",
+    "PG",
+    "HD",
+    "WFC",
+    "AAL",
+    "WMT",
+    "VZ",
+    "CVX",
+    "CSCO",
+    "GE",
+    "MU",
+    "COST",
+    "CMCSA",
+    "CCL",
+    "UAL",
+    "LOW",
+    "KO",
+    "ABBV",
+    "TMO",
+    "MRK",
+    "FDX",
+    "BKNG",
+    "NKE",
+    "MS",
+    "CHTR",
+    "GS",
+    "MCD",
+    "IBM",
+    "BMY",
+    "AVGO",
+    "TXN",
+    "NOW",
+    "TWTR"
+   ],
+   "missingSample": [
+    "VTRS"
+   ]
+  },
+  "2022": {
+   "asOf": "2021-12-20",
+   "members": 505,
+   "withData": 505,
+   "missing": 0,
+   "renamed": 0,
+   "selected": [
+    "TSLA",
+    "NVDA",
+    "AAPL",
+    "AMZN",
+    "MSFT",
+    "AMD",
+    "FB",
+    "GOOGL",
+    "PYPL",
+    "GOOG",
+    "MRNA",
+    "V",
+    "NFLX",
+    "BAC",
+    "BA",
+    "JPM",
+    "PFE",
+    "DIS",
+    "MA",
+    "INTC",
+    "F",
+    "ADBE",
+    "QCOM",
+    "C",
+    "UNH",
+    "CRM",
+    "MU",
+    "JNJ",
+    "HD",
+    "T",
+    "XOM",
+    "CVX",
+    "BRK-B",
+    "WFC",
+    "CSCO",
+    "COST",
+    "PG",
+    "AVGO",
+    "VZ",
+    "CMCSA",
+    "MRK",
+    "WMT",
+    "AMAT",
+    "NKE",
+    "GS",
+    "GM",
+    "TXN",
+    "MS",
+    "INTU",
+    "TGT",
+    "KO",
+    "LRCX",
+    "BKNG",
+    "ACN",
+    "DHR",
+    "TMO",
+    "SBUX",
+    "ORCL",
+    "LLY",
+    "BMY"
+   ],
+   "missingSample": []
+  },
+  "2023": {
+   "asOf": "2022-12-22",
+   "members": 503,
+   "withData": 503,
+   "missing": 0,
+   "renamed": 0,
+   "selected": [
+    "TSLA",
+    "AAPL",
+    "NVDA",
+    "MSFT",
+    "AMZN",
+    "AMD",
+    "META",
+    "GOOGL",
+    "NFLX",
+    "GOOG",
+    "XOM",
+    "UNH",
+    "V",
+    "CVX",
+    "JPM",
+    "BAC",
+    "AVGO",
+    "PYPL",
+    "INTC",
+    "BRK-B",
+    "ADBE",
+    "COST",
+    "HD",
+    "CRM",
+    "JNJ",
+    "DIS",
+    "TXN",
+    "QCOM",
+    "BA",
+    "PEP",
+    "OXY",
+    "MU",
+    "PFE",
+    "MRK",
+    "CMCSA",
+    "ENPH",
+    "LLY",
+    "CSCO",
+    "PG",
+    "VZ",
+    "MA",
+    "AMGN",
+    "AMAT",
+    "WMT",
+    "TMUS",
+    "LRCX",
+    "COP",
+    "GS",
+    "C",
+    "WFC",
+    "MCD",
+    "T",
+    "ABBV",
+    "KO",
+    "NKE",
+    "TMO",
+    "MRNA",
+    "INTU",
+    "F",
+    "LOW"
+   ],
+   "missingSample": []
+  },
+  "2024": {
+   "asOf": "2023-12-18",
+   "members": 503,
+   "withData": 503,
+   "missing": 0,
+   "renamed": 0,
+   "selected": [
+    "TSLA",
+    "NVDA",
+    "AAPL",
+    "MSFT",
+    "AMZN",
+    "AMD",
+    "META",
+    "GOOGL",
+    "GOOG",
+    "AVGO",
+    "XOM",
+    "NFLX",
+    "LLY",
+    "CVX",
+    "ADBE",
+    "INTC",
+    "UNH",
+    "V",
+    "JPM",
+    "BAC",
+    "UBER",
+    "BA",
+    "BRK-B",
+    "WMT",
+    "COST",
+    "MA",
+    "JNJ",
+    "CRM",
+    "DIS",
+    "PFE",
+    "PG",
+    "PANW",
+    "QCOM",
+    "HD",
+    "PEP",
+    "NKE",
+    "CSCO",
+    "PYPL",
+    "MU",
+    "KO",
+    "TMO",
+    "TXN",
+    "MCD",
+    "AMAT",
+    "CMCSA",
+    "CAT",
+    "MRK",
+    "C",
+    "INTU",
+    "BKNG",
+    "NEE",
+    "ORCL",
+    "BMY",
+    "ABBV",
+    "SBUX",
+    "VZ",
+    "NOW",
+    "WFC",
+    "AMGN",
+    "LRCX"
+   ],
+   "missingSample": []
+  },
+  "2025": {
+   "asOf": "2024-12-23",
+   "members": 503,
+   "withData": 503,
+   "missing": 0,
+   "renamed": 0,
+   "selected": [
+    "TSLA",
+    "NVDA",
+    "AAPL",
+    "MSFT",
+    "AMZN",
+    "META",
+    "AMD",
+    "PLTR",
+    "GOOGL",
+    "AVGO",
+    "GOOG",
+    "LLY",
+    "NFLX",
+    "SMCI",
+    "UNH",
+    "BA",
+    "JPM",
+    "MU",
+    "BRK-B",
+    "COST",
+    "V",
+    "XOM",
+    "CRM",
+    "BAC",
+    "ADBE",
+    "INTC",
+    "HD",
+    "UBER",
+    "QCOM",
+    "ORCL",
+    "WMT",
+    "NOW",
+    "MA",
+    "WFC",
+    "AMAT",
+    "JNJ",
+    "CRWD",
+    "PFE",
+    "TXN",
+    "PG",
+    "MRK",
+    "CVX",
+    "GS",
+    "CSCO",
+    "ABBV",
+    "BKNG",
+    "KO",
+    "INTU",
+    "TMO",
+    "HON",
+    "PEP",
+    "MCD",
+    "C",
+    "LIN",
+    "IBM",
+    "PANW",
+    "DIS",
+    "ACN",
+    "DELL",
+    "LRCX"
+   ],
+   "missingSample": []
+  },
+  "2026": {
+   "asOf": "2025-12-22",
+   "members": 503,
+   "withData": 503,
+   "missing": 0,
+   "renamed": 0,
+   "selected": [
+    "TSLA",
+    "NVDA",
+    "AAPL",
+    "AMD",
+    "MSFT",
+    "AMZN",
+    "META",
+    "GOOGL",
+    "AVGO",
+    "PLTR",
+    "GOOG",
+    "MU",
+    "ORCL",
+    "NFLX",
+    "HOOD",
+    "LLY",
+    "INTC",
+    "COIN",
+    "UNH",
+    "JPM",
+    "APP",
+    "COST",
+    "BRK-B",
+    "V",
+    "SNDK",
+    "WMT",
+    "BAC",
+    "CRM",
+    "AMAT",
+    "GEV",
+    "GS",
+    "XOM",
+    "LRCX",
+    "JNJ",
+    "UBER",
+    "CAT",
+    "BA",
+    "MA",
+    "QCOM",
+    "PG",
+    "CSCO",
+    "BKNG",
+    "HD",
+    "PFE",
+    "TXN",
+    "C",
+    "WFC",
+    "IBM",
+    "WDC",
+    "NOW",
+    "ADBE",
+    "GE",
+    "ABBV",
+    "MRK",
+    "CVX",
+    "KLAC",
+    "CRWD",
+    "LIN",
+    "CVNA",
+    "VZ"
+   ],
+   "missingSample": []
+  }
+ },
+ "symbols": {
+  "AAPL": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 889374,
+   "days": 2284,
+   "daysUnder95pct": 18,
+   "nReq": 245
+  },
+  "AMZN": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 887373,
+   "days": 2284,
+   "daysUnder95pct": 18,
+   "nReq": 393
+  },
+  "FB": {
+   "years": [
+    2018,
+    2022
+   ],
+   "minuteBars": 464400,
+   "days": 1194,
+   "daysUnder95pct": 10,
+   "nReq": 469
+  },
+  "NVDA": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 889181,
+   "days": 2284,
+   "daysUnder95pct": 12,
+   "nReq": 640
+  },
+  "MSFT": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 888274,
+   "days": 2284,
+   "daysUnder95pct": 18,
+   "nReq": 787
+  },
+  "BAC": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 887057,
+   "days": 2283,
+   "daysUnder95pct": 19,
+   "nReq": 919
+  },
+  "GOOGL": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 870564,
+   "days": 2284,
+   "daysUnder95pct": 342,
+   "nReq": 1048
+  },
+  "MU": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 888498,
+   "days": 2284,
+   "daysUnder95pct": 15,
+   "nReq": 1195
+  },
+  "JPM": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886520,
+   "days": 2284,
+   "daysUnder95pct": 11,
+   "nReq": 1308
+  },
+  "GOOG": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 869849,
+   "days": 2284,
+   "daysUnder95pct": 330,
+   "nReq": 1433
+  },
+  "GE": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886637,
+   "days": 2284,
+   "daysUnder95pct": 11,
+   "nReq": 1552
+  },
+  "T": {
+   "years": [
+    2018,
+    2023
+   ],
+   "minuteBars": 619021,
+   "days": 1595,
+   "daysUnder95pct": 13,
+   "nReq": 1640
+  },
+  "NFLX": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 885876,
+   "days": 2284,
+   "daysUnder95pct": 19,
+   "nReq": 1766
+  },
+  "INTC": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 888584,
+   "days": 2284,
+   "daysUnder95pct": 15,
+   "nReq": 1919
+  },
+  "C": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886440,
+   "days": 2284,
+   "daysUnder95pct": 9,
+   "nReq": 2032
+  },
+  "WFC": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886362,
+   "days": 2284,
+   "daysUnder95pct": 9,
+   "nReq": 2143
+  },
+  "CMCSA": {
+   "years": [
+    2018,
+    2024
+   ],
+   "minuteBars": 717514,
+   "days": 1847,
+   "daysUnder95pct": 1,
+   "nReq": 2226
+  },
+  "XOM": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886522,
+   "days": 2284,
+   "daysUnder95pct": 17,
+   "nReq": 2344
+  },
+  "VZ": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886432,
+   "days": 2284,
+   "daysUnder95pct": 13,
+   "nReq": 2456
+  },
+  "WMT": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886485,
+   "days": 2284,
+   "daysUnder95pct": 12,
+   "nReq": 2567
+  },
+  "BA": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886382,
+   "days": 2284,
+   "daysUnder95pct": 15,
+   "nReq": 2690
+  },
+  "V": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886156,
+   "days": 2283,
+   "daysUnder95pct": 3,
+   "nReq": 2793
+  },
+  "JNJ": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886191,
+   "days": 2283,
+   "daysUnder95pct": 3,
+   "nReq": 2896
+  },
+  "HD": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 885062,
+   "days": 2284,
+   "daysUnder95pct": 2,
+   "nReq": 2998
+  },
+  "DIS": {
+   "years": [
+    2018,
+    2025
+   ],
+   "minuteBars": 814012,
+   "days": 2098,
+   "daysUnder95pct": 12,
+   "nReq": 3106
+  },
+  "BKNG": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 571461,
+   "days": 2284,
+   "daysUnder95pct": 1169,
+   "nReq": 3173
+  },
+  "AVGO": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 878639,
+   "days": 2284,
+   "daysUnder95pct": 109,
+   "nReq": 3292
+  },
+  "MRK": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886015,
+   "days": 2284,
+   "daysUnder95pct": 4,
+   "nReq": 3396
+  },
+  "IBM": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 885818,
+   "days": 2284,
+   "daysUnder95pct": 3,
+   "nReq": 3501
+  },
+  "CHTR": {
+   "years": [
+    2018,
+    2021
+   ],
+   "minuteBars": 393322,
+   "days": 1095,
+   "daysUnder95pct": 646,
+   "nReq": 3545
+  },
+  "ORCL": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886332,
+   "days": 2284,
+   "daysUnder95pct": 6,
+   "nReq": 3661
+  },
+  "CSCO": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 887647,
+   "days": 2284,
+   "daysUnder95pct": 6,
+   "nReq": 3774
+  },
+  "CELG": {
+   "years": [
+    2018,
+    2018
+   ],
+   "minuteBars": 131124,
+   "days": 338,
+   "daysUnder95pct": 0,
+   "nReq": 3791
+  },
+  "CVX": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886294,
+   "days": 2284,
+   "daysUnder95pct": 6,
+   "nReq": 3900
+  },
+  "CVS": {
+   "years": [
+    2018,
+    2019
+   ],
+   "minuteBars": 228870,
+   "days": 590,
+   "daysUnder95pct": 2,
+   "nReq": 3928
+  },
+  "BRK-B": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 885190,
+   "days": 2284,
+   "daysUnder95pct": 5,
+   "nReq": 4034
+  },
+  "UNH": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 883909,
+   "days": 2284,
+   "daysUnder95pct": 6,
+   "nReq": 4142
+  },
+  "PG": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 885970,
+   "days": 2284,
+   "daysUnder95pct": 3,
+   "nReq": 4244
+  },
+  "QCOM": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 887625,
+   "days": 2284,
+   "daysUnder95pct": 7,
+   "nReq": 4357
+  },
+  "PYPL": {
+   "years": [
+    2018,
+    2024
+   ],
+   "minuteBars": 717803,
+   "days": 1847,
+   "daysUnder95pct": 6,
+   "nReq": 4452
+  },
+  "GILD": {
+   "years": [
+    2018,
+    2018
+   ],
+   "minuteBars": 131130,
+   "days": 338,
+   "daysUnder95pct": 0,
+   "nReq": 4469
+  },
+  "GS": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 878534,
+   "days": 2284,
+   "daysUnder95pct": 99,
+   "nReq": 4572
+  },
+  "TWX": {
+   "years": [
+    2018,
+    2018
+   ],
+   "minuteBars": 73910,
+   "days": 191,
+   "daysUnder95pct": 0,
+   "nReq": 4583
+  },
+  "GM": {
+   "years": [
+    2018,
+    2022
+   ],
+   "minuteBars": 521476,
+   "days": 1345,
+   "daysUnder95pct": 5,
+   "nReq": 4650
+  },
+  "PFE": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 886904,
+   "days": 2283,
+   "daysUnder95pct": 13,
+   "nReq": 4780
+  },
+  "NKE": {
+   "years": [
+    2018,
+    2024
+   ],
+   "minuteBars": 716424,
+   "days": 1847,
+   "daysUnder95pct": 7,
+   "nReq": 4866
+  },
+  "SLB": {
+   "years": [
+    2018,
+    2019
+   ],
+   "minuteBars": 228851,
+   "days": 590,
+   "daysUnder95pct": 1,
+   "nReq": 4894
+  },
+  "AMAT": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 887317,
+   "days": 2284,
+   "daysUnder95pct": 4,
+   "nReq": 5004
+  },
+  "WBA": {
+   "years": [
+    2018,
+    2018
+   ],
+   "minuteBars": 131096,
+   "days": 338,
+   "daysUnder95pct": 0,
+   "nReq": 5021
+  },
+  "AGN": {
+   "years": [
+    2018,
+    2018
+   ],
+   "minuteBars": 129983,
+   "days": 338,
+   "daysUnder95pct": 1,
+   "nReq": 5037
+  },
+  "DWDP": {
+   "years": [
+    2018,
+    2019
+   ],
+   "minuteBars": 167737,
+   "days": 432,
+   "daysUnder95pct": 0,
+   "nReq": 5059
+  },
+  "LOW": {
+   "years": [
+    2018,
+    2023
+   ],
+   "minuteBars": 617521,
+   "days": 1595,
+   "daysUnder95pct": 3,
+   "nReq": 5130
+  },
+  "AMD": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 889251,
+   "days": 2284,
+   "daysUnder95pct": 19,
+   "nReq": 5303
+  },
+  "SBUX": {
+   "years": [
+    2018,
+    2024
+   ],
+   "minuteBars": 717584,
+   "days": 1847,
+   "daysUnder95pct": 3,
+   "nReq": 5389
+  },
+  "COST": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 873613,
+   "days": 2284,
+   "daysUnder95pct": 211,
+   "nReq": 5489
+  },
+  "MCD": {
+   "years": [
+    2018,
+    2025
+   ],
+   "minuteBars": 811561,
+   "days": 2098,
+   "daysUnder95pct": 5,
+   "nReq": 5583
+  },
+  "AMGN": {
+   "years": [
+    2018,
+    2024
+   ],
+   "minuteBars": 711390,
+   "days": 1847,
+   "daysUnder95pct": 58,
+   "nReq": 5664
+  },
+  "MA": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 882201,
+   "days": 2284,
+   "daysUnder95pct": 28,
+   "nReq": 5763
+  },
+  "LRCX": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 856780,
+   "days": 2284,
+   "daysUnder95pct": 513,
+   "nReq": 5863
+  },
+  "PM": {
+   "years": [
+    2018,
+    2018
+   ],
+   "minuteBars": 131093,
+   "days": 338,
+   "daysUnder95pct": 0,
+   "nReq": 5880
+  },
+  "ADBE": {
+   "years": [
+    2019,
+    2026
+   ],
+   "minuteBars": 785328,
+   "days": 2031,
+   "daysUnder95pct": 20,
+   "nReq": 5973
+  },
+  "CRM": {
+   "years": [
+    2019,
+    2026
+   ],
+   "minuteBars": 787909,
+   "days": 2031,
+   "daysUnder95pct": 5,
+   "nReq": 6070
+  },
+  "TXN": {
+   "years": [
+    2019,
+    2026
+   ],
+   "minuteBars": 788609,
+   "days": 2031,
+   "daysUnder95pct": 0,
+   "nReq": 6161
+  },
+  "CAT": {
+   "years": [
+    2019,
+    2026
+   ],
+   "minuteBars": 784200,
+   "days": 2030,
+   "daysUnder95pct": 28,
+   "nReq": 6253
+  },
+  "UNP": {
+   "years": [
+    2019,
+    2020
+   ],
+   "minuteBars": 228310,
+   "days": 590,
+   "daysUnder95pct": 4,
+   "nReq": 6279
+  },
+  "KO": {
+   "years": [
+    2019,
+    2025
+   ],
+   "minuteBars": 715895,
+   "days": 1844,
+   "daysUnder95pct": 10,
+   "nReq": 6369
+  },
+  "TWTR": {
+   "years": [
+    2019,
+    2021
+   ],
+   "minuteBars": 326231,
+   "days": 842,
+   "daysUnder95pct": 9,
+   "nReq": 6416
+  },
+  "UTX": {
+   "years": [
+    2019,
+    2019
+   ],
+   "minuteBars": 130360,
+   "days": 337,
+   "daysUnder95pct": 1,
+   "nReq": 6432
+  },
+  "PEP": {
+   "years": [
+    2019,
+    2025
+   ],
+   "minuteBars": 716471,
+   "days": 1845,
+   "daysUnder95pct": 2,
+   "nReq": 6515
+  },
+  "MS": {
+   "years": [
+    2019,
+    2022
+   ],
+   "minuteBars": 422938,
+   "days": 1092,
+   "daysUnder95pct": 4,
+   "nReq": 6566
+  },
+  "ABBV": {
+   "years": [
+    2019,
+    2026
+   ],
+   "minuteBars": 787799,
+   "days": 2031,
+   "daysUnder95pct": 2,
+   "nReq": 6657
+  },
+  "BMY": {
+   "years": [
+    2020,
+    2024
+   ],
+   "minuteBars": 520689,
+   "days": 1343,
+   "daysUnder95pct": 1,
+   "nReq": 6718
+  },
+  "BIIB": {
+   "years": [
+    2020,
+    2020
+   ],
+   "minuteBars": 127985,
+   "days": 338,
+   "daysUnder95pct": 42,
+   "nReq": 6733
+  },
+  "NOW": {
+   "years": [
+    2020,
+    2026
+   ],
+   "minuteBars": 657325,
+   "days": 1780,
+   "daysUnder95pct": 625,
+   "nReq": 6813
+  },
+  "TGT": {
+   "years": [
+    2020,
+    2022
+   ],
+   "minuteBars": 325320,
+   "days": 841,
+   "daysUnder95pct": 2,
+   "nReq": 6852
+  },
+  "MMM": {
+   "years": [
+    2020,
+    2020
+   ],
+   "minuteBars": 131133,
+   "days": 339,
+   "daysUnder95pct": 2,
+   "nReq": 6869
+  },
+  "HON": {
+   "years": [
+    2020,
+    2025
+   ],
+   "minuteBars": 616308,
+   "days": 1594,
+   "daysUnder95pct": 5,
+   "nReq": 6939
+  },
+  "TSLA": {
+   "years": [
+    2021,
+    2026
+   ],
+   "minuteBars": 595729,
+   "days": 1528,
+   "daysUnder95pct": 4,
+   "nReq": 7075
+  },
+  "AAL": {
+   "years": [
+    2021,
+    2021
+   ],
+   "minuteBars": 132155,
+   "days": 339,
+   "daysUnder95pct": 1,
+   "nReq": 7102
+  },
+  "CCL": {
+   "years": [
+    2021,
+    2021
+   ],
+   "minuteBars": 131319,
+   "days": 339,
+   "daysUnder95pct": 1,
+   "nReq": 7128
+  },
+  "UAL": {
+   "years": [
+    2021,
+    2021
+   ],
+   "minuteBars": 131946,
+   "days": 339,
+   "daysUnder95pct": 3,
+   "nReq": 7149
+  },
+  "TMO": {
+   "years": [
+    2021,
+    2025
+   ],
+   "minuteBars": 493792,
+   "days": 1342,
+   "daysUnder95pct": 513,
+   "nReq": 7204
+  },
+  "FDX": {
+   "years": [
+    2021,
+    2021
+   ],
+   "minuteBars": 130197,
+   "days": 339,
+   "daysUnder95pct": 2,
+   "nReq": 7221
+  },
+  "MRNA": {
+   "years": [
+    2022,
+    2023
+   ],
+   "minuteBars": 228499,
+   "days": 588,
+   "daysUnder95pct": 1,
+   "nReq": 7251
+  },
+  "F": {
+   "years": [
+    2022,
+    2023
+   ],
+   "minuteBars": 228157,
+   "days": 588,
+   "daysUnder95pct": 4,
+   "nReq": 7292
+  },
+  "INTU": {
+   "years": [
+    2022,
+    2025
+   ],
+   "minuteBars": 400729,
+   "days": 1091,
+   "daysUnder95pct": 458,
+   "nReq": 7337
+  },
+  "ACN": {
+   "years": [
+    2022,
+    2025
+   ],
+   "minuteBars": 418527,
+   "days": 1091,
+   "daysUnder95pct": 29,
+   "nReq": 7383
+  },
+  "DHR": {
+   "years": [
+    2022,
+    2022
+   ],
+   "minuteBars": 129503,
+   "days": 337,
+   "daysUnder95pct": 8,
+   "nReq": 7398
+  },
+  "LLY": {
+   "years": [
+    2022,
+    2026
+   ],
+   "minuteBars": 491817,
+   "days": 1277,
+   "daysUnder95pct": 21,
+   "nReq": 7458
+  },
+  "META": {
+   "years": [
+    2023,
+    2026
+   ],
+   "minuteBars": 398715,
+   "days": 1025,
+   "daysUnder95pct": 9,
+   "nReq": 7528
+  },
+  "OXY": {
+   "years": [
+    2023,
+    2023
+   ],
+   "minuteBars": 130597,
+   "days": 336,
+   "daysUnder95pct": 3,
+   "nReq": 7549
+  },
+  "ENPH": {
+   "years": [
+    2023,
+    2023
+   ],
+   "minuteBars": 130301,
+   "days": 336,
+   "daysUnder95pct": 0,
+   "nReq": 7567
+  },
+  "TMUS": {
+   "years": [
+    2023,
+    2023
+   ],
+   "minuteBars": 130409,
+   "days": 336,
+   "daysUnder95pct": 0,
+   "nReq": 7584
+  },
+  "COP": {
+   "years": [
+    2023,
+    2023
+   ],
+   "minuteBars": 130513,
+   "days": 336,
+   "daysUnder95pct": 0,
+   "nReq": 7601
+  },
+  "UBER": {
+   "years": [
+    2024,
+    2026
+   ],
+   "minuteBars": 300918,
+   "days": 774,
+   "daysUnder95pct": 7,
+   "nReq": 7645
+  },
+  "PANW": {
+   "years": [
+    2024,
+    2025
+   ],
+   "minuteBars": 227271,
+   "days": 588,
+   "daysUnder95pct": 5,
+   "nReq": 7675
+  },
+  "NEE": {
+   "years": [
+    2024,
+    2024
+   ],
+   "minuteBars": 130743,
+   "days": 337,
+   "daysUnder95pct": 0,
+   "nReq": 7692
+  },
+  "PLTR": {
+   "years": [
+    2025,
+    2026
+   ],
+   "minuteBars": 203396,
+   "days": 522,
+   "daysUnder95pct": 2,
+   "nReq": 7740
+  },
+  "SMCI": {
+   "years": [
+    2025,
+    2025
+   ],
+   "minuteBars": 130813,
+   "days": 336,
+   "daysUnder95pct": 4,
+   "nReq": 7770
+  },
+  "CRWD": {
+   "years": [
+    2025,
+    2026
+   ],
+   "minuteBars": 202022,
+   "days": 522,
+   "daysUnder95pct": 7,
+   "nReq": 7799
+  },
+  "LIN": {
+   "years": [
+    2025,
+    2026
+   ],
+   "minuteBars": 193138,
+   "days": 522,
+   "daysUnder95pct": 197,
+   "nReq": 7822
+  },
+  "DELL": {
+   "years": [
+    2025,
+    2025
+   ],
+   "minuteBars": 130262,
+   "days": 336,
+   "daysUnder95pct": 3,
+   "nReq": 7842
+  },
+  "HOOD": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 105902,
+   "days": 272,
+   "daysUnder95pct": 2,
+   "nReq": 7865
+  },
+  "COIN": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 105959,
+   "days": 272,
+   "daysUnder95pct": 2,
+   "nReq": 7886
+  },
+  "APP": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 105764,
+   "days": 272,
+   "daysUnder95pct": 1,
+   "nReq": 7903
+  },
+  "SNDK": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 105815,
+   "days": 272,
+   "daysUnder95pct": 2,
+   "nReq": 7926
+  },
+  "GEV": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 105431,
+   "days": 272,
+   "daysUnder95pct": 4,
+   "nReq": 7941
+  },
+  "WDC": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 105752,
+   "days": 272,
+   "daysUnder95pct": 1,
+   "nReq": 7960
+  },
+  "KLAC": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 100392,
+   "days": 272,
+   "daysUnder95pct": 84,
+   "nReq": 7976
+  },
+  "CVNA": {
+   "years": [
+    2026,
+    2026
+   ],
+   "minuteBars": 105326,
+   "days": 272,
+   "daysUnder95pct": 4,
+   "nReq": 7991
+  },
+  "QQQ": {
+   "years": [
+    2018,
+    2026
+   ],
+   "minuteBars": 889230,
+   "days": 2284,
+   "daysUnder95pct": 18,
+   "nReq": 8183
+  }
+ },
+ "splits": [],
+ "nameChanges": [
+  {
+   "year": 2018,
+   "old": "WYND",
+   "new": "TNL"
+  },
+  {
+   "year": 2020,
+   "old": "NLOK",
+   "new": "GEN"
+  }
+ ],
+ "notes": [],
+ "membershipSource": "S&P 500 Historical Components & Changes (Updated).csv",
+ "knownSplits": [
+  {
+   "sym": "AAPL",
+   "day": "2020-08-31",
+   "ratio": "4:1"
+  },
+  {
+   "sym": "AMZN",
+   "day": "2022-06-06",
+   "ratio": "20:1"
+  },
+  {
+   "sym": "AVGO",
+   "day": "2024-07-15",
+   "ratio": "10:1"
+  },
+  {
+   "sym": "BKNG",
+   "day": "2026-04-06",
+   "ratio": "25:1"
+  },
+  {
+   "sym": "CRWD",
+   "day": "2026-07-02",
+   "ratio": "4:1"
+  },
+  {
+   "sym": "CVNA",
+   "day": "2026-05-08",
+   "ratio": "5:1"
+  },
+  {
+   "sym": "DELL",
+   "day": "2021-11-02",
+   "ratio": "1973:1000"
+  },
+  {
+   "sym": "DWDP",
+   "day": "2019-04-02",
+   "ratio": "1487:1000"
+  },
+  {
+   "sym": "GOOG",
+   "day": "2022-07-18",
+   "ratio": "20:1"
+  },
+  {
+   "sym": "GOOGL",
+   "day": "2022-07-18",
+   "ratio": "20:1"
+  },
+  {
+   "sym": "HON",
+   "day": "2018-10-01",
+   "ratio": "1011:1000"
+  },
+  {
+   "sym": "HON",
+   "day": "2018-10-29",
+   "ratio": "1032:1000"
+  },
+  {
+   "sym": "KLAC",
+   "day": "2026-06-12",
+   "ratio": "10:1"
+  },
+  {
+   "sym": "LRCX",
+   "day": "2024-10-03",
+   "ratio": "10:1"
+  },
+  {
+   "sym": "NEE",
+   "day": "2020-10-27",
+   "ratio": "4:1"
+  },
+  {
+   "sym": "NFLX",
+   "day": "2025-11-17",
+   "ratio": "10:1"
+  },
+  {
+   "sym": "NOW",
+   "day": "2025-12-18",
+   "ratio": "5:1"
+  },
+  {
+   "sym": "NVDA",
+   "day": "2021-07-20",
+   "ratio": "4:1"
+  },
+  {
+   "sym": "NVDA",
+   "day": "2024-06-10",
+   "ratio": "10:1"
+  },
+  {
+   "sym": "PANW",
+   "day": "2022-09-14",
+   "ratio": "3:1"
+  },
+  {
+   "sym": "PANW",
+   "day": "2024-12-16",
+   "ratio": "2:1"
+  },
+  {
+   "sym": "SMCI",
+   "day": "2024-10-01",
+   "ratio": "10:1"
+  },
+  {
+   "sym": "TSLA",
+   "day": "2020-08-31",
+   "ratio": "5:1"
+  },
+  {
+   "sym": "TSLA",
+   "day": "2022-08-25",
+   "ratio": "3:1"
+  },
+  {
+   "sym": "WMT",
+   "day": "2024-02-26",
+   "ratio": "3:1"
+  },
+  {
+   "sym": "GE",
+   "day": "2021-08-02",
+   "ratio": "1:8"
+  },
+  {
+   "sym": "HON",
+   "day": "2026-06-29",
+   "ratio": "1:2"
+  },
+  {
+   "sym": "UTX",
+   "day": "2020-04-03",
+   "ratio": "0.5:1"
+  }
+ ],
+ "requests": 8184
+}
