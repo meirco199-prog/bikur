@@ -44,7 +44,12 @@ export function runSymbol(sym, years, q, variants, { maxKey = RUN1_LAST, startsA
   const m = loadMinute(join(DATA, 'minute', sym + '.bin')), daily = JSON.parse(readFileSync(join(DATA, 'daily', sym + '.json'), 'utf8'));
   const days = E.splitDays(m, E.nyDayKey, E.nyOpenOf), dIdx = new Map(daily.map((d, i) => [d.key, i]));
   const st = E.indState(), cumHist = [], recs = [];
-  const inYears = (key) => years.has(Math.floor(key / 10000)) && key <= maxKey;
+  // פרוטוקול v1.1 סעיף 1: יום עם יותר מ-5% דקות חסרות → בלי מסחר באותו יום; מניה-שנה עם יותר מ-20% ימים כאלה → מושמטת
+  const shortDay = (d) => (d.i1 - d.i0) < 0.95 * (d.close - d.open) / 60;
+  const yrs = new Set(years), dq = {};
+  for (const Y of years){ const ds = days.filter((d) => Math.floor(d.key / 10000) === Y); const sh = ds.filter(shortDay).length; dq[Y] = { days: ds.length, short: sh }; if (!ds.length || sh / ds.length > 0.2) yrs.delete(Y); }
+  runSymbol.dq[sym] = dq;
+  const inYears = (key) => yrs.has(Math.floor(key / 10000)) && key <= maxKey;
   for (let di = 0; di < days.length; di++){
     const d = days[di], b5 = E.bars5(m, d);
     const ind = b5.map((b) => E.indUpdate(st, b));
@@ -54,7 +59,7 @@ export function runSymbol(sym, years, q, variants, { maxKey = RUN1_LAST, startsA
     // מילוי הצטברות לנרות חסרים לפני שמירה להיסטוריה
     for (let k = 1; k < 80; k++) if (!Number.isFinite(cum[k]) && Number.isFinite(cum[k - 1])) cum[k] = cum[k - 1];
     const j = dIdx.get(d.key), dc = j != null ? E.dailyCtx(daily, j) : null, qc = q.get(d.key);
-    const trade = inYears(d.key) && dc && qc && ind.length && ind[ind.length - 1].warm && b5.length >= 20;
+    const trade = inYears(d.key) && !shortDay(d) && dc && qc && ind.length && ind[ind.length - 1].warm && b5.length >= 20;
     if (trade){
       const sig = E.signals(b5, ind, vwap, rvol, dc, d.open);
       const lastEntry = Math.min(d.open + 5.5 * 3600, d.close - 1800);
@@ -97,6 +102,7 @@ export function runSymbol(sym, years, q, variants, { maxKey = RUN1_LAST, startsA
   return recs;
 }
 
+runSymbol.dq = {};
 async function main(){
   mkdirSync(OUT, { recursive: true });
   const universe = JSON.parse(readFileSync(join(DATA, 'universe.json'), 'utf8'));
@@ -113,7 +119,7 @@ async function main(){
     const r = runSymbol(s, ys, q, variants, { maxKey, startsAll: PHASE !== 'final', keepBase });
     recs.push(...r); log(s, [...ys].join(','), 'signals', r.length, 'total', recs.length);
   }
-  const res = analyze(recs, variants.map((x) => x[0]), { phase: PHASE, universe, cands });
+  const res = analyze(recs, variants.map((x) => x[0]), { phase: PHASE, universe, cands, dq: runSymbol.dq });
   writeFileSync(join(OUT, `${PHASE}.json`), JSON.stringify(res.json, null, 1));
   writeFileSync(join(OUT, `${PHASE}.md`), res.md);
   console.log(res.md.slice(0, 4000));

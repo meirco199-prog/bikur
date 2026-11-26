@@ -77,26 +77,33 @@ export function portfolio(recs, vi, { riskPct = 0.005, capPct = 0.2, maxPos = 5,
 }
 
 // ---------- הניתוח ----------
-export function analyze(recs, vnames, { phase = 'run1', universe = {}, cands = [] } = {}){
+export function analyze(recs, vnames, { phase = 'run1', universe = {}, cands = [], dq = {} } = {}){
   const md = [], json = { phase, protocol: 'v1.1', nRecords: recs.length };
   const base = recs.filter((r) => r.start === '1000');
   const by = (s, tf, per) => base.filter((r) => r.s === s && TREND[tf](r.f) && period(r.key) === per);
   md.push(`# מחקר מסחר יומי — ${phase === 'run1' ? 'הרצה 1: פיתוח 2018–2022 ואימות 2023–2024' : 'הרצה סופית: מבחן 01/2025–13/10/2026'}`, '',
     `פרוטוקול v1.1. ${recs.length.toLocaleString('en-US')} אותות. מצב מחקר: סיכון 500$ לעסקה, תקרה 20,000$. כל הסכומים אחרי עמלות IBKR, מרווח והחלקה (מודל קבוע).`, '');
+  // ---- בקרת חוסרים (סעיף 1) ----
+  { const dropped = [], shortDays = { n: 0, of: 0 };
+    for (const [s, ys] of Object.entries(dq)) for (const [y, x] of Object.entries(ys)){ shortDays.n += x.short; shortDays.of += x.days; if (!x.days || x.short / x.days > 0.2) dropped.push(`${s} ${y} (${x.short}/${x.days})`); }
+    json.dataQuality = { dropped, shortDays };
+    md.push(`**בקרת חוסרים:** ${shortDays.n.toLocaleString('en-US')} מתוך ${shortDays.of.toLocaleString('en-US')} ימי מניה עם יותר מ-5% דקות חסרות — בלי מסחר בהם. מניה-שנה מושמטת (יותר מ-20% ימים חסרים): ${dropped.length ? dropped.join(', ') : 'אין'}.`, ''); }
   // ---- שלב ב' ----
   const B = [];
   for (let s = 0; s < STRATS.length; s++) for (const tf of Object.keys(TREND)){
     const dev = metrics(tr(by(s, tf, 'dev')), { boot: 10000 }), v = metrics(tr(by(s, tf, 'val')));
     const reg = {}; for (const [k, x] of [['up', 1], ['flat', 0], ['down', -1]]) reg[k] = metrics(tr(base.filter((r) => r.s === s && TREND[tf](r.f) && r.f.regime === x && period(r.key) !== 'test')));
     const years = {}; for (const r of base.filter((r) => r.s === s && TREND[tf](r.f))){ const y = Math.floor(r.key / 10000); (years[y] ||= []).push({ key: r.key, pnl: val(r, 0, 1) }); }
-    const devV = metrics(tr(by(s, tf, 'dev'), 0, 2));
-    B.push({ s: STRATS[s], tf, dev, val: v, reg, devVar: devV, years: Object.fromEntries(Object.entries(years).map(([y, a]) => [y, metrics(a)])) });
+    const devV = metrics(tr(by(s, tf, 'dev'), 0, 2)), devG = metrics(tr(by(s, tf, 'dev'), 0, 3)), valG = metrics(tr(by(s, tf, 'val'), 0, 3));
+    B.push({ s: STRATS[s], tf, dev, val: v, reg, devVar: devV, devGross: devG, valGross: valG, years: Object.fromEntries(Object.entries(years).map(([y, a]) => [y, metrics(a)])) });
   }
   const adj = holm(B.map((b) => b.dev.pBoot ?? 1)); B.forEach((b, i) => { b.dev.pHolm = adj[i]; });
   json.stageB = B;
   md.push('## שלב ב\' — שש אסטרטגיות × ארבעה מסנני מגמה (תצורת בסיס: כניסה מ-10:00, סטופ מבני, יעד 2R, סוף יום)', '',
     '| אסטרטגיה | מסנן | פיתוח: עסקאות | הצלחה | תוחלת | R | PF | t | p (bootstrap) | p אחרי Holm | אימות: עסקאות | הצלחה | תוחלת | R | PF | t |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const b of B) md.push(`| ${HE_S[b.s]} | ${HE_T[b.tf]} | ${row(b.dev)} | ${pv(b.dev.pBoot)} | ${pv(b.dev.pHolm)} | ${row(b.val)} |`);
+  md.push('', '**לפני עלויות (בלי עמלות, מרווח והחלקה) — האם יש יתרון גולמי בכלל:**', '', '| אסטרטגיה | מסנן | פיתוח: תוחלת גולמית | PF גולמי | t | אימות: תוחלת גולמית | PF גולמי | t |', '|---|---|---|---|---|---|---|---|');
+  for (const b of B) md.push(`| ${HE_S[b.s]} | ${HE_T[b.tf]} | ${fmt$(b.devGross.exp)} | ${f2(b.devGross.pf)} | ${f2(b.devGross.t)} | ${fmt$(b.valGross.exp)} | ${f2(b.valGross.pf)} | ${f2(b.valGross.t)} |`);
   md.push('', '**לפי משטר שוק (פיתוח + אימות), תוחלת לעסקה ו-PF:**', '', '| אסטרטגיה | מסנן | עלייה | דשדוש | ירידה |', '|---|---|---|---|---|');
   for (const b of B) md.push(`| ${HE_S[b.s]} | ${HE_T[b.tf]} | ${fmt$(b.reg.up.exp)} / ${f2(b.reg.up.pf)} (${b.reg.up.n}) | ${fmt$(b.reg.flat.exp)} / ${f2(b.reg.flat.pf)} (${b.reg.flat.n}) | ${fmt$(b.reg.down.exp)} / ${f2(b.reg.down.pf)} (${b.reg.down.n}) |`);
   // מסנן נכנס רק אם משפר t בפיתוח וגם תוחלת באימות מול אותה אסטרטגיה בלי מסנן
