@@ -1,0 +1,33 @@
+# זמני, בענף research/daytrading בלבד — יוסר בסוף. מחקר "יתרון מאירועים" (דוחות, חדשות, זרימות סוף יום). קריאה בלבד, אין פקודות.
+# נתוני Alpaca נשמרים רק במטמון הפרטי של Actions (תנאי הרישיון). פקודות: probe | ...
+name: research-ee-tmp
+on:
+  push:
+    branches: [research/daytrading]
+    paths: ['.github/event-edge/command']
+permissions: { contents: write }
+concurrency: { group: research-ee, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      ALPACA_KEY_ID: ${{ secrets.ALPACA_KEY_ID }}
+      ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: command
+        id: cmd
+        run: echo "cmd=$(head -1 .github/event-edge/command | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: probe
+        if: steps.cmd.outputs.cmd == 'probe'
+        run: node invest-api/scripts/research-ee-probe.mjs | tee invest/docs/research/event-edge/data-gate-probe.json
+      - name: commit aggregated results only
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/event-edge
+          git commit -m "ops: מחקר יתרון מאירועים — ${{ steps.cmd.outputs.cmd }} (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin research/daytrading && git push origin HEAD:research/daytrading && break; sleep 5; done
