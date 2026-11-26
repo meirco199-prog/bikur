@@ -78,3 +78,49 @@ test('ריכוז ביחידות אחידות: פוזיציה בדולרים מו
   const b = T.alerts({ positions: [{ acct: 'U1', sym: 'X', qty: 1000, avg: 19, last: 20.5, peak: 20.5, cls: 'swing', fx: 3.8 }], navByAcct: { U1: navUsd }, dayPnl: 0, phase, now: at('2026-11-25T15:00:00Z') });
   assert.deepEqual(b.filter((x) => x.key.startsWith('conc')).map((x) => x.key.split(':')[0]), ['conc0.2']);
 });
+
+// ---------- העברה שעתית מ-IBKR ----------
+import { keygen, publicKeyOf, encrypt, decrypt } from '../engine/trader-push.js';
+const RAW = {
+  PR: {
+    positions: { positions: [{ contract_description: 'ANT', position: 74, market_price: 84.25, market_value: 6234.5, currency: 'USD', average_price: 92.51, asset_class: 'STK' },
+      { contract_description: 'ANT 261218C00090000', position: 1, market_price: 2, market_value: 200, currency: 'USD', average_price: 2, asset_class: 'OPT' }] },
+    summary: { currency: 'ILS', net_liquidation: 45252.96, gross_position_value: 20759.6 },
+    trades: { trades: [
+      { trade_id: 'a', symbol: 'AMD', sec_type: 'STK', side: 'BUY', size: 10, price: 400, trade_time: '2026-11-27T15:05:00Z', commission: 1 },
+      { trade_id: 'b', symbol: 'AMD', sec_type: 'STK', side: 'SELL', size: 10, price: 404, trade_time: '2026-11-27T15:40:00Z', commission: 1 },
+      { trade_id: 'c', symbol: 'ANT', sec_type: 'STK', side: 'BUY', size: 24, price: 84, trade_time: '2026-11-27T16:00:00Z', commission: 1 },
+      { trade_id: 'd', symbol: 'MRVL', sec_type: 'STK', side: 'BUY', size: 5, price: 140, trade_time: '2026-11-26T15:00:00Z', commission: 1 }] },
+  },
+  CO: { positions: { positions: [{ contract_description: 'NVDA', position: 20, market_price: 150, market_value: 3000, currency: 'USD', average_price: 148, asset_class: 'STK' }] }, summary: { currency: 'USD', net_liquidation: 100000 }, trades: { trades: [] } },
+};
+
+test('העברה מ-IBKR: תמונת מצב בלי מספרי חשבון, מניות בלבד, שער דולר משווי הפוזיציות; "נפתחה היום" משחזור הביצועים', () => {
+  const s = T.snapshotFromConnector(RAW, 1800000000);
+  assert.ok(T.validSnapshot(s)); assert.deepEqual(Object.keys(s.accounts).sort(), ['CO', 'PR']);
+  assert.equal(s.accounts.PR.positions.length, 1, 'אופציה לא נכללת');
+  assert.ok(Math.abs(s.accounts.PR.usdRate - 20759.6 / 6234.5) < 1e-9); assert.equal(s.accounts.CO.usdRate, 1);
+  const { positions, trades } = T.snapshotLive(s, '2026-11-27', T.nyOffsetSec);
+  assert.equal(trades.length, 3, 'רק ביצועים של היום (ניו יורק)');
+  const ant = positions.find((p) => p.sym === 'ANT'), nv = positions.find((p) => p.sym === 'NVDA');
+  assert.equal(ant.qty, 74); assert.equal(ant.avg, 92.51); assert.equal(ant.openedToday, false, 'הייתה פוזיציה של 50 מאתמול');
+  assert.equal(nv.acct, 'CO'); assert.equal(positions.length, 2, 'AMD נקנתה ונמכרה היום');
+  // פוזיציה שכולה נקנתה היום
+  const s2 = T.snapshotFromConnector({ PR: { positions: { positions: [{ contract_description: 'AMD', position: 10, average_price: 400, currency: 'USD', asset_class: 'STK' }] }, summary: { currency: 'USD', net_liquidation: 1e5 }, trades: { trades: [RAW.PR.trades.trades[0]] } } }, 1800000000);
+  const amd = T.snapshotLive(s2, '2026-11-27', T.nyOffsetSec).positions[0];
+  assert.equal(amd.openedToday, true); assert.equal(amd.entryT, at('2026-11-27T15:05:00Z'));
+  // קלט עוין נדחה
+  assert.equal(T.validSnapshot({ ...s, accounts: { U123: s.accounts.PR } }), false);
+  assert.equal(T.validSnapshot({ ...s, trades: [{ ...s.trades[0], sym: '<img>' }] }), false);
+});
+
+test('הצפנה: רק המפתח הפרטי של השרת מפענח; שינוי של תו אחד נדחה; תמונת מצב רגילה קטנה', () => {
+  const k = keygen(), pub = publicKeyOf(k), s = T.snapshotFromConnector(RAW, 1800000000);
+  const c = encrypt(s, pub);
+  assert.deepEqual(decrypt(c, k), s);
+  assert.ok(c.length < 1500, `אורך ${c.length}`);
+  assert.throws(() => decrypt(c, keygen()));
+  const bad = c.slice(0, 80) + (c[80] === 'A' ? 'B' : 'A') + c.slice(81);
+  assert.throws(() => decrypt(bad, k));
+  assert.match(c, /^[A-Za-z0-9_-]+$/);
+});

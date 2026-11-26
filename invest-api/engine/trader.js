@@ -180,3 +180,55 @@ export function mistakes(trips){
   ];
   return cat.map(([name, f]) => { const x = trips.filter(f); return { name, n: x.length, pnl: sum(x) }; }).filter((c) => c.n).sort((a, b) => a.pnl - b.pnl);
 }
+
+// ---------- העברה שעתית מ-IBKR (חלופה ל-Flex, invest/docs/TRADER.md) ----------
+// raw = {PR|CO: {positions, summary, trades}} — הפלט כמו שהוא של get_account_positions / get_account_summary / get_account_trades.
+// בלי מספרי חשבון: המפתחות הם PR/CO בלבד. מחזיר {v, at, accounts:{id:{nav, currency, usdRate, positions}}, trades}
+const SYM = /^[A-Z][A-Z0-9.]{0,7}$/;
+export function snapshotFromConnector(raw, at){
+  const accounts = {}, trades = [];
+  for (const id of ['PR', 'CO']){
+    const r = raw[id]; if (!r) continue;
+    const pos = (r.positions?.positions || []).filter((p) => (p.asset_class || 'STK') === 'STK' && num(p.position) > 0)
+      .map((p) => ({ sym: String(p.contract_description || p.symbol || '').trim().split(/\s/)[0].toUpperCase(), qty: num(p.position), cost: p.average_price == null ? null : num(p.average_price), mark: p.market_price == null ? null : num(p.market_price), currency: p.currency || 'USD', mv: num(p.market_value) }))
+      .filter((p) => SYM.test(p.sym));
+    const s = r.summary || {}, cur = s.currency || 'USD', gross = num(s.gross_position_value);
+    const usdMv = pos.reduce((a, p) => a + (p.mv || 0), 0);
+    // שער הדולר במטבע הבסיס: מתוך שווי הפוזיציות (רק כשכולן בדולר); אחרת null — השירות משתמש בשער האחרון שידוע לו
+    const usdRate = cur === 'USD' ? 1 : (pos.length && pos.every((p) => p.currency === 'USD') && usdMv > 0 && gross > 0 ? gross / usdMv : null);
+    accounts[id] = { nav: s.net_liquidation == null ? null : num(s.net_liquidation), currency: cur, usdRate, positions: pos.map(({ mv, ...p }) => ({ ...p, fx: 1 })) };
+    for (const t of r.trades?.trades || []){
+      const sym = String(t.symbol || '').toUpperCase(), qty = Math.abs(num(t.size) || 0), tt = Date.parse(t.trade_time);
+      if ((t.sec_type || 'STK') !== 'STK' || !SYM.test(sym) || !qty || !Number.isFinite(tt)) continue;
+      trades.push({ acct: id, sym, side: /^S/i.test(t.side || '') ? 'SELL' : 'BUY', qty, price: num(t.price), t: Math.floor(tt / 1000), commission: Math.abs(num(t.commission) || 0), orderType: String(t.order_type || '').slice(0, 12), id: String(t.trade_id || '').slice(0, 40) });
+    }
+  }
+  return { v: 1, at, accounts, trades: trades.sort((a, b) => a.t - b.t) };
+}
+// פוזיציות חיות מתמונת מצב: הכמות והעלות מ-IBKR; "נפתחה היום" ושעת הכניסה — משחזור הביצועים של היום (dateKey, שעון ניו יורק)
+export function snapshotLive(snap, dateKey, nyOffset){
+  const day = (t) => new Date((t + nyOffset(t)) * 1000).toISOString().slice(0, 10);
+  const today = (snap.trades || []).filter((t) => day(t.t) === dateKey);
+  const morning = {};
+  for (const [id, A] of Object.entries(snap.accounts || {})){
+    const m = new Map(A.positions.map((p) => [p.sym, { ...p }]));
+    for (const t of today) if (t.acct === id){ const p = m.get(t.sym) || { sym: t.sym, qty: 0, cost: t.price }; p.qty += t.side === 'BUY' ? -t.qty : t.qty; m.set(t.sym, p); }
+    morning[id] = { positions: [...m.values()].filter((p) => p.qty > 1e-9) };
+  }
+  const flow = new Map(livePositions(morning, today).map((p) => [`${p.acct}|${p.sym}`, p]));
+  const positions = [];
+  for (const [id, A] of Object.entries(snap.accounts || {})) for (const p of A.positions){
+    const f = flow.get(`${id}|${p.sym}`);
+    positions.push({ acct: id, sym: p.sym, qty: p.qty, avg: p.cost, entryT: f?.openedToday ? f.entryT : null, openedToday: !!f?.openedToday });
+  }
+  return { positions, trades: today };
+}
+// בדיקת מבנה לתמונת מצב שפוענחה (השירות לא סומך על הקלט)
+export function validSnapshot(s){
+  if (!s || s.v !== 1 || !Number.isFinite(s.at) || typeof s.accounts !== 'object' || !Array.isArray(s.trades) || s.trades.length > 5000) return false;
+  for (const [id, A] of Object.entries(s.accounts)){
+    if (!['PR', 'CO'].includes(id) || !Array.isArray(A.positions) || A.positions.length > 300) return false;
+    if (!A.positions.every((p) => SYM.test(p.sym) && p.qty > 0 && Number.isFinite(p.qty))) return false;
+  }
+  return s.trades.every((t) => ['PR', 'CO'].includes(t.acct) && SYM.test(t.sym) && ['BUY', 'SELL'].includes(t.side) && t.qty > 0 && Number.isFinite(t.t));
+}

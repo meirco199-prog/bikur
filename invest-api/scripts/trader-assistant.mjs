@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from '
 import { join } from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import * as T from '../engine/trader.js';
+import { decrypt as pushDecrypt } from '../engine/trader-push.js';
 
 const E = process.env, HOME = E.HOME || '.';
 const DIR = E.TRADER_DIR || join(HOME, '.bikur-trader'); mkdirSync(DIR, { recursive: true });
@@ -78,6 +79,21 @@ async function refreshTrades(){
   if (list.length || !TRADES.list.length) TRADES.list = list;
 }
 
+// ---------- העברה שעתית מ-IBKR (חלופה ל-Flex): קובץ מוצפן שמגיע דרך trader.yml (פעולה push) ----------
+// משמש רק כשאין מפתחות Flex. תמונת מצב ישנה מ-PUSH_STALE לא מפעילה התראות על פוזיציות (אולי כבר נמכרו).
+const PF = join(DIR, 'push.in'), PUSH_STALE = 150 * 60;
+Object.assign(ACCT_NAME, { PR: 'פרטי', CO: 'חברה' });
+function ingestPush(){
+  if (!E.TRADER_PUSH_KEY || !existsSync(PF)) return;
+  try {
+    const snap = pushDecrypt(readFileSync(PF, 'utf8'), readFileSync(E.TRADER_PUSH_KEY, 'utf8'));
+    if (!T.validSnapshot(snap)) log('push: מבנה לא תקין');
+    else if (snap.at > now() + 300 || snap.at <= (S.push?.at || 0)) log('push: ישן או עתידי — לא נקלט');
+    else { S.fx ||= {}; for (const [id, A] of Object.entries(snap.accounts)) if (A.usdRate) S.fx[id] = A.usdRate; S.push = snap; save(); log('push:', Object.entries(snap.accounts).map(([k, v]) => `${ACCT_NAME[k]}:${v.positions.length}`).join(' ')); }
+  } catch (e){ log('push נדחה:', e.message); }
+  try { renameSync(PF, PF + '.done'); } catch {}
+}
+
 // ---------- מחירים ונרות (Alpaca, IEX — זמן אמת בחשבון החינמי) ----------
 const DATA = 'https://data.alpaca.markets';
 async function snapshots(syms){ if (!syms.length) return {}; const j = await get(`${DATA}/v2/stocks/snapshots?symbols=${syms.map(encodeURIComponent).join(',')}&feed=iex`, AH); return j || {}; }
@@ -113,17 +129,24 @@ async function earnings(syms){
 }
 
 // ---------- מחזור ----------
-let VIEW = { updated: null, phase: null, positions: [], watch: [], navByAcct: {}, dayPnl: 0, alerts: [], news: {}, earnings: [], configured: { alpaca: !!E.ALPACA_KEY_ID, flex: ACCTS.map((a) => a.name) } };
+let VIEW = { updated: null, phase: null, positions: [], watch: [], navByAcct: {}, dayPnl: 0, alerts: [], news: {}, earnings: [], configured: { alpaca: !!E.ALPACA_KEY_ID, flex: ACCTS.map((a) => a.name), push: !!E.TRADER_PUSH_KEY } };
 const keyOf = (p) => `${p.acct}|${p.sym}`;
 async function cycle(){
   const t = now(), cal = await calendar(), ph = T.marketPhase(cal, t, nyo);
   const dateKey = ph.date;
-  if (ACCTS.length){ await refreshMorning(dateKey); if (ph.phase !== 'closed') await refreshTrades(); }
-  const live = T.livePositions(MORNING.acc, TRADES.list.filter((x) => new Date((x.t + nyo(x.t)) * 1000).toISOString().slice(0, 10) === dateKey));
+  let live, pushStale = false;
+  if (ACCTS.length){ await refreshMorning(dateKey); if (ph.phase !== 'closed') await refreshTrades(); live = T.livePositions(MORNING.acc, TRADES.list.filter((x) => new Date((x.t + nyo(x.t)) * 1000).toISOString().slice(0, 10) === dateKey)); }
+  else {
+    ingestPush();
+    if (S.push){
+      const r = T.snapshotLive(S.push, dateKey, nyo); live = r.positions; TRADES.list = S.push.trades; pushStale = t - S.push.at > PUSH_STALE;
+      MORNING.acc = Object.fromEntries(Object.entries(S.push.accounts).map(([id, A]) => [id, { ...A, usdRate: A.usdRate || S.fx?.[id] || (A.currency === 'USD' ? 1 : null) }]));
+    } else live = [];
+  }
   const syms = [...new Set([...live.map((p) => p.sym), ...S.watch])];
   const snap = ph.phase === 'closed' && VIEW.updated ? null : await snapshots(syms);
   await news(syms); await earnings(syms);
-  const navByAcct = {}; for (const [id, A] of Object.entries(MORNING.acc)) navByAcct[id] = A.nav != null && A.usdRate ? A.nav / A.usdRate : A.nav;
+  const navByAcct = {}; for (const [id, A] of Object.entries(MORNING.acc)) navByAcct[id] = A.nav == null ? null : A.usdRate ? A.nav / A.usdRate : (A.currency && A.currency !== 'USD' ? null : A.nav);
   const positions = [];
   for (const p of live){
     const sn = snap?.[p.sym], last = sn?.latestTrade?.p ?? VIEW.positions.find((x) => keyOf(x) === keyOf(p))?.last ?? null;
@@ -153,12 +176,14 @@ async function cycle(){
     watch.push({ sym: s, last: sn?.latestTrade?.p ?? null, chg: sn?.latestTrade?.p && sn?.prevDailyBar?.c ? sn.latestTrade.p / sn.prevDailyBar.c - 1 : null, above20: tr?.above20, above50: tr?.above50, ma20Up: tr?.ma20Up, atrD: tr?.atrD, vwap: sn?.dailyBar?.vw ?? null });
   }
   const st = { positions, navByAcct, dayPnl, phase: ph, now: t };
-  const fired = ph.phase === 'closed' ? [] : T.alerts(st);
+  const fired = ph.phase === 'closed' || pushStale ? [] : T.alerts(st);
   for (const a of fired) if (!S.sent[a.key]){ S.sent[a.key] = t; await notify(a.text); }
   for (const [k, v] of Object.entries(S.sent)) if (t - v > 10 * 86400) delete S.sent[k]; // שניות — 10 ימים
-  VIEW = { ...VIEW, updated: t, phase: ph, positions, watch, navByAcct, dayPnl, alerts: fired.map((a) => a.text), news: NEWS.items, earnings: EARN.list };
+  VIEW = { ...VIEW, updated: t, phase: ph, positions, pushAt: S.push?.at || null, pushStale, watch, navByAcct, dayPnl, alerts: fired.map((a) => a.text), news: NEWS.items, earnings: EARN.list };
   // אחרי הסגירה: סיכום יומי (פעם אחת)
-  if (ph.phase === 'post' && !S.reviews.find((r) => r.date === dateKey)) await dailyReview(dateKey, ph, positions);
+  // בהעברה השעתית — מחכים לתמונת מצב שנלקחה אחרי הסגירה, כדי שהסיכום יכלול את כל הביצועים של היום
+  const reviewReady = ACCTS.length || (S.push && S.push.at >= ph.closeT);
+  if (ph.phase === 'post' && reviewReady && !S.reviews.find((r) => r.date === dateKey)) await dailyReview(dateKey, ph, positions);
   save();
 }
 
@@ -203,7 +228,7 @@ async function dailyReview(dateKey, ph, positions){
 const PAGE = readFileSync(new URL('./trader-ui.html', import.meta.url), 'utf8');
 const okToken = (k) => { if (!k) return false; const a = Buffer.from(String(k)), b = Buffer.from(S.token); return a.length === b.length && timingSafeEqual(a, b); };
 const body = (req) => new Promise((r) => { let s = ''; req.on('data', (c) => { s += c; if (s.length > 1e4) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(s || '{}')); } catch { r({}); } }); });
-if (process.argv.includes('--check')){ const c = await calendar(); log('calendar days', c.length, 'flex accounts', ACCTS.map((a) => a.name).join(',') || 'אין', 'alpaca', !!E.ALPACA_KEY_ID); process.exit(c.length ? 0 : 1); }
+if (process.argv.includes('--check')){ const c = await calendar(); log('calendar days', c.length, 'flex accounts', ACCTS.map((a) => a.name).join(',') || 'אין', 'push key', !!E.TRADER_PUSH_KEY && existsSync(E.TRADER_PUSH_KEY), 'alpaca', !!E.ALPACA_KEY_ID); process.exit(c.length ? 0 : 1); }
 if (process.argv.includes('--link')){ console.log(`TOKEN=${S.token}`); process.exit(0); }
 createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'), ck = (req.headers.cookie || '').match(/tk=([a-f0-9]+)/)?.[1], k = u.searchParams.get('k') || ck || req.headers['x-token'];
@@ -234,7 +259,7 @@ createServer(async (req, res) => {
 }).listen(PORT, '127.0.0.1', () => log('dashboard on', PORT));
 
 // ---------- הפעלה ----------
-log('start', 'accounts:', ACCTS.map((a) => a.name).join(',') || 'אין Flex עדיין');
+log('start', 'accounts:', ACCTS.map((a) => a.name).join(',') || (E.TRADER_PUSH_KEY ? 'העברה שעתית מ-IBKR' : 'אין חיבור לחשבונות עדיין'));
 for (;;){
   try { await cycle(); } catch (e){ log('cycle error', e.stack || e.message); }
   const ph = VIEW.phase?.phase; await sleep(ph && ph !== 'closed' ? 60e3 : 5 * 60e3);

@@ -31,6 +31,11 @@ mkdir -p /etc/bikur-trader && chmod 750 /etc/bikur-trader && chown root:bridge /
   for k in CO PR; do for v in TOKEN ACTIVITY TRADES; do n="IBKR_FLEX_${v}_${k}"; [ -n "${!n:-}" ] && printf '%s=%s\n' "$n" "${!n}"; done; done
 } > /etc/bikur-trader/trader.env
 chmod 640 /etc/bikur-trader/trader.env; chown root:bridge /etc/bikur-trader/trader.env
+# מפתח פרטי להעברה השעתית מ-IBKR (נוצר פעם אחת, לא יוצא מהשרת); המפתח הציבורי לא סודי ומודפס כדי להגדיר את המשימה השעתית
+PUB=$(cd "$H/bikur" && node invest-api/scripts/trader-push.mjs --keygen /etc/bikur-trader/push.key)
+chmod 640 /etc/bikur-trader/push.key; chown root:bridge /etc/bikur-trader/push.key
+echo 'TRADER_PUSH_KEY=/etc/bikur-trader/push.key' >> /etc/bikur-trader/trader.env
+echo "מפתח ציבורי להעברה מ-IBKR (לא סודי): $PUB"
 echo "חשבונות עם מפתח Flex: $(grep -c '^IBKR_FLEX_TOKEN_' /etc/bikur-trader/trader.env || true)"
 
 say "שירות bikur-trader"

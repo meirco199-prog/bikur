@@ -1,6 +1,8 @@
 # עוזר המסחר האישי (invest/docs/TRADER.md) — התקנה/עדכון/סטטוס על השרת של בעל הריפו. קריאה בלבד: אין שום פקודת מסחר.
 # Secrets: SERVER_HOST, SERVER_ROOT_PASSWORD, ALPACA_KEY_ID, ALPACA_SECRET_KEY, CRON_SECRET (לטלגרם דרך ה-Worker),
 # ולא חובה (מאיר יוצר ב-IBKR, דוחות Flex לקריאה בלבד): IBKR_FLEX_TOKEN_CO/PR, IBKR_FLEX_ACTIVITY_CO/PR, IBKR_FLEX_TRADES_CO/PR.
+# חלופה בלי Flex — פעולה push: משימה שעתית קוראת את החשבונות (קריאה בלבד) ושולחת כאן תמונת מצב מוצפנת למפתח הציבורי של השרת;
+# רק השרת מפענח. pubkey מדפיס את המפתח הציבורי (לא סודי).
 # הלוג ציבורי — הסקריפטים לא מדפיסים טוקנים, כתובות או נתוני חשבון.
 name: Trading assistant (read-only)
 
@@ -12,7 +14,12 @@ on:
         required: true
         default: 'status'
         type: choice
-        options: [install, update, status, link, stop, start]
+        options: [install, update, status, link, stop, start, push, pubkey]
+      payload:
+        description: 'push בלבד: תמונת מצב מוצפנת (base64url)'
+        required: false
+        default: ''
+        type: string
   push:
     branches: [main]
     paths: ['.github/trader/command']
@@ -39,6 +46,7 @@ jobs:
       IBKR_FLEX_ACTIVITY_PR: ${{ secrets.IBKR_FLEX_ACTIVITY_PR }}
       IBKR_FLEX_TRADES_PR: ${{ secrets.IBKR_FLEX_TRADES_PR }}
       WORKER_URL: https://invest-api.meirco199.workers.dev
+      PAYLOAD: ${{ inputs.payload }}
     steps:
       - uses: actions/checkout@v4
       - name: Run on server
@@ -46,7 +54,7 @@ jobs:
           set -e
           ACTION="${{ inputs.action }}"; [ -n "$ACTION" ] || ACTION=$(head -1 .github/trader/command | cut -d' ' -f1)
           miss=""; for v in SERVER_HOST SSHPASS ALPACA_KEY_ID ALPACA_SECRET_KEY CRON_SECRET; do if [ -n "${!v}" ]; then echo "✅ $v"; else echo "❌ $v חסר"; miss=1; fi; done
-          for v in IBKR_FLEX_TOKEN_CO IBKR_FLEX_TOKEN_PR; do if [ -n "${!v}" ]; then echo "✅ $v"; else echo "ℹ️ $v עוד לא הוגדר (החשבון יחובר כשיוגדר)"; fi; done
+          [ "$ACTION" = push ] || for v in IBKR_FLEX_TOKEN_CO IBKR_FLEX_TOKEN_PR; do if [ -n "${!v}" ]; then echo "✅ $v"; else echo "ℹ️ $v לא הוגדר (החשבונות מתעדכנים בהעברה השעתית)"; fi; done
           [ -z "$miss" ] || { echo "::error::חסרים Secrets"; exit 1; }
           sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq sshpass >/dev/null
           SSH="sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 root@$SERVER_HOST"
@@ -60,5 +68,8 @@ jobs:
             status)  $SSH 'systemctl is-active bikur-trader caddy | paste -sd" "; journalctl -u bikur-trader -n 30 --no-pager | sed -E "s/[0-9a-f]{32,}/***/g; s/U[0-9]{6,}/U***/g; s/[0-9]{1,3}(\.[0-9]{1,3}){3}/x.x.x.x/g"' ;;
             stop)    $SSH 'systemctl stop bikur-trader; systemctl disable -q bikur-trader; echo stopped' ;;
             start)   $SSH 'systemctl enable -q bikur-trader; systemctl start bikur-trader; sleep 3; systemctl is-active bikur-trader' ;;
+            push)    [[ "$PAYLOAD" =~ ^[A-Za-z0-9_-]{80,60000}$ ]] || { echo "::error::תמונת מצב לא תקינה"; exit 1; }
+                     printf '%s' "$PAYLOAD" | $SSH 'H=$(getent passwd bridge | cut -d: -f6); D="$H/.bikur-trader"; umask 077; cat > "$D/push.tmp" && chown bridge:bridge "$D/push.tmp" && mv "$D/push.tmp" "$D/push.in" && echo "נמסר לשרת"' ;;
+            pubkey)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); cd "$H/bikur" && node invest-api/scripts/trader-push.mjs --keygen /etc/bikur-trader/push.key' ;;
             *) echo "פעולה לא מוכרת: $ACTION"; exit 1 ;;
           esac
