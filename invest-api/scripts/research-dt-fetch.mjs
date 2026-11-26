@@ -47,7 +47,8 @@ async function bars(symbols, tf, start, end){
 const split = (line) => { const o = []; let c = '', q = false; for (const ch of line){ if (ch === '"'){ q = !q; continue; } if (ch === ',' && !q){ o.push(c); c = ''; continue; } c += ch; } o.push(c); return o; };
 const normSym = (s) => s.trim().toUpperCase().replace(/\s.*$/, '').replace('.', '-');
 async function membership(){
-  const list = await (await fetch('https://api.github.com/repos/fja05680/sp500/contents/', { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'research' } })).json();
+  const list = await (await fetch('https://api.github.com/repos/fja05680/sp500/contents/', { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'research', ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}) } })).json();
+  if (!Array.isArray(list)) throw new Error('רשימת הקבצים של fja05680 לא התקבלה: ' + JSON.stringify(list).slice(0, 200));
   const names = list.map((x) => x.name).filter((n) => /S&P 500 Historical Components (?:&|&amp;) Changes[^/]*\.csv/.test(n));
   const name = names.find((n) => /Updated/i.test(n)) || names[0];
   const f = list.find((x) => x.name === name);
@@ -71,6 +72,7 @@ function save(sym, m){
 
 async function main(){
   mkdirSync(join(DATA, 'minute'), { recursive: true }); mkdirSync(join(DATA, 'daily'), { recursive: true }); mkdirSync(AUDIT, { recursive: true });
+  if (existsSync(join(DATA, 'universe.json')) && existsSync(join(DATA, 'complete.flag'))){ log('הנתונים כבר במטמון — אין הורדה'); return; }
   const audit = { protocol: 'v1.1', fetchedAt: new Date().toISOString(), source: 'Alpaca SIP (adjustment=split)', years: {}, symbols: {}, splits: [], nameChanges: [], notes: [] };
   const mem = await membership(); audit.membershipSource = mem.source;
   const universe = {};
@@ -140,6 +142,7 @@ async function main(){
   audit.knownSplits = [...(ca?.corporate_actions?.forward_splits || []), ...(ca?.corporate_actions?.reverse_splits || [])].map((x) => ({ sym: x.symbol, day: x.ex_date, ratio: `${x.new_rate}:${x.old_rate}` }));
   audit.requests = nReq;
   writeFileSync(join(AUDIT, 'data-audit.json'), JSON.stringify(audit, null, 1));
+  writeFileSync(join(DATA, 'complete.flag'), new Date().toISOString());
   log('done', nReq, 'requests');
 }
 main().catch((e) => { console.error(e); process.exit(1); });

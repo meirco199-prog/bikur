@@ -41,7 +41,11 @@ jobs:
           restore-keys: dt-data-v1-
       - name: fetch Alpaca SIP (skips files already cached)
         if: contains(fromJSON('["data","run1","final"]'), steps.cmd.outputs.cmd)
-        run: node --max-old-space-size=6000 invest-api/scripts/research-dt-fetch.mjs --data ~/dtdata
+        env: { GITHUB_TOKEN: '${{ github.token }}' }
+        run: |
+          # הנתונים מההרצה הקודמת שלמים (data-audit.json כבר בריפו) — מסמנים כדי לא להוריד שוב
+          if [ -f ~/dtdata/universe.json ] && [ -f invest/docs/research/daytrading/results/data-audit.json ] && [ ! -f ~/dtdata/complete.flag ]; then date -u > ~/dtdata/complete.flag; fi
+          node --max-old-space-size=6000 invest-api/scripts/research-dt-fetch.mjs --data ~/dtdata
       - name: save private data cache
         if: always() && contains(fromJSON('["data","run1","final"]'), steps.cmd.outputs.cmd)
         uses: actions/cache/save@v4
