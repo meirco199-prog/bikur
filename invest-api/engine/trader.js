@@ -135,7 +135,8 @@ export function alerts(s){
   const out = [], navTot = Object.values(s.navByAcct).reduce((a, x) => a + (x || 0), 0), date = s.phase.date;
   const fmt = (x) => (x < 0 ? '‎−' : '+') + Math.abs(Math.round(x)).toLocaleString('en-US') + '$';
   if (navTot > 0) for (const lv of RULES.dailyLossPct) if (s.dayPnl <= -lv * navTot) out.push({ key: `loss${lv}:${date}`, text: `🔴 הפסד יומי ${fmt(s.dayPnl)} (${(s.dayPnl / navTot * 100).toFixed(1)}% משני החשבונות). הכלל: עצירה ב-1%.` });
-  const bySym = new Map(); for (const p of s.positions) bySym.set(p.sym, (bySym.get(p.sym) || 0) + p.qty * (p.last ?? p.avg ?? 0) * (p.fx || 1));
+  // שווי בדולרים (מחירי המניות בדולר) מול שווי החשבונות בדולרים (navByAcct כבר מומר) — בלי שער מטבע הבסיס
+  const bySym = new Map(); for (const p of s.positions) bySym.set(p.sym, (bySym.get(p.sym) || 0) + p.qty * (p.last ?? p.avg ?? 0));
   if (navTot > 0) for (const [sym, v] of bySym) for (const lv of RULES.concentrationPct) if (v >= lv * navTot) out.push({ key: `conc${lv}:${sym}:${date}`, text: `🟠 ריכוז: ${sym} = ${(v / navTot * 100).toFixed(0)}% משני החשבונות יחד (תקרה מומלצת ${RULES.capPct * 100}%).` });
   for (const p of s.positions){
     if (p.cls === 'long' || !(p.avg > 0) || p.last == null) continue;

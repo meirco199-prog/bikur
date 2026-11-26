@@ -69,3 +69,12 @@ test('זינוק בכניסה, חלופות יציאה (סטופ לפני יעד
   const m = T.mistakes([{ cls: 'day', overnight: true, pnl: -500, peakRet: 0 }, { peakRet: 0.02, pnl: -200 }, { spike: 'x', pnl: 100 }]);
   assert.deepEqual(m.map((c) => c.name), ['עסקה יומית שהוחזקה ללילה', 'עסקה שהייתה ברווח של +1% ונסגרה בהפסד', 'כניסה אחרי זינוק']);
 });
+
+test('ריכוז ביחידות אחידות: פוזיציה בדולרים מול שווי מומר לדולרים, גם כשחשבון הבסיס בשקלים (שער 3.8)', () => {
+  const phase = T.marketPhase(CAL, at('2026-11-25T15:00:00Z'), T.nyOffsetSec);
+  const navUsd = 380000 / 3.8; // שווי חשבון בשקלים, מומר לדולרים כמו בשירות
+  const a = T.alerts({ positions: [{ acct: 'U1', sym: 'X', qty: 1000, avg: 19, last: 19.9, peak: 19.9, cls: 'swing', fx: 3.8 }], navByAcct: { U1: navUsd }, dayPnl: 0, phase, now: at('2026-11-25T15:00:00Z') });
+  assert.equal(a.filter((x) => x.key.startsWith('conc')).length, 0, '19,900$ מתוך 100,000$ = 19.9% — אין התראה (לא 76%)');
+  const b = T.alerts({ positions: [{ acct: 'U1', sym: 'X', qty: 1000, avg: 19, last: 20.5, peak: 20.5, cls: 'swing', fx: 3.8 }], navByAcct: { U1: navUsd }, dayPnl: 0, phase, now: at('2026-11-25T15:00:00Z') });
+  assert.deepEqual(b.filter((x) => x.key.startsWith('conc')).map((x) => x.key.split(':')[0]), ['conc0.2']);
+});
