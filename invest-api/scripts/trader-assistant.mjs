@@ -98,7 +98,7 @@ let NEWS = { at: 0, items: {} }, EARN = { at: 0, list: [] };
 async function news(syms){
   if (Date.now() - NEWS.at < 10 * 60e3 || !syms.length) return; NEWS.at = Date.now();
   const j = await get(`${DATA}/v1beta1/news?symbols=${syms.map(encodeURIComponent).join(',')}&limit=50`, AH); const items = {};
-  for (const n of j?.news || []) for (const s of n.symbols) if (syms.includes(s)) (items[s] ||= []).length < 3 && items[s].push({ t: n.created_at, h: n.headline, url: n.url });
+  for (const n of j?.news || []) for (const s of n.symbols) if (syms.includes(s)) (items[s] ||= []).length < 3 && items[s].push({ t: n.created_at, h: n.headline, url: /^https?:\/\//i.test(n.url || '') ? n.url : null });
   NEWS.items = items;
 }
 async function earnings(syms){
@@ -155,7 +155,7 @@ async function cycle(){
   const st = { positions, navByAcct, dayPnl, phase: ph, now: t };
   const fired = ph.phase === 'closed' ? [] : T.alerts(st);
   for (const a of fired) if (!S.sent[a.key]){ S.sent[a.key] = t; await notify(a.text); }
-  for (const [k, v] of Object.entries(S.sent)) if (t - v > 10 * 864e5) delete S.sent[k];
+  for (const [k, v] of Object.entries(S.sent)) if (t - v > 10 * 86400) delete S.sent[k]; // שניות — 10 ימים
   VIEW = { ...VIEW, updated: t, phase: ph, positions, watch, navByAcct, dayPnl, alerts: fired.map((a) => a.text), news: NEWS.items, earnings: EARN.list };
   // אחרי הסגירה: סיכום יומי (פעם אחת)
   if (ph.phase === 'post' && !S.reviews.find((r) => r.date === dateKey)) await dailyReview(dateKey, ph, positions);
