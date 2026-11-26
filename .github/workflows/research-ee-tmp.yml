@@ -24,6 +24,28 @@ jobs:
       - name: probe
         if: steps.cmd.outputs.cmd == 'probe'
         run: node invest-api/scripts/research-ee-probe.mjs | tee invest/docs/research/event-edge/data-gate-probe.json
+      - name: unit tests
+        run: node --test invest-api/tests/research-event-edge.test.mjs
+      - name: restore private data cache
+        if: contains(fromJSON('["run1","final"]'), steps.cmd.outputs.cmd)
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/eedata
+          key: ee-data-v1-${{ github.run_id }}
+          restore-keys: ee-data-v1-
+      - name: fetch (skips what is cached)
+        if: contains(fromJSON('["run1","final"]'), steps.cmd.outputs.cmd)
+        env: { GITHUB_TOKEN: '${{ github.token }}' }
+        run: node --max-old-space-size=6000 invest-api/scripts/research-ee-fetch.mjs --data ~/eedata
+      - name: save private data cache
+        if: always() && contains(fromJSON('["run1","final"]'), steps.cmd.outputs.cmd)
+        uses: actions/cache/save@v4
+        with:
+          path: ~/eedata
+          key: ee-data-v1-${{ github.run_id }}
+      - name: run
+        if: contains(fromJSON('["run1","final"]'), steps.cmd.outputs.cmd)
+        run: node --max-old-space-size=6500 invest-api/scripts/research-ee-run.mjs --data ~/eedata --phase ${{ steps.cmd.outputs.cmd }}
       - name: commit aggregated results only
         if: always()
         run: |
