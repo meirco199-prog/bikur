@@ -1,0 +1,26 @@
+# זמני, בענף research/daytrading בלבד — יוסר בסוף המחקר. הורדת מחירים ציבוריים בלבד (Yahoo) למחקר המסחר היומי. אין מפתחות, אין פקודות.
+name: research-dt-tmp
+on:
+  push:
+    branches: [research/daytrading]
+    paths: ['.github/daytrading/command']
+permissions: { contents: write }
+concurrency: { group: research-dt, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: fetch (stage A prices)
+        run: |
+          CMD=$(head -1 .github/daytrading/command | cut -d' ' -f1)
+          if [ "$CMD" = "fetch-a" ]; then node invest-api/scripts/research-dt-fetch-a.mjs; fi
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add invest/docs/research/daytrading
+          git commit -m "ops: נתוני מחקר מסחר יומי (ריצה ${GITHUB_RUN_ID})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin research/daytrading && git push origin HEAD:research/daytrading && break; sleep 5; done
