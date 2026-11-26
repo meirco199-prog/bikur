@@ -165,6 +165,20 @@ export function analyze(recs, vnames, { phase = 'run1', universe = {}, cands = [
     for (const riskPct of [0.0025, 0.005, 0.01]) for (const capPct of [0.1, 0.2, 0.3]) for (const daily of [null, 'pct1', 'two']) grid.push({ riskPct, capPct, daily, ...portfolio(rsVal, 0, { riskPct, capPct, daily }) });
     json.stageC.push({ s: b.s, tf: b.tf, variants: C, pick, combos, portfolio: pf, portfolioGridVal: grid });
   }
+  // הגנה על רווחים ומגבלות זמן — לכל שש האסטרטגיות (בלי מסנן), דיווח בלבד (בקשת מאיר סעיף 3–4; לא משנה את הבחירה)
+  { const VV = vnames.filter((_, vi) => !(phase === 'final' && vi >= VARIANTS.length));
+    md.push('## הגנה על רווחים, סטופ, יעד ומגבלות זמן — כל שש האסטרטגיות (בלי מסנן, אחרי עלויות)', '', 'בכל תא: תוחלת לעסקה בפיתוח / באימות, ו-PF בפיתוח. לפני עלויות — בסוגריים, תוחלת גולמית בפיתוח.', '',
+      '| גרסה | ' + STRATS.map((x) => HE_S[x]).join(' | ') + ' |', '|---|' + STRATS.map(() => '---').join('|') + '|');
+    json.allStrategiesVariants = {};
+    VV.forEach((vn, vi) => {
+      const cells = STRATS.map((x, s) => {
+        const d = metrics(tr(by(s, 'none', 'dev'), vi)), v = metrics(tr(by(s, 'none', 'val'), vi)), g = metrics(tr(by(s, 'none', 'dev'), vi, 3));
+        (json.allStrategiesVariants[x] ||= {})[vn] = { dev: d, val: v, devGross: g };
+        return `${fmt$(d.exp)} / ${fmt$(v.exp)} · PF ${f2(d.pf)} (${fmt$(g.exp)})`;
+      });
+      md.push(`| ${vn} | ${cells.join(' | ')} |`);
+    });
+    md.push(''); }
   // ברמת החשבון לכל אסטרטגיה בבסיס, בלי מסנן
   md.push('## ברמת החשבון — כל אסטרטגיה בתצורת הבסיס, בלי מסנן (100,000$, סיכון 0.5%, תקרה 20%, עד 5 פוזיציות)', '', '| אסטרטגיה | פיתוח: תשואה כוללת | שנתית | ירידה מקס\' | Sharpe | עסקאות | נדחו | אימות: תשואה כוללת | שנתית | ירידה מקס\' | Sharpe |', '|---|---|---|---|---|---|---|---|---|---|---|');
   json.portfolioBase = {};
