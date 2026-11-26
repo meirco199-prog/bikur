@@ -1,0 +1,20 @@
+{
+ "protocol": "event-edge v1.2",
+ "fetchedAt": "2026-11-26T14:20:16.853Z",
+ "events": 102412,
+ "sp500Events": 15770,
+ "symbols": 4240,
+ "noDailyData": 1002,
+ "illiquid": 35378,
+ "candidates": 66032,
+ "timing": {
+  "amc": 4959,
+  "bmo": 19231,
+  "undetermined": 41842,
+  "explicit": 0,
+  "explicitAgree": 0
+ },
+ "smallGap": 4102,
+ "reactionDays": 1913,
+ "minuteEvents": 20088
+}
