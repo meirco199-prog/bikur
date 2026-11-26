@@ -1,0 +1,116 @@
+{
+ "nasdaq_2018-04-26": {
+  "status": 200,
+  "n": 257,
+  "sample": [
+   {
+    "s": "MSFT",
+    "time": "time-not-supplied",
+    "eps": "$0.95",
+    "f": "$0.85",
+    "sur": "11.76"
+   },
+   {
+    "s": "AMZN",
+    "time": "time-not-supplied",
+    "eps": "$3.27",
+    "f": "$1.22",
+    "sur": "168.03"
+   },
+   {
+    "s": "ABBV",
+    "time": "time-not-supplied",
+    "eps": "$1.87",
+    "f": "$1.80",
+    "sur": "3.89"
+   }
+  ]
+ },
+ "nasdaq_2021-07-27": {
+  "status": 200,
+  "n": 146,
+  "sample": [
+   {
+    "s": "AAPL",
+    "time": "time-not-supplied",
+    "eps": "$1.30",
+    "f": "$1",
+    "sur": "30"
+   },
+   {
+    "s": "MSFT",
+    "time": "time-not-supplied",
+    "eps": "$2.17",
+    "f": "$1.90",
+    "sur": "14.21"
+   },
+   {
+    "s": "GOOG",
+    "time": "time-not-supplied",
+    "eps": "$27.26",
+    "f": "$19.89",
+    "sur": "37.05"
+   }
+  ]
+ },
+ "nasdaq_2024-10-30": {
+  "status": 200,
+  "n": 298,
+  "sample": [
+   {
+    "s": "MSFT",
+    "time": "time-not-supplied",
+    "eps": "$3.30",
+    "f": "$3.08",
+    "sur": "7.14"
+   },
+   {
+    "s": "META",
+    "time": "time-not-supplied",
+    "eps": "$6.03",
+    "f": "$5.19",
+    "sur": "16.18"
+   },
+   {
+    "s": "LLY",
+    "time": "time-not-supplied",
+    "eps": "$1.18",
+    "f": "$1.52",
+    "sur": "-22.37"
+   }
+  ]
+ },
+ "news_AAPL_2018-05-01": {
+  "status": 200,
+  "n": 0,
+  "sample": []
+ },
+ "news_NVDA_2021-08-18": {
+  "status": 200,
+  "n": 0,
+  "sample": []
+ },
+ "news_MSFT_2024-10-30": {
+  "status": 200,
+  "n": 0,
+  "sample": []
+ },
+ "news2_start=2024-10-30&end=2024-10-31&limit=5": {
+  "status": 200,
+  "n": 0
+ },
+ "news2_symbols=MSFT&start=2024-10-30&end=2024-11-01&limit=5": {
+  "status": 200,
+  "n": 0
+ },
+ "news2_symbols=AAPL&limit=5": {
+  "status": 200,
+  "n": 5,
+  "first": "2026-11-26T11:32:14Z"
+ },
+ "news2_symbols=AAPL&start=2019-01-02&end=2019-01-05&limit=5&sort=asc": {
+  "status": 200,
+  "n": 0
+ },
+ "alphaVantageKey": false
+}
