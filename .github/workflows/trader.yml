@@ -1,0 +1,64 @@
+# עוזר המסחר האישי (invest/docs/TRADER.md) — התקנה/עדכון/סטטוס על השרת של בעל הריפו. קריאה בלבד: אין שום פקודת מסחר.
+# Secrets: SERVER_HOST, SERVER_ROOT_PASSWORD, ALPACA_KEY_ID, ALPACA_SECRET_KEY, CRON_SECRET (לטלגרם דרך ה-Worker),
+# ולא חובה (מאיר יוצר ב-IBKR, דוחות Flex לקריאה בלבד): IBKR_FLEX_TOKEN_CO/PR, IBKR_FLEX_ACTIVITY_CO/PR, IBKR_FLEX_TRADES_CO/PR.
+# הלוג ציבורי — הסקריפטים לא מדפיסים טוקנים, כתובות או נתוני חשבון.
+name: Trading assistant (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'install (התקנה/עדכון מלא + קישור בטלגרם) | update (משיכת קוד + ריסטארט) | status | link (שליחת הקישור שוב בטלגרם) | stop | start'
+        required: true
+        default: 'status'
+        type: choice
+        options: [install, update, status, link, stop, start]
+  push:
+    branches: [main]
+    paths: ['.github/trader/command']
+
+permissions:
+  contents: read
+
+concurrency: trader
+
+jobs:
+  remote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SSHPASS: ${{ secrets.SERVER_ROOT_PASSWORD }}
+      ALPACA_KEY_ID: ${{ secrets.ALPACA_KEY_ID }}
+      ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      IBKR_FLEX_TOKEN_CO: ${{ secrets.IBKR_FLEX_TOKEN_CO }}
+      IBKR_FLEX_ACTIVITY_CO: ${{ secrets.IBKR_FLEX_ACTIVITY_CO }}
+      IBKR_FLEX_TRADES_CO: ${{ secrets.IBKR_FLEX_TRADES_CO }}
+      IBKR_FLEX_TOKEN_PR: ${{ secrets.IBKR_FLEX_TOKEN_PR }}
+      IBKR_FLEX_ACTIVITY_PR: ${{ secrets.IBKR_FLEX_ACTIVITY_PR }}
+      IBKR_FLEX_TRADES_PR: ${{ secrets.IBKR_FLEX_TRADES_PR }}
+      WORKER_URL: https://invest-api.meirco199.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run on server
+        run: |
+          set -e
+          ACTION="${{ inputs.action }}"; [ -n "$ACTION" ] || ACTION=$(head -1 .github/trader/command | cut -d' ' -f1)
+          miss=""; for v in SERVER_HOST SSHPASS ALPACA_KEY_ID ALPACA_SECRET_KEY CRON_SECRET; do if [ -n "${!v}" ]; then echo "✅ $v"; else echo "❌ $v חסר"; miss=1; fi; done
+          for v in IBKR_FLEX_TOKEN_CO IBKR_FLEX_TOKEN_PR; do if [ -n "${!v}" ]; then echo "✅ $v"; else echo "ℹ️ $v עוד לא הוגדר (החשבון יחובר כשיוגדר)"; fi; done
+          [ -z "$miss" ] || { echo "::error::חסרים Secrets"; exit 1; }
+          sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq sshpass >/dev/null
+          SSH="sshpass -e ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 root@$SERVER_HOST"
+          q(){ printf '%q' "$1"; }
+          EXP="export ALPACA_KEY_ID=$(q "$ALPACA_KEY_ID") ALPACA_SECRET_KEY=$(q "$ALPACA_SECRET_KEY") WORKER_URL=$(q "$WORKER_URL") CRON_SECRET=$(q "$CRON_SECRET")"
+          for v in IBKR_FLEX_TOKEN_CO IBKR_FLEX_ACTIVITY_CO IBKR_FLEX_TRADES_CO IBKR_FLEX_TOKEN_PR IBKR_FLEX_ACTIVITY_PR IBKR_FLEX_TRADES_PR; do [ -n "${!v}" ] && EXP="$EXP $v=$(q "${!v}")"; done
+          case "$ACTION" in
+            install) { echo "$EXP"; cat .github/trader/install.sh; } | $SSH 'bash -s' ;;
+            link)    { echo "$EXP LINK_ONLY=1"; cat .github/trader/install.sh; } | $SSH 'bash -s' ;;
+            update)  $SSH 'H=$(getent passwd bridge | cut -d: -f6); sudo -u bridge git -C "$H/bikur" pull -q && sudo -u bridge git -C "$H/bikur" log --oneline -1 && systemctl restart bikur-trader && sleep 5 && systemctl is-active bikur-trader' ;;
+            status)  $SSH 'systemctl is-active bikur-trader caddy | paste -sd" "; journalctl -u bikur-trader -n 30 --no-pager | sed -E "s/[0-9a-f]{32,}/***/g; s/U[0-9]{6,}/U***/g; s/[0-9]{1,3}(\.[0-9]{1,3}){3}/x.x.x.x/g"' ;;
+            stop)    $SSH 'systemctl stop bikur-trader; systemctl disable -q bikur-trader; echo stopped' ;;
+            start)   $SSH 'systemctl enable -q bikur-trader; systemctl start bikur-trader; sleep 3; systemctl is-active bikur-trader' ;;
+            *) echo "פעולה לא מוכרת: $ACTION"; exit 1 ;;
+          esac
