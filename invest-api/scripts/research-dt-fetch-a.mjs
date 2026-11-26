@@ -9,7 +9,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const OUT = arg('--outdir', 'invest/docs/research/daytrading/data-a');
 const US = 'AAOI ADBE AEHR ALAB ALM AMD ANT APA ASST AUGO AXON BABA BEAM BMNR BRK-B CIEN COHR COIN CRDO CRSP CRWD DASH DOCN ECHO EQPT EXPE FA FIX FTAI GOOGL HOOD IBRX INIO IONQ IONS IRTC KLAC LEGN LINE LITE LLY LRCX MA MELI MNDY MPC MRVL MSFT MSTR MTSI MU NBIS OKTA PL PPTA PURR RGTI RKLB ROAD SITM SMMT SNDK STLA TEM TSLA TSM USAR VEEV VLO VOO VRT TEVA QQQ SPY SMH';
 const TA = 'AZRG BEZQ DSCT ESLT HARL LUMI MGDL MLSR MTRX MZTF NICE NWMD POLI TEVA';
-const SYMS = [...US.split(' '), ...TA.split(' ').map((s) => s + '.TA'), '^TA125.TA'];
+const ONLY = arg('--only', ''), SYMS0 = [...US.split(' '), ...TA.split(' ').map((s) => s + '.TA'), '^TA125.TA', 'NVDA'];
+const SYMS = ONLY ? ONLY.split(',') : SYMS0;
 const log = (...a) => console.error(...a), sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function get(url){ for (let i = 0; i < 4; i++){ try { const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }); if (r.ok) return await r.json(); log(url, r.status); if (r.status === 404) return null; } catch (e) { log(url, e.message); } await sleep(2000 * (i + 1)); } return null; }
 async function chart(sym, interval, p1, p2){
@@ -33,4 +34,4 @@ for (const s of SYMS){
   writeFileSync(join(OUT, s.replace(/[^A-Za-z0-9.]/g, '_') + '.json.gz'), gzipSync(JSON.stringify(rec)));
   log(s, meta[s]);
 }
-writeFileSync(join(OUT, 'meta.json'), JSON.stringify({ fetchedAt: new Date().toISOString(), source: 'Yahoo Finance chart v8', meta }, null, 1));
+if (!ONLY) writeFileSync(join(OUT, 'meta.json'), JSON.stringify({ fetchedAt: new Date().toISOString(), source: 'Yahoo Finance chart v8', meta }, null, 1));

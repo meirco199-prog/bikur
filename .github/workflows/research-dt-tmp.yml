@@ -17,7 +17,8 @@ jobs:
       - name: fetch (stage A prices)
         run: |
           CMD=$(head -1 .github/daytrading/command | cut -d' ' -f1)
-          if [ "$CMD" = "fetch-a" ]; then node invest-api/scripts/research-dt-fetch-a.mjs; fi
+          ARGS=$(head -1 .github/daytrading/command | cut -s -d" " -f3-)
+          if [ "$CMD" = "fetch-a" ]; then node invest-api/scripts/research-dt-fetch-a.mjs $ARGS; fi
       - name: commit
         run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
