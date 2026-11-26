@@ -66,7 +66,11 @@ async function load(){
   const nav=Object.values(ST.navByAcct||{}).reduce((a,x)=>a+(x||0),0), expo=(ST.positions||[]).reduce((a,p)=>a+(p.last??p.avg??0)*p.qty,0);
   $('#day').innerHTML=`<span class="${cls(ST.dayPnl)}">${f$(ST.dayPnl)}</span>`; $('#nav').textContent=nav?Math.round(nav).toLocaleString('en-US')+'$':'—'; $('#expo').textContent=nav?Math.round(expo/nav*100)+'%':'—';
   $('#alerts').innerHTML=(ST.alerts||[]).map((a)=>`<div class="card alert">${esc(a)}</div>`).join('');
-  if(!ST.configured?.flex?.length) $('#alerts').innerHTML+=`<div class="card alert">עדיין אין חיבור לחשבונות (מפתח Flex של IBKR). המחירים, המעקב והמחשבון כבר עובדים.</div>`;
+  if(!ST.configured?.flex?.length){
+    const hm=(x)=>new Date(x*1000).toLocaleString('he-IL',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+    if(ST.pushAt) $('#alerts').innerHTML+=`<div class="card${ST.pushStale?' alert':''}"><span class="mute">הפוזיציות מ-IBKR עודכנו ${esc(hm(ST.pushAt))} (מתעדכן פעם בשעה; המחירים כל דקה).${ST.pushStale?' העדכון ישן — התראות על פוזיציות מושהות עד העדכון הבא.':''}</span></div>`;
+    else $('#alerts').innerHTML+=`<div class="card alert">עדיין לא הגיעו פוזיציות מהחשבונות. המחירים, המעקב והמחשבון כבר עובדים.</div>`;
+  }
   $('#t-pos').innerHTML=(ST.positions||[]).map((p)=>{const r=p.rec||{},ret=p.avg?p.last/p.avg-1:null,pk=p.avg&&p.peak?p.peak/p.avg-1:null;return `<div class="card">
     <div class="row"><b style="font-size:17px">${esc(p.sym)}</b><span class="pill">${esc(p.acctName)} · ${p.qty.toLocaleString('en-US')} מניות</span></div>
     <div class="row"><span class="big ${cls(p.pnl)}">${f$(p.pnl)}</span><span class="${cls(ret)}">${pc(ret)}</span></div>
