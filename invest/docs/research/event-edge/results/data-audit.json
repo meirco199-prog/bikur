@@ -1,0 +1,16 @@
+{
+ "protocol": "event-edge v1.0",
+ "fetchedAt": "2026-11-26T13:08:14.198Z",
+ "events": 15975,
+ "withBoth": 15757,
+ "timeCounts": {
+  "time-not-supplied": 15876,
+  "time-after-hours": 36,
+  "time-pre-market": 63
+ },
+ "symbols": 579,
+ "noDaily": 0,
+ "smallGap": 3246,
+ "reactionDays": 1593,
+ "minuteEvents": 12503
+}
