@@ -73,3 +73,49 @@ export const H1_GRID = Object.freeze([0.01, 0.02, 0.04].flatMap((gap) => [true, 
 export const H1_BASE = 'gap2%_held_1000';
 export const H2_GRID = Object.freeze([0, 0.0025, 0.005].flatMap((thr) => [false, true].map((withR12) => Object.freeze({ thr, withR12, k: `r1>${thr * 100}%${withR12 ? '+r12' : ''}` }))));
 export const H2_BASE = 'r1>0%';
+
+// ---------- v1.2 ----------
+// שעת הדוח ממחזור: hours = [{t, v}] נרות שעה (כולל מוקדם ומאוחר) עד סוף D; dayKey(t), minuteOfDay(t) מבחוץ.
+// מחזיר 'amc' (אחרי הסגירה → התגובה ב-D+1), 'bmo' (לפני הפתיחה → D) או null (לא חד-משמעי)
+export function timingFromVolume(hours, D, dayKey, minuteOfDay){
+  const win = new Map(); // key → {pre, post}
+  for (const b of hours){ const k = dayKey(b.t), m = minuteOfDay(b.t); const w = win.get(k) || { pre: 0, post: 0 };
+    if (m >= 240 && m < 570) w.pre += b.v; else if (m >= 960 && m < 1200) w.post += b.v; win.set(k, w); }
+  const d = win.get(D); if (!d) return null;
+  const prior = [...win.keys()].filter((k) => k < D).sort((a, b) => b - a).slice(0, 20).map((k) => win.get(k));
+  if (prior.length < 10) return null;
+  const avg = (f) => prior.reduce((a, w) => a + w[f], 0) / prior.length;
+  const pre = d.pre / Math.max(1, avg('pre')), post = d.post / Math.max(1, avg('post'));
+  if (Math.max(pre, post) < 3) return null;
+  return post >= pre ? 'amc' : 'bmo';
+}
+// קבוצה לפי נזילות: inSP500 (bool), medDollarVol20, price
+export function groupOf(inSP500, dv, price){
+  if (!(price >= 5)) return null;
+  if (inSP500) return 'G500';
+  if (dv >= 20e6) return 'GMID';
+  if (dv >= 5e6) return 'GSMALL';
+  return null;
+}
+export const GROUP_COST = Object.freeze({ G500: { hs: 1.5, borrow: 0 }, GMID: { hs: 4, borrow: 0.0005 }, GSMALL: { hs: 10, borrow: 0.001, shortMinPx: 10 } });
+// עלות לצד בנקודות בסיס לפי נזילות ב-30 הדקות שלפני הביצוע: m = {h,l,c,v} מערכים, i = אינדקס הביצוע
+export function sideBps(m, i, group, sh){
+  let rs = [], vs = 0, n = 0; for (let k = Math.max(0, i - 30); k < i; k++){ rs.push((m.h[k] - m.l[k]) / m.c[k] * 1e4); vs += m.v[k]; n++; }
+  rs.sort((a, b) => a - b); const med = rs.length ? rs[Math.floor(rs.length / 2)] : 10, avgV = n ? vs / n : 1;
+  return Math.max(GROUP_COST[group].hs, 0.1 * med) + 2 + 10 * Math.sqrt(sh / Math.max(1, avgV));
+}
+// עסקה עם עלויות משתנות ושורט עם עלות השאלה. מחזיר {gross, net, net2, sh}
+export function tradePnl2(m, iE, iX, side, notional, group){
+  const entry = m.o[iE], exit = m.o[iX], sh = Math.floor(notional / entry); if (sh < 1) return null;
+  const gross = side * sh * (exit - entry);
+  const be = sideBps(m, iE, group, sh), bx = sideBps(m, iX, group, sh);
+  const slip = (be * entry + bx * exit) / 1e4 * sh, borrow = side < 0 ? GROUP_COST[group].borrow * sh * entry : 0;
+  const com = commission(sh, entry) + commission(sh, exit);
+  return { gross, net: gross - slip - com - borrow, net2: gross - 2 * slip - com - borrow, sh };
+}
+// H1 לפי v1.2: אותו כלל כמו h1Trade, מחזיר גם אינדקסים לחישוב עלות
+export function h1Trade2(ev, v){
+  const t = h1Trade(ev, v); if (!t) return null;
+  const e = entryAt(ev.m, ev.open + v.startMin * 60), x = entryAt(ev.m, ev.close - 300);
+  return { ...t, iE: e.i, iX: x.i };
+}

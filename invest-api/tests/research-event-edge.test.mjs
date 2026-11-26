@@ -48,3 +48,19 @@ test('עלויות לפי החשבונות בפועל: מינימום 1$ להז�
   assert.ok(Math.abs(p.net - (200 - 3.5e-4 * 200 * 201 - 1.3 - 1.3)) < 1e-9); assert.ok(p2.net < p.net);
   assert.equal(X.tradePnl(100, 99, -1, 20000).gross, 200, 'שורט מרוויח בירידה');
 });
+
+test('v1.2: שעת הדוח ממחזור לפני הפתיחה/אחרי הסגירה (פי 3 מהרגיל); קבוצות נזילות; עלות משתנה ושורט עם השאלה', () => {
+  const day = (k) => Date.UTC(2024, 5, k) / 1000, mk = (k, pre, post) => [{ t: day(k) + 12 * 3600, v: pre }, { t: day(k) + 22 * 3600, v: post }];
+  const hours = []; for (let k = 1; k <= 25; k++) hours.push(...mk(k, 100, 100));
+  hours.push(...mk(26, 120, 900));
+  const dk = (t) => Number(new Date(t * 1000).toISOString().slice(0, 10).replace(/-/g, '')), mod = (t) => Math.floor((t % 86400) / 60) - 240; // UTC−4
+  assert.equal(X.timingFromVolume(hours, 20240626, dk, mod), 'amc');
+  hours.splice(-2, 2, ...mk(26, 500, 110)); assert.equal(X.timingFromVolume(hours, 20240626, dk, mod), 'bmo');
+  hours.splice(-2, 2, ...mk(26, 150, 150)); assert.equal(X.timingFromVolume(hours, 20240626, dk, mod), null, 'פחות מפי 3 — לא מוכרע');
+  assert.equal(X.groupOf(true, 1e6, 50), 'G500'); assert.equal(X.groupOf(false, 3e7, 50), 'GMID'); assert.equal(X.groupOf(false, 8e6, 50), 'GSMALL'); assert.equal(X.groupOf(false, 3e6, 50), null); assert.equal(X.groupOf(false, 3e7, 4), null);
+  const n = 60, m = { o: Array(n).fill(100), h: Array(n).fill(100.1), l: Array(n).fill(99.9), c: Array(n).fill(100), v: Array(n).fill(1e5) };
+  m.o[59] = 101;
+  const L = X.tradePnl2(m, 40, 59, 1, 20000, 'GSMALL'), S = X.tradePnl2(m, 40, 59, -1, 20000, 'GSMALL');
+  assert.equal(L.gross, 200); assert.ok(L.net < L.gross && L.net2 < L.net); assert.ok(S.gross === -200 && S.net < S.gross - 0.001 * 20000 + 1, 'שורט משלם השאלה 0.1%');
+  assert.ok(X.sideBps(m, 40, 'GSMALL', 200) >= 12, 'מינימום 10 + החלקה 2');
+});

@@ -30,7 +30,7 @@ jobs:
       - name: unit tests
         run: node --test invest-api/tests/research-event-edge.test.mjs
       - name: restore private data cache
-        if: contains(fromJSON('["run1","final"]'), steps.cmd.outputs.cmd)
+        if: contains(fromJSON('["run1","final","run12"]'), steps.cmd.outputs.cmd)
         uses: actions/cache/restore@v4
         with:
           path: ~/eedata
@@ -40,8 +40,15 @@ jobs:
         if: contains(fromJSON('["run1","final"]'), steps.cmd.outputs.cmd)
         env: { GITHUB_TOKEN: '${{ github.token }}' }
         run: node --max-old-space-size=6000 invest-api/scripts/research-ee-fetch.mjs --data ~/eedata
+      - name: fetch v1.2 (skips what is cached)
+        if: steps.cmd.outputs.cmd == 'run12'
+        env: { GITHUB_TOKEN: '${{ github.token }}' }
+        run: node --max-old-space-size=6000 invest-api/scripts/research-ee-fetch2.mjs --data ~/eedata
+      - name: run v1.2
+        if: steps.cmd.outputs.cmd == 'run12'
+        run: node --max-old-space-size=6500 invest-api/scripts/research-ee-run2.mjs --data ~/eedata --phase run1
       - name: save private data cache
-        if: always() && contains(fromJSON('["run1","final"]'), steps.cmd.outputs.cmd)
+        if: always() && contains(fromJSON('["run1","final","run12"]'), steps.cmd.outputs.cmd)
         uses: actions/cache/save@v4
         with:
           path: ~/eedata
