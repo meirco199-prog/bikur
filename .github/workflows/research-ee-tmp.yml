@@ -24,6 +24,9 @@ jobs:
       - name: probe
         if: steps.cmd.outputs.cmd == 'probe'
         run: node invest-api/scripts/research-ee-probe.mjs | tee invest/docs/research/event-edge/data-gate-probe.json
+      - name: probe2 (iShares holdings history)
+        if: steps.cmd.outputs.cmd == 'probe2'
+        run: node invest-api/scripts/research-ee-probe2.mjs | tee invest/docs/research/event-edge/data-gate-probe2.json
       - name: unit tests
         run: node --test invest-api/tests/research-event-edge.test.mjs
       - name: restore private data cache
